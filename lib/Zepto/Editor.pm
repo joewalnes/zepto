@@ -1,0 +1,825 @@
+package Zepto::Editor;
+# =============================================================================
+# Editor: Main orchestrator for the Zepto editor
+# =============================================================================
+#
+# Coordinates all components:
+#   - Document: text content and undo/redo
+#   - View: cursor, selection, viewport
+#   - Terminal: raw mode, I/O
+#   - Renderer: screen drawing
+#   - InputParser: keyboard/mouse events
+#   - Preferences: configuration
+#
+# Handles the main event loop and all editor commands.
+# =============================================================================
+
+use strict;
+use warnings;
+use utf8;
+use Carp;
+
+use Exporter 'import';
+our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_QUIT);
+
+# Version for crash reports
+our $VERSION = '0.1.0';
+
+use Zepto::Document;
+use Zepto::View;
+use Zepto::Terminal;
+use Zepto::Renderer;
+use Zepto::InputParser;
+use Zepto::Preferences;
+use Zepto::Theme;
+
+# Editor states
+use constant {
+    STATE_EDITING => 'editing',
+    STATE_MENU    => 'menu',
+    STATE_DIALOG  => 'dialog',
+    STATE_QUIT    => 'quit',
+};
+
+# Load command and menu modules (they add methods to this package)
+use Zepto::Editor::Commands;
+use Zepto::Editor::Menu;
+
+# Timing and UI settings
+use constant {
+    INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
+    MESSAGE_DISPLAY_SEC => 3,     # Seconds to show status messages
+    RESERVED_ROWS       => 2,     # Rows for menu bar + status bar
+};
+
+sub new {
+    my ($class, %opts) = @_;
+
+    my $self = bless {
+        # Core components
+        document  => undef,
+        view      => undef,
+        terminal  => $opts{terminal} // Zepto::Terminal->new(),
+        parser    => Zepto::InputParser->new(),
+        prefs     => $opts{prefs} // Zepto::Preferences->new(),
+        theme     => undef,
+
+        # UI state
+        state        => STATE_EDITING,
+        menu_open    => undef,
+        menu_selected => 0,
+        dialog       => undef,
+        message      => '',
+        message_time => 0,
+
+        # Search state
+        search_term   => '',
+        search_replace => '',
+        last_search_pos => 0,
+
+        # Clipboard
+        clipboard    => '',
+
+        # Quit confirmation
+        quit_pending => 0,
+
+        # File path from command line
+        file_path    => $opts{file},
+    }, $class;
+
+    # Initialize theme
+    $self->{theme} = Zepto::Theme->get_theme($self->{prefs}->theme());
+
+    return $self;
+}
+
+# =============================================================================
+# Initialization
+# =============================================================================
+
+sub init {
+    my ($self) = @_;
+
+    my $term = $self->{terminal};
+
+    # Set cursor color and shape BEFORE raw mode (raw mode may interfere)
+    my $cursor_color = $self->{theme}->color('cursor_color');
+    if ($cursor_color) {
+        print STDOUT "\x1b]12;${cursor_color}\x1b\\";  # OSC 12 - cursor color
+    }
+    print STDOUT "\x1b[5 q";  # DECSCUSR 5 - blinking bar cursor
+    STDOUT->flush();
+
+    # Setup terminal
+    $term->enable_raw_mode();
+    $term->enter_alt_screen();
+    $term->enable_mouse() if $self->{prefs}->mouse_enabled();
+    $term->get_size();
+
+    # Setup SIGWINCH handler for terminal resize
+    $SIG{WINCH} = sub {
+        $term->refresh_size();
+        $self->render();
+    };
+
+    # Load or create document
+    if ($self->{file_path} && -f $self->{file_path}) {
+        $self->{document} = Zepto::Document->load($self->{file_path});
+        $self->show_message("Loaded: " . $self->{file_path});
+    }
+    else {
+        $self->{document} = Zepto::Document->new(
+            path => $self->{file_path},
+        );
+        if ($self->{file_path}) {
+            $self->show_message("New file: " . $self->{file_path});
+        }
+    }
+
+    # Create view - account for gutter width in text area
+    my ($rows, $cols) = $term->get_size();
+    my $line_count = $self->{document}->line_count();
+    my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+    my $text_width = $cols - $gutter_width - 1;  # -1 for separator
+    $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
+
+    $self->{view} = Zepto::View->new(
+        document => $self->{document},
+        viewport_rows => $rows - RESERVED_ROWS,
+        viewport_cols => $text_width,
+    );
+
+    return $self;
+}
+
+# =============================================================================
+# Main Loop
+# =============================================================================
+
+sub run {
+    my ($self) = @_;
+
+    # Wrap everything in eval to catch crashes and ensure terminal cleanup
+    my $error;
+    eval {
+        $self->init();
+        $self->render();
+
+        while ($self->{state} ne STATE_QUIT) {
+            # Read input with timeout for message clearing
+            my $input = $self->{terminal}->read_blocking(INPUT_TIMEOUT_SEC);
+
+            my $needs_render = 0;
+
+            # Clear message after timeout
+            if ($self->{message} && time() - $self->{message_time} > MESSAGE_DISPLAY_SEC) {
+                $self->{message} = '';
+                $needs_render = 1;
+            }
+
+            if (length $input) {
+                $self->handle_input($input);
+                $needs_render = 1;
+            }
+
+            # Only render when needed to preserve cursor blink animation
+            $self->render() if $needs_render;
+        }
+        1;
+    } or do {
+        $error = $@ || 'Unknown error';
+    };
+
+    # Always cleanup terminal, even on crash
+    eval { $self->cleanup(); };
+
+    # If we crashed, print crash report to stderr
+    if ($error) {
+        # Ensure terminal is fully reset for readable output
+        print STDERR "\r\n";  # Start on fresh line
+        system('stty', 'sane') if -t STDERR;  # Reset terminal settings
+        $self->_print_crash_report($error);
+        exit(1);
+    }
+}
+
+sub _print_crash_report {
+    my ($self, $error) = @_;
+
+    # Get stack trace if not already present
+    my $trace = $error;
+    unless ($trace =~ /\n\s+at\s+\S+\s+line\s+\d+/) {
+        $trace = Carp::longmess($error);
+    }
+
+    # Gather context
+    my $file = $self->{file_path} // '[no file]';
+    my $state = $self->{state} // 'unknown';
+    my $cursor_info = '';
+    if ($self->{view}) {
+        my $line = $self->{view}->cursor_line() + 1;
+        my $col = $self->{view}->cursor_col() + 1;
+        $cursor_info = "Cursor: line $line, col $col";
+    }
+    my $doc_info = '';
+    if ($self->{document}) {
+        my $lines = $self->{document}->line_count();
+        my $dirty = $self->{document}->is_dirty() ? ' (modified)' : '';
+        $doc_info = "Document: $lines lines$dirty";
+    }
+
+    print STDERR <<EOF;
+
+===============================================================================
+ZEPTO CRASH REPORT
+===============================================================================
+Version: $VERSION
+File: $file
+State: $state
+$cursor_info
+$doc_info
+
+Error:
+$trace
+===============================================================================
+
+EOF
+}
+
+sub cleanup {
+    my ($self) = @_;
+
+    $self->{terminal}->cleanup();
+
+    # Clear SIGWINCH handler
+    $SIG{WINCH} = 'DEFAULT';
+}
+
+# =============================================================================
+# Input Handling
+# =============================================================================
+
+sub handle_input {
+    my ($self, $input) = @_;
+
+    my @events = $self->{parser}->parse($input);
+
+    # Check for pending escape (e.g., standalone ESC key)
+    if (!@events) {
+        my $pending = $self->{parser}->flush_pending();
+        push @events, $pending if $pending;
+    }
+
+    for my $event (@events) {
+        $self->handle_event($event);
+    }
+}
+
+sub handle_event {
+    my ($self, $event) = @_;
+
+    return unless $event;
+
+    # Route to appropriate handler based on state
+    if ($self->{state} eq STATE_DIALOG) {
+        $self->handle_dialog_event($event);
+    }
+    elsif ($self->{state} eq STATE_MENU) {
+        $self->handle_menu_event($event);
+    }
+    else {
+        $self->handle_editing_event($event);
+    }
+}
+
+# =============================================================================
+# Editing Event Handling
+# =============================================================================
+
+sub handle_editing_event {
+    my ($self, $event) = @_;
+
+    my $type = $event->{type};
+    my $view = $self->{view};
+    my $doc = $self->{document};
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+        my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
+        my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+        my $alt = Zepto::InputParser::has_modifier($event, 'alt');
+
+        # Navigation
+        if ($key eq 'up')     { $view->move_up($shift); }
+        elsif ($key eq 'down')  { $view->move_down($shift); }
+        elsif ($key eq 'left')  {
+            if ($alt) { $view->move_word_left($shift); }
+            else { $view->move_left($shift); }
+        }
+        elsif ($key eq 'right') {
+            if ($alt) { $view->move_word_right($shift); }
+            else { $view->move_right($shift); }
+        }
+        elsif ($key eq 'home')  {
+            if ($ctrl) { $view->move_to_document_start($shift); }
+            else { $view->move_to_line_start($shift); }
+        }
+        elsif ($key eq 'end')   {
+            if ($ctrl) { $view->move_to_document_end($shift); }
+            else { $view->move_to_line_end($shift); }
+        }
+        elsif ($key eq 'pageup')   { $view->move_page_up($shift); }
+        elsif ($key eq 'pagedown') { $view->move_page_down($shift); }
+
+        # Editing keys
+        elsif ($key eq 'backspace') { $self->do_backspace(); }
+        elsif ($key eq 'delete')    { $self->do_delete(); }
+        elsif ($key eq 'enter')     { $self->do_enter(); }
+        elsif ($key eq 'tab')       {
+            if ($shift) { $self->do_unindent(); }
+            else { $self->do_indent(); }
+        }
+
+        # Escape - close menu, clear selection, or open menu bar
+        elsif ($key eq 'escape') {
+            if ($self->{menu_open}) {
+                $self->close_menu();
+            }
+            elsif ($view->has_selection()) {
+                $view->clear_selection();
+            }
+            else {
+                # Nothing to cancel - open menu bar
+                $self->open_menu('f');
+            }
+            $self->{quit_pending} = 0;
+        }
+
+        # Function keys (if any special handling needed)
+    }
+    elsif ($type eq 'char') {
+        my $char = $event->{char};
+        my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
+        my $alt = Zepto::InputParser::has_modifier($event, 'alt');
+
+        if ($ctrl) {
+            $self->handle_ctrl_char($char);
+        }
+        elsif ($alt) {
+            $self->handle_alt_char($char);
+        }
+        else {
+            $self->do_insert_char($char);
+        }
+    }
+    elsif ($type eq 'mouse') {
+        $self->handle_mouse_event($event);
+    }
+}
+
+sub handle_ctrl_char {
+    my ($self, $char) = @_;
+
+    $char = lc($char);
+
+    # File operations
+    if    ($char eq 's') { $self->cmd_save(); }
+    elsif ($char eq 'w') { $self->cmd_save_and_quit(); }
+    elsif ($char eq 'q') { $self->cmd_quit(); }
+
+    # Edit operations
+    elsif ($char eq 'z') { $self->cmd_undo(); }
+    elsif ($char eq 'y') { $self->cmd_redo(); }
+    elsif ($char eq 'x') { $self->cmd_cut(); }
+    elsif ($char eq 'c') { $self->cmd_copy(); }
+    elsif ($char eq 'v') { $self->cmd_paste(); }
+    elsif ($char eq 'a') { $self->cmd_select_all(); }
+
+    # Search operations
+    elsif ($char eq 'f') { $self->cmd_find(); }
+    elsif ($char eq 'j') { $self->cmd_find_next(); }
+    elsif ($char eq 'k') { $self->cmd_find_prev(); }
+    elsif ($char eq 'r') { $self->cmd_replace(); }
+    elsif ($char eq 'g') { $self->cmd_goto_line(); }
+
+    # View
+    elsif ($char eq 't') { $self->cmd_toggle_theme(); }
+
+    # Reset quit pending for any other command
+    $self->{quit_pending} = 0 unless $char eq 'q';
+}
+
+sub handle_alt_char {
+    my ($self, $char) = @_;
+
+    my $view = $self->{view};
+
+    # Word movement (Option+Arrow on macOS sends ESC b/f)
+    if    ($char eq 'b') { $view->move_word_left(); }
+    elsif ($char eq 'f') { $view->move_word_right(); }
+    # Menus accessed via Escape key, not Alt+letter
+}
+
+sub handle_mouse_event {
+    my ($self, $event) = @_;
+
+    my $action = $event->{action};
+    my $x = $event->{x};
+    my $y = $event->{y};
+    my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+
+    my $term = $self->{terminal};
+    my $view = $self->{view};
+
+    if ($action eq 'press') {
+        # Check if click is in menu bar (row 1)
+        if ($y == 1) {
+            $self->handle_menu_click($x);
+            return;
+        }
+
+        # Click in text area
+        my $text_row = $y - 2;  # Adjust for menu bar
+        my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
+        my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+        my $text_col = $x - $gutter_width - 1;
+
+        if ($text_col >= 0) {
+            my $doc_line = $view->scroll_line() + $text_row;
+            my $doc_col = $view->scroll_col() + $text_col;
+
+            # Clamp to document bounds
+            $doc_line = 0 if $doc_line < 0;
+            $doc_line = $self->{document}->line_count() - 1
+                if $doc_line >= $self->{document}->line_count();
+
+            my $line_len = $self->{document}->line_length($doc_line);
+            $doc_col = $line_len if $doc_col > $line_len;
+            $doc_col = 0 if $doc_col < 0;
+
+            $view->set_cursor($doc_line, $doc_col, $shift);
+        }
+    }
+    elsif ($action eq 'scroll') {
+        if ($event->{button} eq 'up') {
+            $view->move_up() for (1..3);
+        }
+        else {
+            $view->move_down() for (1..3);
+        }
+    }
+    elsif ($action eq 'drag') {
+        # Handle drag for selection
+        my $text_row = $y - 2;
+        my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
+        my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+        my $text_col = $x - $gutter_width - 1;
+
+        if ($text_col >= 0 && !$view->has_selection()) {
+            # Start selection on first drag
+            $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
+        }
+
+        my $doc_line = $view->scroll_line() + $text_row;
+        my $doc_col = $view->scroll_col() + $text_col;
+
+        # Extend selection
+        $view->set_cursor($doc_line, $doc_col, 1) if $text_col >= 0;
+    }
+}
+
+# =============================================================================
+# Dialog Handling
+# =============================================================================
+
+sub open_dialog {
+    my ($self, %opts) = @_;
+    $self->{state} = STATE_DIALOG;
+    $self->{dialog} = {
+        title   => $opts{title} // 'Dialog',
+        prompt  => $opts{prompt} // '',
+        value   => $opts{value} // '',
+        cursor  => length($opts{value} // ''),
+        on_submit => $opts{on_submit},
+        on_cancel => $opts{on_cancel},
+    };
+}
+
+sub close_dialog {
+    my ($self) = @_;
+    $self->{state} = STATE_EDITING;
+    $self->{dialog} = undef;
+}
+
+sub handle_dialog_event {
+    my ($self, $event) = @_;
+
+    my $dialog = $self->{dialog};
+    my $type = $event->{type};
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+
+        if ($key eq 'enter') {
+            my $value = $dialog->{value};
+            $self->close_dialog();
+            $dialog->{on_submit}->($value) if $dialog->{on_submit};
+        }
+        elsif ($key eq 'escape') {
+            $self->close_dialog();
+            $dialog->{on_cancel}->() if $dialog->{on_cancel};
+        }
+        elsif ($key eq 'backspace') {
+            if ($dialog->{cursor} > 0) {
+                my $val = $dialog->{value};
+                my $pos = $dialog->{cursor};
+                $dialog->{value} = substr($val, 0, $pos - 1) . substr($val, $pos);
+                $dialog->{cursor}--;
+            }
+        }
+        elsif ($key eq 'delete') {
+            if ($dialog->{cursor} < length($dialog->{value})) {
+                my $val = $dialog->{value};
+                my $pos = $dialog->{cursor};
+                $dialog->{value} = substr($val, 0, $pos) . substr($val, $pos + 1);
+            }
+        }
+        elsif ($key eq 'left') {
+            $dialog->{cursor}-- if $dialog->{cursor} > 0;
+        }
+        elsif ($key eq 'right') {
+            $dialog->{cursor}++ if $dialog->{cursor} < length($dialog->{value});
+        }
+        elsif ($key eq 'home') {
+            $dialog->{cursor} = 0;
+        }
+        elsif ($key eq 'end') {
+            $dialog->{cursor} = length($dialog->{value});
+        }
+    }
+    elsif ($type eq 'char') {
+        my $char = $event->{char};
+        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
+            my $val = $dialog->{value};
+            my $pos = $dialog->{cursor};
+            $dialog->{value} = substr($val, 0, $pos) . $char . substr($val, $pos);
+            $dialog->{cursor}++;
+        }
+    }
+}
+
+# =============================================================================
+# Editing Commands
+# =============================================================================
+
+sub do_insert_char {
+    my ($self, $char) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    # Delete selection first if any
+    if ($view->has_selection()) {
+        $self->delete_selection();
+    }
+
+    my $offset = $doc->line_col_to_offset(
+        $view->cursor_line(),
+        $view->cursor_col()
+    );
+
+    $doc->insert($offset, $char);
+    $view->move_right();
+}
+
+sub do_backspace {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    if ($view->has_selection()) {
+        $self->delete_selection();
+        return;
+    }
+
+    my $line = $view->cursor_line();
+    my $col = $view->cursor_col();
+
+    return if $line == 0 && $col == 0;
+
+    $view->move_left();
+
+    my $offset = $doc->line_col_to_offset(
+        $view->cursor_line(),
+        $view->cursor_col()
+    );
+
+    $doc->delete($offset, 1);
+}
+
+sub do_delete {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    if ($view->has_selection()) {
+        $self->delete_selection();
+        return;
+    }
+
+    my $offset = $doc->line_col_to_offset(
+        $view->cursor_line(),
+        $view->cursor_col()
+    );
+
+    return if $offset >= $doc->length();
+
+    $doc->delete($offset, 1);
+}
+
+sub do_enter {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    # Delete selection first
+    if ($view->has_selection()) {
+        $self->delete_selection();
+    }
+
+    my $offset = $doc->line_col_to_offset(
+        $view->cursor_line(),
+        $view->cursor_col()
+    );
+
+    # Get indentation of current line for auto-indent
+    my $indent = '';
+    if ($self->{prefs}->auto_indent()) {
+        my $line_content = $doc->get_line_content($view->cursor_line());
+        if ($line_content =~ /^(\s+)/) {
+            $indent = $1;
+        }
+    }
+
+    $doc->insert($offset, "\n" . $indent);
+
+    # Move to start of new line (after indent)
+    $view->move_down();
+    $view->move_to_line_start();
+    $view->move_right() for (1..length($indent));
+}
+
+sub do_indent {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    if ($view->has_selection()) {
+        # Indent selected lines
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        my $indent = $self->{prefs}->tab_string();
+        my $indent_len = length($indent);
+
+        for my $line ($sl..$el) {
+            my $offset = $doc->line_start_offset($line);
+            $doc->insert($offset, $indent);
+        }
+
+        # Preserve selection with adjusted columns
+        $view->set_cursor($sl, $sc + $indent_len, 0);  # Move to start
+        $view->set_cursor($el, $ec + $indent_len, 1);  # Extend selection to end
+        return;
+    }
+
+    # Insert tab at cursor
+    my $offset = $doc->line_col_to_offset(
+        $view->cursor_line(),
+        $view->cursor_col()
+    );
+
+    my $indent = $self->{prefs}->tab_string();
+    $doc->insert($offset, $indent);
+    $view->move_right() for (1..length($indent));
+}
+
+sub do_unindent {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+    my $tab_width = $self->{prefs}->tab_width();
+
+    my ($start_line, $end_line, $had_selection);
+    my ($orig_sc, $orig_ec);
+
+    if ($view->has_selection()) {
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        $start_line = $sl;
+        $end_line = $el;
+        $orig_sc = $sc;
+        $orig_ec = $ec;
+        $had_selection = 1;
+    }
+    else {
+        $start_line = $view->cursor_line();
+        $end_line = $start_line;
+        $had_selection = 0;
+    }
+
+    my $first_removed = 0;
+    my $last_removed = 0;
+
+    for my $line ($start_line..$end_line) {
+        my $content = $doc->get_line_content($line);
+        my $removed = 0;
+
+        if ($content =~ /^\t/) {
+            # Remove one tab
+            my $offset = $doc->line_start_offset($line);
+            $doc->delete($offset, 1);
+            $removed = $tab_width;  # Tab counts as tab_width for column adjustment
+        }
+        elsif ($content =~ /^( {1,$tab_width})/) {
+            # Remove up to tab_width spaces
+            my $spaces = length($1);
+            my $offset = $doc->line_start_offset($line);
+            $doc->delete($offset, $spaces);
+            $removed = $spaces;
+        }
+
+        $first_removed = $removed if $line == $start_line;
+        $last_removed = $removed if $line == $end_line;
+    }
+
+    # Preserve selection with adjusted columns
+    if ($had_selection) {
+        my $new_sc = $orig_sc > $first_removed ? $orig_sc - $first_removed : 0;
+        my $new_ec = $orig_ec > $last_removed ? $orig_ec - $last_removed : 0;
+        $view->set_cursor($start_line, $new_sc, 0);
+        $view->set_cursor($end_line, $new_ec, 1);
+    }
+}
+
+sub delete_selection {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    return unless $view->has_selection();
+
+    my ($start, $end) = $view->selection_offsets();
+    $doc->delete($start, $end - $start);
+
+    my ($line, $col) = $doc->offset_to_line_col($start);
+    $view->clear_selection();
+    $view->set_cursor($line, $col);
+}
+
+# =============================================================================
+# Rendering
+# =============================================================================
+
+sub render {
+    my ($self) = @_;
+
+    my $term = $self->{terminal};
+    my ($rows, $cols) = $term->get_size();
+
+    # Update view size - account for gutter width
+    my $line_count = $self->{document}->line_count();
+    my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+    my $text_width = $cols - $gutter_width - 1;
+    $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
+
+    $self->{view}->set_viewport_size($rows - RESERVED_ROWS, $text_width);
+    $self->{view}->ensure_cursor_visible();
+
+    my $output = Zepto::Renderer->render(
+        document => $self->{document},
+        view     => $self->{view},
+        theme    => $self->{theme},
+        rows     => $rows,
+        cols     => $cols,
+        message  => $self->{message},
+        ui       => {
+            menu_open => $self->{menu_open},
+            menu_selected => $self->{menu_selected},
+            dialog => $self->{dialog},
+        },
+    );
+
+    $term->write($output);
+}
+
+sub show_message {
+    my ($self, $msg) = @_;
+    $self->{message} = $msg;
+    $self->{message_time} = time();
+}
+
+1;
