@@ -52,7 +52,10 @@ for my $file (@modules) {
     
     # Remove __END__ and POD (keep it compact)
     $content =~ s/\n__END__.*//s;
-    
+
+    # Strip comment-only lines (lines starting with #)
+    $content =~ s/^[ \t]*#.*\n//gm;
+
     # Add section header (handle nested modules like Editor/Commands)
     my ($pkg) = $file =~ m{lib/Zepto/(.+)\.pm$};
     $pkg =~ s{/}{::}g;
