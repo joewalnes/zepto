@@ -104,12 +104,17 @@ utf8::encode($output) if utf8::is_utf8($output);
 
 ## Documentation Requirements
 
-### SPECIFICATION.md
-Keep `SPECIFICATION.md` synchronized with actual capabilities:
+### README.md Feature List
+Keep the "Full Feature List" section in `README.md` synchronized with actual capabilities:
 - Add new features as they're implemented
-- Mark removed/changed features
-- Update status (Draft → Implemented) as features are completed
-- Include non-functional requirements (performance, reliability)
+- Remove features that are removed
+- Don't list features that don't exist yet (those go in TODO.md)
+- Be accurate about what's configurable vs hardcoded
+
+### TODO.md
+Track unimplemented features in `TODO.md`:
+- Add planned features here, not in README
+- Remove items when implemented (and add to README)
 
 ### Code Comments
 - Comment the "why", not the "what"
@@ -169,12 +174,13 @@ subtest 'Dialog rows have consistent width' => sub {
 
 ### Adding New Features
 
-1. Update SPECIFICATION.md with the requirement
-2. Write failing tests that define expected behavior
-3. Implement in the appropriate module(s)
-4. Verify all tests pass (220+ currently)
-5. Manual testing for visual/interactive features
-6. Update this file if new patterns/lessons emerge
+1. Write failing tests that define expected behavior
+2. Implement in the appropriate module(s)
+3. Verify all tests pass
+4. Manual testing for visual/interactive features
+5. Update README.md "Full Feature List" section
+6. Remove from TODO.md if it was listed there
+7. Update this file if new patterns/lessons emerge
 
 ## Common Pitfalls
 
