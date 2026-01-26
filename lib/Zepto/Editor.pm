@@ -799,11 +799,19 @@ sub _move_lines {
     my $view = $self->{view};
 
     # Determine line range (expand selection to full lines)
-    my ($start_line, $end_line);
+    my ($start_line, $end_line, $orig_sc, $orig_ec);
     if ($view->has_selection()) {
         my ($sl, $sc, $el, $ec) = $view->selection();
         $start_line = $sl;
         $end_line = $el;
+        $orig_sc = $sc;
+        $orig_ec = $ec;
+        # If selection ends at col 0, don't include that line
+        # (common when selecting by moving cursor down past lines)
+        if ($ec == 0 && $el > $sl) {
+            $end_line = $el - 1;
+            $orig_ec = $doc->line_length($end_line);
+        }
     }
     else {
         $start_line = $view->cursor_line();
@@ -841,9 +849,9 @@ sub _move_lines {
         $swap_text .= "\n" unless $swap_text =~ /\n$/;
         $move_text =~ s/\n$//;
     }
-    elsif ($direction < 0 && $start_line == $doc->line_count() - 1) {
-        # Moving up from last line
-        # move_text (last line) needs newline since it's moving to middle
+    elsif ($direction < 0 && $end_line == $doc->line_count() - 1) {
+        # Moving up when selection includes last line
+        # move_text (includes last line) needs newline since it's moving to middle
         # swap_text loses its trailing newline since it's becoming last
         $move_text .= "\n" unless $move_text =~ /\n$/;
         $swap_text =~ s/\n$//;
@@ -870,11 +878,11 @@ sub _move_lines {
     my $new_start_line = $start_line + $direction;
     my $new_end_line = $end_line + $direction;
 
-    if ($view->has_selection()) {
-        my ($sl, $sc, $el, $ec) = $view->selection();
+    if (defined $orig_sc) {
+        # Had selection - restore it on the new line positions
         $view->clear_selection();
-        $view->set_cursor($new_start_line, $sc, 0);
-        $view->set_cursor($new_end_line, $ec, 1);
+        $view->set_cursor($new_start_line, $orig_sc, 0);
+        $view->set_cursor($new_end_line, $orig_ec, 1);
     }
     else {
         my $col = $view->cursor_col();
@@ -904,6 +912,10 @@ sub _duplicate_lines {
         my ($sl, $sc, $el, $ec) = $view->selection();
         $start_line = $sl;
         $end_line = $el;
+        # If selection ends at col 0, don't include that line
+        if ($ec == 0 && $el > $sl) {
+            $end_line = $el - 1;
+        }
     }
     else {
         $start_line = $view->cursor_line();
