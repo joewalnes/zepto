@@ -529,7 +529,7 @@ subtest 'Mouse drag selection' => sub {
     my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
 
     # Simulate press at column 6 (start of "World")
-    my $x_start = $gutter_width + 1 + 6;  # gutter + separator + col 6
+    my $x_start = $gutter_width + 6;  # gutter + col 6
     my $press = { type => 'mouse', action => 'press', x => $x_start, y => 2, modifiers => [] };
     $editor->handle_mouse_event($press);
 
@@ -537,7 +537,7 @@ subtest 'Mouse drag selection' => sub {
     is($editor->{view}->cursor_col(), 6, 'Cursor at column 6 after press');
 
     # Simulate drag to column 11 (end of "World")
-    my $x_end = $gutter_width + 1 + 11;
+    my $x_end = $gutter_width + 11;
     my $drag = { type => 'mouse', action => 'drag', x => $x_end, y => 2, modifiers => [] };
     $editor->handle_mouse_event($drag);
 

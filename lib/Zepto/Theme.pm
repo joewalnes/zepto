@@ -76,120 +76,122 @@ sub bg_rgb {
 sub dark_theme {
     my $class = shift;
 
+    # Tokyo Night inspired - deep blues with cyan/purple accents
     return $class->new('dark', {
         # Main text area
-        fg          => fg_rgb(212, 212, 212),  # Light gray text
-        bg          => bg_rgb(30, 30, 46),     # Deep blue-gray background
+        fg          => fg_rgb(192, 202, 245),  # Soft blue-white text
+        bg          => bg_rgb(26, 27, 38),     # Deep night blue
 
         # Line numbers gutter
-        gutter_fg   => fg_rgb(98, 98, 118),    # Dimmed
-        gutter_bg   => bg_rgb(24, 24, 37),     # Slightly darker
+        gutter_fg   => fg_rgb(86, 95, 137),    # Muted blue-gray
+        gutter_bg   => bg_rgb(22, 22, 30),     # Darker blue
 
         # Selection
-        selection_fg => fg_rgb(255, 255, 255),
-        selection_bg => bg_rgb(68, 68, 102),   # Purple-ish highlight
+        selection_fg => fg_rgb(192, 202, 245),
+        selection_bg => bg_rgb(51, 70, 124),   # Deep blue highlight
 
         # Cursor line (subtle highlight)
-        cursor_line_bg => bg_rgb(40, 40, 56),
+        cursor_line_bg => bg_rgb(41, 46, 66),
 
-        # Cursor color (electric yellow - maximum visibility)
-        cursor_color => '#FFFF00',  # Pure bright yellow for OSC 12
+        # Cursor color
+        cursor_color => '#7aa2f7',  # Soft blue
 
         # Menu bar
-        menu_fg      => fg_rgb(200, 200, 220),
-        menu_bg      => bg_rgb(45, 45, 65),
-        menu_hotkey  => fg_rgb(136, 192, 208), # Cyan accent
+        menu_fg      => fg_rgb(169, 177, 214),
+        menu_bg      => bg_rgb(36, 40, 59),
+        menu_hotkey  => fg_rgb(125, 207, 255), # Cyan accent
         menu_active_fg => fg_rgb(255, 255, 255),
-        menu_active_bg => bg_rgb(80, 80, 120),
+        menu_active_bg => bg_rgb(52, 79, 138),  # Darker blue for contrast
 
         # Dropdown menu
-        dropdown_fg  => fg_rgb(200, 200, 220),
-        dropdown_bg  => bg_rgb(55, 55, 75),
+        dropdown_fg  => fg_rgb(169, 177, 214),
+        dropdown_bg  => bg_rgb(36, 40, 59),
         dropdown_selected_fg => fg_rgb(255, 255, 255),
-        dropdown_selected_bg => bg_rgb(100, 100, 140),
-        dropdown_border => fg_rgb(80, 80, 100),
-        dropdown_shortcut => fg_rgb(140, 140, 160),
+        dropdown_selected_bg => bg_rgb(52, 79, 138),  # Darker blue for contrast
+        dropdown_border => fg_rgb(61, 66, 91),
+        dropdown_shortcut => fg_rgb(86, 95, 137),
 
         # Status bar
-        status_fg    => fg_rgb(180, 180, 200),
-        status_bg    => bg_rgb(45, 45, 65),
-        status_accent => fg_rgb(136, 192, 208), # Cyan
+        status_fg    => fg_rgb(169, 177, 214),
+        status_bg    => bg_rgb(36, 40, 59),
+        status_accent => fg_rgb(125, 207, 255), # Cyan
 
         # Dialog
-        dialog_fg    => fg_rgb(212, 212, 212),
-        dialog_bg    => bg_rgb(50, 50, 70),
-        dialog_border => fg_rgb(100, 100, 130),
+        dialog_fg    => fg_rgb(192, 202, 245),
+        dialog_bg    => bg_rgb(36, 40, 59),
+        dialog_border => fg_rgb(61, 66, 91),
         dialog_input_fg => fg_rgb(255, 255, 255),
-        dialog_input_bg => bg_rgb(35, 35, 50),
+        dialog_input_bg => bg_rgb(26, 27, 38),
 
         # Search highlights
-        match_fg     => fg_rgb(30, 30, 46),
-        match_bg     => bg_rgb(229, 192, 123),  # Yellow highlight
+        match_fg     => fg_rgb(26, 27, 38),
+        match_bg     => bg_rgb(224, 175, 104),  # Warm yellow
 
         # Messages
-        error_fg     => fg_rgb(255, 100, 100),
-        warning_fg   => fg_rgb(229, 192, 123),
-        info_fg      => fg_rgb(136, 192, 208),
+        error_fg     => fg_rgb(247, 118, 142),
+        warning_fg   => fg_rgb(224, 175, 104),
+        info_fg      => fg_rgb(125, 207, 255),
     });
 }
 
 sub light_theme {
     my $class = shift;
 
+    # Catppuccin Latte inspired - warm creamy background with lavender accents
     return $class->new('light', {
         # Main text area
-        fg          => fg_rgb(90, 90, 90),     # Medium gray text (lighter so cursor stands out)
-        bg          => bg_rgb(253, 253, 253),  # Off-white background
+        fg          => fg_rgb(76, 79, 105),    # Dark blue-gray text
+        bg          => bg_rgb(239, 241, 245),  # Warm light gray (Base)
 
         # Line numbers gutter
-        gutter_fg   => fg_rgb(150, 150, 160),
-        gutter_bg   => bg_rgb(243, 243, 243),
+        gutter_fg   => fg_rgb(156, 160, 176),  # Overlay0
+        gutter_bg   => bg_rgb(230, 233, 239),  # Mantle
 
         # Selection
-        selection_fg => fg_rgb(0, 0, 0),
-        selection_bg => bg_rgb(180, 210, 250),  # Light blue highlight
+        selection_fg => fg_rgb(76, 79, 105),
+        selection_bg => bg_rgb(188, 192, 204),  # Surface1
 
         # Cursor line
-        cursor_line_bg => bg_rgb(245, 245, 250),
+        cursor_line_bg => bg_rgb(231, 234, 242),
 
-        # Cursor color (bright red - #000000 pure black doesn't work in some terminals)
-        cursor_color => '#FF0000',  # Bright red for OSC 12
+        # Cursor color
+        cursor_color => '#7287fd',  # Lavender
 
         # Menu bar
-        menu_fg      => fg_rgb(60, 60, 70),
-        menu_bg      => bg_rgb(235, 235, 240),
-        menu_hotkey  => fg_rgb(0, 100, 180),   # Blue accent
-        menu_active_fg => fg_rgb(255, 255, 255),
-        menu_active_bg => bg_rgb(0, 100, 180),
+        menu_fg      => fg_rgb(76, 79, 105),
+        menu_bg      => bg_rgb(220, 224, 232),  # Surface0
+        menu_hotkey  => fg_rgb(30, 102, 245),   # Blue accent
+        menu_active_fg => fg_rgb(239, 241, 245),
+        menu_active_bg => bg_rgb(114, 135, 253), # Lavender
 
-        # Dropdown menu (light gray background for contrast with editor)
-        dropdown_fg  => fg_rgb(30, 30, 40),
-        dropdown_bg  => bg_rgb(240, 240, 245),
-        dropdown_selected_fg => fg_rgb(255, 255, 255),
-        dropdown_selected_bg => bg_rgb(0, 100, 180),
-        dropdown_border => fg_rgb(180, 180, 190),
-        dropdown_shortcut => fg_rgb(100, 100, 120),
+        # Dropdown menu
+        dropdown_fg  => fg_rgb(76, 79, 105),
+        dropdown_bg  => bg_rgb(230, 233, 239),
+        dropdown_selected_fg => fg_rgb(239, 241, 245),
+        dropdown_selected_bg => bg_rgb(114, 135, 253),
+        dropdown_border => fg_rgb(172, 176, 190),
+        dropdown_shortcut => fg_rgb(124, 127, 147),
 
         # Status bar
-        status_fg    => fg_rgb(80, 80, 100),
-        status_bg    => bg_rgb(235, 235, 240),
-        status_accent => fg_rgb(0, 100, 180),
+        status_fg    => fg_rgb(76, 79, 105),
+        status_bg    => bg_rgb(220, 224, 232),
+        status_accent => bg_rgb(30, 102, 245),
 
         # Dialog
-        dialog_fg    => fg_rgb(50, 50, 50),
-        dialog_bg    => bg_rgb(255, 255, 255),
-        dialog_border => fg_rgb(180, 180, 200),
-        dialog_input_fg => fg_rgb(0, 0, 0),
-        dialog_input_bg => bg_rgb(250, 250, 255),
+        dialog_fg    => fg_rgb(76, 79, 105),
+        dialog_bg    => bg_rgb(239, 241, 245),
+        dialog_border => fg_rgb(172, 176, 190),
+        dialog_input_fg => fg_rgb(76, 79, 105),
+        dialog_input_bg => bg_rgb(255, 255, 255),
 
         # Search highlights
-        match_fg     => fg_rgb(0, 0, 0),
-        match_bg     => bg_rgb(255, 230, 100),
+        match_fg     => fg_rgb(76, 79, 105),
+        match_bg     => bg_rgb(223, 142, 29),   # Yellow/peach
 
         # Messages
-        error_fg     => fg_rgb(200, 50, 50),
-        warning_fg   => fg_rgb(180, 120, 0),
-        info_fg      => fg_rgb(0, 100, 180),
+        error_fg     => fg_rgb(210, 15, 57),    # Red
+        warning_fg   => fg_rgb(223, 142, 29),   # Yellow
+        info_fg      => fg_rgb(30, 102, 245),   # Blue
     });
 }
 

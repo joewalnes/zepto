@@ -417,8 +417,8 @@ subtest 'Selection highlighting' => sub {
     # Should contain both text
     like($stripped, qr/Hello/, 'Contains text before selection');
     like($stripped, qr/World/, 'Contains selected text');
-    # Should contain selection colors (selection_bg from theme)
-    like($output, qr/\x1b\[48;2;68;68;102m/, 'Contains selection background color');
+    # Should contain selection colors (selection_bg from theme - Tokyo Night blue)
+    like($output, qr/\x1b\[48;2;51;70;124m/, 'Contains selection background color');
 };
 
 # ============================================================================
@@ -617,9 +617,9 @@ subtest 'Text lines have consistent column alignment' => sub {
     # Check that line numbers 1, 2, 3 appear before content
     # Strip escape codes to check structure
     my $stripped = strip_escapes($output);
-    ok($stripped =~ /1.*?\x{2502}.*?AAA/s, 'Line 1 has AAA');
-    ok($stripped =~ /2.*?\x{2502}.*?BBB/s, 'Line 2 has BBB');
-    ok($stripped =~ /3.*?\x{2502}.*?CCC/s, 'Line 3 has CCC');
+    ok($stripped =~ /1\s+AAA/s, 'Line 1 has AAA');
+    ok($stripped =~ /2\s+BBB/s, 'Line 2 has BBB');
+    ok($stripped =~ /3\s+CCC/s, 'Line 3 has CCC');
 };
 
 # =============================================================================

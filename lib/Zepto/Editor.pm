@@ -140,7 +140,7 @@ sub init {
     my ($rows, $cols) = $term->get_size();
     my $line_count = $self->{document}->line_count();
     my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-    my $text_width = $cols - $gutter_width - 1;  # -1 for separator
+    my $text_width = $cols - $gutter_width;
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
     $self->{view} = Zepto::View->new(
@@ -442,7 +442,7 @@ sub handle_mouse_event {
         my $text_row = $y - 2;  # Adjust for menu bar
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
         my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width - 1;
+        my $text_col = $x - $gutter_width;
 
         if ($text_col >= 0) {
             my $doc_line = $view->scroll_line() + $text_row;
@@ -473,7 +473,7 @@ sub handle_mouse_event {
         my $text_row = $y - 2;
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
         my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width - 1;
+        my $text_col = $x - $gutter_width;
 
         if ($text_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
@@ -793,7 +793,7 @@ sub render {
     # Update view size - account for gutter width
     my $line_count = $self->{document}->line_count();
     my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-    my $text_width = $cols - $gutter_width - 1;
+    my $text_width = $cols - $gutter_width;
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
     $self->{view}->set_viewport_size($rows - RESERVED_ROWS, $text_width);

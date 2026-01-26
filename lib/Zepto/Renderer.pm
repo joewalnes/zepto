@@ -197,7 +197,7 @@ sub render {
     my $line_count = $doc ? $doc->line_count() : 1;
     my $gutter_width = $class->get_gutter_width($line_count);
 
-    my $text_width = $cols - $gutter_width - 1;  # -1 for separator
+    my $text_width = $cols - $gutter_width;
     $text_width = MIN_TEXT_WIDTH if $text_width < MIN_TEXT_WIDTH;
 
     # Render menu bar (row 1)
@@ -358,10 +358,9 @@ sub _render_text_area {
             $output .= ' ' x $gutter_width;
         }
 
-        # Separator and background (highlight if cursor line)
+        # Background (highlight if cursor line)
         my $line_bg = $is_cursor_line ? $theme->color('cursor_line_bg') : $theme->color('bg');
         $output .= $line_bg . $theme->color('fg');
-        $output .= BOX_VERTICAL;  # │ box drawing character
 
         # Text content
         if ($doc_line < $doc->line_count()) {
@@ -683,7 +682,7 @@ sub _cursor_screen_pos {
     my $scroll_col = $view->scroll_col();
 
     my $screen_row = $cursor_line - $scroll_line + $menu_height + 1;
-    my $screen_col = $cursor_col - $scroll_col + $gutter_width + 2;  # +1 for separator, +1 for 1-indexed
+    my $screen_col = $cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);
 }
