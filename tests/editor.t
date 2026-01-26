@@ -319,7 +319,7 @@ subtest 'Delete selection' => sub {
 
     $editor->delete_selection();
     ok(!$editor->{view}->has_selection(), 'Selection cleared');
-    like($editor->{document}->text(), qr/^Hello\n/, 'Selection deleted');
+    is($editor->{document}->text(), 'Hello', 'Selection deleted');
 };
 
 # ============================================================================
@@ -428,7 +428,7 @@ subtest 'Copy and paste' => sub {
     $editor->{view}->move_to_line_end();
 
     $editor->cmd_paste();
-    like($editor->{document}->text(), qr/Hello World\nHello/, 'Text pasted');
+    is($editor->{document}->text(), 'Hello WorldHello', 'Text pasted');
 };
 
 # ============================================================================

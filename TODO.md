@@ -39,5 +39,4 @@ Features not yet implemented.
 
 ## Bugs / Edge Cases
 
-- [ ] Handle last line without newline
 - [ ] Handle empty lines correctly

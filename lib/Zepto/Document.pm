@@ -49,6 +49,9 @@ sub load {
     # Normalize to LF internally
     $content =~ s/\r\n/\n/g;
 
+    # Strip trailing newline for editing (save adds it back)
+    $content =~ s/\n$//;
+
     # Get file permissions
     my $permissions = (stat($path))[2] & 07777;
 
@@ -68,6 +71,11 @@ sub save {
     die "No path specified" unless defined $path;
 
     my $content = $self->{buffer}->text();
+
+    # Ensure file ends with newline (POSIX convention)
+    if (length($content) > 0 && $content !~ /\n$/) {
+        $content .= "\n";
+    }
 
     # Convert to target line ending
     if ($self->{line_ending} eq "\r\n") {
