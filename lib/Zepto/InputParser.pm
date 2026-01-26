@@ -294,9 +294,9 @@ sub _decode_sgr_mouse {
     my ($self, $button, $x, $y, $final) = @_;
 
     # Button encoding:
-    # 0 = left, 1 = middle, 2 = right
+    # 0 = left, 1 = middle, 2 = right, 3 = release/none
     # +4 = shift, +8 = alt, +16 = ctrl
-    # +32 = motion (drag)
+    # +32 = motion (drag or move)
     # +64 = scroll
 
     my $btn = $button & 3;
@@ -314,6 +314,11 @@ sub _decode_sgr_mouse {
         $btn = ($btn == 0) ? 'up' : 'down';
     }
     elsif ($motion) {
+        # Motion with btn == 3 means mouse movement without any button held
+        # This is not a drag, just movement - ignore it
+        if ($btn == 3) {
+            return { type => EVT_NONE };
+        }
         $action = MOUSE_DRAG;
     }
     elsif ($final eq 'M') {

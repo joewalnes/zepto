@@ -64,6 +64,9 @@ subtest 'State constants' => sub {
     is(Zepto::Editor::STATE_EDITING, 'editing', 'STATE_EDITING');
     is(Zepto::Editor::STATE_MENU, 'menu', 'STATE_MENU');
     is(Zepto::Editor::STATE_DIALOG, 'dialog', 'STATE_DIALOG');
+    is(Zepto::Editor::STATE_PROMPT, 'prompt', 'STATE_PROMPT');
+    is(Zepto::Editor::STATE_FOOTER_INPUT, 'footer_input', 'STATE_FOOTER_INPUT');
+    is(Zepto::Editor::STATE_FILE_PICKER, 'file_picker', 'STATE_FILE_PICKER');
     is(Zepto::Editor::STATE_QUIT, 'quit', 'STATE_QUIT');
 };
 
@@ -1069,6 +1072,192 @@ subtest 'File picker escape closes' => sub {
     $editor->handle_input("\e");  # Escape
     is($editor->{state}, 'editing', 'Back to editing after escape');
     ok(!$editor->{file_picker}, 'File picker cleared');
+};
+
+# ============================================================================
+# Footer input handling (Save As in footer)
+# ============================================================================
+subtest 'Footer input opens and closes' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    my $submitted_value;
+    $editor->open_footer_input(
+        prompt => 'Test:',
+        value => 'initial',
+        on_submit => sub { $submitted_value = shift; },
+    );
+
+    is($editor->{state}, 'footer_input', 'State is footer_input');
+    is($editor->{footer_input}{prompt}, 'Test:', 'Prompt set');
+    is($editor->{footer_input}{value}, 'initial', 'Initial value set');
+
+    $editor->close_footer_input();
+    is($editor->{state}, 'editing', 'Back to editing');
+    is($editor->{footer_input}, undef, 'Footer input cleared');
+};
+
+subtest 'Footer input handles typing' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->open_footer_input(prompt => 'Name:');
+    is($editor->{footer_input}{value}, '', 'Value initially empty');
+
+    # Type characters
+    $editor->handle_input('a');
+    is($editor->{footer_input}{value}, 'a', 'Char added');
+
+    $editor->handle_input('bc');
+    is($editor->{footer_input}{value}, 'abc', 'More chars added');
+
+    # Backspace
+    $editor->handle_input("\x7f");  # DEL/backspace
+    is($editor->{footer_input}{value}, 'ab', 'Backspace works');
+};
+
+subtest 'Footer input submit calls callback' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $submitted;
+    $editor->open_footer_input(
+        prompt => 'Name:',
+        on_submit => sub { $submitted = shift; },
+    );
+
+    $editor->handle_input('test.txt');
+    $editor->handle_input("\r");  # Enter
+
+    is($submitted, 'test.txt', 'Submit callback received value');
+    is($editor->{state}, 'editing', 'Back to editing after submit');
+};
+
+subtest 'Footer input escape cancels' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $cancelled = 0;
+    $editor->open_footer_input(
+        prompt => 'Name:',
+        on_cancel => sub { $cancelled = 1; },
+    );
+
+    $editor->handle_input('partial');
+    $editor->handle_input("\e");  # Escape
+
+    is($cancelled, 1, 'Cancel callback called');
+    is($editor->{state}, 'editing', 'Back to editing after cancel');
+};
+
+# ============================================================================
+# Menu bar Open button
+# ============================================================================
+subtest 'Click Open button in menu bar' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Render once to set up button positions
+    # We need to manually trigger the rendering to populate button positions
+    my $cols = 80;
+    Zepto::Renderer->_render_menu_bar($editor->{theme}, $cols, {});
+
+    my @buttons = Zepto::Renderer::get_menu_bar_buttons();
+    ok(scalar(@buttons) >= 3, 'At least 3 buttons (Open, Save, Quit)');
+
+    # Find the Open button
+    my ($open_btn) = grep { $_->{action} eq 'open' } @buttons;
+    ok($open_btn, 'Open button exists');
+
+    # Click on it
+    my $x = int(($open_btn->{x_start} + $open_btn->{x_end}) / 2);
+    $editor->handle_menu_click($x);
+
+    is($editor->{state}, 'file_picker', 'Clicking Open button opens file picker');
+};
+
+# ============================================================================
+# Mouse button tracking (spurious drag prevention)
+# ============================================================================
+subtest 'Mouse button state tracking' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Hello World\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    is($editor->{mouse_button_down}, 0, 'Mouse button initially up');
+
+    # Press
+    my $press = { type => 'mouse', action => 'press', x => 10, y => 2, modifiers => [] };
+    $editor->handle_mouse_event($press);
+    is($editor->{mouse_button_down}, 1, 'Mouse button down after press');
+
+    # Release
+    my $release = { type => 'mouse', action => 'release', x => 10, y => 2, modifiers => [] };
+    $editor->handle_mouse_event($release);
+    is($editor->{mouse_button_down}, 0, 'Mouse button up after release');
+};
+
+subtest 'Drag without press is ignored' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Hello World\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
+
+    # Ensure mouse button is up
+    is($editor->{mouse_button_down}, 0, 'Mouse button initially up');
+    ok(!$editor->{view}->has_selection(), 'No selection initially');
+
+    # Send drag event without press first (spurious motion)
+    my $drag = { type => 'mouse', action => 'drag', x => $gutter_width + 5, y => 2, modifiers => [] };
+    $editor->handle_mouse_event($drag);
+
+    # Should NOT create selection
+    ok(!$editor->{view}->has_selection(), 'No selection after spurious drag');
+};
+
+subtest 'Drag after press creates selection' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Hello World\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
+
+    # Press first
+    my $press = { type => 'mouse', action => 'press', x => $gutter_width + 0, y => 2, modifiers => [] };
+    $editor->handle_mouse_event($press);
+    is($editor->{mouse_button_down}, 1, 'Mouse button down');
+
+    # Then drag
+    my $drag = { type => 'mouse', action => 'drag', x => $gutter_width + 5, y => 2, modifiers => [] };
+    $editor->handle_mouse_event($drag);
+
+    # Should create selection
+    ok($editor->{view}->has_selection(), 'Selection created after proper press+drag');
 };
 
 done_testing();

@@ -27,10 +27,9 @@ sub cmd_save {
     my $doc = $self->{document};
 
     unless ($doc->path()) {
-        # Need to get filename
-        $self->open_dialog(
-            title => 'Save As',
-            prompt => 'Filename:',
+        # Need to get filename - use footer input (in status bar)
+        $self->open_footer_input(
+            prompt => 'Save As:',
             on_submit => sub {
                 my ($filename) = @_;
                 if ($filename) {
@@ -43,6 +42,9 @@ sub cmd_save {
                         $self->show_message("Saved: $filename");
                     }
                 }
+            },
+            on_cancel => sub {
+                $self->show_message("Save cancelled");
             },
         );
         return;

@@ -20,7 +20,7 @@ use utf8;
 use Carp;
 
 use Exporter 'import';
-our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FILE_PICKER STATE_QUIT);
+our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FILE_PICKER STATE_QUIT);
 
 # Version for crash reports
 our $VERSION = '0.1.0';
@@ -36,12 +36,13 @@ use Zepto::FilePicker;
 
 # Editor states
 use constant {
-    STATE_EDITING     => 'editing',
-    STATE_MENU        => 'menu',
-    STATE_DIALOG      => 'dialog',
-    STATE_PROMPT      => 'prompt',        # Simple choice in status bar
-    STATE_FILE_PICKER => 'file_picker',   # Fuzzy file finder
-    STATE_QUIT        => 'quit',
+    STATE_EDITING      => 'editing',
+    STATE_MENU         => 'menu',
+    STATE_DIALOG       => 'dialog',
+    STATE_PROMPT       => 'prompt',        # Simple choice in status bar
+    STATE_FOOTER_INPUT => 'footer_input',  # Text input in status bar
+    STATE_FILE_PICKER  => 'file_picker',   # Fuzzy file finder
+    STATE_QUIT         => 'quit',
 };
 
 # Load command and menu modules (they add methods to this package)
@@ -86,11 +87,17 @@ sub new {
         # Quit confirmation
         quit_pending => 0,
 
+        # Mouse button state for reliable drag detection
+        mouse_button_down => 0,
+
         # File path from command line
         file_path    => $opts{file},
 
         # Prompt state (for status bar prompts)
         prompt       => undef,
+
+        # Footer input state (for text input in status bar)
+        footer_input => undef,
 
         # File picker state
         file_picker  => undef,
@@ -299,6 +306,9 @@ sub handle_event {
     elsif ($self->{state} eq STATE_PROMPT) {
         $self->handle_prompt_event($event);
     }
+    elsif ($self->{state} eq STATE_FOOTER_INPUT) {
+        $self->handle_footer_input_event($event);
+    }
     elsif ($self->{state} eq STATE_FILE_PICKER) {
         $self->handle_file_picker_event($event);
     }
@@ -457,6 +467,9 @@ sub handle_mouse_event {
     my $view = $self->{view};
 
     if ($action eq 'press') {
+        # Track mouse button state
+        $self->{mouse_button_down} = 1;
+
         # Check if click is in menu bar (row 1)
         if ($y == 1) {
             $self->handle_menu_click($x);
@@ -485,6 +498,10 @@ sub handle_mouse_event {
             $view->set_cursor($doc_line, $doc_col, $shift);
         }
     }
+    elsif ($action eq 'release') {
+        # Track mouse button state
+        $self->{mouse_button_down} = 0;
+    }
     elsif ($action eq 'scroll') {
         if ($event->{button} eq 'up') {
             $view->move_up() for (1..3);
@@ -494,6 +511,10 @@ sub handle_mouse_event {
         }
     }
     elsif ($action eq 'drag') {
+        # Only handle drag if mouse button is actually down
+        # (some terminals send spurious motion events)
+        return unless $self->{mouse_button_down};
+
         # Handle drag for selection
         my $text_row = $y - 2;
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
@@ -654,6 +675,87 @@ sub handle_prompt_event {
 }
 
 # =============================================================================
+# Footer Input Handling (text input in status bar)
+# =============================================================================
+
+sub open_footer_input {
+    my ($self, %opts) = @_;
+    $self->{state} = STATE_FOOTER_INPUT;
+    $self->{footer_input} = {
+        prompt    => $opts{prompt} // '',
+        value     => $opts{value} // '',
+        cursor    => length($opts{value} // ''),
+        on_submit => $opts{on_submit},
+        on_cancel => $opts{on_cancel},
+    };
+}
+
+sub close_footer_input {
+    my ($self) = @_;
+    $self->{state} = STATE_EDITING;
+    $self->{footer_input} = undef;
+}
+
+sub handle_footer_input_event {
+    my ($self, $event) = @_;
+
+    my $input = $self->{footer_input};
+    my $type = $event->{type};
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+
+        if ($key eq 'enter') {
+            my $value = $input->{value};
+            my $callback = $input->{on_submit};
+            $self->close_footer_input();
+            $callback->($value) if $callback;
+        }
+        elsif ($key eq 'escape') {
+            my $callback = $input->{on_cancel};
+            $self->close_footer_input();
+            $callback->() if $callback;
+        }
+        elsif ($key eq 'backspace') {
+            if ($input->{cursor} > 0) {
+                my $val = $input->{value};
+                my $pos = $input->{cursor};
+                $input->{value} = substr($val, 0, $pos - 1) . substr($val, $pos);
+                $input->{cursor}--;
+            }
+        }
+        elsif ($key eq 'delete') {
+            if ($input->{cursor} < length($input->{value})) {
+                my $val = $input->{value};
+                my $pos = $input->{cursor};
+                $input->{value} = substr($val, 0, $pos) . substr($val, $pos + 1);
+            }
+        }
+        elsif ($key eq 'left') {
+            $input->{cursor}-- if $input->{cursor} > 0;
+        }
+        elsif ($key eq 'right') {
+            $input->{cursor}++ if $input->{cursor} < length($input->{value});
+        }
+        elsif ($key eq 'home') {
+            $input->{cursor} = 0;
+        }
+        elsif ($key eq 'end') {
+            $input->{cursor} = length($input->{value});
+        }
+    }
+    elsif ($type eq 'char') {
+        my $char = $event->{char};
+        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
+            my $val = $input->{value};
+            my $pos = $input->{cursor};
+            $input->{value} = substr($val, 0, $pos) . $char . substr($val, $pos);
+            $input->{cursor}++;
+        }
+    }
+}
+
+# =============================================================================
 # File Picker Handling
 # =============================================================================
 
@@ -737,22 +839,12 @@ sub _handle_file_picker_mouse {
     my $y = $event->{y};
 
     # Calculate which row was clicked
-    # Row 1 = menu bar, Row 2 = search input, Row 3+ = file list
-    my $list_start_row = 3;
+    # Row 1 = menu bar, Row 2 = search input, Row 3 = separator, Row 4+ = file list
+    my $list_start_row = 4;
     my ($rows, $cols) = $self->{terminal}->get_size();
     my $list_end_row = $rows - 1;  # -1 for status bar
 
     if ($action eq 'press') {
-        if ($y >= $list_start_row && $y < $list_end_row) {
-            my $list_index = ($y - $list_start_row) + $picker->scroll();
-            my $max = $picker->filtered_count() - 1;
-            if ($list_index >= 0 && $list_index <= $max) {
-                $picker->select_index($list_index);
-                # Double-click would open, but we'll just select on single click
-            }
-        }
-    }
-    elsif ($action eq 'double_click') {
         if ($y >= $list_start_row && $y < $list_end_row) {
             my $list_index = ($y - $list_start_row) + $picker->scroll();
             my $max = $picker->filtered_count() - 1;
@@ -1205,6 +1297,7 @@ sub render {
             menu_selected => $self->{menu_selected},
             dialog => $self->{dialog},
             prompt => $self->{prompt},
+            footer_input => $self->{footer_input},
             file_picker => $self->{file_picker},
         },
     );

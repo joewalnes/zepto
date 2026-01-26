@@ -43,12 +43,15 @@ sub close_menu {
 sub handle_menu_click {
     my ($self, $x) = @_;
 
-    # Check for clicks on Save/Quit buttons (right side of menu bar)
+    # Check for clicks on Open/Save/Quit buttons (right side of menu bar)
     my @buttons = Zepto::Renderer::get_menu_bar_buttons();
     for my $btn (@buttons) {
         if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
             my $action = $btn->{action};
-            if ($action eq 'save') {
+            if ($action eq 'open') {
+                $self->cmd_open_file();
+            }
+            elsif ($action eq 'save') {
                 $self->cmd_save();
             }
             elsif ($action eq 'quit') {

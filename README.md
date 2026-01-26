@@ -18,6 +18,7 @@ Zepto is:
 
 ## Features
 
+- **Fuzzy file finder** (Ctrl+O) — Quick open files by typing partial names
 - Full mouse support (click, drag, scroll)
 - Undo/redo
 - Find and replace (regex supported)
@@ -118,10 +119,12 @@ make test     # Run tests
 ### User Interface
 
 - Menu bar with mouse support
+- Quick access buttons (Open, Save, Quit) in menu bar
 - Dropdown menus with keyboard navigation
 - Line numbers in gutter
 - Status bar (filename, position, modified state)
 - Modal dialogs for search, replace, go-to-line
+- Footer prompts for simple inputs (Save As, confirmations)
 - Escape closes menus and dialogs
 
 ### Mouse Support

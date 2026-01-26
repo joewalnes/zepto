@@ -12,6 +12,8 @@ my @modules = qw(
     lib/Zepto/Theme.pm
     lib/Zepto/Preferences.pm
     lib/Zepto/Terminal.pm
+    lib/Zepto/Config.pm
+    lib/Zepto/FilePicker.pm
     lib/Zepto/Renderer.pm
     lib/Zepto/Editor.pm
     lib/Zepto/Editor/Commands.pm

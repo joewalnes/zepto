@@ -128,6 +128,7 @@ use constant MENU_ESC_PREFIX_WIDTH => 6;  # "[Esc] "
 
 # Menu bar buttons on the right side
 our @MENU_BAR_BUTTONS = (
+    { label => 'Open', key => '^O', action => 'open' },
     { label => 'Save', key => '^S', action => 'save' },
     { label => 'Quit', key => '^Q', action => 'quit' },
 );
@@ -226,11 +227,15 @@ sub render {
         );
     }
 
-    # Render status bar (last row) - prompt replaces normal content
+    # Render status bar (last row) - prompt/footer_input replace normal content
     $output .= _move_to($rows, 1);
     if ($ui->{prompt}) {
         $output .= $class->_render_prompt(
             $theme, $ui->{prompt}, $cols, $rows
+        );
+    } elsif ($ui->{footer_input}) {
+        $output .= $class->_render_footer_input(
+            $theme, $ui->{footer_input}, $cols
         );
     } else {
         $output .= $class->_render_status_bar(
@@ -261,6 +266,13 @@ sub render {
         my $picker = $ui->{file_picker};
         my $query_len = length($picker->query() // '');
         $output .= _move_to(2, 4 + $query_len);  # Row 2, after "> "
+        $output .= SHOW_CURSOR;
+    } elsif ($ui->{footer_input}) {
+        # Position cursor in footer input field
+        my $input = $ui->{footer_input};
+        my $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
+        my $cursor_pos = $input->{cursor} // 0;
+        $output .= _move_to($rows, $prompt_len + $cursor_pos + 1);
         $output .= SHOW_CURSOR;
     } elsif ($ui->{menu_open}) {
         # Hide cursor when menu is open so it doesn't shine through
@@ -724,6 +736,54 @@ sub _cursor_screen_pos {
     my $_prompt_buttons = [];
     sub _set_prompt_buttons { shift; $_prompt_buttons = shift; }
     sub get_prompt_buttons { return @{$_prompt_buttons}; }
+}
+
+# =============================================================================
+# Footer Input Rendering (text input in status bar)
+# =============================================================================
+
+sub _render_footer_input {
+    my ($class, $theme, $input, $cols) = @_;
+
+    my $output = '';
+    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+
+    my $prompt = $input->{prompt} // '';
+    my $value = $input->{value} // '';
+
+    # Render: " Prompt: [input value          ] "
+    my $prompt_str = ' ' . $prompt . ' ';
+    $output .= $prompt_str;
+
+    # Input field with distinct background
+    $output .= $theme->color('dialog_input_bg');
+    $output .= $theme->color('dialog_input_fg');
+
+    # Calculate available width for input field
+    my $prompt_len = length($prompt_str);
+    my $input_width = $cols - $prompt_len - 2;  # -2 for padding
+    $input_width = 10 if $input_width < 10;
+
+    # Display value (truncate from left if too long)
+    my $display_value = $value;
+    if (length($display_value) > $input_width) {
+        $display_value = substr($display_value, length($display_value) - $input_width);
+    }
+    $output .= $display_value;
+
+    # Fill remaining input area
+    my $fill = $input_width - length($display_value);
+    $output .= ' ' x $fill if $fill > 0;
+
+    # Pad rest of status bar
+    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    my $remaining = $cols - $prompt_len - $input_width;
+    $output .= ' ' x $remaining if $remaining > 0;
+
+    $output .= RESET;
+    $output .= CLEAR_LINE;
+
+    return $output;
 }
 
 sub _render_prompt {
