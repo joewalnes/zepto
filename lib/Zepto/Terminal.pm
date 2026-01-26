@@ -74,7 +74,12 @@ sub new {
         _rows       => DEFAULT_ROWS,
         _cols       => DEFAULT_COLS,
         _output_buf => '',
+        _clipboard_copy_cmd  => undef,
+        _clipboard_paste_cmd => undef,
     }, $class;
+
+    # Detect platform clipboard commands
+    $self->_detect_clipboard_commands();
 
     return $self;
 }
@@ -427,6 +432,99 @@ sub clear_line {
 sub reset_attributes {
     my ($self) = @_;
     $self->write(RESET_ATTRS);
+}
+
+# =============================================================================
+# System Clipboard
+# =============================================================================
+
+# Detect available clipboard commands for the current platform
+sub _detect_clipboard_commands {
+    my ($self) = @_;
+
+    # macOS
+    if ($^O eq 'darwin') {
+        if (_command_exists('pbcopy')) {
+            $self->{_clipboard_copy_cmd} = 'pbcopy';
+            $self->{_clipboard_paste_cmd} = 'pbpaste';
+            return;
+        }
+    }
+    # Linux/BSD with X11
+    elsif (_command_exists('xclip')) {
+        $self->{_clipboard_copy_cmd} = 'xclip -selection clipboard';
+        $self->{_clipboard_paste_cmd} = 'xclip -selection clipboard -o';
+        return;
+    }
+    elsif (_command_exists('xsel')) {
+        $self->{_clipboard_copy_cmd} = 'xsel --clipboard --input';
+        $self->{_clipboard_paste_cmd} = 'xsel --clipboard --output';
+        return;
+    }
+    # Wayland
+    elsif (_command_exists('wl-copy')) {
+        $self->{_clipboard_copy_cmd} = 'wl-copy';
+        $self->{_clipboard_paste_cmd} = 'wl-paste';
+        return;
+    }
+    # WSL
+    elsif (_command_exists('clip.exe')) {
+        $self->{_clipboard_copy_cmd} = 'clip.exe';
+        # paste on WSL requires PowerShell
+        $self->{_clipboard_paste_cmd} = 'powershell.exe -command "Get-Clipboard"';
+        return;
+    }
+
+    # No clipboard command found - OSC 52 will still work for copy
+}
+
+sub _command_exists {
+    my ($cmd) = @_;
+    my $check = `which $cmd 2>/dev/null`;
+    return defined $check && $check ne '';
+}
+
+# Copy text to system clipboard
+# Uses both OSC 52 (for terminal support) and platform command (as fallback)
+sub copy_to_clipboard {
+    my ($self, $text) = @_;
+    return unless defined $text && length $text;
+
+    # Method 1: OSC 52 escape sequence
+    # Works in modern terminals, through tmux (with set-clipboard on), over SSH
+    require MIME::Base64;
+    my $encoded = MIME::Base64::encode_base64($text, '');
+    # OSC 52 ; c ; base64-data ST (ST = \x1b\\)
+    $self->write("\x1b]52;c;${encoded}\x1b\\");
+
+    # Method 2: Platform clipboard command
+    if ($self->{_clipboard_copy_cmd}) {
+        # Use pipe to avoid shell escaping issues
+        my $pid = open(my $pipe, '|-', $self->{_clipboard_copy_cmd});
+        if ($pid) {
+            print $pipe $text;
+            close $pipe;
+        }
+    }
+
+    return 1;
+}
+
+# Read text from system clipboard
+# Returns clipboard contents or empty string if unavailable
+sub paste_from_clipboard {
+    my ($self) = @_;
+
+    return '' unless $self->{_clipboard_paste_cmd};
+
+    my $text = `$self->{_clipboard_paste_cmd} 2>/dev/null`;
+    return defined $text ? $text : '';
+}
+
+# Check if system clipboard is available
+sub has_system_clipboard {
+    my ($self) = @_;
+    return defined $self->{_clipboard_copy_cmd};
 }
 
 # =============================================================================

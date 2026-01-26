@@ -233,6 +233,61 @@ subtest 'Has input with no data' => sub {
 };
 
 # ============================================================================
+# System Clipboard
+# ============================================================================
+subtest 'Clipboard command detection' => sub {
+    my $term = Zepto::Terminal->new();
+
+    # On macOS, should detect pbcopy/pbpaste
+    # On other systems, may or may not have clipboard support
+    # Just verify the detection runs without error
+    ok(defined $term->has_system_clipboard(), 'has_system_clipboard returns defined value');
+
+    if ($^O eq 'darwin') {
+        ok($term->has_system_clipboard(), 'macOS should have pbcopy');
+        is($term->{_clipboard_copy_cmd}, 'pbcopy', 'Copy command is pbcopy');
+        is($term->{_clipboard_paste_cmd}, 'pbpaste', 'Paste command is pbpaste');
+    }
+};
+
+subtest 'copy_to_clipboard generates OSC 52' => sub {
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+
+    $term->copy_to_clipboard("hello");
+
+    seek($out_fh, 0, 0);
+    my $output = do { local $/; <$out_fh> };
+
+    # Should contain OSC 52 sequence with base64 encoded "hello"
+    # "hello" in base64 is "aGVsbG8="
+    like($output, qr/\x1b\]52;c;aGVsbG8=\x1b\\/, 'OSC 52 sequence generated');
+};
+
+subtest 'copy_to_clipboard handles empty/undef' => sub {
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+
+    $term->copy_to_clipboard('');
+    $term->copy_to_clipboard(undef);
+
+    seek($out_fh, 0, 0);
+    my $output = do { local $/; <$out_fh> };
+
+    # Should not output anything for empty/undef
+    unlike($output, qr/\x1b\]52/, 'No OSC 52 for empty input');
+};
+
+subtest 'paste_from_clipboard returns string' => sub {
+    my $term = Zepto::Terminal->new();
+
+    # Should return a string (possibly empty if no clipboard support)
+    my $result = $term->paste_from_clipboard();
+    ok(defined $result, 'paste_from_clipboard returns defined value');
+    ok(!ref($result), 'paste_from_clipboard returns scalar');
+};
+
+# ============================================================================
 # Cleanup
 # ============================================================================
 subtest 'Cleanup resets state' => sub {

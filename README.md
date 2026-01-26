@@ -77,7 +77,7 @@ make test     # Run tests
 
 - Insert, delete, backspace
 - Undo / redo (Ctrl+Z / Ctrl+Y)
-- Cut, copy, paste (Ctrl+X / Ctrl+C / Ctrl+V)
+- Cut, copy, paste (Ctrl+X / Ctrl+C / Ctrl+V) with system clipboard integration
 - Auto-indent on newline
 - Tab key inserts spaces
 - Indent / unindent selected block (Tab / Shift+Tab)

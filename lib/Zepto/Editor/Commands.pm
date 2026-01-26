@@ -115,6 +115,7 @@ sub cmd_cut {
 
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
+        $self->{terminal}->copy_to_clipboard($self->{clipboard});
         $self->delete_selection();
         $self->show_message("Cut");
     }
@@ -127,12 +128,19 @@ sub cmd_copy {
 
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
+        $self->{terminal}->copy_to_clipboard($self->{clipboard});
         $self->show_message("Copied");
     }
 }
 
 sub cmd_paste {
     my ($self) = @_;
+
+    # Try system clipboard first, fall back to internal clipboard
+    my $text = $self->{terminal}->paste_from_clipboard();
+    if (length $text) {
+        $self->{clipboard} = $text;  # Sync internal clipboard
+    }
 
     return unless length $self->{clipboard};
 
