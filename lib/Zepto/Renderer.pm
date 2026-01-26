@@ -200,16 +200,18 @@ sub render {
     my $text_width = $cols - $gutter_width - 1;  # -1 for separator
     $text_width = MIN_TEXT_WIDTH if $text_width < MIN_TEXT_WIDTH;
 
-    # Render menu bar
+    # Render menu bar (row 1)
+    $output .= _move_to(1, 1);
     $output .= $class->_render_menu_bar($theme, $cols, $ui);
 
-    # Render text area with line numbers
+    # Render text area with line numbers (rows 2 to 2+text_height-1)
     $output .= $class->_render_text_area(
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width
     );
 
-    # Render status bar
+    # Render status bar (last row)
+    $output .= _move_to($rows, 1);
     $output .= $class->_render_status_bar(
         $doc, $view, $theme, $cols, $message
     );
@@ -317,7 +319,6 @@ sub _render_menu_bar {
 
     $output .= RESET;
     $output .= CLEAR_LINE;
-    $output .= "\r\n";  # Move to next line for text area
 
     return $output;
 }
@@ -338,6 +339,9 @@ sub _render_text_area {
     for my $screen_row (0 .. $height - 1) {
         my $doc_line = $scroll_line + $screen_row;
         my $is_cursor_line = ($doc_line == $cursor_line);
+
+        # Position cursor at start of this row (row 2 is first text row, after menu)
+        $output .= _move_to($screen_row + 2, 1);
 
         # Line number gutter (highlight if cursor line)
         if ($is_cursor_line) {
@@ -398,7 +402,6 @@ sub _render_text_area {
 
         $output .= RESET;
         $output .= CLEAR_LINE;
-        $output .= "\r\n";
     }
 
     return $output;
