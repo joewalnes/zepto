@@ -118,6 +118,9 @@ sub init {
 
     my $term = $self->{terminal};
 
+    # Set process name (shows in ps/top)
+    $0 = 'zepto';
+
     # Set cursor color and shape BEFORE raw mode (raw mode may interfere)
     my $cursor_color = $self->{theme}->color('cursor_color');
     if ($cursor_color) {
@@ -151,6 +154,9 @@ sub init {
             $self->show_message("New file: " . $self->{file_path});
         }
     }
+
+    # Set terminal title
+    $self->update_title();
 
     # Create view - account for gutter width in text area
     my ($rows, $cols) = $term->get_size();
@@ -269,6 +275,21 @@ sub cleanup {
 
     # Clear SIGWINCH handler
     $SIG{WINCH} = 'DEFAULT';
+}
+
+sub update_title {
+    my ($self) = @_;
+
+    my $title = 'zepto';
+    if ($self->{document} && $self->{document}->path()) {
+        $title .= ' - ' . $self->{document}->filename();
+    }
+    elsif ($self->{file_path}) {
+        my ($name) = $self->{file_path} =~ m{([^/]+)$};
+        $title .= ' - ' . $name if $name;
+    }
+
+    $self->{terminal}->set_title($title);
 }
 
 # =============================================================================

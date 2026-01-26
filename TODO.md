@@ -9,4 +9,3 @@
 - Expand selection: double click select word, triple line, quad paragraph, 5 all. And shortcut key
 - Detect if file changed and prompt for reload
 - Git change status
-- Set process name (shows in ps/top terminal)

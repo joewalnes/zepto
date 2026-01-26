@@ -52,6 +52,10 @@ use constant {
     # Cursor shape and color reset
     CURSOR_DEFAULT => "\x1b[0 q",           # Reset cursor shape to default
     CURSOR_COLOR_RESET => "\x1b]112\x1b\\", # OSC 112 - Reset cursor color to default (ST terminator)
+
+    # Terminal title (OSC 0 sets both icon and window title)
+    TITLE_SET      => "\x1b]0;",            # OSC 0 - Set title (needs ST terminator)
+    TITLE_END      => "\x07",               # BEL terminator for title
 };
 
 # Default terminal size and I/O settings
@@ -528,10 +532,26 @@ sub has_system_clipboard {
 }
 
 # =============================================================================
+# Terminal Title
+# =============================================================================
+
+sub set_title {
+    my ($self, $title) = @_;
+    $self->write(TITLE_SET . $title . TITLE_END);
+    $self->flush();
+}
+
+sub restore_title {
+    my ($self) = @_;
+    # Reset title by setting empty title (most terminals restore default)
+    $self->write(TITLE_SET . TITLE_END);
+    $self->flush();
+}
+
+# =============================================================================
 # Cleanup
 # =============================================================================
 
-# Restore terminal to original state
 sub cleanup {
     my ($self) = @_;
 
@@ -547,6 +567,9 @@ sub cleanup {
     # Reset cursor shape and color to terminal defaults
     $self->write(CURSOR_DEFAULT);
     $self->write(CURSOR_COLOR_RESET);
+
+    # Restore terminal title
+    $self->restore_title();
 
     # Show cursor
     $self->show_cursor();

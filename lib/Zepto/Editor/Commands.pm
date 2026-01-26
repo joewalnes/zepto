@@ -39,6 +39,7 @@ sub cmd_save {
                         $self->show_message("Error: $@");
                     }
                     else {
+                        $self->update_title();
                         $self->show_message("Saved: $filename");
                     }
                 }
@@ -122,6 +123,7 @@ sub _create_new_file {
     $self->{document} = Zepto::Document->new();
     $self->{view} = Zepto::View->new(document => $self->{document});
     $self->{file_path} = undef;
+    $self->update_title();
     $self->show_message("New file");
 }
 
@@ -189,6 +191,7 @@ sub _load_file {
         $self->{document} = Zepto::Document->load($path);
         $self->{view} = Zepto::View->new(document => $self->{document});
         $self->{file_path} = $path;
+        $self->update_title();
         $self->show_message("Opened: $path");
     };
     if ($@) {
