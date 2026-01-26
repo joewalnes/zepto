@@ -741,7 +741,7 @@ sub do_unindent {
             # Remove one tab
             my $offset = $doc->line_start_offset($line);
             $doc->delete($offset, 1);
-            $removed = $tab_width;  # Tab counts as tab_width for column adjustment
+            $removed = 1;  # Actual character count removed
         }
         elsif ($content =~ /^( {1,$tab_width})/) {
             # Remove up to tab_width spaces
@@ -761,6 +761,12 @@ sub do_unindent {
         my $new_ec = $orig_ec > $last_removed ? $orig_ec - $last_removed : 0;
         $view->set_cursor($start_line, $new_sc, 0);
         $view->set_cursor($end_line, $new_ec, 1);
+    }
+    else {
+        # Adjust cursor position for single-line unindent
+        my $cur_col = $view->cursor_col();
+        my $new_col = $cur_col > $first_removed ? $cur_col - $first_removed : 0;
+        $view->set_cursor($start_line, $new_col, 0);
     }
 }
 
