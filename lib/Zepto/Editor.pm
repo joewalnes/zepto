@@ -20,7 +20,7 @@ use utf8;
 use Carp;
 
 use Exporter 'import';
-our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_QUIT);
+our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FILE_PICKER STATE_QUIT);
 
 # Version for crash reports
 our $VERSION = '0.1.0';
@@ -32,13 +32,16 @@ use Zepto::Renderer;
 use Zepto::InputParser;
 use Zepto::Preferences;
 use Zepto::Theme;
+use Zepto::FilePicker;
 
 # Editor states
 use constant {
-    STATE_EDITING => 'editing',
-    STATE_MENU    => 'menu',
-    STATE_DIALOG  => 'dialog',
-    STATE_QUIT    => 'quit',
+    STATE_EDITING     => 'editing',
+    STATE_MENU        => 'menu',
+    STATE_DIALOG      => 'dialog',
+    STATE_PROMPT      => 'prompt',        # Simple choice in status bar
+    STATE_FILE_PICKER => 'file_picker',   # Fuzzy file finder
+    STATE_QUIT        => 'quit',
 };
 
 # Load command and menu modules (they add methods to this package)
@@ -85,6 +88,12 @@ sub new {
 
         # File path from command line
         file_path    => $opts{file},
+
+        # Prompt state (for status bar prompts)
+        prompt       => undef,
+
+        # File picker state
+        file_picker  => undef,
     }, $class;
 
     # Initialize theme
@@ -287,6 +296,12 @@ sub handle_event {
     elsif ($self->{state} eq STATE_MENU) {
         $self->handle_menu_event($event);
     }
+    elsif ($self->{state} eq STATE_PROMPT) {
+        $self->handle_prompt_event($event);
+    }
+    elsif ($self->{state} eq STATE_FILE_PICKER) {
+        $self->handle_file_picker_event($event);
+    }
     else {
         $self->handle_editing_event($event);
     }
@@ -391,7 +406,9 @@ sub handle_ctrl_char {
     $char = lc($char);
 
     # File operations
-    if    ($char eq 's') { $self->cmd_save(); }
+    if    ($char eq 'n') { $self->cmd_new_file(); }
+    elsif ($char eq 'o') { $self->cmd_open_file(); }
+    elsif ($char eq 's') { $self->cmd_save(); }
     elsif ($char eq 'w') { $self->cmd_save_and_quit(); }
     elsif ($char eq 'q') { $self->cmd_quit(); }
 
@@ -573,6 +590,184 @@ sub handle_dialog_event {
             $dialog->{value} = substr($val, 0, $pos) . $char . substr($val, $pos);
             $dialog->{cursor}++;
         }
+    }
+}
+
+# =============================================================================
+# Prompt Handling (status bar choices)
+# =============================================================================
+
+sub open_prompt {
+    my ($self, %opts) = @_;
+    $self->{state} = STATE_PROMPT;
+    $self->{prompt} = {
+        text    => $opts{text} // '',
+        options => $opts{options} // [],  # [{key => 's', label => 'Save'}, ...]
+        on_select => $opts{on_select},
+    };
+}
+
+sub close_prompt {
+    my ($self) = @_;
+    $self->{state} = STATE_EDITING;
+    $self->{prompt} = undef;
+}
+
+sub handle_prompt_event {
+    my ($self, $event) = @_;
+
+    my $prompt = $self->{prompt};
+    my $type = $event->{type};
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+        if ($key eq 'escape') {
+            $self->close_prompt();
+            return;
+        }
+    }
+    elsif ($type eq 'char') {
+        my $char = lc($event->{char});
+
+        # Check if char matches an option
+        for my $opt (@{$prompt->{options}}) {
+            if (lc($opt->{key}) eq $char) {
+                $self->close_prompt();
+                $prompt->{on_select}->($opt->{key}) if $prompt->{on_select};
+                return;
+            }
+        }
+    }
+    elsif ($type eq 'mouse' && $event->{action} eq 'press') {
+        # Check for clicks on options in status bar
+        # Options are rendered with positions stored by renderer
+        my @buttons = Zepto::Renderer::get_prompt_buttons();
+        for my $btn (@buttons) {
+            if ($event->{y} == $btn->{y} &&
+                $event->{x} >= $btn->{x_start} && $event->{x} <= $btn->{x_end}) {
+                $self->close_prompt();
+                $prompt->{on_select}->($btn->{key}) if $prompt->{on_select};
+                return;
+            }
+        }
+    }
+}
+
+# =============================================================================
+# File Picker Handling
+# =============================================================================
+
+sub open_file_picker {
+    my ($self, %opts) = @_;
+
+    my $base_dir = $opts{base_dir} // '.';
+
+    $self->{state} = STATE_FILE_PICKER;
+    $self->{file_picker} = Zepto::FilePicker->new(
+        base_dir  => $base_dir,
+        on_select => $opts{on_select},
+        on_cancel => $opts{on_cancel},
+    );
+}
+
+sub close_file_picker {
+    my ($self) = @_;
+    $self->{state} = STATE_EDITING;
+    $self->{file_picker} = undef;
+}
+
+sub handle_file_picker_event {
+    my ($self, $event) = @_;
+
+    my $picker = $self->{file_picker};
+    return unless $picker;
+
+    my $type = $event->{type};
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+
+        if ($key eq 'escape') {
+            $picker->cancel();
+            $self->close_file_picker();
+        }
+        elsif ($key eq 'enter') {
+            $picker->confirm();
+            $self->close_file_picker();
+        }
+        elsif ($key eq 'up') {
+            $picker->move_up();
+        }
+        elsif ($key eq 'down') {
+            $picker->move_down();
+        }
+        elsif ($key eq 'page_up') {
+            my ($rows, $cols) = $self->{terminal}->get_size();
+            my $visible = $rows - RESERVED_ROWS - 2;  # -2 for picker header
+            $picker->page_up($visible);
+        }
+        elsif ($key eq 'page_down') {
+            my ($rows, $cols) = $self->{terminal}->get_size();
+            my $visible = $rows - RESERVED_ROWS - 2;
+            $picker->page_down($visible);
+        }
+        elsif ($key eq 'backspace') {
+            $picker->backspace();
+        }
+    }
+    elsif ($type eq 'char') {
+        my $char = $event->{char};
+        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
+            $picker->append_char($char);
+        }
+    }
+    elsif ($type eq 'mouse') {
+        $self->_handle_file_picker_mouse($event);
+    }
+}
+
+sub _handle_file_picker_mouse {
+    my ($self, $event) = @_;
+
+    my $picker = $self->{file_picker};
+    return unless $picker;
+
+    my $action = $event->{action};
+    my $x = $event->{x};
+    my $y = $event->{y};
+
+    # Calculate which row was clicked
+    # Row 1 = menu bar, Row 2 = search input, Row 3+ = file list
+    my $list_start_row = 3;
+    my ($rows, $cols) = $self->{terminal}->get_size();
+    my $list_end_row = $rows - 1;  # -1 for status bar
+
+    if ($action eq 'press') {
+        if ($y >= $list_start_row && $y < $list_end_row) {
+            my $list_index = ($y - $list_start_row) + $picker->scroll();
+            my $max = $picker->filtered_count() - 1;
+            if ($list_index >= 0 && $list_index <= $max) {
+                $picker->select_index($list_index);
+                # Double-click would open, but we'll just select on single click
+            }
+        }
+    }
+    elsif ($action eq 'double_click') {
+        if ($y >= $list_start_row && $y < $list_end_row) {
+            my $list_index = ($y - $list_start_row) + $picker->scroll();
+            my $max = $picker->filtered_count() - 1;
+            if ($list_index >= 0 && $list_index <= $max) {
+                $picker->select_index($list_index);
+                $picker->confirm();
+                $self->close_file_picker();
+            }
+        }
+    }
+    elsif ($action eq 'scroll_up') {
+        $picker->move_up();
+    }
+    elsif ($action eq 'scroll_down') {
+        $picker->move_down();
     }
 }
 
@@ -1009,6 +1204,8 @@ sub render {
             menu_open => $self->{menu_open},
             menu_selected => $self->{menu_selected},
             dialog => $self->{dialog},
+            prompt => $self->{prompt},
+            file_picker => $self->{file_picker},
         },
     );
 

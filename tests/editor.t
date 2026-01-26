@@ -859,4 +859,216 @@ subtest 'Quit requires confirmation on dirty document' => sub {
     is($editor->{state}, 'quit', 'Second Ctrl+Q quits');
 };
 
+# ============================================================================
+# New File (Ctrl+N)
+# ============================================================================
+subtest 'New file on clean document' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Original content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Document is clean, should create new immediately
+    $editor->cmd_new_file();
+
+    is($editor->{document}->text(), '', 'Document is now empty');
+    is($editor->{file_path}, undef, 'File path cleared');
+    like($editor->{message}, qr/new file/i, 'New file message shown');
+};
+
+subtest 'New file on dirty document shows prompt' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Original\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Make dirty
+    $editor->{document}->insert(0, 'x');
+    ok($editor->{document}->is_dirty(), 'Document is dirty');
+
+    $editor->cmd_new_file();
+
+    is($editor->{state}, 'prompt', 'Prompt state activated');
+    ok($editor->{prompt}, 'Prompt is set');
+    like($editor->{prompt}{text}, qr/unsaved/i, 'Prompt shows unsaved message');
+};
+
+# ============================================================================
+# Open File (Ctrl+O)
+# ============================================================================
+subtest 'Open file on clean document shows picker' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_open_file();
+
+    is($editor->{state}, 'file_picker', 'File picker state activated');
+    ok($editor->{file_picker}, 'File picker is set');
+};
+
+subtest 'Open file on dirty document shows prompt first' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Original\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Make dirty
+    $editor->{document}->insert(0, 'x');
+
+    $editor->cmd_open_file();
+
+    is($editor->{state}, 'prompt', 'Prompt state activated first');
+    ok(!$editor->{file_picker}, 'File picker not yet opened');
+};
+
+# ============================================================================
+# Prompt handling
+# ============================================================================
+subtest 'Prompt responds to key press' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Open prompt with test callback
+    my $choice_made;
+    $editor->open_prompt(
+        text => 'Test prompt',
+        options => [
+            { key => 'y', label => 'Yes' },
+            { key => 'n', label => 'No' },
+        ],
+        on_select => sub { $choice_made = shift; },
+    );
+
+    is($editor->{state}, 'prompt', 'Prompt state active');
+
+    # Press 'y'
+    $editor->handle_input('y');
+
+    is($choice_made, 'y', 'Callback received correct choice');
+    is($editor->{state}, 'editing', 'Back to editing state');
+};
+
+subtest 'Prompt escape cancels' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $choice_made = 'not_called';
+    $editor->open_prompt(
+        text => 'Test',
+        options => [{ key => 'y', label => 'Yes' }],
+        on_select => sub { $choice_made = shift; },
+    );
+
+    # Press escape
+    $editor->handle_input("\e");
+
+    is($choice_made, 'not_called', 'Callback not called on escape');
+    is($editor->{state}, 'editing', 'Back to editing state');
+};
+
+# ============================================================================
+# File picker handling
+# ============================================================================
+subtest 'File picker navigation' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_open_file();
+    ok($editor->{file_picker}, 'File picker opened');
+
+    my $initial = $editor->{file_picker}->selected();
+
+    # Arrow down
+    $editor->handle_input("\e[B");  # Down arrow
+    is($editor->{file_picker}->selected(), $initial + 1, 'Down arrow moves selection');
+
+    # Arrow up
+    $editor->handle_input("\e[A");  # Up arrow
+    is($editor->{file_picker}->selected(), $initial, 'Up arrow moves selection back');
+};
+
+subtest 'File picker typing filters' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_open_file();
+    my $initial_count = $editor->{file_picker}->filtered_count();
+
+    # Type to filter
+    $editor->handle_input('xyz');  # Unlikely to match much
+
+    my $new_count = $editor->{file_picker}->filtered_count();
+    ok($new_count <= $initial_count, 'Typing filters results');
+    is($editor->{file_picker}->query(), 'xyz', 'Query updated');
+};
+
+subtest 'File picker escape closes' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_open_file();
+    is($editor->{state}, 'file_picker', 'File picker open');
+
+    $editor->handle_input("\e");  # Escape
+    is($editor->{state}, 'editing', 'Back to editing after escape');
+    ok(!$editor->{file_picker}, 'File picker cleared');
+};
+
 done_testing();

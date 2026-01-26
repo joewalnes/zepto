@@ -84,6 +84,116 @@ sub cmd_quit {
     }
 }
 
+sub cmd_new_file {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+
+    # If current file is dirty, ask to save first
+    if ($doc->is_dirty()) {
+        $self->_prompt_save_discard(sub {
+            my ($choice) = @_;
+            if ($choice eq 's') {
+                # Save then new
+                $self->cmd_save();
+                # After save completes (if successful), create new
+                unless ($doc->is_dirty()) {
+                    $self->_create_new_file();
+                }
+            }
+            elsif ($choice eq 'd') {
+                # Discard and create new
+                $self->_create_new_file();
+            }
+            # 'c' = cancel, do nothing
+        });
+    }
+    else {
+        $self->_create_new_file();
+    }
+}
+
+sub _create_new_file {
+    my ($self) = @_;
+
+    # Create fresh document and view
+    $self->{document} = Zepto::Document->new();
+    $self->{view} = Zepto::View->new(document => $self->{document});
+    $self->{file_path} = undef;
+    $self->show_message("New file");
+}
+
+sub cmd_open_file {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+
+    # If current file is dirty, ask to save first
+    if ($doc->is_dirty()) {
+        $self->_prompt_save_discard(sub {
+            my ($choice) = @_;
+            if ($choice eq 's') {
+                # Save then open picker
+                $self->cmd_save();
+                unless ($doc->is_dirty()) {
+                    $self->_open_file_picker();
+                }
+            }
+            elsif ($choice eq 'd') {
+                # Discard and open picker
+                $self->_open_file_picker();
+            }
+            # 'c' = cancel, do nothing
+        });
+    }
+    else {
+        $self->_open_file_picker();
+    }
+}
+
+sub _prompt_save_discard {
+    my ($self, $callback) = @_;
+
+    $self->open_prompt(
+        text => 'Unsaved changes.',
+        options => [
+            { key => 's', label => 'Save' },
+            { key => 'd', label => 'Discard' },
+            { key => 'c', label => 'Cancel' },
+        ],
+        on_select => $callback,
+    );
+}
+
+sub _open_file_picker {
+    my ($self) = @_;
+
+    $self->open_file_picker(
+        base_dir => '.',
+        on_select => sub {
+            my ($file) = @_;
+            $self->_load_file($file);
+        },
+        on_cancel => sub {
+            # Just close picker, do nothing
+        },
+    );
+}
+
+sub _load_file {
+    my ($self, $path) = @_;
+
+    eval {
+        $self->{document} = Zepto::Document->load($path);
+        $self->{view} = Zepto::View->new(document => $self->{document});
+        $self->{file_path} = $path;
+        $self->show_message("Opened: $path");
+    };
+    if ($@) {
+        $self->show_message("Error opening file: $@");
+    }
+}
+
 # =============================================================================
 # Edit Commands
 # =============================================================================

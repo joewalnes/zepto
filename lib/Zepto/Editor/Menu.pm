@@ -226,7 +226,9 @@ sub execute_menu_item {
     $self->close_menu();
 
     # Execute action
-    if    ($action eq 'save')       { $self->cmd_save(); }
+    if    ($action eq 'new')        { $self->cmd_new_file(); }
+    elsif ($action eq 'open')       { $self->cmd_open_file(); }
+    elsif ($action eq 'save')       { $self->cmd_save(); }
     elsif ($action eq 'save_quit')  { $self->cmd_save_and_quit(); }
     elsif ($action eq 'quit')       { $self->cmd_quit(); }
     elsif ($action eq 'undo')       { $self->cmd_undo(); }

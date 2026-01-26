@@ -37,6 +37,8 @@ zepto myfile.txt
 
 | Key | Action |
 |-----|--------|
+| Ctrl+N | New file |
+| Ctrl+O | Open file (fuzzy finder) |
 | Ctrl+S | Save |
 | Ctrl+Q | Quit |
 | Ctrl+Z | Undo |
@@ -66,12 +68,15 @@ make test     # Run tests
 
 ### File Operations
 
+- New file (Ctrl+N)
+- Open file with fuzzy finder (Ctrl+O)
 - Open file from command line
 - Create new file if doesn't exist
 - Save (Ctrl+S)
 - Save and quit (Ctrl+W)
 - Quit with unsaved changes protection (Ctrl+Q, double-tap to force)
 - Modified indicator in status bar
+- Save/Discard prompt for unsaved changes
 
 ### Text Editing
 

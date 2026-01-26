@@ -79,6 +79,9 @@ our @MENU_DEFS = (
 # Full menu item definitions - single source of truth for both rendering and execution
 our %MENU_ITEMS = (
     f => [
+        { label => 'New',         shortcut => 'Ctrl+N', action => 'new' },
+        { label => 'Open',        shortcut => 'Ctrl+O', action => 'open' },
+        { separator => 1 },
         { label => 'Save',        shortcut => 'Ctrl+S', action => 'save' },
         { label => 'Save & Quit', shortcut => 'Ctrl+W', action => 'save_quit' },
         { separator => 1 },
@@ -209,17 +212,31 @@ sub render {
     $output .= _move_to(1, 1);
     $output .= $class->_render_menu_bar($theme, $cols, $ui);
 
-    # Render text area with line numbers (rows 2 to 2+text_height-1)
-    $output .= $class->_render_text_area(
-        $doc, $view, $theme,
-        $text_height, $text_width, $gutter_width
-    );
+    # Render text area or file picker
+    if ($ui->{file_picker}) {
+        # File picker replaces the text area
+        $output .= $class->_render_file_picker(
+            $theme, $ui->{file_picker}, $text_height, $cols
+        );
+    } else {
+        # Normal text area with line numbers (rows 2 to 2+text_height-1)
+        $output .= $class->_render_text_area(
+            $doc, $view, $theme,
+            $text_height, $text_width, $gutter_width
+        );
+    }
 
-    # Render status bar (last row)
+    # Render status bar (last row) - prompt replaces normal content
     $output .= _move_to($rows, 1);
-    $output .= $class->_render_status_bar(
-        $doc, $view, $theme, $cols, $message
-    );
+    if ($ui->{prompt}) {
+        $output .= $class->_render_prompt(
+            $theme, $ui->{prompt}, $cols, $rows
+        );
+    } else {
+        $output .= $class->_render_status_bar(
+            $doc, $view, $theme, $cols, $message
+        );
+    }
 
     # Render dropdown menu if open
     if ($ui->{menu_open}) {
@@ -235,12 +252,21 @@ sub render {
         );
     }
 
-    # Position cursor (shape set once at init, not every frame to preserve blink)
+    # Position cursor
     if ($ui->{dialog}) {
         # Dialogs position cursor themselves
         $output .= SHOW_CURSOR;
+    } elsif ($ui->{file_picker}) {
+        # Position cursor in file picker search input
+        my $picker = $ui->{file_picker};
+        my $query_len = length($picker->query() // '');
+        $output .= _move_to(2, 4 + $query_len);  # Row 2, after "> "
+        $output .= SHOW_CURSOR;
     } elsif ($ui->{menu_open}) {
         # Hide cursor when menu is open so it doesn't shine through
+        $output .= HIDE_CURSOR;
+    } elsif ($ui->{prompt}) {
+        # Hide cursor during prompt - no text input
         $output .= HIDE_CURSOR;
     } elsif ($view && $doc) {
         # Position terminal cursor for editing
@@ -688,6 +714,170 @@ sub _cursor_screen_pos {
     my $screen_col = $cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);
+}
+
+# =============================================================================
+# Prompt Rendering (status bar prompt with clickable options)
+# =============================================================================
+
+{
+    my $_prompt_buttons = [];
+    sub _set_prompt_buttons { shift; $_prompt_buttons = shift; }
+    sub get_prompt_buttons { return @{$_prompt_buttons}; }
+}
+
+sub _render_prompt {
+    my ($class, $theme, $prompt, $cols, $rows) = @_;
+
+    my $output = '';
+    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+
+    my $text = $prompt->{text} // '';
+    my @options = @{$prompt->{options} // []};
+
+    # Build prompt string: "Unsaved changes. [S]ave [D]iscard [C]ancel"
+    my $prompt_str = ' ' . $text . ' ';
+
+    # Track button positions for click handling
+    my @buttons;
+    my $x_pos = length($prompt_str) + 1;  # +1 for 1-indexed columns
+
+    for my $opt (@options) {
+        my $key = uc($opt->{key});
+        my $label = $opt->{label};
+
+        # Format: [K]eyLabel with K highlighted
+        my $btn_start = length($prompt_str);
+        $prompt_str .= ' [';
+        $prompt_str .= $key;
+        $prompt_str .= ']';
+        $prompt_str .= substr($label, 1) if length($label) > 1;  # Rest of label after first char
+        $prompt_str .= ' ';
+        my $btn_end = length($prompt_str);
+
+        push @buttons, {
+            key => lc($opt->{key}),
+            x_start => $btn_start + 1,
+            x_end => $btn_end,
+            y => $rows,
+        };
+    }
+
+    # Render with highlighted keys
+    my $rendered = ' ' . $text . ' ';
+    for my $opt (@options) {
+        my $key = uc($opt->{key});
+        my $label = $opt->{label};
+        my $rest = length($label) > 1 ? substr($label, 1) : '';
+
+        $rendered .= ' [';
+        $output .= $rendered;
+        $rendered = '';
+
+        # Highlighted key
+        $output .= $theme->color('menu_hotkey');
+        $output .= $key;
+        $output .= $theme->color('status_fg');
+
+        $rendered = ']' . $rest . ' ';
+    }
+    $output .= $rendered;
+
+    # Pad to fill status bar
+    my $display_len = length($prompt_str);
+    my $padding = $cols - $display_len;
+    $output .= ' ' x $padding if $padding > 0;
+
+    $output .= RESET;
+    $output .= CLEAR_LINE;
+
+    $class->_set_prompt_buttons(\@buttons);
+
+    return $output;
+}
+
+# =============================================================================
+# File Picker Rendering
+# =============================================================================
+
+sub _render_file_picker {
+    my ($class, $theme, $picker, $text_height, $cols) = @_;
+
+    my $output = '';
+
+    my $query = $picker->query() // '';
+    my @filtered = @{$picker->filtered() // []};
+    my $selected = $picker->selected() // 0;
+    my $scroll = $picker->scroll() // 0;
+    my $total = $picker->total_files();
+    my $filtered_count = $picker->filtered_count();
+
+    # Row 2: Search input
+    $output .= _move_to(2, 1);
+    $output .= $theme->color('dialog_bg');
+    $output .= $theme->color('dialog_fg');
+    $output .= ' > ';
+    $output .= $theme->color('dialog_input_fg');
+    $output .= $query;
+
+    # Fill rest of search row
+    my $search_fill = $cols - 3 - length($query);
+    $output .= ' ' x $search_fill if $search_fill > 0;
+    $output .= RESET;
+    $output .= CLEAR_LINE;
+
+    # Separator line
+    $output .= _move_to(3, 1);
+    $output .= $theme->color('dialog_border');
+    $output .= BOX_HORIZONTAL x $cols;
+    $output .= RESET;
+
+    # File list (rows 4 to text_height)
+    my $list_height = $text_height - 2;  # -2 for search row and separator
+    $list_height = 1 if $list_height < 1;
+
+    for my $i (0 .. $list_height - 1) {
+        my $row = 4 + $i;
+        my $file_idx = $scroll + $i;
+
+        $output .= _move_to($row, 1);
+
+        if ($file_idx < @filtered) {
+            my $file = $filtered[$file_idx];
+            my $is_selected = ($file_idx == $selected);
+
+            if ($is_selected) {
+                $output .= $theme->color('dropdown_selected_bg');
+                $output .= $theme->color('dropdown_selected_fg');
+                $output .= ' > ';
+            } else {
+                $output .= $theme->color('bg');
+                $output .= $theme->color('fg');
+                $output .= '   ';
+            }
+
+            # Truncate filename if needed
+            my $max_len = $cols - 4;
+            my $display = $file;
+            if (length($display) > $max_len) {
+                $display = '...' . substr($display, length($display) - $max_len + 3);
+            }
+            $output .= $display;
+
+            # Fill rest of line
+            my $fill = $cols - 3 - length($display);
+            $output .= ' ' x $fill if $fill > 0;
+        } else {
+            # Empty row (beyond file list)
+            $output .= $theme->color('empty_line_bg');
+            $output .= ' ' x $cols;
+        }
+
+        $output .= RESET;
+        $output .= CLEAR_LINE;
+    }
+
+    return $output;
 }
 
 1;
