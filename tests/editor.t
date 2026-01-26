@@ -431,6 +431,52 @@ subtest 'Copy and paste' => sub {
     is($editor->{document}->text(), 'Hello WorldHello', 'Text pasted');
 };
 
+subtest 'Copy without selection copies current line' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("line one\nline two\nline three\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Position cursor on line two, no selection
+    $editor->{view}->move_down();
+    ok(!$editor->{view}->has_selection(), 'No selection initially');
+
+    $editor->cmd_copy();
+
+    # Should have selected and copied the entire line including newline
+    ok($editor->{view}->has_selection(), 'Line is now selected');
+    is($editor->{clipboard}, "line two\n", 'Entire line copied including newline');
+    is($editor->{view}->cursor_line(), 1, 'Cursor stays on same line');
+    is($editor->{view}->cursor_col(), 8, 'Cursor at end of line');
+};
+
+subtest 'Cut without selection cuts current line' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("line one\nline two\nline three\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Position cursor on line two, no selection
+    $editor->{view}->move_down();
+    ok(!$editor->{view}->has_selection(), 'No selection initially');
+
+    $editor->cmd_cut();
+
+    # Line should be cut
+    is($editor->{clipboard}, "line two\n", 'Entire line cut including newline');
+    is($editor->{document}->text(), "line one\nline three", 'Line removed from document');
+};
+
 # ============================================================================
 # Find functionality
 # ============================================================================

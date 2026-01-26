@@ -113,6 +113,9 @@ sub cmd_cut {
 
     my $view = $self->{view};
 
+    # If no selection, select current line first
+    $view->select_line() unless $view->has_selection();
+
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
         $self->{terminal}->copy_to_clipboard($self->{clipboard});
@@ -125,12 +128,33 @@ sub cmd_copy {
     my ($self) = @_;
 
     my $view = $self->{view};
+    my $doc = $self->{document};
 
-    if ($view->has_selection()) {
-        $self->{clipboard} = $view->selected_text();
+    # If no selection, copy current line (including newline if not last line)
+    unless ($view->has_selection()) {
+        my $line = $view->cursor_line();
+        my $content = $doc->get_line_content($line);
+
+        # Add newline if not the last line
+        if ($line < $doc->line_count() - 1) {
+            $content .= "\n";
+        }
+
+        $self->{clipboard} = $content;
         $self->{terminal}->copy_to_clipboard($self->{clipboard});
-        $self->show_message("Copied");
+
+        # Select the line visually (cursor stays at end of line)
+        my $line_len = $doc->line_length($line);
+        $view->set_cursor($line, 0, 0);        # Start of line, no extend
+        $view->set_cursor($line, $line_len, 1); # End of line, extend selection
+
+        $self->show_message("Copied line");
+        return;
     }
+
+    $self->{clipboard} = $view->selected_text();
+    $self->{terminal}->copy_to_clipboard($self->{clipboard});
+    $self->show_message("Copied");
 }
 
 sub cmd_paste {
