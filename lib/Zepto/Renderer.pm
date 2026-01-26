@@ -92,6 +92,11 @@ our %MENU_ITEMS = (
         { label => 'Copy',       shortcut => 'Ctrl+C', action => 'copy' },
         { label => 'Paste',      shortcut => 'Ctrl+V', action => 'paste' },
         { separator => 1 },
+        { label => 'Move Line Up',      shortcut => 'Alt+\x{2191}', action => 'move_line_up' },
+        { label => 'Move Line Down',    shortcut => 'Alt+\x{2193}', action => 'move_line_down' },
+        { label => 'Duplicate Line Up',   shortcut => 'Alt+Shift+\x{2191}', action => 'dup_line_up' },
+        { label => 'Duplicate Line Down', shortcut => 'Alt+Shift+\x{2193}', action => 'dup_line_down' },
+        { separator => 1 },
         { label => 'Select All', shortcut => 'Ctrl+A', action => 'select_all' },
     ],
     s => [

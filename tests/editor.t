@@ -404,6 +404,129 @@ subtest 'Unindent preserves selection' => sub {
 };
 
 # ============================================================================
+# Move/duplicate lines
+# ============================================================================
+subtest 'Move line down' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\nccc\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Cursor on first line
+    is($editor->{view}->cursor_line(), 0, 'Start on line 0');
+
+    $editor->do_move_line_down();
+
+    is($editor->{document}->text(), "bbb\naaa\nccc", 'Line moved down');
+    is($editor->{view}->cursor_line(), 1, 'Cursor follows moved line');
+};
+
+subtest 'Move line up' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\nccc\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Move cursor to second line
+    $editor->{view}->move_down();
+    is($editor->{view}->cursor_line(), 1, 'Start on line 1');
+
+    $editor->do_move_line_up();
+
+    is($editor->{document}->text(), "bbb\naaa\nccc", 'Line moved up');
+    is($editor->{view}->cursor_line(), 0, 'Cursor follows moved line');
+};
+
+subtest 'Move line at boundary is no-op' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Try to move first line up - should be no-op
+    $editor->do_move_line_up();
+    is($editor->{document}->text(), "aaa\nbbb", 'First line stays put');
+
+    # Move to last line, try to move down - should be no-op
+    $editor->{view}->move_down();
+    $editor->do_move_line_down();
+    is($editor->{document}->text(), "aaa\nbbb", 'Last line stays put');
+};
+
+subtest 'Move multiple selected lines' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\nccc\nddd\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Select lines 1-2 (bbb, ccc)
+    $editor->{view}->move_down();  # Line 1
+    $editor->{view}->set_cursor(1, 0, 0);
+    $editor->{view}->set_cursor(2, 3, 1);  # Partial selection of line 2
+
+    $editor->do_move_line_down();
+
+    is($editor->{document}->text(), "aaa\nddd\nbbb\nccc", 'Selected lines moved down');
+    ok($editor->{view}->has_selection(), 'Selection preserved');
+};
+
+subtest 'Duplicate line down' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->do_duplicate_line_down();
+
+    is($editor->{document}->text(), "aaa\naaa\nbbb", 'Line duplicated below');
+    is($editor->{view}->cursor_line(), 1, 'Cursor on new duplicate');
+};
+
+subtest 'Duplicate line up' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->{view}->move_down();  # Line 1
+
+    $editor->do_duplicate_line_up();
+
+    is($editor->{document}->text(), "aaa\nbbb\nbbb", 'Line duplicated above');
+    is($editor->{view}->cursor_line(), 1, 'Cursor on new duplicate');
+};
+
+# ============================================================================
 # Copy/paste
 # ============================================================================
 subtest 'Copy and paste' => sub {

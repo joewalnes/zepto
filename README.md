@@ -81,6 +81,8 @@ make test     # Run tests
 - Auto-indent on newline
 - Tab key inserts spaces
 - Indent / unindent selected block (Tab / Shift+Tab)
+- Move line(s) up/down (Alt+↑ / Alt+↓)
+- Duplicate line(s) up/down (Alt+Shift+↑ / Alt+Shift+↓)
 
 ### Navigation
 

@@ -309,9 +309,17 @@ sub handle_editing_event {
         my $shift = Zepto::InputParser::has_modifier($event, 'shift');
         my $alt = Zepto::InputParser::has_modifier($event, 'alt');
 
-        # Navigation
-        if ($key eq 'up')     { $view->move_up($shift); }
-        elsif ($key eq 'down')  { $view->move_down($shift); }
+        # Navigation / Line movement
+        if ($key eq 'up') {
+            if ($alt && $shift) { $self->do_duplicate_line_up(); }
+            elsif ($alt) { $self->do_move_line_up(); }
+            else { $view->move_up($shift); }
+        }
+        elsif ($key eq 'down') {
+            if ($alt && $shift) { $self->do_duplicate_line_down(); }
+            elsif ($alt) { $self->do_move_line_down(); }
+            else { $view->move_down($shift); }
+        }
         elsif ($key eq 'left')  {
             if ($alt) { $view->move_word_left($shift); }
             else { $view->move_left($shift); }
@@ -768,6 +776,179 @@ sub do_unindent {
         my $new_col = $cur_col > $first_removed ? $cur_col - $first_removed : 0;
         $view->set_cursor($start_line, $new_col, 0);
     }
+}
+
+# =============================================================================
+# Move/Duplicate Lines
+# =============================================================================
+
+sub do_move_line_up {
+    my ($self) = @_;
+    $self->_move_lines(-1);
+}
+
+sub do_move_line_down {
+    my ($self) = @_;
+    $self->_move_lines(1);
+}
+
+sub _move_lines {
+    my ($self, $direction) = @_;  # -1 = up, 1 = down
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    # Determine line range (expand selection to full lines)
+    my ($start_line, $end_line);
+    if ($view->has_selection()) {
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        $start_line = $sl;
+        $end_line = $el;
+    }
+    else {
+        $start_line = $view->cursor_line();
+        $end_line = $start_line;
+    }
+
+    # Check boundaries
+    if ($direction < 0 && $start_line == 0) {
+        return;  # Can't move up from first line
+    }
+    if ($direction > 0 && $end_line >= $doc->line_count() - 1) {
+        return;  # Can't move down from last line
+    }
+
+    # Get the text of lines to move (including newlines)
+    my $move_start = $doc->line_start_offset($start_line);
+    my $move_end = $end_line == $doc->line_count() - 1
+        ? $doc->length()
+        : $doc->line_start_offset($end_line + 1);
+    my $move_text = $doc->get_text($move_start, $move_end);
+
+    # Get the adjacent line we're swapping with
+    my $swap_line = $direction < 0 ? $start_line - 1 : $end_line + 1;
+    my $swap_start = $doc->line_start_offset($swap_line);
+    my $swap_end = $swap_line == $doc->line_count() - 1
+        ? $doc->length()
+        : $doc->line_start_offset($swap_line + 1);
+    my $swap_text = $doc->get_text($swap_start, $swap_end);
+
+    # Handle edge case: last line has no trailing newline
+    if ($direction > 0 && $swap_line == $doc->line_count() - 1) {
+        # Moving down to swap with last line
+        # swap_text (last line) needs newline since it's moving to middle
+        # move_text loses its trailing newline since it's becoming last
+        $swap_text .= "\n" unless $swap_text =~ /\n$/;
+        $move_text =~ s/\n$//;
+    }
+    elsif ($direction < 0 && $start_line == $doc->line_count() - 1) {
+        # Moving up from last line
+        # move_text (last line) needs newline since it's moving to middle
+        # swap_text loses its trailing newline since it's becoming last
+        $move_text .= "\n" unless $move_text =~ /\n$/;
+        $swap_text =~ s/\n$//;
+    }
+
+    # Perform the swap by deleting and reinserting
+    my $full_start = $direction < 0 ? $swap_start : $move_start;
+    my $full_end = $direction < 0 ? $move_end : $swap_end;
+
+    # Delete the entire range
+    $doc->delete($full_start, $full_end - $full_start);
+
+    # Insert in new order
+    if ($direction < 0) {
+        # Moving up: insert moved text, then swap text
+        $doc->insert($full_start, $move_text . $swap_text);
+    }
+    else {
+        # Moving down: insert swap text, then moved text
+        $doc->insert($full_start, $swap_text . $move_text);
+    }
+
+    # Update cursor/selection to follow moved lines
+    my $new_start_line = $start_line + $direction;
+    my $new_end_line = $end_line + $direction;
+
+    if ($view->has_selection()) {
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        $view->clear_selection();
+        $view->set_cursor($new_start_line, $sc, 0);
+        $view->set_cursor($new_end_line, $ec, 1);
+    }
+    else {
+        my $col = $view->cursor_col();
+        $view->set_cursor($new_start_line, $col, 0);
+    }
+}
+
+sub do_duplicate_line_up {
+    my ($self) = @_;
+    $self->_duplicate_lines(-1);
+}
+
+sub do_duplicate_line_down {
+    my ($self) = @_;
+    $self->_duplicate_lines(1);
+}
+
+sub _duplicate_lines {
+    my ($self, $direction) = @_;  # -1 = up, 1 = down
+
+    my $doc = $self->{document};
+    my $view = $self->{view};
+
+    # Determine line range (expand selection to full lines)
+    my ($start_line, $end_line);
+    if ($view->has_selection()) {
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        $start_line = $sl;
+        $end_line = $el;
+    }
+    else {
+        $start_line = $view->cursor_line();
+        $end_line = $start_line;
+    }
+
+    # Get the text of lines to duplicate
+    my $dup_start = $doc->line_start_offset($start_line);
+    my $dup_end = $end_line == $doc->line_count() - 1
+        ? $doc->length()
+        : $doc->line_start_offset($end_line + 1);
+    my $dup_text = $doc->get_text($dup_start, $dup_end);
+
+    # Ensure text ends with newline for proper insertion
+    my $needs_newline = $dup_text !~ /\n$/;
+    $dup_text .= "\n" if $needs_newline;
+
+    # Insert the duplicate
+    my $insert_pos;
+    my $cursor_line_delta;
+
+    if ($direction < 0) {
+        # Duplicate above: insert at start of first line
+        $insert_pos = $dup_start;
+        $cursor_line_delta = 0;  # Cursor stays on original (which shifted down)
+    }
+    else {
+        # Duplicate below: insert after last line
+        $insert_pos = $dup_end;
+        if ($needs_newline) {
+            # Last line didn't have newline, we need to add one before
+            $doc->insert($dup_end, "\n");
+            $insert_pos = $dup_end + 1;
+            $dup_text =~ s/\n$//;  # Remove the newline we added to dup_text
+        }
+        $cursor_line_delta = $end_line - $start_line + 1;  # Move to duplicate
+    }
+
+    $doc->insert($insert_pos, $dup_text);
+
+    # Move cursor to the duplicate
+    my $new_line = $start_line + $cursor_line_delta;
+    my $col = $view->cursor_col();
+    $view->clear_selection();
+    $view->set_cursor($new_line, $col, 0);
 }
 
 sub delete_selection {

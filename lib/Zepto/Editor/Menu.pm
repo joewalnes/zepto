@@ -234,6 +234,10 @@ sub execute_menu_item {
     elsif ($action eq 'cut')        { $self->cmd_cut(); }
     elsif ($action eq 'copy')       { $self->cmd_copy(); }
     elsif ($action eq 'paste')      { $self->cmd_paste(); }
+    elsif ($action eq 'move_line_up')   { $self->do_move_line_up(); }
+    elsif ($action eq 'move_line_down') { $self->do_move_line_down(); }
+    elsif ($action eq 'dup_line_up')    { $self->do_duplicate_line_up(); }
+    elsif ($action eq 'dup_line_down')  { $self->do_duplicate_line_down(); }
     elsif ($action eq 'select_all') { $self->cmd_select_all(); }
     elsif ($action eq 'find')       { $self->cmd_find(); }
     elsif ($action eq 'find_next')  { $self->cmd_find_next(); }
