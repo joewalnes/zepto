@@ -183,7 +183,7 @@ subtest 'Content displayed' => sub {
     like($output, qr/Foo Bar/, 'Contains second line content');
 };
 
-subtest 'Empty lines beyond document show tilde' => sub {
+subtest 'Empty lines beyond document use distinct background' => sub {
     my ($doc, $view) = create_test_state("Short\n");
     my $theme = Zepto::Theme->dark_theme();
 
@@ -195,9 +195,8 @@ subtest 'Empty lines beyond document show tilde' => sub {
         cols     => 80,
     );
 
-    # Count tildes (should be many for empty lines)
-    my $tilde_count = () = $output =~ /~/g;
-    ok($tilde_count > 10, 'Has tildes for empty lines');
+    # Check for empty_line_bg color (rgb 20,21,30 for dark theme)
+    like($output, qr/\x1b\[48;2;20;21;30m/, 'Has empty line background color');
 };
 
 # ============================================================================
@@ -468,9 +467,8 @@ subtest 'Large terminal' => sub {
     );
 
     ok(defined $output, 'Renders on large terminal');
-    # Should have many tildes for empty lines
-    my $tilde_count = () = $output =~ /~/g;
-    ok($tilde_count > 50, 'Many tildes on large terminal');
+    # Should have empty line background for lines beyond document
+    like($output, qr/\x1b\[48;2;20;21;30m/, 'Has empty line background on large terminal');
 };
 
 # ============================================================================

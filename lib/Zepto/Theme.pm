@@ -93,6 +93,9 @@ sub dark_theme {
         # Cursor line (subtle highlight)
         cursor_line_bg => bg_rgb(41, 46, 66),
 
+        # Empty lines (beyond end of file)
+        empty_line_bg => bg_rgb(20, 21, 30),
+
         # Cursor color
         cursor_color => '#7aa2f7',  # Soft blue
 
@@ -153,6 +156,9 @@ sub light_theme {
 
         # Cursor line
         cursor_line_bg => bg_rgb(231, 234, 242),
+
+        # Empty lines (beyond end of file)
+        empty_line_bg => bg_rgb(225, 228, 235),
 
         # Cursor color
         cursor_color => '#7287fd',  # Lavender

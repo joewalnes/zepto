@@ -397,11 +397,9 @@ sub _render_text_area {
             }
         }
         else {
-            # Empty line (beyond document)
-            $output .= $theme->color('gutter_fg');
-            $output .= '~';
-            $output .= $theme->color('fg');
-            $output .= ' ' x ($width - 1);
+            # Empty line (beyond document) - use distinct background
+            $output .= $theme->color('empty_line_bg');
+            $output .= ' ' x $width;
         }
 
         $output .= RESET;
