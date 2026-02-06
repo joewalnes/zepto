@@ -2,6 +2,14 @@
 
 A minimal terminal text editor in a single file.
 
+## Quick Start
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/joewalnes/zepto/releases/download/latest/zepto -o ~/.local/bin/zepto && chmod +x ~/.local/bin/zepto
+```
+
+Then run `zepto myfile.txt`. Or [download manually](https://github.com/joewalnes/zepto/releases/download/latest/zepto).
+
 ## Why Zepto?
 
 Sometimes you just need to edit a file. You're SSH'd into a server, inside a Docker container, or
