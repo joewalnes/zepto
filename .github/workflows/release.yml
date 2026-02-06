@@ -1,0 +1,65 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - name: Test and build
+        run: |
+          make test
+          make build
+          make check
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Delete existing latest release
+        run: gh release delete latest --cleanup-tag --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create latest release
+        run: |
+          gh release create latest \
+            --title "Latest Build" \
+            --notes "Built from commit ${{ github.sha }}
+
+          **Latest (updates on each build):**
+          \`\`\`
+          curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/zepto -o zepto && chmod +x zepto
+          \`\`\`
+
+          **This specific build (${{ steps.sha.outputs.short }}):**
+          \`\`\`
+          curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.sha.outputs.short }}/zepto -o zepto && chmod +x zepto
+          \`\`\`" \
+            --prerelease \
+            zepto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create SHA-tagged release
+        run: |
+          gh release create ${{ steps.sha.outputs.short }} \
+            --title "Build ${{ steps.sha.outputs.short }}" \
+            --notes "Permanent release for commit ${{ github.sha }}" \
+            --prerelease \
+            zepto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
