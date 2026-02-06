@@ -2,6 +2,14 @@
 
 A minimal terminal text editor in a single file.
 
+## Quick Start
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/joewalnes/zepto/releases/download/latest/zepto -o ~/.local/bin/zepto && chmod +x ~/.local/bin/zepto
+```
+
+Then run `zepto myfile.txt`. Or [download manually](https://github.com/joewalnes/zepto/releases/download/latest/zepto).
+
 ## Why Zepto?
 
 Sometimes you just need to edit a file. You're SSH'd into a server, inside a Docker container, or
@@ -45,11 +53,12 @@ zepto myfile.txt
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
 | Ctrl+X/C/V | Cut/Copy/Paste |
-| Ctrl+F | Find |
-| Ctrl+R | Replace |
+| Ctrl+F | Find (live) |
+| Ctrl+R | Replace (live) |
+| Ctrl+J/K | Find next/previous |
 | Ctrl+G | Go to line |
 | Ctrl+A | Select all |
-| Ctrl+/ | Help |
+| Alt+↑/↓ | Move line up/down |
 
 All features are also accessible via keyboard shortcuts, menu bar, and mouse.
 
@@ -110,11 +119,17 @@ make test     # Run tests
 
 ### Search & Replace
 
-- Find (Ctrl+F)
-- Find next / previous (Ctrl+N / Ctrl+P)
-- Replace (Ctrl+R)
-- Replace all
-- Search wraps around document
+- **Live interactive find** (Ctrl+F) — Search with instant highlighting
+- **Live find & replace** (Ctrl+R) — Replace with live preview
+- Regex search enabled by default (PCRE syntax)
+- Case insensitive by default
+- Toggle regex mode (Alt+R or click [.*])
+- Toggle case sensitivity (Alt+I or click [Aa])
+- Navigate matches with ↑/↓ arrow keys
+- Find next / previous (Ctrl+J / Ctrl+K)
+- Enter to replace all matches
+- Current match highlighted distinctly
+- Match count shown in footer
 
 ### User Interface
 
