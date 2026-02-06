@@ -42,7 +42,7 @@ jobs:
 
           **Latest (updates on each build):**
           \`\`\`
-          curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/zepto -o zepto && chmod +x zepto
+          curl -fsSL https://github.com/${{ github.repository }}/releases/download/latest/zepto -o zepto && chmod +x zepto
           \`\`\`
 
           **This specific build (${{ steps.sha.outputs.short }}):**
