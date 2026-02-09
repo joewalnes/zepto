@@ -1,4 +1,6 @@
-.PHONY: all test test-verbose clean build check loc
+.PHONY: all test test-verbose clean build install check loc
+
+PREFIX ?= $(HOME)/.local
 
 # Default target: test, build, check, loc
 all: test build check loc
@@ -33,6 +35,12 @@ zepto: lib/Zepto/*.pm
 	@perl build.pl > zepto
 	@chmod +x zepto
 	@echo "Built: zepto"
+
+# Install to PREFIX/bin
+install: zepto
+	@mkdir -p $(PREFIX)/bin
+	@cp zepto $(PREFIX)/bin/zepto
+	@echo "Installed: $(PREFIX)/bin/zepto"
 
 # Check Perl syntax of all modules
 check:
