@@ -521,4 +521,14 @@ sub cmd_toggle_theme {
     }
 }
 
+sub cmd_toggle_powerline {
+    my ($self) = @_;
+
+    my $current = $self->{prefs}->powerline();
+    my $new_state = $current ? 0 : 1;
+
+    $self->{prefs}->set_powerline($new_state);
+    Zepto::Chars->set_enabled($new_state);
+}
+
 1;

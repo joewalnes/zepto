@@ -102,9 +102,16 @@ sub dark_theme {
         # Menu bar
         menu_fg      => fg_rgb(169, 177, 214),
         menu_bg      => bg_rgb(36, 40, 59),
-        menu_hotkey  => fg_rgb(125, 207, 255), # Cyan accent
-        menu_active_fg => fg_rgb(255, 255, 255),
-        menu_active_bg => bg_rgb(52, 79, 138),  # Darker blue for contrast
+        menu_bg_fg   => fg_rgb(36, 40, 59),       # Menu bg as foreground (for pill edges)
+        menu_hotkey  => fg_rgb(125, 207, 255),    # Cyan accent
+        menu_active_fg => fg_rgb(122, 162, 247),  # Pill border color (accent blue)
+        menu_active_bg => bg_rgb(52, 79, 138),    # Inside pill background
+        menu_active_edge => fg_rgb(52, 79, 138),  # Active pill bg as fg (for edges)
+        menu_active_text => fg_rgb(255, 255, 255), # Text inside active pill
+        menu_pill_fg => fg_rgb(65, 72, 104),      # Inactive pill border (subtle)
+        menu_pill_bg => bg_rgb(45, 51, 74),       # Inactive pill background
+        menu_pill_edge => fg_rgb(45, 51, 74),     # Inactive pill bg as fg (for edges)
+        menu_pill_text => fg_rgb(169, 177, 214), # Text inside inactive pill
 
         # Dropdown menu
         dropdown_fg  => fg_rgb(169, 177, 214),
@@ -117,7 +124,16 @@ sub dark_theme {
         # Status bar
         status_fg    => fg_rgb(169, 177, 214),
         status_bg    => bg_rgb(36, 40, 59),
+        status_bg_fg => fg_rgb(36, 40, 59),     # Status bg as foreground
         status_accent => fg_rgb(125, 207, 255), # Cyan
+        # Status bar segments
+        status_file_fg   => fg_rgb(255, 255, 255),
+        status_file_bg   => bg_rgb(52, 79, 138),    # Blue segment
+        status_file_edge => fg_rgb(52, 79, 138),
+        status_pos_fg    => fg_rgb(255, 255, 255),
+        status_pos_bg    => bg_rgb(86, 95, 137),    # Muted segment
+        status_pos_edge  => fg_rgb(86, 95, 137),
+        status_modified_fg => fg_rgb(224, 175, 104), # Yellow for modified
 
         # Dialog
         dialog_fg    => fg_rgb(192, 202, 245),
@@ -165,10 +181,17 @@ sub light_theme {
 
         # Menu bar
         menu_fg      => fg_rgb(76, 79, 105),
-        menu_bg      => bg_rgb(220, 224, 232),  # Surface0
+        menu_bg      => bg_rgb(239, 241, 245),  # Base (lighter, matches main bg)
+        menu_bg_fg   => fg_rgb(239, 241, 245),  # Menu bg as foreground (for pill edges)
         menu_hotkey  => fg_rgb(30, 102, 245),   # Blue accent
-        menu_active_fg => fg_rgb(239, 241, 245),
-        menu_active_bg => bg_rgb(114, 135, 253), # Lavender
+        menu_active_fg => fg_rgb(114, 135, 253),  # Pill border (lavender)
+        menu_active_bg => bg_rgb(114, 135, 253),  # Inside pill background
+        menu_active_edge => fg_rgb(114, 135, 253), # Active pill bg as fg (for edges)
+        menu_active_text => fg_rgb(255, 255, 255), # Text inside active pill
+        menu_pill_fg => fg_rgb(172, 176, 190),    # Inactive pill border
+        menu_pill_bg => bg_rgb(204, 208, 218),    # Inactive pill background
+        menu_pill_edge => fg_rgb(204, 208, 218),  # Inactive pill bg as fg (for edges)
+        menu_pill_text => fg_rgb(76, 79, 105),   # Text inside inactive pill
 
         # Dropdown menu
         dropdown_fg  => fg_rgb(76, 79, 105),
@@ -181,7 +204,16 @@ sub light_theme {
         # Status bar
         status_fg    => fg_rgb(76, 79, 105),
         status_bg    => bg_rgb(220, 224, 232),
+        status_bg_fg => fg_rgb(220, 224, 232),  # Status bg as foreground
         status_accent => bg_rgb(30, 102, 245),
+        # Status bar segments
+        status_file_fg   => fg_rgb(255, 255, 255),
+        status_file_bg   => bg_rgb(114, 135, 253),  # Lavender segment
+        status_file_edge => fg_rgb(114, 135, 253),
+        status_pos_fg    => fg_rgb(255, 255, 255),
+        status_pos_bg    => bg_rgb(156, 160, 176),  # Muted segment
+        status_pos_edge  => fg_rgb(156, 160, 176),
+        status_modified_fg => fg_rgb(223, 142, 29), # Yellow for modified
 
         # Dialog
         dialog_fg    => fg_rgb(76, 79, 105),

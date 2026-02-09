@@ -57,6 +57,8 @@ zepto myfile.txt
 | Ctrl+R | Replace |
 | Ctrl+G | Go to line |
 | Ctrl+A | Select all |
+| Ctrl+T | Toggle theme |
+| Ctrl+P | Toggle Powerline glyphs |
 | Ctrl+/ | Help |
 
 All features are also accessible via keyboard shortcuts, menu bar, and mouse.
@@ -147,8 +149,15 @@ make test     # Run tests
 
 - Dark theme (default)
 - Light theme
-- Switch via View menu
+- Switch via View menu (Ctrl+T)
 - True-color (24-bit RGB)
+
+### Powerline Glyphs
+
+- Enhanced UI with Powerline/Nerd Font glyphs (rounded pills, icons)
+- Toggle with Ctrl+P or View menu
+- Automatically falls back to ASCII when disabled
+- Disable by default: `--no-powerline` flag or `ZEPTO_POWERLINE=0` env var
 
 ### Terminal Compatibility
 

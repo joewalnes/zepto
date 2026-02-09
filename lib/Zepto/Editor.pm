@@ -460,6 +460,7 @@ sub handle_ctrl_char {
 
     # View
     elsif ($char eq 't') { $self->cmd_toggle_theme(); }
+    elsif ($char eq 'p') { $self->cmd_toggle_powerline(); }
 
     # Reset quit pending for any other command
     $self->{quit_pending} = 0 unless $char eq 'q';
@@ -1310,6 +1311,7 @@ sub render {
         document => $self->{document},
         view     => $self->{view},
         theme    => $self->{theme},
+        prefs    => $self->{prefs},
         rows     => $rows,
         cols     => $cols,
         message  => $self->{message},

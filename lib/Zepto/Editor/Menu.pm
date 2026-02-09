@@ -67,7 +67,7 @@ sub handle_menu_click {
     for my $key (keys %$positions) {
         my $pos = $positions->{$key};
         if ($x >= $pos->{start} && $x <= $pos->{end}) {
-            if ($self->{menu_open} eq $key) {
+            if (($self->{menu_open} // '') eq $key) {
                 $self->close_menu();
             }
             else {
@@ -250,6 +250,7 @@ sub execute_menu_item {
     elsif ($action eq 'replace')    { $self->cmd_replace(); }
     elsif ($action eq 'goto')       { $self->cmd_goto_line(); }
     elsif ($action eq 'toggle_theme') { $self->cmd_toggle_theme(); }
+    elsif ($action eq 'toggle_powerline') { $self->cmd_toggle_powerline(); }
 }
 
 1;

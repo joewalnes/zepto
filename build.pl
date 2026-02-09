@@ -14,6 +14,7 @@ my @modules = qw(
     lib/Zepto/Terminal.pm
     lib/Zepto/Config.pm
     lib/Zepto/FilePicker.pm
+    lib/Zepto/Chars.pm
     lib/Zepto/Renderer.pm
     lib/Zepto/Editor.pm
     lib/Zepto/Editor/Commands.pm
@@ -77,7 +78,36 @@ print <<'MAIN';
 # =============================================================================
 package main;
 
-my $file = $ARGV[0];
-my $editor = Zepto::Editor->new(file => $file);
+# Parse command line options
+my $file;
+my $no_powerline = 0;
+
+for my $arg (@ARGV) {
+    if ($arg eq '--no-powerline' || $arg eq '-P') {
+        $no_powerline = 1;
+    } elsif ($arg eq '--help' || $arg eq '-h') {
+        print "Usage: zepto [options] [file]\n";
+        print "Options:\n";
+        print "  --no-powerline, -P  Disable Powerline/Nerd Font glyphs\n";
+        print "  --help, -h          Show this help\n";
+        print "\nEnvironment:\n";
+        print "  ZEPTO_POWERLINE=0   Disable Powerline glyphs by default\n";
+        exit 0;
+    } elsif ($arg !~ /^-/) {
+        $file = $arg;
+    }
+}
+
+# Check environment variable for powerline setting
+my $powerline = 1;  # Default ON
+if ($no_powerline || (defined $ENV{ZEPTO_POWERLINE} && $ENV{ZEPTO_POWERLINE} eq '0')) {
+    $powerline = 0;
+}
+
+# Create preferences with powerline setting
+my $prefs = Zepto::Preferences->new(powerline => $powerline);
+Zepto::Chars->set_enabled($powerline);
+
+my $editor = Zepto::Editor->new(file => $file, prefs => $prefs);
 $editor->run();
 MAIN

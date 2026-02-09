@@ -22,6 +22,7 @@ my %DEFAULTS = (
     show_line_numbers => 1,
     show_status_bar  => 1,
     show_menu_bar    => 1,
+    powerline        => 1,            # Use Powerline/Nerd Font glyphs
 
     # Editing
     tab_width        => 4,
@@ -178,6 +179,9 @@ sub set_search_case_sensitive { $_[0]->set('search_case_sensitive', $_[1]) }
 
 sub search_wrap { $_[0]->get('search_wrap') }
 sub set_search_wrap { $_[0]->set('search_wrap', $_[1]) }
+
+sub powerline { $_[0]->get('powerline') }
+sub set_powerline { $_[0]->set('powerline', $_[1]) }
 
 # =============================================================================
 # Tab/space conversion helpers

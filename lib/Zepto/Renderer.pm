@@ -19,6 +19,7 @@ package Zepto::Renderer;
 use strict;
 use warnings;
 use utf8;
+use Zepto::Chars;
 
 # Escape sequences
 use constant {
@@ -70,10 +71,10 @@ use constant {
 
 # Menu definitions (single source of truth for menu names, order, and items)
 our @MENU_DEFS = (
-    { key => 'f', name => 'File' },
-    { key => 'e', name => 'Edit' },
-    { key => 's', name => 'Search' },
-    { key => 'v', name => 'View' },
+    { key => 'f', name => 'File',   icon => 'menu_file' },
+    { key => 'e', name => 'Edit',   icon => 'menu_edit' },
+    { key => 's', name => 'Search', icon => 'menu_search' },
+    { key => 'v', name => 'View',   icon => 'menu_view' },
 );
 
 # Full menu item definitions - single source of truth for both rendering and execution
@@ -113,6 +114,7 @@ our %MENU_ITEMS = (
     ],
     v => [
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
+        { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
     ],
 );
 
@@ -123,30 +125,36 @@ sub get_menu_actions {
     return [ map { $_->{separator} ? '-' : $_->{action} } @$items ];
 }
 
-# Menu bar prefix "[Esc] " width
-use constant MENU_ESC_PREFIX_WIDTH => 6;  # "[Esc] "
+# Menu bar prefix width (menu pill + space)
+# Format: ' ' + RL + ' ☰ esc ' + RR + ' ' = 11 chars
+use constant MENU_ESC_PREFIX_WIDTH => 11;
 
 # Menu bar buttons on the right side
 our @MENU_BAR_BUTTONS = (
-    { label => 'Open', key => '^O', action => 'open' },
-    { label => 'Save', key => '^S', action => 'save' },
-    { label => 'Quit', key => '^Q', action => 'quit' },
+    { label => 'Open', key => '^O', action => 'open', icon => 'folder_open' },
+    { label => 'Save', key => '^S', action => 'save', icon => 'save' },
+    { label => 'Quit', key => '^Q', action => 'quit', icon => 'quit' },
 );
 
 # Calculate menu positions dynamically from menu definitions
 # Returns hash: { f => { start => 0, end => 5, x => 1 }, ... }
 sub get_menu_positions {
     my %positions;
-    my $x = MENU_ESC_PREFIX_WIDTH;  # Account for "[Esc] " prefix
+    my $x = MENU_ESC_PREFIX_WIDTH;  # Account for menu icon prefix
 
     for my $menu (@MENU_DEFS) {
-        my $width = length($menu->{name}) + 2;  # " Name "
+        # Pill format: RL + space + [icon + space] + Name + space + RR
+        my $width = length($menu->{name}) + 4;  # edges + padding
+        # Add icon width (always present - either powerline or bullet)
+        if ($menu->{icon}) {
+            $width += 2;  # icon (1 display char) + space
+        }
         $positions{$menu->{key}} = {
             start => $x,                  # Start of clickable region (0-indexed)
             end   => $x + $width - 1,     # End of clickable region (0-indexed)
             x     => $x + 1,              # X position for dropdown (1-indexed for terminal)
         };
-        $x += $width;
+        $x += $width + 1;  # +1 for space between pills
     }
 
     return \%positions;
@@ -184,9 +192,15 @@ sub render {
     my $view     = $args{view};
     my $ui       = $args{ui} // {};
     my $theme    = $args{theme};
+    my $prefs    = $args{prefs};
     my $rows     = $args{rows} // DEFAULT_ROWS;
     my $cols     = $args{cols} // DEFAULT_COLS;
     my $message  = $args{message} // '';
+
+    # Sync Chars module with prefs
+    if ($prefs) {
+        Zepto::Chars->set_enabled($prefs->powerline());
+    }
 
     my $output = '';
 
@@ -246,7 +260,7 @@ sub render {
     # Render dropdown menu if open
     if ($ui->{menu_open}) {
         $output .= $class->_render_dropdown(
-            $theme, $ui, $cols
+            $theme, $ui, $cols, $prefs
         );
     }
 
@@ -299,67 +313,106 @@ sub _render_menu_bar {
     my $output = '';
     $output .= $theme->color('menu_bg') . $theme->color('menu_fg');
 
-    # Left side: [Esc] prefix
-    $output .= '[Esc] ';
+    # Left side: Menu icon as a subtle pill
+    my $menu_icon = Zepto::Chars->get('menu');
+    my $rl = Zepto::Chars->get('round_left');
+    my $rr = Zepto::Chars->get('round_right');
+
+    # Menu indicator pill
+    $output .= ' ';
+    $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+    $output .= $rl;
+    $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+    $output .= " $menu_icon esc ";
+    $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+    $output .= $rr;
+    $output .= $theme->color('menu_fg') . ' ';
+
     my $x = MENU_ESC_PREFIX_WIDTH;
 
-    # Menu names
+    # Menu names as rounded pills with icons
+    # Reset colors before starting menu pills to ensure clean state
+    $output .= RESET . $theme->color('menu_bg') . $theme->color('menu_fg');
+
     for my $menu (@MENU_DEFS) {
         my $is_active = ($ui->{menu_open} // '') eq $menu->{key};
+        my $icon = $menu->{icon} ? Zepto::Chars->get($menu->{icon}) : '';
+        my $icon_str = $icon ? "$icon " : '';
+        my $content = " $icon_str$menu->{name} ";
 
         if ($is_active) {
-            $output .= $theme->color('menu_active_bg');
-            $output .= $theme->color('menu_active_fg');
-        }
-
-        $output .= ' ';
-        $output .= $menu->{name};
-        $output .= ' ';
-
-        if ($is_active) {
-            $output .= $theme->color('menu_bg');
+            # Active menu: colored pill
+            # Both edges: bg=menu bar, fg=pill interior (powerline chars fill with fg)
+            $output .= $theme->color('menu_bg') . $theme->color('menu_active_edge');
+            $output .= $rl;
+            $output .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+            $output .= $content;
+            $output .= $theme->color('menu_bg') . $theme->color('menu_active_edge');
+            $output .= $rr;
+            $output .= $theme->color('menu_fg');
+        } else {
+            # Inactive menu: subtle pill
+            $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+            $output .= $rl;
+            $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+            $output .= $content;
+            $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+            $output .= $rr;
             $output .= $theme->color('menu_fg');
         }
 
-        $x += length($menu->{name}) + 2;
+        $output .= ' ';  # Space between pills
+        # Width: pill chars (2) + space + [icon + space if present] + name + space + trailing space
+        my $pill_width = length($menu->{name}) + 4;  # 2 edges + 2 spaces around name
+        $pill_width += 2 if $icon;  # icon (1 display char) + space (always, not just powerline)
+        $x += $pill_width + 1;  # +1 for space between pills
     }
 
-    # Right side: Save and Quit buttons
-    # Calculate button string and width
+    # Right side: Action buttons as rounded pills with icons + labels
     my @buttons_copy;
-    my $buttons_str = '';
     my $buttons_width = 0;
     for my $btn (@MENU_BAR_BUTTONS) {
-        my $btn_text = ' ' . $btn->{label} . ' ' . $btn->{key} . ' ';
-        $buttons_str .= $btn_text;
+        # Get icon for button (always present, either powerline or bullet)
+        my $icon = $btn->{icon} ? Zepto::Chars->get($btn->{icon}) : '';
+        # Inner content: " icon label key " (3 template spaces + icon_str)
+        my $icon_str = $icon ? "$icon " : '';
+        my $btn_inner = " $icon_str$btn->{label} $btn->{key} ";
+        # Display width: 3 (spaces in template) + label + key + icon(2 if present)
+        my $inner_width = length($btn->{label}) + length($btn->{key}) + 3;
+        $inner_width += 2 if $icon;  # icon (1) + space (1)
+        # Total: rl(1) + inner + rr(1) + trailing_space(1)
+        my $btn_width = $inner_width + 3;
         push @buttons_copy, {
             %$btn,
-            width => length($btn_text),
+            inner => $btn_inner,
+            width => $btn_width,
         };
-        $buttons_width += length($btn_text);
+        $buttons_width += $btn_width;
     }
 
     # Fill middle with spaces
     my $remaining = $cols - $x - $buttons_width;
     $output .= ' ' x $remaining if $remaining > 0;
 
-    # Track button positions and render
+    # Track button positions and render as pills
     my $btn_x = $cols - $buttons_width;
     for my $btn (@buttons_copy) {
         $btn->{x_start} = $btn_x;
-        $btn->{x_end} = $btn_x + $btn->{width} - 1;
+        $btn->{x_end} = $btn_x + $btn->{width} - 2;  # -1 for trailing space
         $btn_x += $btn->{width};
+
+        # Render button as pill (both edges: bg=menu, fg=pill interior)
+        $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+        $output .= $rl;
+        $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+        $output .= $btn->{inner};
+        $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
+        $output .= $rr;
+        $output .= $theme->color('menu_fg') . ' ';
     }
     $class->_set_menu_bar_buttons(\@buttons_copy);
 
-    # Render buttons with subtle distinction
-    my $btn_bg = $theme->color('dropdown_bg');
-    my $btn_fg = $theme->color('dropdown_fg');
-    for my $btn (@buttons_copy) {
-        $output .= $btn_bg . $btn_fg;
-        $output .= ' ' . $btn->{label} . ' ' . $btn->{key} . ' ';
-    }
-
+    # Reset before clear to show terminal default on right edge (consistent with text rows)
     $output .= RESET;
     $output .= CLEAR_LINE;
 
@@ -500,45 +553,80 @@ sub _render_line_with_highlights {
     return $output;
 }
 
-# Render the status bar
+# Render the status bar with Powerline segments
 sub _render_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message) = @_;
 
     my $output = '';
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    my $ar = Zepto::Chars->get('arrow_right');
+    my $al = Zepto::Chars->get('arrow_left');
 
-    # Right side: cursor position
-    my $right = '';
-    if ($view && $doc) {
-        my $line = $view->cursor_line() + 1;
-        my $col = $view->cursor_col() + 1;
-        $right = sprintf("Ln %d, Col %d ", $line, $col);
-    }
-
-    # Left side: message (if any) or filename
-    my $left = '';
+    # If there's a message, show it simply
     if ($message) {
-        # Show message with warning color
-        $output .= $theme->color('warning_fg');
-        $left = ' ' . $message;
-    }
-    elsif ($doc) {
-        $left = ' ' . $doc->filename();
-        $left .= ' *' if $doc->is_dirty();
-    }
-    else {
-        $left = ' [No file]';
+        $output .= $theme->color('status_bg') . $theme->color('warning_fg');
+        $output .= ' ' . $message;
+        my $padding = $cols - length($message) - 1;
+        $output .= ' ' x $padding if $padding > 0;
+        $output .= RESET . CLEAR_LINE;
+        return $output;
     }
 
-    my $left_len = length($left);
-    my $right_len = length($right);
-    my $padding = $cols - $left_len - $right_len;
-    $padding = 0 if $padding < 0;
+    # Get file info
+    my $filename = $doc ? $doc->filename() : '[No file]';
+    my $is_dirty = $doc && $doc->is_dirty();
+    my $modified_icon = $is_dirty ? ' ' . Zepto::Chars->get('modified') : '';
 
-    $output .= $left;
-    $output .= $theme->color('status_fg') if $message;  # Reset after warning color
-    $output .= ' ' x $padding;
-    $output .= $right;
+    # Get position info
+    my $line = $view ? $view->cursor_line() + 1 : 1;
+    my $col = $view ? $view->cursor_col() + 1 : 1;
+    my $col_padded = sprintf("%-3d", $col);  # Left-align, pad to 3 digits to prevent jiggle
+    my $pos_text = " $line:$col_padded";
+
+    # Build left segment: filename with optional modified indicator
+    my $file_text = " $filename$modified_icon ";
+    my $file_width = length($filename) + 2;
+    $file_width += 2 if $is_dirty;  # For modified icon + space
+
+    # Build right segment: position (col is always 3 chars wide)
+    # Format: " line:col" = space(1) + line + colon(1) + col(3)
+    my $pos_width = 1 + length("$line") + 1 + 3;
+
+    # Calculate middle fill (arrow chars only in powerline mode)
+    my $segment_overhead = Zepto::Chars->enabled() ? 2 : 0;
+    my $middle = $cols - $file_width - $pos_width - $segment_overhead;
+    $middle = 0 if $middle < 0;
+
+    # Render: [file segment][arrow][middle fill][arrow][pos segment]
+    # File segment
+    $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
+    $output .= " $filename";
+    if ($is_dirty) {
+        $output .= $theme->color('status_modified_fg');
+        $output .= " " . Zepto::Chars->get('modified');
+        $output .= $theme->color('status_file_fg');
+    }
+    $output .= ' ';
+
+    # Arrow transition: file -> middle (only in powerline mode)
+    if (Zepto::Chars->enabled()) {
+        $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
+        $output .= $ar;
+    }
+
+    # Middle fill
+    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    $output .= ' ' x $middle if $middle > 0;
+
+    # Arrow transition: middle -> pos (only in powerline mode)
+    if (Zepto::Chars->enabled()) {
+        # For left arrow: bg=where we came from, fg=where we're going
+        $output .= $theme->color('status_bg') . $theme->color('status_pos_edge');
+        $output .= $al;
+    }
+
+    # Position segment
+    $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
+    $output .= $pos_text;
 
     $output .= RESET;
     $output .= CLEAR_LINE;
@@ -555,7 +643,7 @@ sub _render_status_bar {
 
 # Render dropdown menu
 sub _render_dropdown {
-    my ($class, $theme, $ui, $total_cols) = @_;
+    my ($class, $theme, $ui, $total_cols, $prefs) = @_;
 
     my $output = '';
 
@@ -571,21 +659,35 @@ sub _render_dropdown {
     my $menu_x = $positions->{$menu_key}{x} // 1;
 
     my $menu_width = MENU_DROPDOWN_WIDTH;
-    my $menu_height = scalar @$items;
+    my $menu_height = scalar @$items + 2;  # +2 for top/bottom borders
 
-    # Draw menu box
-    for my $i (0 .. $menu_height - 1) {
+    # Get box drawing characters
+    my $box_tl = Zepto::Chars->get('box_tl');
+    my $box_tr = Zepto::Chars->get('box_tr');
+    my $box_bl = Zepto::Chars->get('box_bl');
+    my $box_br = Zepto::Chars->get('box_br');
+    my $box_h = Zepto::Chars->get('box_h');
+    my $box_v = Zepto::Chars->get('box_v');
+    my $arrow_r = Zepto::Chars->get('arrow_right');
+
+    # Top border
+    $output .= _move_to(2, $menu_x);
+    $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
+    $output .= $box_tl . ($box_h x ($menu_width - 2)) . $box_tr;
+
+    # Menu items
+    for my $i (0 .. scalar(@$items) - 1) {
         my $item = $items->[$i];
-        my $row = 2 + $i;  # Start below menu bar
+        my $row = 3 + $i;  # Start below top border
 
         $output .= _move_to($row, $menu_x);
+        $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
+        $output .= $box_v;
 
         if ($item->{separator}) {
             $output .= $theme->color('dropdown_bg');
             $output .= $theme->color('dropdown_border');
-            $output .= ' ';
-            $output .= BOX_HORIZONTAL x ($menu_width - 4);  # ─
-            $output .= ' ';
+            $output .= $box_h x ($menu_width - 2);
         }
         else {
             my $is_selected = ($i == $selected);
@@ -599,12 +701,15 @@ sub _render_dropdown {
                 $output .= $theme->color('dropdown_fg');
             }
 
-            $output .= ' ';
+            # Selection indicator: arrow when selected, spaces otherwise
+            my $prefix = $is_selected ? ($arrow_r . ' ') : '  ';
+            $output .= $prefix;
 
             my $label = $item->{label} // '';
             my $shortcut = $item->{shortcut} // '';
 
-            my $label_space = $menu_width - 4 - length($shortcut);
+            # Fixed prefix width of 2 (arrow or spaces)
+            my $label_space = $menu_width - 3 - 2 - length($shortcut);
             if (length($label) > $label_space) {
                 $label = substr($label, 0, $label_space);
             }
@@ -619,8 +724,16 @@ sub _render_dropdown {
             $output .= ' ';
         }
 
+        $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
+        $output .= $box_v;
         $output .= RESET;
     }
+
+    # Bottom border
+    $output .= _move_to(3 + scalar(@$items), $menu_x);
+    $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
+    $output .= $box_bl . ($box_h x ($menu_width - 2)) . $box_br;
+    $output .= RESET;
 
     return $output;
 }
@@ -647,6 +760,14 @@ sub _render_dialog {
     $x = 1 if $x < 1;
     $y = 1 if $y < 1;
 
+    # Get box drawing characters (rounded when powerline enabled)
+    my $box_tl = Zepto::Chars->get('box_tl');
+    my $box_tr = Zepto::Chars->get('box_tr');
+    my $box_bl = Zepto::Chars->get('box_bl');
+    my $box_br = Zepto::Chars->get('box_br');
+    my $box_h = Zepto::Chars->get('box_h');
+    my $box_v = Zepto::Chars->get('box_v');
+
     # Draw dialog box
     $output .= $theme->color('dialog_bg');
     $output .= $theme->color('dialog_fg');
@@ -654,32 +775,32 @@ sub _render_dialog {
     # Top border
     $output .= _move_to($y, $x);
     $output .= $theme->color('dialog_border');
-    $output .= BOX_TOP_LEFT;  # ┌
-    $output .= BOX_HORIZONTAL x ($dialog_width - 2);  # ─
-    $output .= BOX_TOP_RIGHT;  # ┐
+    $output .= $box_tl;
+    $output .= $box_h x ($dialog_width - 2);
+    $output .= $box_tr;
 
     # Title row
     $output .= _move_to($y + 1, $x);
     $output .= $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    $output .= BOX_VERTICAL;  # │
+    $output .= $box_v;
     my $title_text = " $title ";
     my $title_pad = $dialog_width - 2 - length($title_text);
     $output .= $title_text . (' ' x $title_pad);
-    $output .= BOX_VERTICAL;
+    $output .= $box_v;
 
     # Prompt row
     $output .= _move_to($y + 2, $x);
-    $output .= BOX_VERTICAL;
+    $output .= $box_v;
     my $prompt_text = " $prompt";
     if (length($prompt_text) > $dialog_width - 4) {
         $prompt_text = substr($prompt_text, 0, $dialog_width - 4);
     }
     $output .= $prompt_text . (' ' x ($dialog_width - 2 - length($prompt_text)));
-    $output .= BOX_VERTICAL;
+    $output .= $box_v;
 
     # Input row
     $output .= _move_to($y + 3, $x);
-    $output .= BOX_VERTICAL . " ";
+    $output .= $box_v . " ";
     $output .= $theme->color('dialog_input_bg');
     $output .= $theme->color('dialog_input_fg');
 
@@ -692,14 +813,14 @@ sub _render_dialog {
     $output .= ' ' x ($input_width - length($display_value));
 
     $output .= $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    $output .= " " . BOX_VERTICAL;
+    $output .= " " . $box_v;
 
     # Bottom border
     $output .= _move_to($y + 4, $x);
     $output .= $theme->color('dialog_border');
-    $output .= BOX_BOTTOM_LEFT;  # └
-    $output .= BOX_HORIZONTAL x ($dialog_width - 2);  # ─
-    $output .= BOX_BOTTOM_RIGHT;  # ┘
+    $output .= $box_bl;
+    $output .= $box_h x ($dialog_width - 2);
+    $output .= $box_br;
 
     $output .= RESET;
 
@@ -889,7 +1010,7 @@ sub _render_file_picker {
     # Separator line
     $output .= _move_to(3, 1);
     $output .= $theme->color('dialog_border');
-    $output .= BOX_HORIZONTAL x $cols;
+    $output .= Zepto::Chars->get('box_h') x $cols;
     $output .= RESET;
 
     # File list (rows 4 to text_height)

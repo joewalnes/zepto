@@ -9,6 +9,7 @@ use Zepto::Renderer;
 use Zepto::Theme;
 use Zepto::Document;
 use Zepto::View;
+use Zepto::Chars;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -233,7 +234,9 @@ subtest 'Status bar shows modified indicator' => sub {
         cols     => 80,
     );
 
-    like($output, qr/\*/, 'Shows modified indicator (*)');
+    # Modified indicator uses the 'modified' icon from Chars
+    my $modified_icon = Zepto::Chars->get('modified');
+    like($output, qr/\Q$modified_icon\E/, 'Shows modified indicator icon');
 };
 
 subtest 'Status bar shows cursor position' => sub {
@@ -251,8 +254,8 @@ subtest 'Status bar shows cursor position' => sub {
         cols     => 80,
     );
 
-    like($output, qr/Ln\s+2/, 'Shows line number');
-    like($output, qr/Col\s+3/, 'Shows column number');
+    # Status bar shows line:col format (col padded to 3 digits)
+    like($output, qr/2:\s*3/, 'Shows line:col position');
 };
 
 subtest 'Menu bar shows Esc and action buttons' => sub {
@@ -267,10 +270,10 @@ subtest 'Menu bar shows Esc and action buttons' => sub {
         cols     => 80,
     );
 
-    # Menu bar has [Esc] prefix and Save/Quit buttons on right
-    like($output, qr/\[Esc\]/, 'Shows [Esc] prefix');
-    like($output, qr/Save\s+\^S/, 'Shows Save button');
-    like($output, qr/Quit\s+\^Q/, 'Shows Quit button');
+    # Menu bar has esc prefix (in pill format) and buttons on right
+    like($output, qr/esc/, 'Shows esc prefix');
+    like($output, qr/\^S/, 'Shows Save shortcut');
+    like($output, qr/\^Q/, 'Shows Quit shortcut');
 };
 
 # ============================================================================
@@ -379,16 +382,16 @@ subtest 'Dialog box characters' => sub {
         },
     );
 
-    # Box drawing characters - use constants from Renderer
-    my $top_left = Zepto::Renderer::BOX_TOP_LEFT;
-    my $top_right = Zepto::Renderer::BOX_TOP_RIGHT;
-    my $bottom_left = Zepto::Renderer::BOX_BOTTOM_LEFT;
-    my $bottom_right = Zepto::Renderer::BOX_BOTTOM_RIGHT;
+    # Box drawing characters - use Chars module (rounded by default with powerline)
+    my $top_left = Zepto::Chars->get('box_tl');
+    my $top_right = Zepto::Chars->get('box_tr');
+    my $bottom_left = Zepto::Chars->get('box_bl');
+    my $bottom_right = Zepto::Chars->get('box_br');
 
-    like($output, qr/$top_left/, 'Has top-left corner');
-    like($output, qr/$top_right/, 'Has top-right corner');
-    like($output, qr/$bottom_left/, 'Has bottom-left corner');
-    like($output, qr/$bottom_right/, 'Has bottom-right corner');
+    like($output, qr/\Q$top_left\E/, 'Has top-left corner');
+    like($output, qr/\Q$top_right\E/, 'Has top-right corner');
+    like($output, qr/\Q$bottom_left\E/, 'Has bottom-left corner');
+    like($output, qr/\Q$bottom_right\E/, 'Has bottom-right corner');
 };
 
 # ============================================================================
@@ -635,20 +638,74 @@ subtest 'Dynamic menu positions' => sub {
         ok(exists $positions->{$key}{x}, "Menu '$key' has x");
     }
 
-    # Verify positions are contiguous (no gaps between menus)
+    # Verify positions have gaps for spaces between pills
     my @keys = qw(f e s v);
     for my $i (1 .. $#keys) {
         my $prev_end = $positions->{$keys[$i-1]}{end};
         my $curr_start = $positions->{$keys[$i]}{start};
-        is($curr_start, $prev_end + 1, "Menu '$keys[$i]' starts right after '$keys[$i-1]'");
+        # Now menus have 1 space between them (end + 2 = start)
+        is($curr_start, $prev_end + 2, "Menu '$keys[$i]' starts after space from '$keys[$i-1]'");
     }
 
-    # Verify menu widths match expected (name length + 2 for spaces)
-    my %expected_widths = (f => 6, e => 6, s => 8, v => 6);  # " File " " Edit " " Search " " View "
+    # Verify menu widths match expected (name length + 4 for pill + 2 for icon when powerline enabled)
+    my %expected_widths = (f => 10, e => 10, s => 12, v => 10);  # pill chars + icon + space + name + space
     for my $key (keys %expected_widths) {
         my $width = $positions->{$key}{end} - $positions->{$key}{start} + 1;
         is($width, $expected_widths{$key}, "Menu '$key' has correct width");
     }
+};
+
+# =============================================================================
+# Dropdown menu rendering
+# =============================================================================
+subtest 'Dropdown left border has background color' => sub {
+    # This test verifies that the left border of dropdown menus
+    # sets BOTH background and foreground colors, not just foreground.
+    # Without the background color, the left edge shows terminal default
+    # (black) which appears as an inverted bar in light themes.
+
+    my ($doc, $view) = create_test_state();
+    my $theme = Zepto::Theme->get_theme('light');
+
+    my $ui = {
+        menu_open => 'f',      # File menu open
+        menu_selected => 0,
+    };
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => 80,
+        ui       => $ui,
+    );
+
+    # Get the box_v character and theme colors
+    my $box_v = Zepto::Chars->get('box_v');
+    my $dropdown_bg = $theme->color('dropdown_bg');
+    my $dropdown_border = $theme->color('dropdown_border');
+
+    # Find all instances of box_v (vertical borders) in output
+    # Each left border should be preceded by both bg and fg colors
+    # Pattern: bg_color + border_color + box_v
+    my $expected_prefix = quotemeta($dropdown_bg) . quotemeta($dropdown_border) . quotemeta($box_v);
+
+    # Count how many times the left border appears with correct colors
+    my $correct_borders = () = $output =~ /$expected_prefix/g;
+
+    # We expect at least several (one per menu item row)
+    # File menu has ~7 items, so at least 7 left borders
+    cmp_ok($correct_borders, '>=', 5, 'Left borders have both bg and fg colors set');
+
+    # Also verify we don't have borders with ONLY foreground (the bug)
+    # Pattern: move_to + border_color (without bg) + box_v
+    # This would be: \x1b[row;colH + border_color + box_v (no bg between position and border)
+    my $move_pattern = qr/\x1b\[\d+;\d+H/;
+    my $bad_pattern = qr/$move_pattern\Q$dropdown_border\E\Q$box_v\E/;
+
+    my $bad_borders = () = $output =~ /$bad_pattern/g;
+    is($bad_borders, 0, 'No left borders missing background color');
 };
 
 done_testing();
