@@ -212,8 +212,9 @@ sub render {
 
     # Calculate layout
     my $menu_height = 1;
+    my $ruler_height = 1;
     my $status_height = 1;
-    my $text_height = $rows - $menu_height - $status_height;
+    my $text_height = $rows - $menu_height - $ruler_height - $status_height;
     $text_height = 1 if $text_height < 1;
 
     # Calculate gutter width based on line count
@@ -226,6 +227,10 @@ sub render {
     # Render menu bar (row 1)
     $output .= _move_to(1, 1);
     $output .= $class->_render_menu_bar($theme, $cols, $ui);
+
+    # Render ruler bar (row 2)
+    $output .= _move_to(2, 1);
+    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view);
 
     # Render text area or file picker
     if ($ui->{file_picker}) {
@@ -279,7 +284,7 @@ sub render {
         # Position cursor in file picker search input
         my $picker = $ui->{file_picker};
         my $query_len = length($picker->query() // '');
-        $output .= _move_to(2, 4 + $query_len);  # Row 2, after "> "
+        $output .= _move_to(3, 4 + $query_len);  # Row 3, after "> "
         $output .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
@@ -419,6 +424,88 @@ sub _render_menu_bar {
     return $output;
 }
 
+# Render the ruler bar showing column positions
+sub _render_ruler_bar {
+    my ($class, $theme, $cols, $gutter_width, $view) = @_;
+
+    my $output = '';
+
+    # Get cursor column (0-indexed internally, display as 1-indexed)
+    my $cursor_col_0 = $view ? $view->cursor_col() : 0;
+    my $scroll_col = $view ? $view->scroll_col() : 0;
+    my $cursor_col = $cursor_col_0 + 1;  # 1-indexed for display
+
+    # Visible cursor position (relative to viewport)
+    my $visible_cursor = $cursor_col_0 - $scroll_col;
+
+    # Start with gutter area (empty, matches gutter width)
+    $output .= $theme->color('ruler_bg') . $theme->color('ruler_fg');
+    $output .= ' ' x $gutter_width;
+
+    # Calculate ruler width (text area width)
+    my $ruler_width = $cols - $gutter_width;
+
+    # Build ruler string: |10      |20      |30 ... (1-indexed columns, marks at multiples of 10)
+    my $ruler = '';
+    my $mark_interval = 10;
+    my $x = 0;
+
+    while ($x < $ruler_width) {
+        my $col_num = $scroll_col + $x + 1;  # 1-indexed column number
+        # Mark every 10th column (10, 20, 30...)
+        if ($col_num % $mark_interval == 0) {
+            $ruler .= '|' . $col_num;
+            $x += 1 + length("$col_num");
+        } else {
+            $ruler .= ' ';
+            $x++;
+        }
+    }
+    # Pad/truncate to exact width
+    $ruler = substr($ruler, 0, $ruler_width);
+    $ruler .= ' ' x ($ruler_width - length($ruler)) if length($ruler) < $ruler_width;
+
+    # Calculate cursor badge position and size
+    # Badge shows: space + column number + round right
+    my $rr = Zepto::Chars->get('round_right');
+    my $cursor_str = sprintf("%d", $cursor_col);
+    my $badge_width = length($cursor_str) + 2;  # +1 for leading space, +1 for round_right
+    my $badge_start = $visible_cursor;
+    my $badge_end = $badge_start + $badge_width;
+
+    # Render the ruler, inserting cursor badge at the right position
+    # Use explicit index control (no auto-increment in for loop)
+    my $i = 0;
+    while ($i < $ruler_width) {
+        # Check if we're at the cursor badge position
+        if ($i == $badge_start && $visible_cursor >= 0 && $badge_end <= $ruler_width) {
+            # Render cursor badge: space + number + round right
+            $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg');
+            $output .= ' ' . $cursor_str;
+            $output .= $theme->color('ruler_bg') . $theme->color('ruler_cursor_edge') . $rr;
+            $output .= $theme->color('ruler_fg');
+            # Skip past the badge width in the source ruler
+            $i += $badge_width;
+        } else {
+            # Regular ruler character
+            my $ch = substr($ruler, $i, 1);
+            if ($ch eq '|') {
+                $output .= $theme->color('ruler_mark');
+                $output .= $ch;
+                $output .= $theme->color('ruler_fg');
+            } else {
+                $output .= $ch;
+            }
+            $i++;
+        }
+    }
+
+    $output .= RESET;
+    $output .= CLEAR_LINE;
+
+    return $output;
+}
+
 # Render the text area with line numbers
 sub _render_text_area {
     my ($class, $doc, $view, $theme, $height, $width, $gutter_width) = @_;
@@ -436,21 +523,38 @@ sub _render_text_area {
         my $doc_line = $scroll_line + $screen_row;
         my $is_cursor_line = ($doc_line == $cursor_line);
 
-        # Position cursor at start of this row (row 2 is first text row, after menu)
-        $output .= _move_to($screen_row + 2, 1);
+        # Position cursor at start of this row (row 3 is first text row, after menu and ruler)
+        $output .= _move_to($screen_row + 3, 1);
 
-        # Line number gutter (highlight if cursor line)
-        if ($is_cursor_line) {
-            $output .= $theme->color('cursor_line_bg') . $theme->color('gutter_fg');
-        } else {
-            $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
-        }
-
+        # Line number gutter
         if ($doc_line < $doc->line_count()) {
-            my $line_num = sprintf("%*d", $gutter_width - 1, $doc_line + 1);
-            $output .= $line_num . ' ';
+            my $line_num_str = sprintf("%d", $doc_line + 1);
+
+            if ($is_cursor_line) {
+                # Cursor line: flag style - round left, arrow right (points into text)
+                my $rl = Zepto::Chars->get('round_left');
+                my $ar = Zepto::Chars->get('arrow_right');
+
+                # Calculate padding to right-align the badge
+                my $badge_width = length($line_num_str) + 2;  # +2 for edge chars
+                my $pad = $gutter_width - $badge_width;
+                $pad = 0 if $pad < 0;
+
+                # Gutter background, then badge with round left + arrow right
+                $output .= $theme->color('gutter_bg') . (' ' x $pad);
+                $output .= $theme->color('gutter_bg') . $theme->color('ruler_cursor_edge') . $rl;
+                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $line_num_str;
+                # Arrow right: badge color as fg, next area color as bg
+                $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
+            } else {
+                # Normal line: standard gutter
+                $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
+                my $line_num = sprintf("%*d", $gutter_width - 1, $doc_line + 1);
+                $output .= $line_num . ' ';
+            }
         }
         else {
+            $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
             $output .= ' ' x $gutter_width;
         }
 
@@ -481,16 +585,37 @@ sub _render_text_area {
                 $view, $theme, $cursor_line, $cursor_col, $is_cursor_line
             );
 
-            # Fill remaining space with cursor line background if needed
-            my $fill = $width - length($line_content);
-            if ($fill > 0) {
-                $output .= $line_bg . ' ' x $fill;
+            # Fill remaining space with appropriate backgrounds (crosshair column highlight)
+            my $fill_start = length($line_content);
+            my $visible_cursor_col = $cursor_col - $scroll_col;
+            my $col_bg = $theme->color('cursor_col_bg');
+
+            for (my $i = $fill_start; $i < $width; $i++) {
+                if ($is_cursor_line) {
+                    $output .= $line_bg . ' ';
+                }
+                elsif ($i == $visible_cursor_col) {
+                    $output .= $col_bg . ' ';
+                }
+                else {
+                    $output .= $theme->color('bg') . ' ';
+                }
             }
         }
         else {
-            # Empty line (beyond document) - use distinct background
-            $output .= $theme->color('empty_line_bg');
-            $output .= ' ' x $width;
+            # Empty line (beyond document) - highlight cursor column for crosshair
+            my $empty_bg = $theme->color('empty_line_bg');
+            my $col_bg = $theme->color('cursor_col_bg');
+            my $visible_cursor_col = $cursor_col - $scroll_col;
+
+            for (my $i = 0; $i < $width; $i++) {
+                if ($i == $visible_cursor_col) {
+                    $output .= $col_bg . ' ';
+                }
+                else {
+                    $output .= $empty_bg . ' ';
+                }
+            }
         }
 
         $output .= RESET;
@@ -500,54 +625,96 @@ sub _render_text_area {
     return $output;
 }
 
-# Render a line with selection highlighting
+# Render a line with selection and crosshair highlighting
 sub _render_line_with_highlights {
     my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line) = @_;
 
     my $output = '';
     my $len = length($content);
 
-    # Determine background color (cursor line highlight or normal)
-    my $line_bg = $is_cursor_line ? $theme->color('cursor_line_bg') : $theme->color('bg');
+    # Background colors
+    my $bg = $theme->color('bg');
+    my $line_bg = $theme->color('cursor_line_bg');
+    my $col_bg = $theme->color('cursor_col_bg');
+    my $fg = $theme->color('fg');
+
+    # Cursor column position relative to viewport
+    my $visible_cursor_col = $cursor_col - $scroll_col;
 
     # Get selection info
     my $has_selection = $view->has_selection();
-    return $content unless $has_selection;
+    my ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col);
+    my ($sel_start, $sel_end) = (-1, -1);
 
-    my ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col) = $view->selection();
+    if ($has_selection) {
+        ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col) = $view->selection();
+        my $line_in_selection = ($line_num >= $sel_start_line && $line_num <= $sel_end_line);
 
-    # Check if this line has any selection
-    my $line_in_selection = ($line_num >= $sel_start_line && $line_num <= $sel_end_line);
-    return $content unless $line_in_selection;
+        if ($line_in_selection) {
+            $sel_start = 0;
+            $sel_end = $len;
 
-    # Calculate selection range on this line
-    my $sel_start = 0;
-    my $sel_end = $len;
+            if ($line_num == $sel_start_line) {
+                $sel_start = $sel_start_col - $scroll_col;
+                $sel_start = 0 if $sel_start < 0;
+            }
 
-    if ($line_num == $sel_start_line) {
-        $sel_start = $sel_start_col - $scroll_col;
-        $sel_start = 0 if $sel_start < 0;
+            if ($line_num == $sel_end_line) {
+                $sel_end = $sel_end_col - $scroll_col;
+                $sel_end = 0 if $sel_end < 0;
+            }
+        }
     }
 
-    if ($line_num == $sel_end_line) {
-        $sel_end = $sel_end_col - $scroll_col;
-        $sel_end = 0 if $sel_end < 0;
-    }
+    # Render character by character with appropriate backgrounds
+    my $last_bg = '';
+    for (my $i = 0; $i < $len; $i++) {
+        my $char = substr($content, $i, 1);
+        my $char_bg;
 
-    # Render in three parts: before, selected, after
-    if ($sel_start > 0) {
-        $output .= substr($content, 0, $sel_start);
-    }
+        # Check if in selection (takes priority)
+        if ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
+            $char_bg = $theme->color('selection_bg');
+            if ($last_bg ne 'sel') {
+                $output .= $char_bg . $theme->color('selection_fg');
+                $last_bg = 'sel';
+            }
+        }
+        # Check crosshair highlighting
+        elsif ($is_cursor_line && $i == $visible_cursor_col) {
+            # Intersection - use cursor line bg (brightest)
+            $char_bg = $line_bg;
+            if ($last_bg ne 'line') {
+                $output .= $char_bg . $fg;
+                $last_bg = 'line';
+            }
+        }
+        elsif ($is_cursor_line) {
+            # Cursor line only
+            $char_bg = $line_bg;
+            if ($last_bg ne 'line') {
+                $output .= $char_bg . $fg;
+                $last_bg = 'line';
+            }
+        }
+        elsif ($i == $visible_cursor_col) {
+            # Cursor column only
+            $char_bg = $col_bg;
+            if ($last_bg ne 'col') {
+                $output .= $char_bg . $fg;
+                $last_bg = 'col';
+            }
+        }
+        else {
+            # Normal background
+            $char_bg = $bg;
+            if ($last_bg ne 'bg') {
+                $output .= $char_bg . $fg;
+                $last_bg = 'bg';
+            }
+        }
 
-    if ($sel_end > $sel_start && $sel_start < $len) {
-        $output .= $theme->color('selection_bg') . $theme->color('selection_fg');
-        my $end = $sel_end > $len ? $len : $sel_end;
-        $output .= substr($content, $sel_start, $end - $sel_start);
-        $output .= $line_bg . $theme->color('fg');
-    }
-
-    if ($sel_end < $len) {
-        $output .= substr($content, $sel_end);
+        $output .= $char;
     }
 
     return $output;
@@ -559,7 +726,6 @@ sub _render_status_bar {
 
     my $output = '';
     my $ar = Zepto::Chars->get('arrow_right');
-    my $al = Zepto::Chars->get('arrow_left');
 
     # If there's a message, show it simply
     if ($message) {
@@ -576,27 +742,17 @@ sub _render_status_bar {
     my $is_dirty = $doc && $doc->is_dirty();
     my $modified_icon = $is_dirty ? ' ' . Zepto::Chars->get('modified') : '';
 
-    # Get position info
-    my $line = $view ? $view->cursor_line() + 1 : 1;
-    my $col = $view ? $view->cursor_col() + 1 : 1;
-    my $col_padded = sprintf("%-3d", $col);  # Left-align, pad to 3 digits to prevent jiggle
-    my $pos_text = " $line:$col_padded";
-
     # Build left segment: filename with optional modified indicator
     my $file_text = " $filename$modified_icon ";
     my $file_width = length($filename) + 2;
     $file_width += 2 if $is_dirty;  # For modified icon + space
 
-    # Build right segment: position (col is always 3 chars wide)
-    # Format: " line:col" = space(1) + line + colon(1) + col(3)
-    my $pos_width = 1 + length("$line") + 1 + 3;
-
-    # Calculate middle fill (arrow chars only in powerline mode)
-    my $segment_overhead = Zepto::Chars->enabled() ? 2 : 0;
-    my $middle = $cols - $file_width - $pos_width - $segment_overhead;
+    # Calculate middle fill (arrow char only in powerline mode)
+    my $segment_overhead = Zepto::Chars->enabled() ? 1 : 0;
+    my $middle = $cols - $file_width - $segment_overhead;
     $middle = 0 if $middle < 0;
 
-    # Render: [file segment][arrow][middle fill][arrow][pos segment]
+    # Render: [file segment][arrow][middle fill]
     # File segment
     $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
     $output .= " $filename";
@@ -616,17 +772,6 @@ sub _render_status_bar {
     # Middle fill
     $output .= $theme->color('status_bg') . $theme->color('status_fg');
     $output .= ' ' x $middle if $middle > 0;
-
-    # Arrow transition: middle -> pos (only in powerline mode)
-    if (Zepto::Chars->enabled()) {
-        # For left arrow: bg=where we came from, fg=where we're going
-        $output .= $theme->color('status_bg') . $theme->color('status_pos_edge');
-        $output .= $al;
-    }
-
-    # Position segment
-    $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
-    $output .= $pos_text;
 
     $output .= RESET;
     $output .= CLEAR_LINE;
@@ -670,15 +815,15 @@ sub _render_dropdown {
     my $box_v = Zepto::Chars->get('box_v');
     my $arrow_r = Zepto::Chars->get('arrow_right');
 
-    # Top border
-    $output .= _move_to(2, $menu_x);
+    # Top border (row 3, after menu and ruler)
+    $output .= _move_to(3, $menu_x);
     $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
     $output .= $box_tl . ($box_h x ($menu_width - 2)) . $box_tr;
 
     # Menu items
     for my $i (0 .. scalar(@$items) - 1) {
         my $item = $items->[$i];
-        my $row = 3 + $i;  # Start below top border
+        my $row = 4 + $i;  # Start below top border (row 3)
 
         $output .= _move_to($row, $menu_x);
         $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
@@ -730,7 +875,7 @@ sub _render_dropdown {
     }
 
     # Bottom border
-    $output .= _move_to(3 + scalar(@$items), $menu_x);
+    $output .= _move_to(4 + scalar(@$items), $menu_x);
     $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
     $output .= $box_bl . ($box_h x ($menu_width - 2)) . $box_br;
     $output .= RESET;
@@ -843,7 +988,8 @@ sub _cursor_screen_pos {
     my $scroll_line = $view->scroll_line();
     my $scroll_col = $view->scroll_col();
 
-    my $screen_row = $cursor_line - $scroll_line + $menu_height + 1;
+    # +2 for menu bar and ruler bar
+    my $screen_row = $cursor_line - $scroll_line + $menu_height + 2;
     my $screen_col = $cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);
@@ -993,8 +1139,8 @@ sub _render_file_picker {
     my $total = $picker->total_files();
     my $filtered_count = $picker->filtered_count();
 
-    # Row 2: Search input
-    $output .= _move_to(2, 1);
+    # Row 3: Search input (after menu and ruler)
+    $output .= _move_to(3, 1);
     $output .= $theme->color('dialog_bg');
     $output .= $theme->color('dialog_fg');
     $output .= ' > ';
@@ -1008,17 +1154,17 @@ sub _render_file_picker {
     $output .= CLEAR_LINE;
 
     # Separator line
-    $output .= _move_to(3, 1);
+    $output .= _move_to(4, 1);
     $output .= $theme->color('dialog_border');
     $output .= Zepto::Chars->get('box_h') x $cols;
     $output .= RESET;
 
-    # File list (rows 4 to text_height)
+    # File list (rows 5+ to text_height)
     my $list_height = $text_height - 2;  # -2 for search row and separator
     $list_height = 1 if $list_height < 1;
 
     for my $i (0 .. $list_height - 1) {
-        my $row = 4 + $i;
+        my $row = 5 + $i;
         my $file_idx = $scroll + $i;
 
         $output .= _move_to($row, 1);

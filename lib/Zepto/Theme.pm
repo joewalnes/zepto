@@ -93,6 +93,9 @@ sub dark_theme {
         # Cursor line (subtle highlight)
         cursor_line_bg => bg_rgb(41, 46, 66),
 
+        # Cursor column (subtle vertical highlight for crosshair effect)
+        cursor_col_bg => bg_rgb(35, 39, 55),
+
         # Empty lines (beyond end of file)
         empty_line_bg => bg_rgb(20, 21, 30),
 
@@ -150,6 +153,14 @@ sub dark_theme {
         error_fg     => fg_rgb(247, 118, 142),
         warning_fg   => fg_rgb(224, 175, 104),
         info_fg      => fg_rgb(125, 207, 255),
+
+        # Ruler bar
+        ruler_fg     => fg_rgb(86, 95, 137),     # Muted, like line numbers
+        ruler_bg     => bg_rgb(30, 32, 44),      # Slightly darker than menu
+        ruler_mark   => fg_rgb(61, 66, 91),      # Separator marks
+        ruler_cursor_fg   => fg_rgb(255, 255, 255),
+        ruler_cursor_bg   => bg_rgb(52, 79, 138),  # Matches active pill
+        ruler_cursor_edge => fg_rgb(52, 79, 138),
     });
 }
 
@@ -172,6 +183,9 @@ sub light_theme {
 
         # Cursor line
         cursor_line_bg => bg_rgb(231, 234, 242),
+
+        # Cursor column (subtle vertical highlight for crosshair effect)
+        cursor_col_bg => bg_rgb(235, 237, 245),
 
         # Empty lines (beyond end of file)
         empty_line_bg => bg_rgb(225, 228, 235),
@@ -230,6 +244,14 @@ sub light_theme {
         error_fg     => fg_rgb(210, 15, 57),    # Red
         warning_fg   => fg_rgb(223, 142, 29),   # Yellow
         info_fg      => fg_rgb(30, 102, 245),   # Blue
+
+        # Ruler bar
+        ruler_fg     => fg_rgb(156, 160, 176),  # Muted, like line numbers
+        ruler_bg     => bg_rgb(230, 233, 239),  # Matches gutter
+        ruler_mark   => fg_rgb(172, 176, 190),  # Separator marks
+        ruler_cursor_fg   => fg_rgb(255, 255, 255),
+        ruler_cursor_bg   => bg_rgb(114, 135, 253),  # Matches active pill
+        ruler_cursor_edge => fg_rgb(114, 135, 253),
     });
 }
 

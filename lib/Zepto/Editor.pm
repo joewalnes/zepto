@@ -498,11 +498,14 @@ sub handle_mouse_event {
             return;
         }
 
+        # Ignore clicks on ruler bar (row 2)
+        return if $y == 2;
+
         # Click in text area
-        my $text_row = $y - 2;  # Adjust for menu bar
+        my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
         my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width;
+        my $text_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
         if ($text_col >= 0) {
             my $doc_line = $view->scroll_line() + $text_row;
@@ -538,10 +541,10 @@ sub handle_mouse_event {
         return unless $self->{mouse_button_down};
 
         # Handle drag for selection
-        my $text_row = $y - 2;
+        my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
         my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width;
+        my $text_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
         if ($text_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
