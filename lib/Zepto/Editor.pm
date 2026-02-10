@@ -53,7 +53,7 @@ use Zepto::Editor::Menu;
 use constant {
     INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
     MESSAGE_DISPLAY_SEC => 3,     # Seconds to show status messages
-    RESERVED_ROWS       => 2,     # Rows for menu bar + status bar
+    RESERVED_ROWS       => 3,     # Rows for menu bar + ruler bar + status bar
 };
 
 sub new {
