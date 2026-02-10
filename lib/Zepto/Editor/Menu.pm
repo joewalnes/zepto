@@ -130,7 +130,7 @@ sub handle_menu_event {
                 my $menu_x = $positions->{$self->{menu_open}}{x} // 1;
                 my $menu_width = Zepto::Renderer::MENU_DROPDOWN_WIDTH;
 
-                my $item_idx = $event->{y} - 2;  # Row 2 = item 0
+                my $item_idx = $event->{y} - 3;  # Row 3 = item 0 (row 2 is top border)
                 my $x = $event->{x};
 
                 # Check if click is within dropdown bounds

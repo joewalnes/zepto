@@ -815,15 +815,15 @@ sub _render_dropdown {
     my $box_v = Zepto::Chars->get('box_v');
     my $arrow_r = Zepto::Chars->get('arrow_right');
 
-    # Top border (row 3, after menu and ruler)
-    $output .= _move_to(3, $menu_x);
+    # Top border (row 2, overlays ruler bar)
+    $output .= _move_to(2, $menu_x);
     $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
     $output .= $box_tl . ($box_h x ($menu_width - 2)) . $box_tr;
 
     # Menu items
     for my $i (0 .. scalar(@$items) - 1) {
         my $item = $items->[$i];
-        my $row = 4 + $i;  # Start below top border (row 3)
+        my $row = 3 + $i;  # Start below top border (row 2)
 
         $output .= _move_to($row, $menu_x);
         $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
@@ -875,7 +875,7 @@ sub _render_dropdown {
     }
 
     # Bottom border
-    $output .= _move_to(4 + scalar(@$items), $menu_x);
+    $output .= _move_to(3 + scalar(@$items), $menu_x);
     $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
     $output .= $box_bl . ($box_h x ($menu_width - 2)) . $box_br;
     $output .= RESET;
