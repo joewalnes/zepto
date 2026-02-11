@@ -1,0 +1,324 @@
+# Expected syntax highlighting for go_complete.go
+# Generated from Go grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Package main demonstrates various Go syntax elements</COMMENT>
+<KEYWORD>package</KEYWORD> main
+
+<KEYWORD>import</KEYWORD> (
+	<STRING>"context"</STRING>
+	<STRING>"encoding/json"</STRING>
+	<STRING>"errors"</STRING>
+	<STRING>"fmt"</STRING>
+	<STRING>"io"</STRING>
+	<STRING>"net/http"</STRING>
+	<STRING>"sync"</STRING>
+	<STRING>"time"</STRING>
+)
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> (
+	<TYPE>MaxValue</TYPE>    <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>
+	<TYPE>Pi</TYPE>          <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>
+	<TYPE>Greeting</TYPE>    <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>
+	<TYPE>DefaultPort</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>8080</NUMBER>
+)
+
+<COMMENT>// Iota enumeration</COMMENT>
+<KEYWORD>const</KEYWORD> (
+	<TYPE>StatusPending</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>iota</KEYWORD>
+	<TYPE>StatusActive</TYPE>
+	<TYPE>StatusCompleted</TYPE>
+	<TYPE>StatusFailed</TYPE>
+)
+
+<COMMENT>// Type definitions</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Status</TYPE> <TYPE>int</TYPE>
+
+<KEYWORD>type</KEYWORD> <TYPE>Config</TYPE> <KEYWORD>struct</KEYWORD> {
+	<TYPE>Host</TYPE>    <TYPE>string</TYPE> <STRING>`json:"host"`</STRING>
+	<TYPE>Port</TYPE>    <TYPE>int</TYPE>    <STRING>`json:"port,omitempty"`</STRING>
+	<TYPE>Timeout</TYPE> time.<TYPE>Duration</TYPE>
+	<TYPE>Debug</TYPE>   <TYPE>bool</TYPE>
+}
+
+<COMMENT>// Interface definition</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Reader</TYPE> <KEYWORD>interface</KEYWORD> {
+	<FUNCTION>Read</FUNCTION>(p []<TYPE>byte</TYPE>) (n <TYPE>int</TYPE>, err <TYPE>error</TYPE>)
+}
+
+<KEYWORD>type</KEYWORD> <TYPE>Writer</TYPE> <KEYWORD>interface</KEYWORD> {
+	<FUNCTION>Write</FUNCTION>(p []<TYPE>byte</TYPE>) (n <TYPE>int</TYPE>, err <TYPE>error</TYPE>)
+}
+
+<COMMENT>// Embedded interface</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>ReadWriter</TYPE> <KEYWORD>interface</KEYWORD> {
+	<TYPE>Reader</TYPE>
+	<TYPE>Writer</TYPE>
+}
+
+<COMMENT>// Generic type (Go 1.18+)</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Stack</TYPE>[<TYPE>T</TYPE> <TYPE>any</TYPE>] <KEYWORD>struct</KEYWORD> {
+	items []<TYPE>T</TYPE>
+	mu    sync.<TYPE>Mutex</TYPE>
+}
+
+<COMMENT>// Method on generic type</COMMENT>
+<KEYWORD>func</KEYWORD> (s *Stack[T]) <FUNCTION>Push</FUNCTION>(item <TYPE>T</TYPE>) {
+	s.mu.<FUNCTION>Lock</FUNCTION>()
+	<KEYWORD>defer</KEYWORD> s.mu.<FUNCTION>Unlock</FUNCTION>()
+	s.items <OPERATOR>=</OPERATOR> <FUNCTION>append</FUNCTION>(s.items, item)
+}
+
+<KEYWORD>func</KEYWORD> (s *Stack[T]) <FUNCTION>Pop</FUNCTION>() (<TYPE>T</TYPE>, <TYPE>bool</TYPE>) {
+	s.mu.<FUNCTION>Lock</FUNCTION>()
+	<KEYWORD>defer</KEYWORD> s.mu.<FUNCTION>Unlock</FUNCTION>()
+	<KEYWORD>var</KEYWORD> zero <TYPE>T</TYPE>
+	<KEYWORD>if</KEYWORD> <FUNCTION>len</FUNCTION>(s.items) <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
+		<KEYWORD>return</KEYWORD> zero, <KEYWORD>false</KEYWORD>
+	}
+	item <OPERATOR>:=</OPERATOR> s.items[<FUNCTION>len</FUNCTION>(s.items)<OPERATOR>-</OPERATOR><NUMBER>1</NUMBER>]
+	s.items <OPERATOR>=</OPERATOR> s.items[:<FUNCTION>len</FUNCTION>(s.items)<OPERATOR>-</OPERATOR><NUMBER>1</NUMBER>]
+	<KEYWORD>return</KEYWORD> item, <KEYWORD>true</KEYWORD>
+}
+
+<COMMENT>// Function with multiple return values</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>divide</FUNCTION>(a, b <TYPE>float64</TYPE>) (<TYPE>float64</TYPE>, <TYPE>error</TYPE>) {
+	<KEYWORD>if</KEYWORD> b <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
+		<KEYWORD>return</KEYWORD> <NUMBER>0</NUMBER>, errors.<FUNCTION>New</FUNCTION>(<STRING>"division by zero"</STRING>)
+	}
+	<KEYWORD>return</KEYWORD> a <OPERATOR>/</OPERATOR> b, <KEYWORD>nil</KEYWORD>
+}
+
+<COMMENT>// Named return values</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>minMax</FUNCTION>(numbers []<TYPE>int</TYPE>) (min, max <TYPE>int</TYPE>) {
+	<KEYWORD>if</KEYWORD> <FUNCTION>len</FUNCTION>(numbers) <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
+		<KEYWORD>return</KEYWORD>
+	}
+	min, max <OPERATOR>=</OPERATOR> numbers[<NUMBER>0</NUMBER>], numbers[<NUMBER>0</NUMBER>]
+	<KEYWORD>for</KEYWORD> _, n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> numbers {
+		<KEYWORD>if</KEYWORD> n <OPERATOR><</OPERATOR> min {
+			min <OPERATOR>=</OPERATOR> n
+		}
+		<KEYWORD>if</KEYWORD> n <OPERATOR>></OPERATOR> max {
+			max <OPERATOR>=</OPERATOR> n
+		}
+	}
+	<KEYWORD>return</KEYWORD>
+}
+
+<COMMENT>// Variadic function</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>sum</FUNCTION>(numbers <OPERATOR>...</OPERATOR><TYPE>int</TYPE>) <TYPE>int</TYPE> {
+	total <OPERATOR>:=</OPERATOR> <NUMBER>0</NUMBER>
+	<KEYWORD>for</KEYWORD> _, n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> numbers {
+		total <OPERATOR>+=</OPERATOR> n
+	}
+	<KEYWORD>return</KEYWORD> total
+}
+
+<COMMENT>// Generic function</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>Map</FUNCTION>[<TYPE>T</TYPE>, <TYPE>U</TYPE> <TYPE>any</TYPE>](slice []<TYPE>T</TYPE>, fn <KEYWORD>func</KEYWORD>(<TYPE>T</TYPE>) <TYPE>U</TYPE>) []<TYPE>U</TYPE> {
+	result <OPERATOR>:=</OPERATOR> <FUNCTION>make</FUNCTION>([]<TYPE>U</TYPE>, <FUNCTION>len</FUNCTION>(slice))
+	<KEYWORD>for</KEYWORD> i, v <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> slice {
+		result[i] <OPERATOR>=</OPERATOR> <FUNCTION>fn</FUNCTION>(v)
+	}
+	<KEYWORD>return</KEYWORD> result
+}
+
+<COMMENT>// Struct with methods</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Person</TYPE> <KEYWORD>struct</KEYWORD> {
+	<TYPE>Name</TYPE> <TYPE>string</TYPE>
+	<TYPE>Age</TYPE>  <TYPE>int</TYPE>
+}
+
+<KEYWORD>func</KEYWORD> <FUNCTION>NewPerson</FUNCTION>(name <TYPE>string</TYPE>, age <TYPE>int</TYPE>) <OPERATOR>*</OPERATOR><TYPE>Person</TYPE> {
+	<KEYWORD>return</KEYWORD> <OPERATOR>&</OPERATOR><TYPE>Person</TYPE>{<TYPE>Name</TYPE>: name, <TYPE>Age</TYPE>: age}
+}
+
+<KEYWORD>func</KEYWORD> (p *Person) <FUNCTION>Greet</FUNCTION>() <TYPE>string</TYPE> {
+	<KEYWORD>return</KEYWORD> fmt.<FUNCTION>Sprintf</FUNCTION>(<STRING>"Hello, I'm %s, %d years old"</STRING>, p.<TYPE>Name</TYPE>, p.<TYPE>Age</TYPE>)
+}
+
+<KEYWORD>func</KEYWORD> (p Person) <FUNCTION>String</FUNCTION>() <TYPE>string</TYPE> {
+	<KEYWORD>return</KEYWORD> fmt.<FUNCTION>Sprintf</FUNCTION>(<STRING>"%s (%d)"</STRING>, p.<TYPE>Name</TYPE>, p.<TYPE>Age</TYPE>)
+}
+
+<COMMENT>// HTTP handler</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>handleRequest</FUNCTION>(w http.<TYPE>ResponseWriter</TYPE>, r <OPERATOR>*</OPERATOR>http.<TYPE>Request</TYPE>) {
+	ctx <OPERATOR>:=</OPERATOR> r.<FUNCTION>Context</FUNCTION>()
+	<KEYWORD>select</KEYWORD> {
+	<KEYWORD>case</KEYWORD> <OPERATOR><-</OPERATOR>ctx.<FUNCTION>Done</FUNCTION>():
+		http.<FUNCTION>Error</FUNCTION>(w, <STRING>"Request cancelled"</STRING>, http.<TYPE>StatusRequestTimeout</TYPE>)
+		<KEYWORD>return</KEYWORD>
+	<KEYWORD>default</KEYWORD>:
+	}
+
+	data <OPERATOR>:=</OPERATOR> <KEYWORD>map</KEYWORD>[<TYPE>string</TYPE>]<KEYWORD>interface</KEYWORD>{}{
+		<STRING>"status"</STRING>:  <STRING>"ok"</STRING>,
+		<STRING>"message"</STRING>: <STRING>"Hello, World!"</STRING>,
+		<STRING>"count"</STRING>:   <NUMBER>42</NUMBER>,
+	}
+
+	w.<FUNCTION>Header</FUNCTION>().<FUNCTION>Set</FUNCTION>(<STRING>"Content-Type"</STRING>, <STRING>"application/json"</STRING>)
+	json.<FUNCTION>NewEncoder</FUNCTION>(w).<FUNCTION>Encode</FUNCTION>(data)
+}
+
+<COMMENT>// Goroutine and channel example</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>worker</FUNCTION>(id <TYPE>int</TYPE>, jobs <OPERATOR><-</OPERATOR><KEYWORD>chan</KEYWORD> <TYPE>int</TYPE>, results <KEYWORD>chan</KEYWORD><OPERATOR><-</OPERATOR> <TYPE>int</TYPE>, wg <OPERATOR>*</OPERATOR>sync.<TYPE>WaitGroup</TYPE>) {
+	<KEYWORD>defer</KEYWORD> wg.<FUNCTION>Done</FUNCTION>()
+	<KEYWORD>for</KEYWORD> job <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> jobs {
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Worker %d processing job %d\n"</STRING>, id, job)
+		time.<FUNCTION>Sleep</FUNCTION>(<NUMBER>100</NUMBER> <OPERATOR>*</OPERATOR> time.<TYPE>Millisecond</TYPE>)
+		results <OPERATOR><-</OPERATOR> job <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>
+	}
+}
+
+<COMMENT>// Context with timeout</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>fetchWithTimeout</FUNCTION>(ctx context.<TYPE>Context</TYPE>, url <TYPE>string</TYPE>) ([]<TYPE>byte</TYPE>, <TYPE>error</TYPE>) {
+	ctx, cancel <OPERATOR>:=</OPERATOR> context.<FUNCTION>WithTimeout</FUNCTION>(ctx, <NUMBER>5</NUMBER><OPERATOR>*</OPERATOR>time.<TYPE>Second</TYPE>)
+	<KEYWORD>defer</KEYWORD> <FUNCTION>cancel</FUNCTION>()
+
+	req, err <OPERATOR>:=</OPERATOR> http.<FUNCTION>NewRequestWithContext</FUNCTION>(ctx, http.<TYPE>MethodGet</TYPE>, url, <KEYWORD>nil</KEYWORD>)
+	<KEYWORD>if</KEYWORD> err <OPERATOR>!=</OPERATOR> <KEYWORD>nil</KEYWORD> {
+		<KEYWORD>return</KEYWORD> <KEYWORD>nil</KEYWORD>, err
+	}
+
+	resp, err <OPERATOR>:=</OPERATOR> http.<TYPE>DefaultClient</TYPE>.<FUNCTION>Do</FUNCTION>(req)
+	<KEYWORD>if</KEYWORD> err <OPERATOR>!=</OPERATOR> <KEYWORD>nil</KEYWORD> {
+		<KEYWORD>return</KEYWORD> <KEYWORD>nil</KEYWORD>, err
+	}
+	<KEYWORD>defer</KEYWORD> resp.<TYPE>Body</TYPE>.<FUNCTION>Close</FUNCTION>()
+
+	<KEYWORD>return</KEYWORD> io.<FUNCTION>ReadAll</FUNCTION>(resp.<TYPE>Body</TYPE>)
+}
+
+<KEYWORD>func</KEYWORD> <FUNCTION>main</FUNCTION>() {
+	<COMMENT>// Variable declarations</COMMENT>
+	<KEYWORD>var</KEYWORD> name <TYPE>string</TYPE> <OPERATOR>=</OPERATOR> <STRING>"World"</STRING>
+	count <OPERATOR>:=</OPERATOR> <NUMBER>42</NUMBER>
+	<KEYWORD>var</KEYWORD> items <OPERATOR>=</OPERATOR> []<TYPE>int</TYPE>{<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>}
+	numbers <OPERATOR>:=</OPERATOR> []<TYPE>int</TYPE>{<NUMBER>10</NUMBER>, <NUMBER>20</NUMBER>, <NUMBER>30</NUMBER>}
+
+	<COMMENT>// Map literal</COMMENT>
+	config <OPERATOR>:=</OPERATOR> <KEYWORD>map</KEYWORD>[<TYPE>string</TYPE>]<KEYWORD>interface</KEYWORD>{}{
+		<STRING>"host"</STRING>: <STRING>"localhost"</STRING>,
+		<STRING>"port"</STRING>: <NUMBER>8080</NUMBER>,
+		<STRING>"debug"</STRING>: <KEYWORD>true</KEYWORD>,
+	}
+
+	<COMMENT>// Slice operations</COMMENT>
+	slice <OPERATOR>:=</OPERATOR> <FUNCTION>make</FUNCTION>([]<TYPE>int</TYPE>, <NUMBER>0</NUMBER>, <NUMBER>10</NUMBER>)
+	slice <OPERATOR>=</OPERATOR> <FUNCTION>append</FUNCTION>(slice, <NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>)
+	copied <OPERATOR>:=</OPERATOR> <FUNCTION>make</FUNCTION>([]<TYPE>int</TYPE>, <FUNCTION>len</FUNCTION>(slice))
+	<FUNCTION>copy</FUNCTION>(copied, slice)
+
+	<COMMENT>// Control structures</COMMENT>
+	<KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Positive"</STRING>)
+	} <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> count <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Zero"</STRING>)
+	} <KEYWORD>else</KEYWORD> {
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Negative"</STRING>)
+	}
+
+	<COMMENT>// If with initialization</COMMENT>
+	<KEYWORD>if</KEYWORD> n <OPERATOR>:=</OPERATOR> <FUNCTION>len</FUNCTION>(items); n <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Items: %d\n"</STRING>, n)
+	}
+
+	<COMMENT>// Switch statement</COMMENT>
+	<KEYWORD>switch</KEYWORD> status <OPERATOR>:=</OPERATOR> <TYPE>StatusActive</TYPE>; status {
+	<KEYWORD>case</KEYWORD> <TYPE>StatusPending</TYPE>:
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Pending"</STRING>)
+	<KEYWORD>case</KEYWORD> <TYPE>StatusActive</TYPE>, <TYPE>StatusCompleted</TYPE>:
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Active or Completed"</STRING>)
+	<KEYWORD>default</KEYWORD>:
+		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Unknown"</STRING>)
+	}
+
+	<COMMENT>// Type switch</COMMENT>
+	<KEYWORD>var</KEYWORD> val <KEYWORD>interface</KEYWORD>{} <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+	<KEYWORD>switch</KEYWORD> v <OPERATOR>:=</OPERATOR> val.(<KEYWORD>type</KEYWORD>) {
+	<KEYWORD>case</KEYWORD> <TYPE>int</TYPE>:
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Integer: %d\n"</STRING>, v)
+	<KEYWORD>case</KEYWORD> <TYPE>string</TYPE>:
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"String: %s\n"</STRING>, v)
+	<KEYWORD>default</KEYWORD>:
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Unknown type: %T\n"</STRING>, v)
+	}
+
+	<COMMENT>// For loops</COMMENT>
+	<KEYWORD>for</KEYWORD> i <OPERATOR>:=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR> {
+		<KEYWORD>if</KEYWORD> i<OPERATOR>%</OPERATOR><NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
+			<KEYWORD>continue</KEYWORD>
+		}
+		<KEYWORD>if</KEYWORD> i <OPERATOR>></OPERATOR> <NUMBER>5</NUMBER> {
+			<KEYWORD>break</KEYWORD>
+		}
+		fmt.<FUNCTION>Println</FUNCTION>(i)
+	}
+
+	<COMMENT>// Range loop</COMMENT>
+	<KEYWORD>for</KEYWORD> index, value <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> items {
+		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"%d: %d\n"</STRING>, index, value)
+	}
+
+	<COMMENT>// Infinite loop</COMMENT>
+	<KEYWORD>go</KEYWORD> <KEYWORD>func</KEYWORD>() {
+		<KEYWORD>for</KEYWORD> {
+			<KEYWORD>select</KEYWORD> {
+			<KEYWORD>case</KEYWORD> <OPERATOR><-</OPERATOR>time.<FUNCTION>After</FUNCTION>(<NUMBER>1</NUMBER> <OPERATOR>*</OPERATOR> time.<TYPE>Second</TYPE>):
+				<KEYWORD>return</KEYWORD>
+			}
+		}
+	}()
+
+	<COMMENT>// Defer, panic, recover</COMMENT>
+	<KEYWORD>defer</KEYWORD> <KEYWORD>func</KEYWORD>() {
+		<KEYWORD>if</KEYWORD> r <OPERATOR>:=</OPERATOR> <FUNCTION>recover</FUNCTION>(); r <OPERATOR>!=</OPERATOR> <KEYWORD>nil</KEYWORD> {
+			fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Recovered:"</STRING>, r)
+		}
+	}()
+
+	<COMMENT>// Channel operations</COMMENT>
+	ch <OPERATOR>:=</OPERATOR> <FUNCTION>make</FUNCTION>(<KEYWORD>chan</KEYWORD> <TYPE>int</TYPE>, <NUMBER>10</NUMBER>)
+	<KEYWORD>go</KEYWORD> <KEYWORD>func</KEYWORD>() {
+		<KEYWORD>for</KEYWORD> _, n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> numbers {
+			ch <OPERATOR><-</OPERATOR> n
+		}
+		<FUNCTION>close</FUNCTION>(ch)
+	}()
+
+	<KEYWORD>for</KEYWORD> n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> ch {
+		fmt.<FUNCTION>Println</FUNCTION>(n)
+	}
+
+	<COMMENT>// Anonymous struct</COMMENT>
+	po<TYPE>int</TYPE> <OPERATOR>:=</OPERATOR> <KEYWORD>struct</KEYWORD> {
+		<TYPE>X</TYPE>, <TYPE>Y</TYPE> <TYPE>int</TYPE>
+	}{<NUMBER>10</NUMBER>, <NUMBER>20</NUMBER>}
+	fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Point: %+v\n"</STRING>, po<TYPE>int</TYPE>)
+
+	<COMMENT>// Type assertion</COMMENT>
+	<KEYWORD>var</KEYWORD> reader io.<TYPE>Reader</TYPE>
+	<KEYWORD>if</KEYWORD> closer, ok <OPERATOR>:=</OPERATOR> reader.(io.<TYPE>Closer</TYPE>); ok {
+		<KEYWORD>defer</KEYWORD> closer.<FUNCTION>Close</FUNCTION>()
+	}
+
+	<COMMENT>// Raw string literal</COMMENT>
+	query <OPERATOR>:=</OPERATOR> <STRING>`</STRING>
+<STRING>		SELECT *</STRING>
+<STRING>		FROM users</STRING>
+<STRING>		WHERE name = 'John'</STRING>
+<STRING>	`</STRING>
+
+	<COMMENT>// Numeric literals</COMMENT>
+	integer <OPERATOR>:=</OPERATOR> <NUMBER>42</NUMBER>
+	hex <OPERATOR>:=</OPERATOR> <NUMBER>0xFF</NUMBER>
+	octal <OPERATOR>:=</OPERATOR> <NUMBER>0o755</NUMBER>
+	binary <OPERATOR>:=</OPERATOR> <NUMBER>0b1010</NUMBER>
+	float <OPERATOR>:=</OPERATOR> <NUMBER>3.14</NUMBER>
+	scientific <OPERATOR>:=</OPERATOR> <NUMBER>1.5e10</NUMBER>
+
+	fmt.<FUNCTION>Println</FUNCTION>(name, count, config, query, integer, hex, octal, binary, float, scientific, po<TYPE>int</TYPE>)
+}

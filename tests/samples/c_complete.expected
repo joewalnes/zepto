@@ -1,0 +1,150 @@
+# Expected syntax highlighting for c_complete.c
+# Generated from C grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete C example demonstrating syntax highlighting</COMMENT>
+<KEYWORD>#include</KEYWORD> <STRING><stdio.h></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><stdlib.h></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><string.h></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><stdbool.h></STRING>
+
+<COMMENT>// Macro definitions</COMMENT>
+<KEYWORD>#define</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT> <NUMBER>1024</NUMBER>
+<KEYWORD>#define</KEYWORD> <FUNCTION>MIN</FUNCTION>(a, b) ((a) <OPERATOR><</OPERATOR> (b) ? (a) : (b))
+
+<COMMENT>// Type definitions</COMMENT>
+<KEYWORD>typedef</KEYWORD> <TYPE>unsigned</TYPE> <TYPE>int</TYPE> u<TYPE>int</TYPE>;
+<KEYWORD>typedef</KEYWORD> <KEYWORD>struct</KEYWORD> <TYPE>Node</TYPE> <TYPE>Node</TYPE>;
+
+<COMMENT>// Enum declaration</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE> {
+    <CONSTANT>STATUS_OK</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>,
+    <CONSTANT>STATUS_ERROR</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>,
+    <CONSTANT>STATUS_PENDING</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>
+};
+
+<COMMENT>// Struct declaration</COMMENT>
+<KEYWORD>struct</KEYWORD> <TYPE>Node</TYPE> {
+    <TYPE>int</TYPE> value;
+    <KEYWORD>struct</KEYWORD> <TYPE>Node</TYPE> <OPERATOR>*</OPERATOR>next;
+    <TYPE>char</TYPE> name[<NUMBER>64</NUMBER>];
+};
+
+<COMMENT>// Union example</COMMENT>
+<KEYWORD>union</KEYWORD> <TYPE>Data</TYPE> {
+    <TYPE>int</TYPE> i;
+    <TYPE>float</TYPE> f;
+    <TYPE>char</TYPE> str[<NUMBER>20</NUMBER>];
+};
+
+<COMMENT>// Function prototypes</COMMENT>
+<KEYWORD>static</KEYWORD> <TYPE>int</TYPE> <FUNCTION>compare</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>void</TYPE> <OPERATOR>*</OPERATOR>a, <KEYWORD>const</KEYWORD> <TYPE>void</TYPE> <OPERATOR>*</OPERATOR>b);
+<TYPE>int</TYPE> <FUNCTION>process_data</FUNCTION>(<TYPE>int</TYPE> <OPERATOR>*</OPERATOR>arr, <TYPE>size_t</TYPE> len);
+<TYPE>Node</TYPE><OPERATOR>*</OPERATOR> <FUNCTION>create_node</FUNCTION>(<TYPE>int</TYPE> value, <KEYWORD>const</KEYWORD> <TYPE>char</TYPE> <OPERATOR>*</OPERATOR>name);
+
+<COMMENT>// Static variable</COMMENT>
+<KEYWORD>static</KEYWORD> <TYPE>int</TYPE> counter <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+
+<COMMENT>// Main function</COMMENT>
+<TYPE>int</TYPE> <FUNCTION>main</FUNCTION>(<TYPE>int</TYPE> argc, <TYPE>char</TYPE> <OPERATOR>*</OPERATOR>argv[]) {
+    <COMMENT>// Variable declarations</COMMENT>
+    <TYPE>int</TYPE> count <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+    <TYPE>long</TYPE> big_number <OPERATOR>=</OPERATOR> <NUMBER>123456789L</NUMBER>;
+    <TYPE>double</TYPE> pi <OPERATOR>=</OPERATOR> <NUMBER>3.14159265358979</NUMBER>;
+    <TYPE>float</TYPE> ratio <OPERATOR>=</OPERATOR> <NUMBER>0.5f</NUMBER>;
+    <KEYWORD>bool</KEYWORD> flag <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>;
+    <TYPE>char</TYPE> letter <OPERATOR>=</OPERATOR> <STRING>'A'</STRING>;
+    <TYPE>char</TYPE> <OPERATOR>*</OPERATOR>message <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+
+    <COMMENT>// Array declarations</COMMENT>
+    <TYPE>int</TYPE> numbers[<NUMBER>5</NUMBER>] <OPERATOR>=</OPERATOR> {<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>};
+    <TYPE>int</TYPE> <OPERATOR>*</OPERATOR>dynamic_arr <OPERATOR>=</OPERATOR> <FUNCTION>malloc</FUNCTION>(<NUMBER>10</NUMBER> <OPERATOR>*</OPERATOR> <KEYWORD>sizeof</KEYWORD>(<TYPE>int</TYPE>));
+
+    <COMMENT>// Pointer arithmetic</COMMENT>
+    <TYPE>int</TYPE> <OPERATOR>*</OPERATOR>ptr <OPERATOR>=</OPERATOR> numbers;
+    ptr<OPERATOR>++</OPERATOR>;
+    <OPERATOR>*</OPERATOR>ptr <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
+
+    <COMMENT>// Hex, octal, binary literals</COMMENT>
+    <TYPE>int</TYPE> hex_val <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>;
+    <TYPE>int</TYPE> oct_val <OPERATOR>=</OPERATOR> <NUMBER>0777</NUMBER>;
+    <TYPE>unsigned</TYPE> <TYPE>long</TYPE> u<TYPE>long</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0xDEADBEEFUL</NUMBER>;
+
+    <COMMENT>// Control flow</COMMENT>
+    <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        <FUNCTION>printf</FUNCTION>(<STRING>"Positive: %d\n"</STRING>, count);
+    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+        <FUNCTION>printf</FUNCTION>(<STRING>"Negative\n"</STRING>);
+    } <KEYWORD>else</KEYWORD> {
+        <FUNCTION>printf</FUNCTION>(<STRING>"Zero\n"</STRING>);
+    }
+
+    <COMMENT>// Switch statement</COMMENT>
+    <KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE> status <OPERATOR>=</OPERATOR> <CONSTANT>STATUS_OK</CONSTANT>;
+    <KEYWORD>switch</KEYWORD> (status) {
+        <KEYWORD>case</KEYWORD> <CONSTANT>STATUS_OK</CONSTANT>:
+            <FUNCTION>printf</FUNCTION>(<STRING>"OK\n"</STRING>);
+            <KEYWORD>break</KEYWORD>;
+        <KEYWORD>case</KEYWORD> <CONSTANT>STATUS_ERROR</CONSTANT>:
+            <FUNCTION>printf</FUNCTION>(<STRING>"Error\n"</STRING>);
+            <KEYWORD>break</KEYWORD>;
+        <KEYWORD>default</KEYWORD>:
+            <FUNCTION>printf</FUNCTION>(<STRING>"Unknown\n"</STRING>);
+    }
+
+    <COMMENT>// Loops</COMMENT>
+    <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>++</OPERATOR>) {
+        <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
+        <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
+        <FUNCTION>printf</FUNCTION>(<STRING>"%d\n"</STRING>, i);
+    }
+
+    <KEYWORD>while</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        count<OPERATOR>--</OPERATOR>;
+    }
+
+    <KEYWORD>do</KEYWORD> {
+        count<OPERATOR>++</OPERATOR>;
+    } <KEYWORD>while</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>);
+
+    <COMMENT>// Struct usage</COMMENT>
+    <TYPE>Node</TYPE> <OPERATOR>*</OPERATOR>node <OPERATOR>=</OPERATOR> <FUNCTION>create_node</FUNCTION>(<NUMBER>42</NUMBER>, <STRING>"test"</STRING>);
+    <FUNCTION>printf</FUNCTION>(<STRING>"Node: %s = %d\n"</STRING>, node<OPERATOR>-></OPERATOR>name, node<OPERATOR>-></OPERATOR>value);
+
+    <COMMENT>// Memory management</COMMENT>
+    <FUNCTION>free</FUNCTION>(dynamic_arr);
+    <FUNCTION>free</FUNCTION>(node);
+
+    <KEYWORD>return</KEYWORD> <NUMBER>0</NUMBER>;
+}
+
+<COMMENT>// Function implementation</COMMENT>
+<TYPE>Node</TYPE><OPERATOR>*</OPERATOR> <FUNCTION>create_node</FUNCTION>(<TYPE>int</TYPE> value, <KEYWORD>const</KEYWORD> <TYPE>char</TYPE> <OPERATOR>*</OPERATOR>name) {
+    <TYPE>Node</TYPE> <OPERATOR>*</OPERATOR>node <OPERATOR>=</OPERATOR> <FUNCTION>malloc</FUNCTION>(<KEYWORD>sizeof</KEYWORD>(<TYPE>Node</TYPE>));
+    <KEYWORD>if</KEYWORD> (node <OPERATOR>==</OPERATOR> <KEYWORD>NULL</KEYWORD>) {
+        <FUNCTION>perror</FUNCTION>(<STRING>"malloc failed"</STRING>);
+        <KEYWORD>return</KEYWORD> <KEYWORD>NULL</KEYWORD>;
+    }
+    node<OPERATOR>-></OPERATOR>value <OPERATOR>=</OPERATOR> value;
+    <FUNCTION>strncpy</FUNCTION>(node<OPERATOR>-></OPERATOR>name, name, <KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-></OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>);
+    node<OPERATOR>-></OPERATOR>name[<KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-></OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>] <OPERATOR>=</OPERATOR> <STRING>'\0'</STRING>;
+    node<OPERATOR>-></OPERATOR>next <OPERATOR>=</OPERATOR> <KEYWORD>NULL</KEYWORD>;
+    <KEYWORD>return</KEYWORD> node;
+}
+
+<TYPE>int</TYPE> <FUNCTION>process_data</FUNCTION>(<TYPE>int</TYPE> <OPERATOR>*</OPERATOR>arr, <TYPE>size_t</TYPE> len) {
+    <TYPE>int</TYPE> sum <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>for</KEYWORD> (<TYPE>size_t</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> len; i<OPERATOR>++</OPERATOR>) {
+        sum <OPERATOR>+=</OPERATOR> arr[i];
+    }
+    <KEYWORD>return</KEYWORD> sum;
+}
+
+<KEYWORD>static</KEYWORD> <TYPE>int</TYPE> <FUNCTION>compare</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>void</TYPE> <OPERATOR>*</OPERATOR>a, <KEYWORD>const</KEYWORD> <TYPE>void</TYPE> <OPERATOR>*</OPERATOR>b) {
+    <KEYWORD>return</KEYWORD> (<OPERATOR>*</OPERATOR>(<TYPE>int</TYPE><OPERATOR>*</OPERATOR>)a <OPERATOR>-</OPERATOR> <OPERATOR>*</OPERATOR>(<TYPE>int</TYPE><OPERATOR>*</OPERATOR>)b);
+}
+
+<COMMENT>/*</COMMENT>
+<COMMENT> * Multi-line comment</COMMENT>
+<COMMENT> * explaining the algorithm</COMMENT>
+<COMMENT> */</COMMENT>

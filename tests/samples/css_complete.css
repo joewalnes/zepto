@@ -1,0 +1,326 @@
+/* ==========================================================================
+   Complete CSS Example - Demonstrating various syntax elements
+   ========================================================================== */
+
+/* CSS Custom Properties (Variables) */
+:root {
+    --primary-color: #3498db;
+    --secondary-color: rgb(231, 76, 60);
+    --spacing-unit: 8px;
+    --font-family: 'Segoe UI', Tahoma, sans-serif;
+    --transition-duration: 0.3s;
+}
+
+/* Universal selector and reset */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Element selectors */
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.6;
+    color: #333;
+    background-color: #fff;
+}
+
+/* Class selectors */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-unit);
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all var(--transition-duration) ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: darken(var(--primary-color), 10%);
+    transform: translateY(-2px);
+}
+
+/* ID selectors */
+#header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Attribute selectors */
+[type="text"],
+[type="email"],
+[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+}
+
+[data-theme="dark"] {
+    --bg-color: #1a1a2e;
+    --text-color: #eee;
+}
+
+input[type="checkbox"]:checked + label {
+    color: var(--primary-color);
+}
+
+a[href^="https://"] {
+    color: green;
+}
+
+a[href$=".pdf"]::after {
+    content: " (PDF)";
+}
+
+a[href*="example"] {
+    font-weight: bold;
+}
+
+/* Pseudo-classes */
+a:link { color: blue; }
+a:visited { color: purple; }
+a:hover { color: red; }
+a:active { color: orange; }
+a:focus { outline: 2px solid var(--primary-color); }
+
+input:focus-visible {
+    outline: 3px solid rgba(52, 152, 219, 0.5);
+}
+
+li:first-child { font-weight: bold; }
+li:last-child { border-bottom: none; }
+li:nth-child(odd) { background-color: #f9f9f9; }
+li:nth-child(2n+1) { color: #666; }
+
+tr:nth-of-type(even) { background: #f5f5f5; }
+
+input:required { border-left: 3px solid red; }
+input:optional { border-left: 3px solid green; }
+input:valid { border-color: green; }
+input:invalid { border-color: red; }
+input:placeholder-shown { font-style: italic; }
+
+:empty { display: none; }
+:not(.active) { opacity: 0.5; }
+:is(h1, h2, h3) { font-family: Georgia, serif; }
+:where(article, section) p { margin-bottom: 1em; }
+
+/* Pseudo-elements */
+p::first-line {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+p::first-letter {
+    font-size: 3em;
+    float: left;
+    line-height: 1;
+}
+
+.quote::before {
+    content: "\201C";  /* Unicode left quote */
+}
+
+.quote::after {
+    content: "\201D";  /* Unicode right quote */
+}
+
+::selection {
+    background: var(--primary-color);
+    color: white;
+}
+
+::placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+/* Combinators */
+header nav { display: flex; }           /* Descendant */
+ul > li { list-style: none; }           /* Child */
+h2 + p { margin-top: 0; }               /* Adjacent sibling */
+h2 ~ p { color: #666; }                 /* General sibling */
+
+/* Media queries */
+@media screen and (min-width: 768px) {
+    .container {
+        padding: 0 20px;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #121212;
+        --text-color: #e0e0e0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+@media print {
+    .no-print { display: none; }
+    body { font-size: 12pt; }
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.animated {
+    animation: fadeIn 0.5s ease-out forwards;
+    animation-delay: 0.2s;
+}
+
+/* Flexbox */
+.flex-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.flex-item {
+    flex: 1 1 300px;
+}
+
+/* Grid */
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-rows: auto;
+    grid-gap: 20px;
+    grid-template-areas:
+        "header header header"
+        "sidebar main main"
+        "footer footer footer";
+}
+
+.grid-header { grid-area: header; }
+.grid-sidebar { grid-area: sidebar; }
+.grid-main { grid-area: main; }
+.grid-footer { grid-area: footer; }
+
+/* Transforms */
+.transform-example {
+    transform: rotate(45deg) scale(1.2) translateX(10px);
+    transform-origin: center center;
+}
+
+/* Filters */
+.filter-example {
+    filter: blur(2px) brightness(1.1) contrast(1.2) saturate(1.5);
+}
+
+/* Gradients */
+.gradient-linear {
+    background: linear-gradient(to right, #ff6b6b, #4ecdc4);
+}
+
+.gradient-radial {
+    background: radial-gradient(circle at center, #fff 0%, #000 100%);
+}
+
+.gradient-conic {
+    background: conic-gradient(from 90deg, red, yellow, lime, aqua, blue, magenta, red);
+}
+
+/* Clip path */
+.clip-example {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+/* CSS Functions */
+.calc-example {
+    width: calc(100% - 40px);
+    height: calc(100vh - 60px);
+}
+
+.clamp-example {
+    font-size: clamp(1rem, 2.5vw, 2rem);
+}
+
+.minmax-example {
+    width: min(100%, 800px);
+    height: max(200px, 20vh);
+}
+
+/* Font face */
+@font-face {
+    font-family: 'CustomFont';
+    src: url('/fonts/custom.woff2') format('woff2'),
+         url('/fonts/custom.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Import */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+/* Supports */
+@supports (display: grid) {
+    .container {
+        display: grid;
+    }
+}
+
+@supports not (aspect-ratio: 1/1) {
+    .fallback {
+        padding-top: 100%;
+    }
+}
+
+/* Layer */
+@layer utilities {
+    .hidden { display: none; }
+    .visible { display: block; }
+}
+
+/* Container queries */
+@container (min-width: 400px) {
+    .card {
+        flex-direction: row;
+    }
+}

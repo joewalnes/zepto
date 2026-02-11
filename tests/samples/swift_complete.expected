@@ -1,0 +1,233 @@
+# Expected syntax highlighting for swift_complete.swift
+# Generated from Swift grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete Swift example demonstrating syntax highlighting</COMMENT>
+<KEYWORD>import</KEYWORD> <TYPE>Foundation</TYPE>
+
+<COMMENT>// Protocol definition</COMMENT>
+<KEYWORD>protocol</KEYWORD> <TYPE>Drawable</TYPE> {
+    <KEYWORD>func</KEYWORD> <FUNCTION>draw</FUNCTION>()
+    <KEYWORD>var</KEYWORD> description: <TYPE>String</TYPE> { <KEYWORD>get</KEYWORD> }
+}
+
+<COMMENT>// Protocol with associated type</COMMENT>
+<KEYWORD>protocol</KEYWORD> <TYPE>Container</TYPE> {
+    <KEYWORD>associatedtype</KEYWORD> <TYPE>Item</TYPE>
+    <KEYWORD>mutating</KEYWORD> <KEYWORD>func</KEYWORD> <FUNCTION>append</FUNCTION>(_ item: <TYPE>Item</TYPE>)
+    <KEYWORD>var</KEYWORD> count: <TYPE>Int</TYPE> { <KEYWORD>get</KEYWORD> }
+    <KEYWORD>subscript</KEYWORD>(i: <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Item</TYPE> { <KEYWORD>get</KEYWORD> }
+}
+
+<COMMENT>// Enum with associated values</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>Success</TYPE>, <TYPE>Failure</TYPE>: <TYPE>Error</TYPE><OPERATOR>></OPERATOR> {
+    <KEYWORD>case</KEYWORD> <FUNCTION>success</FUNCTION>(<TYPE>Success</TYPE>)
+    <KEYWORD>case</KEYWORD> <FUNCTION>failure</FUNCTION>(<TYPE>Failure</TYPE>)
+}
+
+<COMMENT>// Enum with raw values</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE>: <TYPE>Int</TYPE> {
+    <KEYWORD>case</KEYWORD> pending <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>
+    <KEYWORD>case</KEYWORD> active <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>
+    <KEYWORD>case</KEYWORD> completed <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>
+}
+
+<COMMENT>// Struct</COMMENT>
+<KEYWORD>struct</KEYWORD> <TYPE>Point</TYPE> {
+    <KEYWORD>var</KEYWORD> x: <TYPE>Double</TYPE>
+    <KEYWORD>var</KEYWORD> y: <TYPE>Double</TYPE>
+
+    <COMMENT>// Computed property</COMMENT>
+    <KEYWORD>var</KEYWORD> magnitude: <TYPE>Double</TYPE> {
+        <KEYWORD>return</KEYWORD> (x <OPERATOR>*</OPERATOR> x <OPERATOR>+</OPERATOR> y <OPERATOR>*</OPERATOR> y).<FUNCTION>squareRoot</FUNCTION>()
+    }
+
+    <COMMENT>// Mutating method</COMMENT>
+    <KEYWORD>mutating</KEYWORD> <KEYWORD>func</KEYWORD> <FUNCTION>translate</FUNCTION>(by off<KEYWORD>set</KEYWORD>: <TYPE>Point</TYPE>) {
+        x <OPERATOR>+=</OPERATOR> off<KEYWORD>set</KEYWORD>.x
+        y <OPERATOR>+=</OPERATOR> off<KEYWORD>set</KEYWORD>.y
+    }
+}
+
+<COMMENT>// Class with inheritance</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Shape</TYPE>: <TYPE>Drawable</TYPE> {
+    <KEYWORD>var</KEYWORD> name: <TYPE>String</TYPE>
+
+    <KEYWORD>init</KEYWORD>(name: <TYPE>String</TYPE>) {
+        <KEYWORD>self</KEYWORD>.name <OPERATOR>=</OPERATOR> name
+    }
+
+    <KEYWORD>func</KEYWORD> <FUNCTION>draw</FUNCTION>() {
+        <FUNCTION>print</FUNCTION>(<STRING>"Drawing \(name)"</STRING>)
+    }
+
+    <KEYWORD>var</KEYWORD> description: <TYPE>String</TYPE> {
+        <KEYWORD>return</KEYWORD> <STRING>"Shape: \(name)"</STRING>
+    }
+}
+
+<COMMENT>// Subclass</COMMENT>
+<KEYWORD>final</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Circle</TYPE>: <TYPE>Shape</TYPE> {
+    <KEYWORD>var</KEYWORD> radius: <TYPE>Double</TYPE>
+
+    <KEYWORD>init</KEYWORD>(radius: <TYPE>Double</TYPE>) {
+        <KEYWORD>self</KEYWORD>.radius <OPERATOR>=</OPERATOR> radius
+        <KEYWORD>super</KEYWORD>.<KEYWORD>init</KEYWORD>(name: <STRING>"Circle"</STRING>)
+    }
+
+    <KEYWORD>override</KEYWORD> <KEYWORD>func</KEYWORD> <FUNCTION>draw</FUNCTION>() {
+        <FUNCTION>print</FUNCTION>(<STRING>"Drawing circle with radius \(radius)"</STRING>)
+    }
+
+    <KEYWORD>func</KEYWORD> <FUNCTION>area</FUNCTION>() <OPERATOR>-></OPERATOR> <TYPE>Double</TYPE> {
+        <KEYWORD>return</KEYWORD> <TYPE>Double</TYPE>.pi <OPERATOR>*</OPERATOR> radius <OPERATOR>*</OPERATOR> radius
+    }
+}
+
+<COMMENT>// Actor (Swift concurrency)</COMMENT>
+<KEYWORD>actor</KEYWORD> <TYPE>Counter</TYPE> {
+    <KEYWORD>private</KEYWORD> <KEYWORD>var</KEYWORD> value <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>
+
+    <KEYWORD>func</KEYWORD> <FUNCTION>increment</FUNCTION>() {
+        value <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>
+    }
+
+    <KEYWORD>func</KEYWORD> <FUNCTION>getValue</FUNCTION>() <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> {
+        <KEYWORD>return</KEYWORD> value
+    }
+}
+
+<COMMENT>// Generic function</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>swap</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR>(_ a: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>, _ b: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>) {
+    <KEYWORD>let</KEYWORD> temp <OPERATOR>=</OPERATOR> a
+    a <OPERATOR>=</OPERATOR> b
+    b <OPERATOR>=</OPERATOR> temp
+}
+
+<COMMENT>// Function with closures</COMMENT>
+<KEYWORD>func</KEYWORD> <FUNCTION>performOperation</FUNCTION>(_ operation: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE>, on a: <TYPE>Int</TYPE>, and b: <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> {
+    <KEYWORD>return</KEYWORD> <FUNCTION>operation</FUNCTION>(a, b)
+}
+
+<COMMENT>// Extension</COMMENT>
+<KEYWORD>extension</KEYWORD> <TYPE>Int</TYPE> {
+    <KEYWORD>var</KEYWORD> is<TYPE>Even</TYPE>: <TYPE>Bool</TYPE> {
+        <KEYWORD>return</KEYWORD> <KEYWORD>self</KEYWORD> <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>
+    }
+
+    <KEYWORD>func</KEYWORD> <FUNCTION>times</FUNCTION>(_ action: () <OPERATOR>-></OPERATOR> <TYPE>Void</TYPE>) {
+        <KEYWORD>for</KEYWORD> _ <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR><</OPERATOR><KEYWORD>self</KEYWORD> {
+            <FUNCTION>action</FUNCTION>()
+        }
+    }
+}
+
+<COMMENT>// Property wrapper</COMMENT>
+<ATTRIBUTE>@propertyWrapper</ATTRIBUTE>
+<KEYWORD>struct</KEYWORD> <TYPE>Clamped</TYPE><OPERATOR><</OPERATOR><TYPE>Value</TYPE>: <TYPE>Comparable</TYPE><OPERATOR>></OPERATOR> {
+    <KEYWORD>var</KEYWORD> value: <TYPE>Value</TYPE>
+    <KEYWORD>let</KEYWORD> range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR><</OPERATOR><TYPE>Value</TYPE><OPERATOR>></OPERATOR>
+
+    <KEYWORD>var</KEYWORD> wrapped<TYPE>Value</TYPE>: <TYPE>Value</TYPE> {
+        <KEYWORD>get</KEYWORD> { value }
+        <KEYWORD>set</KEYWORD> { value <OPERATOR>=</OPERATOR> <FUNCTION>min</FUNCTION>(<FUNCTION>max</FUNCTION>(new<TYPE>Value</TYPE>, range.lower<TYPE>Bound</TYPE>), range.upper<TYPE>Bound</TYPE>) }
+    }
+
+    <KEYWORD>init</KEYWORD>(wrapped<TYPE>Value</TYPE>: <TYPE>Value</TYPE>, range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR><</OPERATOR><TYPE>Value</TYPE><OPERATOR>></OPERATOR>) {
+        <KEYWORD>self</KEYWORD>.range <OPERATOR>=</OPERATOR> range
+        <KEYWORD>self</KEYWORD>.value <OPERATOR>=</OPERATOR> <FUNCTION>min</FUNCTION>(<FUNCTION>max</FUNCTION>(wrapped<TYPE>Value</TYPE>, range.lower<TYPE>Bound</TYPE>), range.upper<TYPE>Bound</TYPE>)
+    }
+}
+
+<COMMENT>// Main code</COMMENT>
+<ATTRIBUTE>@main</ATTRIBUTE>
+<KEYWORD>struct</KEYWORD> <TYPE>App</TYPE> {
+    <KEYWORD>static</KEYWORD> <KEYWORD>func</KEYWORD> <FUNCTION>main</FUNCTION>() <KEYWORD>async</KEYWORD> {
+        <COMMENT>// Variable declarations</COMMENT>
+        <KEYWORD>let</KEYWORD> count: <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+        <KEYWORD>var</KEYWORD> name <OPERATOR>=</OPERATOR> <STRING>"Swift"</STRING>
+        <KEYWORD>let</KEYWORD> pi: <TYPE>Double</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>
+        <KEYWORD>let</KEYWORD> flag: <TYPE>Bool</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>
+        <KEYWORD>let</KEYWORD> character: <TYPE>Character</TYPE> <OPERATOR>=</OPERATOR> <STRING>"A"</STRING>
+        <KEYWORD>let</KEYWORD> message: <TYPE>String</TYPE> <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>
+
+        <COMMENT>// Optional binding</COMMENT>
+        <KEYWORD>var</KEYWORD> <KEYWORD>optional</KEYWORD>: <TYPE>String</TYPE><OPERATOR>?</OPERATOR> <OPERATOR>=</OPERATOR> <STRING>"value"</STRING>
+        <KEYWORD>if</KEYWORD> <KEYWORD>let</KEYWORD> value <OPERATOR>=</OPERATOR> <KEYWORD>optional</KEYWORD> {
+            <FUNCTION>print</FUNCTION>(value)
+        }
+
+        <COMMENT>// Guard statement</COMMENT>
+        <KEYWORD>guard</KEYWORD> <KEYWORD>let</KEYWORD> unwrapped <OPERATOR>=</OPERATOR> <KEYWORD>optional</KEYWORD> <KEYWORD>else</KEYWORD> {
+            <KEYWORD>return</KEYWORD>
+        }
+
+        <COMMENT>// Nil coalescing</COMMENT>
+        <KEYWORD>let</KEYWORD> result <OPERATOR>=</OPERATOR> <KEYWORD>optional</KEYWORD> <OPERATOR>??</OPERATOR> <STRING>"default"</STRING>
+
+        <COMMENT>// Array and dictionary</COMMENT>
+        <KEYWORD>var</KEYWORD> numbers: [<TYPE>Int</TYPE>] <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>]
+        <KEYWORD>var</KEYWORD> dict: [<TYPE>String</TYPE>: <TYPE>Int</TYPE>] <OPERATOR>=</OPERATOR> [<STRING>"one"</STRING>: <NUMBER>1</NUMBER>, <STRING>"two"</STRING>: <NUMBER>2</NUMBER>]
+
+        <COMMENT>// Control flow</COMMENT>
+        <KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+            <FUNCTION>print</FUNCTION>(<STRING>"Positive"</STRING>)
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> <FUNCTION>count</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER> {
+            <FUNCTION>print</FUNCTION>(<STRING>"Negative"</STRING>)
+        } <KEYWORD>else</KEYWORD> {
+            <FUNCTION>print</FUNCTION>(<STRING>"Zero"</STRING>)
+        }
+
+        <COMMENT>// Switch with pattern matching</COMMENT>
+        <KEYWORD>switch</KEYWORD> count {
+        <KEYWORD>case</KEYWORD> <NUMBER>0</NUMBER>:
+            <FUNCTION>print</FUNCTION>(<STRING>"Zero"</STRING>)
+        <KEYWORD>case</KEYWORD> <NUMBER>1.</NUMBER>..<NUMBER>10</NUMBER>:
+            <FUNCTION>print</FUNCTION>(<STRING>"Between 1 and 10"</STRING>)
+        <KEYWORD>case</KEYWORD> <KEYWORD>let</KEYWORD> x <KEYWORD>where</KEYWORD> x <OPERATOR>></OPERATOR> <NUMBER>100</NUMBER>:
+            <FUNCTION>print</FUNCTION>(<STRING>"Large: \(x)"</STRING>)
+        <KEYWORD>default</KEYWORD>:
+            <FUNCTION>print</FUNCTION>(<STRING>"Other"</STRING>)
+        }
+
+        <COMMENT>// For loop</COMMENT>
+        <KEYWORD>for</KEYWORD> i <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR><</OPERATOR><NUMBER>10</NUMBER> {
+            <KEYWORD>if</KEYWORD> i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER> { <KEYWORD>continue</KEYWORD> }
+            <KEYWORD>if</KEYWORD> i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER> { <KEYWORD>break</KEYWORD> }
+            <FUNCTION>print</FUNCTION>(i)
+        }
+
+        <COMMENT>// While loop</COMMENT>
+        <KEYWORD>var</KEYWORD> counter <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>
+        <KEYWORD>while</KEYWORD> <FUNCTION>counter</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER> {
+            counter <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>
+        }
+
+        <COMMENT>// Closures</COMMENT>
+        <KEYWORD>let</KEYWORD> add: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> { $<NUMBER>0</NUMBER> <OPERATOR>+</OPERATOR> $<NUMBER>1</NUMBER> }
+        <KEYWORD>let</KEYWORD> doubled <OPERATOR>=</OPERATOR> numbers.map { $<NUMBER>0</NUMBER> <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
+        <KEYWORD>let</KEYWORD> filtered <OPERATOR>=</OPERATOR> numbers.filter { $<NUMBER>0</NUMBER> <OPERATOR>></OPERATOR> <NUMBER>2</NUMBER> }
+
+        <COMMENT>// Async/await</COMMENT>
+        <KEYWORD>let</KEYWORD> async<TYPE>Counter</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>Counter</FUNCTION>()
+        <KEYWORD>await</KEYWORD> async<TYPE>Counter</TYPE>.<FUNCTION>increment</FUNCTION>()
+        <KEYWORD>let</KEYWORD> value <OPERATOR>=</OPERATOR> <KEYWORD>await</KEYWORD> async<TYPE>Counter</TYPE>.<FUNCTION>getValue</FUNCTION>()
+
+        <COMMENT>// Try/catch</COMMENT>
+        <KEYWORD>do</KEYWORD> {
+            <KEYWORD>let</KEYWORD> data <OPERATOR>=</OPERATOR> <KEYWORD>try</KEYWORD> <FUNCTION>Data</FUNCTION>(contents<TYPE>Of</TYPE>: <FUNCTION>URL</FUNCTION>(file<TYPE>URLWithPath</TYPE>: <STRING>"/path"</STRING>))
+        } <KEYWORD>catch</KEYWORD> {
+            <FUNCTION>print</FUNCTION>(<STRING>"Error: \(error)"</STRING>)
+        }
+
+        <COMMENT>// Defer</COMMENT>
+        <KEYWORD>defer</KEYWORD> {
+            <FUNCTION>print</FUNCTION>(<STRING>"Cleanup"</STRING>)
+        }
+    }
+}
+
+<COMMENT>/*</COMMENT>
+<COMMENT> * Multi-line comment</COMMENT>
+<COMMENT> * demonstrating Swift features</COMMENT>
+<COMMENT> */</COMMENT>

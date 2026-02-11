@@ -129,6 +129,60 @@ sub get_menu_actions {
 # Format: ' ' + RL + ' ☰ esc ' + RR + ' ' = 11 chars
 use constant MENU_ESC_PREFIX_WIDTH => 11;
 
+# Tab width for visual rendering
+use constant TAB_WIDTH => 4;
+
+# Expand tabs in a string to spaces, respecting tab stops
+# Also returns a mapping from original char positions to visual positions
+# Returns: ($expanded_string, \@char_to_visual)
+# @char_to_visual[i] = visual column where character i starts
+sub _expand_tabs {
+    my ($text) = @_;
+    return ('', []) unless defined $text && length($text) > 0;
+
+    my $expanded = '';
+    my @char_to_visual;
+    my $visual_col = 0;
+
+    for my $i (0 .. length($text) - 1) {
+        my $char = substr($text, $i, 1);
+        push @char_to_visual, $visual_col;
+
+        if ($char eq "\t") {
+            # Expand to next tab stop
+            my $spaces = TAB_WIDTH - ($visual_col % TAB_WIDTH);
+            $expanded .= ' ' x $spaces;
+            $visual_col += $spaces;
+        } else {
+            $expanded .= $char;
+            $visual_col++;
+        }
+    }
+
+    return ($expanded, \@char_to_visual);
+}
+
+# Convert a character position to visual column
+sub _char_to_visual_col {
+    my ($text, $char_pos) = @_;
+    return 0 unless defined $text && $char_pos > 0;
+
+    my $visual_col = 0;
+    my $len = length($text);
+    $char_pos = $len if $char_pos > $len;
+
+    for my $i (0 .. $char_pos - 1) {
+        my $char = substr($text, $i, 1);
+        if ($char eq "\t") {
+            $visual_col += TAB_WIDTH - ($visual_col % TAB_WIDTH);
+        } else {
+            $visual_col++;
+        }
+    }
+
+    return $visual_col;
+}
+
 # Menu bar buttons on the right side
 our @MENU_BAR_BUTTONS = (
     { label => 'Open', key => '^O', action => 'open', icon => 'folder_open' },
@@ -188,14 +242,15 @@ sub get_gutter_width {
 sub render {
     my ($class, %args) = @_;
 
-    my $doc      = $args{document};
-    my $view     = $args{view};
-    my $ui       = $args{ui} // {};
-    my $theme    = $args{theme};
-    my $prefs    = $args{prefs};
-    my $rows     = $args{rows} // DEFAULT_ROWS;
-    my $cols     = $args{cols} // DEFAULT_COLS;
-    my $message  = $args{message} // '';
+    my $doc         = $args{document};
+    my $view        = $args{view};
+    my $ui          = $args{ui} // {};
+    my $theme       = $args{theme};
+    my $prefs       = $args{prefs};
+    my $rows        = $args{rows} // DEFAULT_ROWS;
+    my $cols        = $args{cols} // DEFAULT_COLS;
+    my $message     = $args{message} // '';
+    my $highlighter = $args{highlighter};  # Optional syntax highlighter
 
     # Sync Chars module with prefs
     if ($prefs) {
@@ -230,7 +285,7 @@ sub render {
 
     # Render ruler bar (row 2)
     $output .= _move_to(2, 1);
-    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view);
+    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc);
 
     # Render text area or file picker
     if ($ui->{file_picker}) {
@@ -242,7 +297,7 @@ sub render {
         # Normal text area with line numbers (rows 2 to 2+text_height-1)
         $output .= $class->_render_text_area(
             $doc, $view, $theme,
-            $text_height, $text_width, $gutter_width
+            $text_height, $text_width, $gutter_width, $highlighter
         );
     }
 
@@ -302,7 +357,7 @@ sub render {
     } elsif ($view && $doc) {
         # Position terminal cursor for editing
         my ($cursor_row, $cursor_col) = $class->_cursor_screen_pos(
-            $view, $gutter_width, $menu_height
+            $view, $gutter_width, $menu_height, $doc
         );
         $output .= _move_to($cursor_row, $cursor_col);
         $output .= SHOW_CURSOR;
@@ -426,17 +481,25 @@ sub _render_menu_bar {
 
 # Render the ruler bar showing column positions
 sub _render_ruler_bar {
-    my ($class, $theme, $cols, $gutter_width, $view) = @_;
+    my ($class, $theme, $cols, $gutter_width, $view, $doc) = @_;
 
     my $output = '';
 
-    # Get cursor column (0-indexed internally, display as 1-indexed)
-    my $cursor_col_0 = $view ? $view->cursor_col() : 0;
+    # Get cursor position
+    my $cursor_line = $view ? $view->cursor_line() : 0;
+    my $cursor_col_char = $view ? $view->cursor_col() : 0;
     my $scroll_col = $view ? $view->scroll_col() : 0;
-    my $cursor_col = $cursor_col_0 + 1;  # 1-indexed for display
+
+    # Calculate visual cursor column from the cursor line's content
+    # This ensures ruler badge matches the crosshair visual position
+    my $cursor_line_content = ($doc && $cursor_line < $doc->line_count())
+        ? $doc->get_line_content($cursor_line)
+        : '';
+    my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col_char);
+    my $cursor_col = $visual_cursor_col + 1;  # 1-indexed for display
 
     # Visible cursor position (relative to viewport)
-    my $visible_cursor = $cursor_col_0 - $scroll_col;
+    my $visible_cursor = $visual_cursor_col - $scroll_col;
 
     # Start with gutter area (empty, matches gutter width)
     $output .= $theme->color('ruler_bg') . $theme->color('ruler_fg');
@@ -508,7 +571,7 @@ sub _render_ruler_bar {
 
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter) = @_;
 
     my $output = '';
 
@@ -518,6 +581,14 @@ sub _render_text_area {
     my $scroll_col = $view->scroll_col();
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
+
+    # Calculate the visual cursor column ONCE from the cursor line's content
+    # This ensures the crosshair is a straight vertical line regardless of tabs on other lines
+    my $cursor_line_content = $cursor_line < $doc->line_count()
+        ? $doc->get_line_content($cursor_line)
+        : '';
+    my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
+    my $visible_cursor_col = $visual_cursor_col - $scroll_col;
 
     for my $screen_row (0 .. $height - 1) {
         my $doc_line = $scroll_line + $screen_row;
@@ -565,29 +636,56 @@ sub _render_text_area {
         # Text content
         if ($doc_line < $doc->line_count()) {
             my $line_content = $doc->get_line_content($doc_line);
+            my $full_line_content = $line_content;  # Keep full line for tokenization
 
-            # Apply horizontal scroll
-            if ($scroll_col > 0 && $scroll_col < length($line_content)) {
-                $line_content = substr($line_content, $scroll_col);
+            # Get syntax tokens for this line (before tab expansion)
+            my $tokens = [];
+            if ($highlighter) {
+                ($tokens) = $highlighter->tokenize_line($full_line_content, $doc_line);
             }
-            elsif ($scroll_col >= length($line_content)) {
-                $line_content = '';
+
+            # Expand tabs in the full line content and get position mapping
+            my ($expanded_content, $char_to_visual) = _expand_tabs($full_line_content);
+
+            # Convert token positions from character to visual positions
+            my @visual_tokens;
+            for my $tok (@$tokens) {
+                my $vis_start = $char_to_visual->[$tok->{start}] // 0;
+                my $vis_end = $tok->{end} < @$char_to_visual
+                    ? $char_to_visual->[$tok->{end}]
+                    : length($expanded_content);
+                push @visual_tokens, {
+                    start => $vis_start,
+                    end => $vis_end,
+                    type => $tok->{type},
+                };
+            }
+
+            # Note: visual_cursor_col and visible_cursor_col are calculated once before the loop
+            # to ensure a straight vertical crosshair regardless of tab content on different lines
+
+            # Apply horizontal scroll (now in visual columns)
+            if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
+                $expanded_content = substr($expanded_content, $scroll_col);
+            }
+            elsif ($scroll_col >= length($expanded_content)) {
+                $expanded_content = '';
             }
 
             # Truncate to width
-            if (length($line_content) > $width) {
-                $line_content = substr($line_content, 0, $width);
+            if (length($expanded_content) > $width) {
+                $expanded_content = substr($expanded_content, 0, $width);
             }
 
-            # Render with selection and cursor highlighting
+            # Render with selection, syntax, and cursor highlighting
             $output .= $class->_render_line_with_highlights(
-                $line_content, $doc_line, $scroll_col, $width,
-                $view, $theme, $cursor_line, $cursor_col, $is_cursor_line
+                $expanded_content, $doc_line, $scroll_col, $width,
+                $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
+                $full_line_content
             );
 
             # Fill remaining space with appropriate backgrounds (crosshair column highlight)
-            my $fill_start = length($line_content);
-            my $visible_cursor_col = $cursor_col - $scroll_col;
+            my $fill_start = length($expanded_content);
             my $col_bg = $theme->color('cursor_col_bg');
 
             for (my $i = $fill_start; $i < $width; $i++) {
@@ -604,9 +702,9 @@ sub _render_text_area {
         }
         else {
             # Empty line (beyond document) - highlight cursor column for crosshair
+            # Uses pre-calculated visible_cursor_col for consistent vertical alignment
             my $empty_bg = $theme->color('empty_line_bg');
             my $col_bg = $theme->color('cursor_col_bg');
-            my $visible_cursor_col = $cursor_col - $scroll_col;
 
             for (my $i = 0; $i < $width; $i++) {
                 if ($i == $visible_cursor_col) {
@@ -625,9 +723,12 @@ sub _render_text_area {
     return $output;
 }
 
-# Render a line with selection and crosshair highlighting
+# Render a line with selection, syntax, and crosshair highlighting
+# $content: tab-expanded content for this line
+# $orig_content: original content (with tabs) for position conversion
+# $cursor_col: visual cursor column (already converted)
 sub _render_line_with_highlights {
-    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line) = @_;
+    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content) = @_;
 
     my $output = '';
     my $len = length($content);
@@ -637,6 +738,31 @@ sub _render_line_with_highlights {
     my $line_bg = $theme->color('cursor_line_bg');
     my $col_bg = $theme->color('cursor_col_bg');
     my $fg = $theme->color('fg');
+
+    # Build syntax color lookup from tokens (adjusted for scroll)
+    # Maps visible column → syntax foreground color
+    my @syntax_fg;
+    if ($tokens && @$tokens) {
+        for my $tok (@$tokens) {
+            my $type = $tok->{type};
+            my $color = $theme->color("syntax_$type");
+            next unless $color;  # Skip if no color defined for this type
+
+            # Adjust token positions for scroll
+            my $start = $tok->{start} - $scroll_col;
+            my $end = $tok->{end} - $scroll_col;
+
+            # Clamp to visible range
+            $start = 0 if $start < 0;
+            next if $start >= $len;  # Token entirely scrolled off right
+            $end = $len if $end > $len;
+            next if $end <= 0;  # Token entirely scrolled off left
+
+            for my $c ($start .. $end - 1) {
+                $syntax_fg[$c] = $color if $c >= 0 && $c < $len;
+            }
+        }
+    }
 
     # Cursor column position relative to viewport
     my $visible_cursor_col = $cursor_col - $scroll_col;
@@ -655,63 +781,55 @@ sub _render_line_with_highlights {
             $sel_end = $len;
 
             if ($line_num == $sel_start_line) {
-                $sel_start = $sel_start_col - $scroll_col;
+                # Convert character position to visual column
+                my $visual_sel_start = _char_to_visual_col($orig_content, $sel_start_col);
+                $sel_start = $visual_sel_start - $scroll_col;
                 $sel_start = 0 if $sel_start < 0;
             }
 
             if ($line_num == $sel_end_line) {
-                $sel_end = $sel_end_col - $scroll_col;
+                # Convert character position to visual column
+                my $visual_sel_end = _char_to_visual_col($orig_content, $sel_end_col);
+                $sel_end = $visual_sel_end - $scroll_col;
                 $sel_end = 0 if $sel_end < 0;
             }
         }
     }
 
-    # Render character by character with appropriate backgrounds
-    my $last_bg = '';
+    # Render character by character with appropriate backgrounds and foregrounds
+    # Priority: selection > cursor_line/col > syntax > default
+    my $last_style = '';
     for (my $i = 0; $i < $len; $i++) {
         my $char = substr($content, $i, 1);
-        my $char_bg;
+        my ($char_bg, $char_fg, $style_key);
 
-        # Check if in selection (takes priority)
+        # Check if in selection (use selection bg but preserve syntax fg)
         if ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
             $char_bg = $theme->color('selection_bg');
-            if ($last_bg ne 'sel') {
-                $output .= $char_bg . $theme->color('selection_fg');
-                $last_bg = 'sel';
-            }
+            $char_fg = $syntax_fg[$i] // $fg;  # Preserve syntax highlighting
+            $style_key = "sel:" . ($syntax_fg[$i] // 'def');
         }
         # Check crosshair highlighting
-        elsif ($is_cursor_line && $i == $visible_cursor_col) {
-            # Intersection - use cursor line bg (brightest)
-            $char_bg = $line_bg;
-            if ($last_bg ne 'line') {
-                $output .= $char_bg . $fg;
-                $last_bg = 'line';
-            }
-        }
         elsif ($is_cursor_line) {
-            # Cursor line only
             $char_bg = $line_bg;
-            if ($last_bg ne 'line') {
-                $output .= $char_bg . $fg;
-                $last_bg = 'line';
-            }
+            $char_fg = $syntax_fg[$i] // $fg;
+            $style_key = "line:" . ($syntax_fg[$i] // 'def');
         }
         elsif ($i == $visible_cursor_col) {
-            # Cursor column only
             $char_bg = $col_bg;
-            if ($last_bg ne 'col') {
-                $output .= $char_bg . $fg;
-                $last_bg = 'col';
-            }
+            $char_fg = $syntax_fg[$i] // $fg;
+            $style_key = "col:" . ($syntax_fg[$i] // 'def');
         }
         else {
-            # Normal background
             $char_bg = $bg;
-            if ($last_bg ne 'bg') {
-                $output .= $char_bg . $fg;
-                $last_bg = 'bg';
-            }
+            $char_fg = $syntax_fg[$i] // $fg;
+            $style_key = "bg:" . ($syntax_fg[$i] // 'def');
+        }
+
+        # Only emit escape codes when style changes
+        if ($style_key ne $last_style) {
+            $output .= $char_bg . $char_fg;
+            $last_style = $style_key;
         }
 
         $output .= $char;
@@ -981,16 +1099,22 @@ sub _render_dialog {
 
 # Calculate screen position for cursor
 sub _cursor_screen_pos {
-    my ($class, $view, $gutter_width, $menu_height) = @_;
+    my ($class, $view, $gutter_width, $menu_height, $doc) = @_;
 
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
     my $scroll_line = $view->scroll_line();
     my $scroll_col = $view->scroll_col();
 
+    # Convert character position to visual column (accounting for tabs)
+    my $cursor_line_content = ($doc && $cursor_line < $doc->line_count())
+        ? $doc->get_line_content($cursor_line)
+        : '';
+    my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
+
     # +2 for menu bar and ruler bar
     my $screen_row = $cursor_line - $scroll_line + $menu_height + 2;
-    my $screen_col = $cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
+    my $screen_col = $visual_cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);
 }

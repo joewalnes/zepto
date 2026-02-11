@@ -1,0 +1,106 @@
+# A complete YAML example demonstrating various syntax elements
+---
+# Document metadata
+name: example-project
+version: "1.0.0"
+description: A complete YAML example
+
+# Boolean values
+enabled: true
+debug: false
+production: yes
+staging: no
+on_flag: on
+off_flag: off
+
+# Null values
+empty_value: null
+tilde_null: ~
+
+# Numbers
+integer: 42
+negative: -17
+float: 3.14159
+scientific: 1.5e+10
+hex: 0xFF
+octal: 0o755
+infinity: .inf
+negative_infinity: -.inf
+not_a_number: .nan
+
+# Strings
+simple_string: Hello World
+quoted_double: "Hello \"World\""
+quoted_single: 'Hello ''World'''
+multiline_folded: >
+  This is a folded
+  multiline string that
+  becomes a single line.
+multiline_literal: |
+  This is a literal
+  multiline string that
+  preserves newlines.
+
+# Collections
+simple_list:
+  - item1
+  - item2
+  - item3
+
+inline_list: [one, two, three]
+
+nested_list:
+  - - nested1
+    - nested2
+  - - nested3
+
+simple_map:
+  key1: value1
+  key2: value2
+
+inline_map: {name: John, age: 30}
+
+nested_map:
+  level1:
+    level2:
+      level3: deep_value
+
+# Anchors and aliases
+defaults: &defaults
+  adapter: postgres
+  host: localhost
+  port: 5432
+
+development:
+  <<: *defaults
+  database: dev_db
+
+production:
+  <<: *defaults
+  database: prod_db
+  host: prod.example.com
+
+# Complex keys
+? - key
+  - with
+  - list
+: complex_key_value
+
+# Tags
+explicit_string: !!str 123
+explicit_int: !!int "456"
+explicit_float: !!float "3.14"
+binary: !!binary |
+  R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
+
+# Timestamps
+datetime: 2024-01-15T10:30:00Z
+date: 2024-01-15
+time_with_offset: 2024-01-15T10:30:00+05:30
+
+# Environment variables (common pattern)
+database_url: ${DATABASE_URL}
+api_key: ${API_KEY:-default_key}
+
+# Special characters in strings
+special: "Contains: colons, {braces}, [brackets], and #hash"

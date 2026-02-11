@@ -1,0 +1,204 @@
+# Expected syntax highlighting for zig_complete.zig
+# Generated from Zig grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete Zig example demonstrating syntax highlighting</COMMENT>
+<KEYWORD>const</KEYWORD> std <OPERATOR>=</OPERATOR> <FUNCTION>@import</FUNCTION>(<STRING>"std"</STRING>);
+<KEYWORD>const</KEYWORD> mem <OPERATOR>=</OPERATOR> std.mem;
+<KEYWORD>const</KEYWORD> <TYPE>Allocator</TYPE> <OPERATOR>=</OPERATOR> mem.<TYPE>Allocator</TYPE>;
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT>: <TYPE>usize</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>1024</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>PI</CONSTANT>: <TYPE>f64</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14159265358979</NUMBER>;
+
+<COMMENT>// Error set</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>FileError</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>error</KEYWORD>{
+    <TYPE>NotFound</TYPE>,
+    <TYPE>AccessDenied</TYPE>,
+    <TYPE>IoError</TYPE>,
+};
+
+<COMMENT>// Struct definition</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>Point</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>struct</KEYWORD> {
+    x: <TYPE>f32</TYPE>,
+    y: <TYPE>f32</TYPE>,
+
+    <KEYWORD>const</KEYWORD> <TYPE>Self</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>@This</FUNCTION>();
+
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>init</FUNCTION>(x: <TYPE>f32</TYPE>, y: <TYPE>f32</TYPE>) <TYPE>Self</TYPE> {
+        <KEYWORD>return</KEYWORD> <TYPE>Self</TYPE>{ .x <OPERATOR>=</OPERATOR> x, .y <OPERATOR>=</OPERATOR> y };
+    }
+
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>distance</FUNCTION>(self: <TYPE>Self</TYPE>, other: <TYPE>Self</TYPE>) <TYPE>f32</TYPE> {
+        <KEYWORD>const</KEYWORD> dx <OPERATOR>=</OPERATOR> self.x <OPERATOR>-</OPERATOR> other.x;
+        <KEYWORD>const</KEYWORD> dy <OPERATOR>=</OPERATOR> self.y <OPERATOR>-</OPERATOR> other.y;
+        <KEYWORD>return</KEYWORD> <FUNCTION>@sqrt</FUNCTION>(dx <OPERATOR>*</OPERATOR> dx <OPERATOR>+</OPERATOR> dy <OPERATOR>*</OPERATOR> dy);
+    }
+};
+
+<COMMENT>// Union type</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>Value</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>union</KEYWORD>(<KEYWORD>enum</KEYWORD>) {
+    int: <TYPE>i64</TYPE>,
+    float: <TYPE>f64</TYPE>,
+    boolean: <TYPE>bool</TYPE>,
+    none: <TYPE>void</TYPE>,
+
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>format</FUNCTION>(self: <TYPE>Value</TYPE>) <TYPE>void</TYPE> {
+        <KEYWORD>switch</KEYWORD> (self) {
+            .int <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>i<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"int: {}\n"</STRING>, .{i}),
+            .float <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>f<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"float: {d}\n"</STRING>, .{f}),
+            .boolean <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>b<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"bool: {}\n"</STRING>, .{b}),
+            .none <OPERATOR>=></OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"none\n"</STRING>, .{}),
+        }
+    }
+};
+
+<COMMENT>// Enum</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>Status</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>enum</KEYWORD>(<TYPE>u8</TYPE>) {
+    pending <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>,
+    active <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>,
+    completed <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>,
+
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>isActive</FUNCTION>(self: <TYPE>Status</TYPE>) <TYPE>bool</TYPE> {
+        <KEYWORD>return</KEYWORD> self <OPERATOR>==</OPERATOR> .active;
+    }
+};
+
+<COMMENT>// Generic function</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>max</FUNCTION>(<KEYWORD>comptime</KEYWORD> <TYPE>T</TYPE>: <TYPE>type</TYPE>, a: <TYPE>T</TYPE>, b: <TYPE>T</TYPE>) <TYPE>T</TYPE> {
+    <KEYWORD>return</KEYWORD> <KEYWORD>if</KEYWORD> (a <OPERATOR>></OPERATOR> b) a <KEYWORD>else</KEYWORD> b;
+}
+
+<COMMENT>// Function with error handling</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>divide</FUNCTION>(a: <TYPE>i32</TYPE>, b: <TYPE>i32</TYPE>) <OPERATOR>!</OPERATOR><TYPE>i32</TYPE> {
+    <KEYWORD>if</KEYWORD> (b <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>) <KEYWORD>return</KEYWORD> <KEYWORD>error</KEYWORD>.<TYPE>DivisionByZero</TYPE>;
+    <KEYWORD>return</KEYWORD> <FUNCTION>@divTrunc</FUNCTION>(a, b);
+}
+
+<COMMENT>// Async function</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>asyncFetch</FUNCTION>(url: []<KEYWORD>const</KEYWORD> <TYPE>u8</TYPE>) <OPERATOR>!</OPERATOR>[]<TYPE>u8</TYPE> {
+    _ <OPERATOR>=</OPERATOR> url;
+    <KEYWORD>return</KEYWORD> <KEYWORD>error</KEYWORD>.<TYPE>NotImplemented</TYPE>;
+}
+
+<COMMENT>// Comptime function</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>fibonacci</FUNCTION>(<KEYWORD>comptime</KEYWORD> n: <TYPE>u32</TYPE>) <TYPE>u32</TYPE> {
+    <KEYWORD>if</KEYWORD> (n <OPERATOR><=</OPERATOR> <NUMBER>1</NUMBER>) <KEYWORD>return</KEYWORD> n;
+    <KEYWORD>return</KEYWORD> <KEYWORD>comptime</KEYWORD> <FUNCTION>fibonacci</FUNCTION>(n <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>) <OPERATOR>+</OPERATOR> <FUNCTION>fibonacci</FUNCTION>(n <OPERATOR>-</OPERATOR> <NUMBER>2</NUMBER>);
+}
+
+<COMMENT>// Main function</COMMENT>
+<KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>main</FUNCTION>() <OPERATOR>!</OPERATOR><TYPE>void</TYPE> {
+    <KEYWORD>const</KEYWORD> stdout <OPERATOR>=</OPERATOR> std.io.<FUNCTION>getStdOut</FUNCTION>().<FUNCTION>writer</FUNCTION>();
+    <KEYWORD>var</KEYWORD> gpa <OPERATOR>=</OPERATOR> std.heap.<FUNCTION>GeneralPurposeAllocator</FUNCTION>(.{}){};
+    <KEYWORD>defer</KEYWORD> _ <OPERATOR>=</OPERATOR> gpa.<FUNCTION>deinit</FUNCTION>();
+    <KEYWORD>const</KEYWORD> allocat<KEYWORD>or</KEYWORD> <OPERATOR>=</OPERATOR> gpa.<FUNCTION>allocator</FUNCTION>();
+
+    <COMMENT>// Variable declarations</COMMENT>
+    <KEYWORD>const</KEYWORD> count: <TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+    <KEYWORD>var</KEYWORD> mutable: <TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>const</KEYWORD> name: []<KEYWORD>const</KEYWORD> <TYPE>u8</TYPE> <OPERATOR>=</OPERATOR> <STRING>"Zig"</STRING>;
+    <KEYWORD>const</KEYWORD> float_val: <TYPE>f64</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>;
+    <KEYWORD>const</KEYWORD> flag: <TYPE>bool</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>;
+    <KEYWORD>const</KEYWORD> char: <TYPE>u8</TYPE> <OPERATOR>=</OPERATOR> <STRING>'A'</STRING>;
+
+    <COMMENT>// Numbers</COMMENT>
+    <KEYWORD>const</KEYWORD> hex: <TYPE>u32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>;
+    <KEYWORD>const</KEYWORD> binary: <TYPE>u8</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0b1010_1010</NUMBER>;
+    <KEYWORD>const</KEYWORD> octal: <TYPE>u32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0o777</NUMBER>;
+
+    <COMMENT>// Arrays and slices</COMMENT>
+    <KEYWORD>var</KEYWORD> array <OPERATOR>=</OPERATOR> [_]<TYPE>i32</TYPE>{ <NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER> };
+    <KEYWORD>const</KEYWORD> slice: []<TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> array[<NUMBER>0.</NUMBER>.<NUMBER>3</NUMBER>];
+
+    <COMMENT>// Pointer operations</COMMENT>
+    <KEYWORD>const</KEYWORD> ptr: <OPERATOR>*</OPERATOR><TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <OPERATOR>&</OPERATOR>mutable;
+    ptr.<OPERATOR>*</OPERATOR> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
+
+    <COMMENT>// Optional type</COMMENT>
+    <KEYWORD>var</KEYWORD> optional: ?<TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>;
+    optional <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+    <KEYWORD>if</KEYWORD> (optional) <OPERATOR>|</OPERATOR>value<OPERATOR>|</OPERATOR> {
+        <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Value: {}\n"</STRING>, .{value});
+    }
+
+    <COMMENT>// Error union</COMMENT>
+    <KEYWORD>const</KEYWORD> result: <TYPE>FileError</TYPE><OPERATOR>!</OPERATOR><TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>divide</FUNCTION>(<NUMBER>10</NUMBER>, <NUMBER>2</NUMBER>);
+    <KEYWORD>const</KEYWORD> value <OPERATOR>=</OPERATOR> result <KEYWORD>catch</KEYWORD> <OPERATOR>|</OPERATOR>err<OPERATOR>|</OPERATOR> {
+        std.debug.<FUNCTION>print</FUNCTION>(<STRING>"Error: {}\n"</STRING>, .{err});
+        <KEYWORD>return</KEYWORD> err;
+    };
+
+    <COMMENT>// Control flow</COMMENT>
+    <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Positive\n"</STRING>, .{});
+    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+        <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Negative\n"</STRING>, .{});
+    } <KEYWORD>else</KEYWORD> {
+        <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Zero\n"</STRING>, .{});
+    }
+
+    <COMMENT>// Switch expression</COMMENT>
+    <KEYWORD>const</KEYWORD> status <OPERATOR>=</OPERATOR> <TYPE>Status</TYPE>.active;
+    <KEYWORD>const</KEYWORD> message <OPERATOR>=</OPERATOR> <KEYWORD>switch</KEYWORD> (status) {
+        .pending <OPERATOR>=></OPERATOR> <STRING>"Waiting..."</STRING>,
+        .active <OPERATOR>=></OPERATOR> <STRING>"Running"</STRING>,
+        .completed <OPERATOR>=></OPERATOR> <STRING>"Done"</STRING>,
+    };
+
+    <COMMENT>// Loops</COMMENT>
+    <KEYWORD>for</KEYWORD> (array) <OPERATOR>|</OPERATOR>item, index<OPERATOR>|</OPERATOR> {
+        <KEYWORD>if</KEYWORD> (index <OPERATOR>==</OPERATOR> <NUMBER>2</NUMBER>) <KEYWORD>continue</KEYWORD>;
+        <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"{}: {}\n"</STRING>, .{ index, item });
+    }
+
+    <KEYWORD>var</KEYWORD> i: <TYPE>u32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>while</KEYWORD> (i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>) : (i <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>) {
+        <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
+        <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
+    }
+
+    <COMMENT>// Defer</COMMENT>
+    <KEYWORD>defer</KEYWORD> <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Cleanup\n"</STRING>, .{});
+
+    <COMMENT>// Errdefer</COMMENT>
+    <KEYWORD>errdefer</KEYWORD> <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Error occurred\n"</STRING>, .{});
+
+    <COMMENT>// Inline assembly</COMMENT>
+    <KEYWORD>const</KEYWORD> result_<KEYWORD>asm</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>asm</KEYWORD> <KEYWORD>volatile</KEYWORD> (<STRING>"syscall"</STRING>
+        : [ret] <STRING>"={rax}"</STRING> (<OPERATOR>-></OPERATOR> <TYPE>usize</TYPE>),
+        : [number] <STRING>"{rax}"</STRING> (<FUNCTION>@as</FUNCTION>(<TYPE>usize</TYPE>, <NUMBER>1</NUMBER>)),
+        : <STRING>"rcx"</STRING>, <STRING>"r11"</STRING>, <STRING>"memory"</STRING>
+    );
+    _ <OPERATOR>=</OPERATOR> result_<KEYWORD>asm</KEYWORD>;
+
+    <COMMENT>// Comptime evaluation</COMMENT>
+    <KEYWORD>const</KEYWORD> fib<NUMBER>10</NUMBER> <OPERATOR>=</OPERATOR> <KEYWORD>comptime</KEYWORD> <FUNCTION>fibonacci</FUNCTION>(<NUMBER>10</NUMBER>);
+    <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Fib(10) = {}\n"</STRING>, .{fib<NUMBER>10</NUMBER>});
+
+    <COMMENT>// Struct usage</COMMENT>
+    <KEYWORD>const</KEYWORD> p<NUMBER>1</NUMBER> <OPERATOR>=</OPERATOR> <TYPE>Point</TYPE>.<FUNCTION>init</FUNCTION>(<NUMBER>0</NUMBER>, <NUMBER>0</NUMBER>);
+    <KEYWORD>const</KEYWORD> p<NUMBER>2</NUMBER> <OPERATOR>=</OPERATOR> <TYPE>Point</TYPE>.<FUNCTION>init</FUNCTION>(<NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>);
+    <KEYWORD>const</KEYWORD> dist <OPERATOR>=</OPERATOR> p<NUMBER>1.</NUMBER><FUNCTION>distance</FUNCTION>(p<NUMBER>2</NUMBER>);
+    <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Distance: {d}\n"</STRING>, .{dist});
+
+    <COMMENT>// Memory allocation</COMMENT>
+    <KEYWORD>const</KEYWORD> buffer <OPERATOR>=</OPERATOR> <KEYWORD>try</KEYWORD> allocat<KEYWORD>or</KEYWORD>.<FUNCTION>alloc</FUNCTION>(<TYPE>u8</TYPE>, <NUMBER>100</NUMBER>);
+    <KEYWORD>defer</KEYWORD> allocat<KEYWORD>or</KEYWORD>.<FUNCTION>free</FUNCTION>(buffer);
+
+    <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Success!\n"</STRING>, .{});
+}
+
+<COMMENT>// Multi-line string</COMMENT>
+<KEYWORD>const</KEYWORD> multi_line <OPERATOR>=</OPERATOR>
+    <STRING>\\This is a</STRING>
+    <STRING>\\multi-line string</STRING>
+    <STRING>\\in Zig</STRING>
+;
+
+<COMMENT>// Tests</COMMENT>
+<KEYWORD>test</KEYWORD> <STRING>"basic test"</STRING> {
+    <KEYWORD>const</KEYWORD> x: <TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>;
+    <KEYWORD>const</KEYWORD> y: <TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>;
+    <KEYWORD>try</KEYWORD> std.testing.<FUNCTION>expect</FUNCTION>(x <OPERATOR>+</OPERATOR> y <OPERATOR>==</OPERATOR> <NUMBER>3</NUMBER>);
+}

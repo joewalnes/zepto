@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Complete HTML Example</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <script src="app.js" defer></script>
+    <style>
+        /* Embedded CSS */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation header -->
+    <header class="main-header" id="top">
+        <nav aria-label="Main navigation">
+            <a href="/" class="logo">Site Name</a>
+            <ul class="nav-list">
+                <li><a href="/about">About</a></li>
+                <li><a href="/contact">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main role="main">
+        <!-- Article section -->
+        <article class="post" data-id="123" data-category="tech">
+            <h1>Complete HTML Example</h1>
+            <p class="intro">This demonstrates <strong>various</strong> HTML elements.</p>
+
+            <section>
+                <h2>Text Elements</h2>
+                <p>Regular paragraph with <em>emphasis</em> and <mark>highlighted</mark> text.</p>
+                <blockquote cite="https://example.com">
+                    This is a blockquote with a citation.
+                </blockquote>
+                <pre><code>const x = 42;</code></pre>
+            </section>
+
+            <section>
+                <h2>Lists</h2>
+                <ul>
+                    <li>Unordered item 1</li>
+                    <li>Unordered item 2</li>
+                </ul>
+                <ol>
+                    <li>Ordered item 1</li>
+                    <li>Ordered item 2</li>
+                </ol>
+                <dl>
+                    <dt>Term</dt>
+                    <dd>Definition</dd>
+                </dl>
+            </section>
+
+            <section>
+                <h2>Form Elements</h2>
+                <form action="/submit" method="POST" enctype="multipart/form-data">
+                    <fieldset>
+                        <legend>Personal Information</legend>
+
+                        <label for="name">Name:</label>
+                        <input type="text" id="name" name="name" required placeholder="Enter name">
+
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" name="email" autocomplete="email">
+
+                        <label for="age">Age:</label>
+                        <input type="number" id="age" name="age" min="0" max="120">
+
+                        <label for="bio">Bio:</label>
+                        <textarea id="bio" name="bio" rows="4" cols="50"></textarea>
+
+                        <label for="country">Country:</label>
+                        <select id="country" name="country">
+                            <optgroup label="Americas">
+                                <option value="us">United States</option>
+                                <option value="ca">Canada</option>
+                            </optgroup>
+                            <optgroup label="Europe">
+                                <option value="uk">United Kingdom</option>
+                                <option value="de" selected>Germany</option>
+                            </optgroup>
+                        </select>
+
+                        <input type="checkbox" id="agree" name="agree" checked>
+                        <label for="agree">I agree to terms</label>
+
+                        <input type="radio" id="opt1" name="option" value="1">
+                        <label for="opt1">Option 1</label>
+
+                        <input type="hidden" name="csrf" value="abc123">
+
+                        <button type="submit" disabled>Submit</button>
+                        <button type="reset">Reset</button>
+                    </fieldset>
+                </form>
+            </section>
+
+            <section>
+                <h2>Media Elements</h2>
+                <figure>
+                    <img src="image.jpg" alt="Description" width="800" height="600" loading="lazy">
+                    <figcaption>Image caption</figcaption>
+                </figure>
+
+                <video controls width="640" height="360" poster="poster.jpg">
+                    <source src="video.mp4" type="video/mp4">
+                    <source src="video.webm" type="video/webm">
+                    <track kind="subtitles" src="subs.vtt" srclang="en" label="English">
+                    Your browser doesn't support video.
+                </video>
+
+                <audio controls>
+                    <source src="audio.mp3" type="audio/mpeg">
+                </audio>
+
+                <iframe src="https://example.com" title="Embedded content"
+                        width="100%" height="400" frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write"
+                        allowfullscreen></iframe>
+            </section>
+
+            <section>
+                <h2>Table</h2>
+                <table>
+                    <caption>Sample Data</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Item 1</td>
+                            <td>100</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">Merged cell</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td>100</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+
+            <section>
+                <h2>Interactive Elements</h2>
+                <details>
+                    <summary>Click to expand</summary>
+                    <p>Hidden content revealed on click.</p>
+                </details>
+
+                <dialog id="dialog">
+                    <p>This is a dialog</p>
+                    <button onclick="this.parentElement.close()">Close</button>
+                </dialog>
+
+                <progress value="70" max="100">70%</progress>
+                <meter value="0.7" min="0" max="1">70%</meter>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Example Site. All rights reserved.</p>
+        <address>
+            Contact: <a href="mailto:info@example.com">info@example.com</a>
+        </address>
+    </footer>
+
+    <script>
+        // Embedded JavaScript
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded');
+        });
+    </script>
+</body>
+</html>

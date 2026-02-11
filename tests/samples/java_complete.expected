@@ -1,0 +1,250 @@
+# Expected syntax highlighting for java_complete.java
+# Generated from Java grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete Java example demonstrating syntax highlighting</COMMENT>
+<KEYWORD>package</KEYWORD> <TYPE>com.example.demo</TYPE>;
+
+<KEYWORD>import</KEYWORD> <TYPE>java.util.*</TYPE>;
+<KEYWORD>import</KEYWORD> <TYPE>java.util.stream.Collectors</TYPE>;
+<KEYWORD>import</KEYWORD> <TYPE>java.io.IOException</TYPE>;
+<KEYWORD>import</KEYWORD> <TYPE>java.nio.file.Files</TYPE>;
+<KEYWORD>import</KEYWORD> <TYPE>java.nio.file.Path</TYPE>;
+
+<COMMENT>// Constants interface</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Constants</TYPE> {
+    <TYPE>String</TYPE> <CONSTANT>APP_NAME</CONSTANT> <OPERATOR>=</OPERATOR> <STRING>"Demo"</STRING>;
+    <TYPE>int</TYPE> <CONSTANT>MAX_SIZE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>1024</NUMBER>;
+}
+
+<COMMENT>// Generic interface</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Repository</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <CONSTANT>ID</CONSTANT><OPERATOR>></OPERATOR> {
+    <TYPE>T</TYPE> <FUNCTION>findById</FUNCTION>(<CONSTANT>ID</CONSTANT> id);
+    <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <FUNCTION>findAll</FUNCTION>();
+    <TYPE>T</TYPE> <FUNCTION>save</FUNCTION>(<TYPE>T</TYPE> entity);
+    <TYPE>void</TYPE> <FUNCTION>delete</FUNCTION>(<TYPE>T</TYPE> entity);
+}
+
+<COMMENT>// Abstract class</COMMENT>
+<KEYWORD>abstract</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>BaseEntity</TYPE> {
+    <KEYWORD>protected</KEYWORD> <TYPE>Long</TYPE> id;
+    <KEYWORD>protected</KEYWORD> <TYPE>Date</TYPE> created<TYPE>At</TYPE>;
+
+    <KEYWORD>public</KEYWORD> <KEYWORD>abstract</KEYWORD> <TYPE>void</TYPE> <FUNCTION>validate</FUNCTION>();
+}
+
+<COMMENT>// Annotation definition</COMMENT>
+<ATTRIBUTE>@interface</ATTRIBUTE> <TYPE>Autowired</TYPE> {
+    <TYPE>boolean</TYPE> <FUNCTION>required</FUNCTION>() <KEYWORD>default</KEYWORD> <KEYWORD>true</KEYWORD>;
+}
+
+<COMMENT>// Enum with methods</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE> {
+    <FUNCTION>PENDING</FUNCTION>(<STRING>"Pending"</STRING>, <NUMBER>0</NUMBER>),
+    <FUNCTION>ACTIVE</FUNCTION>(<STRING>"Active"</STRING>, <NUMBER>1</NUMBER>),
+    <FUNCTION>COMPLETED</FUNCTION>(<STRING>"Completed"</STRING>, <NUMBER>2</NUMBER>);
+
+    <KEYWORD>private</KEYWORD> <KEYWORD>final</KEYWORD> <TYPE>String</TYPE> label;
+    <KEYWORD>private</KEYWORD> <KEYWORD>final</KEYWORD> <TYPE>int</TYPE> code;
+
+    <FUNCTION>Status</FUNCTION>(<TYPE>String</TYPE> label, <TYPE>int</TYPE> code) {
+        <KEYWORD>this</KEYWORD>.label <OPERATOR>=</OPERATOR> label;
+        <KEYWORD>this</KEYWORD>.code <OPERATOR>=</OPERATOR> code;
+    }
+
+    <KEYWORD>public</KEYWORD> <TYPE>String</TYPE> <FUNCTION>getLabel</FUNCTION>() { <KEYWORD>return</KEYWORD> label; }
+    <KEYWORD>public</KEYWORD> <TYPE>int</TYPE> <FUNCTION>getCode</FUNCTION>() { <KEYWORD>return</KEYWORD> code; }
+}
+
+<COMMENT>// Main class with generics</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>Comparable</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>>></OPERATOR> <KEYWORD>extends</KEYWORD> <TYPE>BaseEntity</TYPE> <KEYWORD>implements</KEYWORD> <TYPE>Constants</TYPE> {
+
+    <COMMENT>// Static constant</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>static</KEYWORD> <KEYWORD>final</KEYWORD> <TYPE>double</TYPE> <CONSTANT>PI</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159265358979</NUMBER>;
+
+    <COMMENT>// Instance fields</COMMENT>
+    <KEYWORD>private</KEYWORD> <TYPE>String</TYPE> name;
+    <KEYWORD>private</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> items;
+    <KEYWORD>private</KEYWORD> <TYPE>Map</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE>, <TYPE>Object</TYPE><OPERATOR>></OPERATOR> metadata;
+    <ATTRIBUTE>@Autowired</ATTRIBUTE>
+    <KEYWORD>private</KEYWORD> <TYPE>Repository</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>Long</TYPE><OPERATOR>></OPERATOR> repository;
+
+    <COMMENT>// Static initializer</COMMENT>
+    <KEYWORD>static</KEYWORD> {
+        <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Class loaded"</STRING>);
+    }
+
+    <COMMENT>// Constructor</COMMENT>
+    <KEYWORD>public</KEYWORD> <FUNCTION>JavaExample</FUNCTION>(<TYPE>String</TYPE> name) {
+        <KEYWORD>this</KEYWORD>.name <OPERATOR>=</OPERATOR> name;
+        <KEYWORD>this</KEYWORD>.items <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>ArrayList</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>();
+        <KEYWORD>this</KEYWORD>.metadata <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>HashMap</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>();
+        <KEYWORD>this</KEYWORD>.created<TYPE>At</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Date</FUNCTION>();
+    }
+
+    <COMMENT>// Overridden method</COMMENT>
+    <ATTRIBUTE>@Override</ATTRIBUTE>
+    <KEYWORD>public</KEYWORD> <TYPE>void</TYPE> <FUNCTION>validate</FUNCTION>() {
+        <KEYWORD>if</KEYWORD> (name <OPERATOR>==</OPERATOR> <KEYWORD>null</KEYWORD> <OPERATOR>||</OPERATOR> name.<FUNCTION>isEmpty</FUNCTION>()) {
+            <KEYWORD>throw</KEYWORD> <KEYWORD>new</KEYWORD> <FUNCTION>IllegalStateException</FUNCTION>(<STRING>"Name is required"</STRING>);
+        }
+    }
+
+    <COMMENT>// Generic method</COMMENT>
+    <KEYWORD>public</KEYWORD> <OPERATOR><</OPERATOR><TYPE>U</TYPE><OPERATOR>></OPERATOR> <TYPE>Optional</TYPE><OPERATOR><</OPERATOR><TYPE>U</TYPE><OPERATOR>></OPERATOR> <FUNCTION>transform</FUNCTION>(<TYPE>T</TYPE> item, java.util.function.<TYPE>Function</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>U</TYPE><OPERATOR>></OPERATOR> mapper) {
+        <KEYWORD>if</KEYWORD> (item <OPERATOR>==</OPERATOR> <KEYWORD>null</KEYWORD>) {
+            <KEYWORD>return</KEYWORD> <TYPE>Optional</TYPE>.<FUNCTION>empty</FUNCTION>();
+        }
+        <KEYWORD>return</KEYWORD> <TYPE>Optional</TYPE>.<FUNCTION>of</FUNCTION>(mapper.<FUNCTION>apply</FUNCTION>(item));
+    }
+
+    <COMMENT>// Method with varargs</COMMENT>
+    <KEYWORD>public</KEYWORD> <TYPE>void</TYPE> <FUNCTION>addItems</FUNCTION>(<TYPE>T</TYPE>... new<TYPE>Items</TYPE>) {
+        <KEYWORD>for</KEYWORD> (<TYPE>T</TYPE> item : new<TYPE>Items</TYPE>) {
+            items.<FUNCTION>add</FUNCTION>(item);
+        }
+    }
+
+    <COMMENT>// Lambda and stream operations</COMMENT>
+    <KEYWORD>public</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <FUNCTION>getFilteredItems</FUNCTION>(java.util.function.<TYPE>Predicate</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> filter) {
+        <KEYWORD>return</KEYWORD> items.<FUNCTION>stream</FUNCTION>()
+            .<FUNCTION>filter</FUNCTION>(filter)
+            .<FUNCTION>sorted</FUNCTION>()
+            .<FUNCTION>collect</FUNCTION>(<TYPE>Collectors</TYPE>.<FUNCTION>toList</FUNCTION>());
+    }
+
+    <COMMENT>// Exception handling</COMMENT>
+    <KEYWORD>public</KEYWORD> <TYPE>String</TYPE> <FUNCTION>readFile</FUNCTION>(<TYPE>String</TYPE> path) {
+        <KEYWORD>try</KEYWORD> {
+            <KEYWORD>return</KEYWORD> <KEYWORD>new</KEYWORD> <TYPE>String</TYPE>(<TYPE>Files</TYPE>.<FUNCTION>readAllBytes</FUNCTION>(<TYPE>Path</TYPE>.<FUNCTION>of</FUNCTION>(path)));
+        } <KEYWORD>catch</KEYWORD> (<TYPE>IOException</TYPE> e) {
+            <TYPE>System</TYPE>.err.<FUNCTION>println</FUNCTION>(<STRING>"Error: "</STRING> <OPERATOR>+</OPERATOR> e.<FUNCTION>getMessage</FUNCTION>());
+            <KEYWORD>return</KEYWORD> <KEYWORD>null</KEYWORD>;
+        } <KEYWORD>finally</KEYWORD> {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Read attempt completed"</STRING>);
+        }
+    }
+
+    <COMMENT>// Switch expression (Java 14+)</COMMENT>
+    <KEYWORD>public</KEYWORD> <TYPE>String</TYPE> <FUNCTION>getStatusMessage</FUNCTION>(<TYPE>Status</TYPE> status) {
+        <KEYWORD>return</KEYWORD> <KEYWORD>switch</KEYWORD> (status) {
+            <KEYWORD>case</KEYWORD> <CONSTANT>PENDING</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Waiting for processing"</STRING>;
+            <KEYWORD>case</KEYWORD> <CONSTANT>ACTIVE</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Currently processing"</STRING>;
+            <KEYWORD>case</KEYWORD> <CONSTANT>COMPLETED</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Processing complete"</STRING>;
+        };
+    }
+
+    <COMMENT>// Record (Java 16+)</COMMENT>
+    record <FUNCTION>Point</FUNCTION>(<TYPE>int</TYPE> x, <TYPE>int</TYPE> y) {
+        <KEYWORD>public</KEYWORD> <TYPE>double</TYPE> <FUNCTION>distanceFromOrigin</FUNCTION>() {
+            <KEYWORD>return</KEYWORD> <TYPE>Math</TYPE>.<FUNCTION>sqrt</FUNCTION>(x <OPERATOR>*</OPERATOR> x <OPERATOR>+</OPERATOR> y <OPERATOR>*</OPERATOR> y);
+        }
+    }
+
+    <COMMENT>// Pattern matching (Java 16+)</COMMENT>
+    <KEYWORD>public</KEYWORD> <TYPE>void</TYPE> <FUNCTION>processObject</FUNCTION>(<TYPE>Object</TYPE> obj) {
+        <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>String</TYPE> s) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"String length: "</STRING> <OPERATOR>+</OPERATOR> s.<FUNCTION>length</FUNCTION>());
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>Integer</TYPE> i) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Integer value: "</STRING> <OPERATOR>+</OPERATOR> i);
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR>?<OPERATOR>></OPERATOR> list) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"List size: "</STRING> <OPERATOR>+</OPERATOR> list.<FUNCTION>size</FUNCTION>());
+        }
+    }
+
+    <COMMENT>// Main method</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>static</KEYWORD> <TYPE>void</TYPE> <FUNCTION>main</FUNCTION>(<TYPE>String</TYPE>[] args) {
+        <COMMENT>// Variable declarations</COMMENT>
+        <TYPE>int</TYPE> count <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+        <TYPE>long</TYPE> big<TYPE>Number</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>123_456_789L</NUMBER>;
+        <TYPE>double</TYPE> pi <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>;
+        <TYPE>float</TYPE> ratio <OPERATOR>=</OPERATOR> <NUMBER>0.5f</NUMBER>;
+        <TYPE>boolean</TYPE> flag <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>;
+        <TYPE>char</TYPE> letter <OPERATOR>=</OPERATOR> <STRING>'A'</STRING>;
+
+        <COMMENT>// String types</COMMENT>
+        <TYPE>String</TYPE> message <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+        <TYPE>String</TYPE> multi<TYPE>Line</TYPE> <OPERATOR>=</OPERATOR> <STRING>""</STRING>"
+            <TYPE>Multi</TYPE><OPERATOR>-</OPERATOR>line
+            text block
+            <STRING>""</STRING>";
+
+        <COMMENT>// Array declarations</COMMENT>
+        <TYPE>int</TYPE>[] numbers <OPERATOR>=</OPERATOR> {<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>};
+        <TYPE>String</TYPE>[] names <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>String</TYPE>[]{<STRING>"Alice"</STRING>, <STRING>"Bob"</STRING>, <STRING>"Charlie"</STRING>};
+
+        <COMMENT>// Object creation</COMMENT>
+        <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> example <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>(<STRING>"Test"</STRING>);
+        example.<FUNCTION>addItems</FUNCTION>(<STRING>"one"</STRING>, <STRING>"two"</STRING>, <STRING>"three"</STRING>);
+
+        <COMMENT>// Null checks and ternary</COMMENT>
+        <TYPE>String</TYPE> result <OPERATOR>=</OPERATOR> example.name <OPERATOR>!=</OPERATOR> <KEYWORD>null</KEYWORD> ? example.name : <STRING>"default"</STRING>;
+
+        <COMMENT>// Control flow</COMMENT>
+        <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Positive"</STRING>);
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Negative"</STRING>);
+        } <KEYWORD>else</KEYWORD> {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Zero"</STRING>);
+        }
+
+        <COMMENT>// Loops</COMMENT>
+        <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>) {
+            <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
+            <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(i);
+        }
+
+        <KEYWORD>for</KEYWORD> (<TYPE>String</TYPE> item : example.items) {
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(item);
+        }
+
+        <KEYWORD>while</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+            count<OPERATOR>-</OPERATOR><OPERATOR>-</OPERATOR>;
+        }
+
+        <KEYWORD>do</KEYWORD> {
+            count<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>;
+        } <KEYWORD>while</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>);
+
+        <COMMENT>// Try-with-resources</COMMENT>
+        <KEYWORD>try</KEYWORD> (var scanner <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> java.util.<FUNCTION>Scanner</FUNCTION>(<TYPE>System</TYPE>.in)) {
+            <TYPE>String</TYPE> input <OPERATOR>=</OPERATOR> scanner.<FUNCTION>nextLine</FUNCTION>();
+            <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Input: "</STRING> <OPERATOR>+</OPERATOR> input);
+        } <KEYWORD>catch</KEYWORD> (<TYPE>Exception</TYPE> e) {
+            e.<FUNCTION>printStackTrace</FUNCTION>();
+        }
+
+        <COMMENT>// Anonymous class</COMMENT>
+        <TYPE>Runnable</TYPE> runnable <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Runnable</FUNCTION>() {
+            <ATTRIBUTE>@Override</ATTRIBUTE>
+            <KEYWORD>public</KEYWORD> <TYPE>void</TYPE> <FUNCTION>run</FUNCTION>() {
+                <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Running"</STRING>);
+            }
+        };
+
+        <COMMENT>// Lambda expressions</COMMENT>
+        <TYPE>Runnable</TYPE> lambda <OPERATOR>=</OPERATOR> () <OPERATOR>-></OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Lambda"</STRING>);
+        java.util.function.<TYPE>Consumer</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> consumer <OPERATOR>=</OPERATOR> s <OPERATOR>-></OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(s);
+        java.util.function.<TYPE>BiFunction</TYPE><OPERATOR><</OPERATOR><TYPE>Integer</TYPE>, <TYPE>Integer</TYPE>, <TYPE>Integer</TYPE><OPERATOR>></OPERATOR> add <OPERATOR>=</OPERATOR> (a, b) <OPERATOR>-></OPERATOR> a <OPERATOR>+</OPERATOR> b;
+
+        <COMMENT>// Method reference</COMMENT>
+        <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> list <OPERATOR>=</OPERATOR> <TYPE>Arrays</TYPE>.<FUNCTION>asList</FUNCTION>(<STRING>"a"</STRING>, <STRING>"b"</STRING>, <STRING>"c"</STRING>);
+        list.<FUNCTION>forEach</FUNCTION>(<TYPE>System</TYPE>.out<OPERATOR>::</OPERATOR>println);
+
+        <COMMENT>// Synchronized block</COMMENT>
+        <KEYWORD>synchronized</KEYWORD> (example) {
+            example.<FUNCTION>validate</FUNCTION>();
+        }
+
+        <COMMENT>// Assertions</COMMENT>
+        <KEYWORD>assert</KEYWORD> count <OPERATOR>>=</OPERATOR> <NUMBER>0</NUMBER> : <STRING>"Count must be non-negative"</STRING>;
+    }
+}
+
+<COMMENT>/*</COMMENT>
+<COMMENT> * Multi-line comment</COMMENT>
+<COMMENT> * demonstrating block comments</COMMENT>
+<COMMENT> * in Java source code</COMMENT>
+<COMMENT> */</COMMENT>

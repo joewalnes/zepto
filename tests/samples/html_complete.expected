@@ -1,0 +1,197 @@
+# Expected syntax highlighting for html_complete.html
+# Generated from HTML grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<KEYWORD><!DOCTYPE html></KEYWORD>
+<TAG><html</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"en"</STRING><TAG>></TAG>
+<TAG><head</TAG><TAG>></TAG>
+    <TAG><meta</TAG> <ATTRIBUTE>charset</ATTRIBUTE>=<STRING>"UTF-8"</STRING><TAG>></TAG>
+    <TAG><meta</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"viewport"</STRING> <ATTRIBUTE>content</ATTRIBUTE>=<STRING>"width=device-width, initial-scale=1.0"</STRING><TAG>></TAG>
+    <TAG><meta</TAG> <ATTRIBUTE>http-equiv</ATTRIBUTE>=<STRING>"X-UA-Compatible"</STRING> <ATTRIBUTE>content</ATTRIBUTE>=<STRING>"ie=edge"</STRING><TAG>></TAG>
+    <TAG><title</TAG><TAG>></TAG>Complete HTML Example<TAG></title></TAG>
+    <TAG><link</TAG> <ATTRIBUTE>rel</ATTRIBUTE>=<STRING>"stylesheet"</STRING> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"styles.css"</STRING><TAG>></TAG>
+    <TAG><link</TAG> <ATTRIBUTE>rel</ATTRIBUTE>=<STRING>"icon"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"image/x-icon"</STRING> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"/favicon.ico"</STRING><TAG>></TAG>
+    <TAG><script</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"app.js"</STRING> <ATTRIBUTE>defer</ATTRIBUTE><TAG>></TAG><TAG></script></TAG>
+    <TAG><style</TAG><TAG>></TAG>
+<FUNCTION>        /* Embedded CSS */</FUNCTION>
+<FUNCTION>        body {</FUNCTION>
+<FUNCTION>            font-family: sans-serif;</FUNCTION>
+<FUNCTION>            margin: 0;</FUNCTION>
+<FUNCTION>        }</FUNCTION>
+<FUNCTION>        .container {</FUNCTION>
+<FUNCTION>            max-width: 1200px;</FUNCTION>
+<FUNCTION>        }</FUNCTION>
+<FUNCTION>    </FUNCTION><TAG></style></TAG>
+<TAG></head></TAG>
+<TAG><body</TAG><TAG>></TAG>
+    <COMMENT><!-- Navigation header --></COMMENT>
+    <TAG><header</TAG> <ATTRIBUTE>class</ATTRIBUTE>=<STRING>"main-header"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"top"</STRING><TAG>></TAG>
+        <TAG><nav</TAG> <ATTRIBUTE>aria-label</ATTRIBUTE>=<STRING>"Main navigation"</STRING><TAG>></TAG>
+            <TAG><a</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"/"</STRING> <ATTRIBUTE>class</ATTRIBUTE>=<STRING>"logo"</STRING><TAG>></TAG>Site Name<TAG></a></TAG>
+            <TAG><ul</TAG> <ATTRIBUTE>class</ATTRIBUTE>=<STRING>"nav-list"</STRING><TAG>></TAG>
+                <TAG><li</TAG><TAG>></TAG><TAG><a</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"/about"</STRING><TAG>></TAG>About<TAG></a></TAG><TAG></li></TAG>
+                <TAG><li</TAG><TAG>></TAG><TAG><a</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"/contact"</STRING><TAG>></TAG>Contact<TAG></a></TAG><TAG></li></TAG>
+            <TAG></ul></TAG>
+        <TAG></nav></TAG>
+    <TAG></header></TAG>
+
+    <TAG><main</TAG> <ATTRIBUTE>role</ATTRIBUTE>=<STRING>"main"</STRING><TAG>></TAG>
+        <COMMENT><!-- Article section --></COMMENT>
+        <TAG><article</TAG> <ATTRIBUTE>class</ATTRIBUTE>=<STRING>"post"</STRING> <ATTRIBUTE>data-id</ATTRIBUTE>=<STRING>"123"</STRING> <ATTRIBUTE>data-category</ATTRIBUTE>=<STRING>"tech"</STRING><TAG>></TAG>
+            <TAG><h1</TAG><TAG>></TAG>Complete HTML Example<TAG></h1></TAG>
+            <TAG><p</TAG> <ATTRIBUTE>class</ATTRIBUTE>=<STRING>"intro"</STRING><TAG>></TAG>This demonstrates <TAG><strong</TAG><TAG>></TAG>various<TAG></strong></TAG> HTML elements.<TAG></p></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Text Elements<TAG></h2></TAG>
+                <TAG><p</TAG><TAG>></TAG>Regular paragraph with <TAG><em</TAG><TAG>></TAG>emphasis<TAG></em></TAG> and <TAG><mark</TAG><TAG>></TAG>highlighted<TAG></mark></TAG> text.<TAG></p></TAG>
+                <TAG><blockquote</TAG> <ATTRIBUTE>cite</ATTRIBUTE>=<STRING>"https://example.com"</STRING><TAG>></TAG>
+                    This is a blockquote with a citation.
+                <TAG></blockquote></TAG>
+                <TAG><pre</TAG><TAG>></TAG><TAG><code</TAG><TAG>></TAG>const x = 42;<TAG></code></TAG><TAG></pre></TAG>
+            <TAG></section></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Lists<TAG></h2></TAG>
+                <TAG><ul</TAG><TAG>></TAG>
+                    <TAG><li</TAG><TAG>></TAG>Unordered item 1<TAG></li></TAG>
+                    <TAG><li</TAG><TAG>></TAG>Unordered item 2<TAG></li></TAG>
+                <TAG></ul></TAG>
+                <TAG><ol</TAG><TAG>></TAG>
+                    <TAG><li</TAG><TAG>></TAG>Ordered item 1<TAG></li></TAG>
+                    <TAG><li</TAG><TAG>></TAG>Ordered item 2<TAG></li></TAG>
+                <TAG></ol></TAG>
+                <TAG><dl</TAG><TAG>></TAG>
+                    <TAG><dt</TAG><TAG>></TAG>Term<TAG></dt></TAG>
+                    <TAG><dd</TAG><TAG>></TAG>Definition<TAG></dd></TAG>
+                <TAG></dl></TAG>
+            <TAG></section></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Form Elements<TAG></h2></TAG>
+                <TAG><form</TAG> <ATTRIBUTE>action</ATTRIBUTE>=<STRING>"/submit"</STRING> <ATTRIBUTE>method</ATTRIBUTE>=<STRING>"POST"</STRING> <ATTRIBUTE>enctype</ATTRIBUTE>=<STRING>"multipart/form-data"</STRING><TAG>></TAG>
+                    <TAG><fieldset</TAG><TAG>></TAG>
+                        <TAG><legend</TAG><TAG>></TAG>Personal Information<TAG></legend></TAG>
+
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"name"</STRING><TAG>></TAG>Name:<TAG></label></TAG>
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"text"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"name"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"name"</STRING> <ATTRIBUTE>required</ATTRIBUTE> <ATTRIBUTE>placeholder</ATTRIBUTE>=<STRING>"Enter name"</STRING><TAG>></TAG>
+
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"email"</STRING><TAG>></TAG>Email:<TAG></label></TAG>
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"email"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"email"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"email"</STRING> <ATTRIBUTE>autocomplete</ATTRIBUTE>=<STRING>"email"</STRING><TAG>></TAG>
+
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"age"</STRING><TAG>></TAG>Age:<TAG></label></TAG>
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"number"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"age"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"age"</STRING> <ATTRIBUTE>min</ATTRIBUTE>=<STRING>"0"</STRING> <ATTRIBUTE>max</ATTRIBUTE>=<STRING>"120"</STRING><TAG>></TAG>
+
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"bio"</STRING><TAG>></TAG>Bio:<TAG></label></TAG>
+                        <TAG><textarea</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"bio"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"bio"</STRING> <ATTRIBUTE>rows</ATTRIBUTE>=<STRING>"4"</STRING> <ATTRIBUTE>cols</ATTRIBUTE>=<STRING>"50"</STRING><TAG>></TAG><TAG></textarea></TAG>
+
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"country"</STRING><TAG>></TAG>Country:<TAG></label></TAG>
+                        <TAG><select</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"country"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"country"</STRING><TAG>></TAG>
+                            <TAG><optgroup</TAG> <ATTRIBUTE>label</ATTRIBUTE>=<STRING>"Americas"</STRING><TAG>></TAG>
+                                <TAG><option</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"us"</STRING><TAG>></TAG>United States<TAG></option></TAG>
+                                <TAG><option</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"ca"</STRING><TAG>></TAG>Canada<TAG></option></TAG>
+                            <TAG></optgroup></TAG>
+                            <TAG><optgroup</TAG> <ATTRIBUTE>label</ATTRIBUTE>=<STRING>"Europe"</STRING><TAG>></TAG>
+                                <TAG><option</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"uk"</STRING><TAG>></TAG>United Kingdom<TAG></option></TAG>
+                                <TAG><option</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"de"</STRING> <ATTRIBUTE>selected</ATTRIBUTE><TAG>></TAG>Germany<TAG></option></TAG>
+                            <TAG></optgroup></TAG>
+                        <TAG></select></TAG>
+
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"checkbox"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"agree"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"agree"</STRING> <ATTRIBUTE>checked</ATTRIBUTE><TAG>></TAG>
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"agree"</STRING><TAG>></TAG>I agree to terms<TAG></label></TAG>
+
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"radio"</STRING> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"opt1"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"option"</STRING> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"1"</STRING><TAG>></TAG>
+                        <TAG><label</TAG> <ATTRIBUTE>for</ATTRIBUTE>=<STRING>"opt1"</STRING><TAG>></TAG>Option 1<TAG></label></TAG>
+
+                        <TAG><input</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"hidden"</STRING> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"csrf"</STRING> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"abc123"</STRING><TAG>></TAG>
+
+                        <TAG><button</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"submit"</STRING> <ATTRIBUTE>disabled</ATTRIBUTE><TAG>></TAG>Submit<TAG></button></TAG>
+                        <TAG><button</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"reset"</STRING><TAG>></TAG>Reset<TAG></button></TAG>
+                    <TAG></fieldset></TAG>
+                <TAG></form></TAG>
+            <TAG></section></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Media Elements<TAG></h2></TAG>
+                <TAG><figure</TAG><TAG>></TAG>
+                    <TAG><img</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"image.jpg"</STRING> <ATTRIBUTE>alt</ATTRIBUTE>=<STRING>"Description"</STRING> <ATTRIBUTE>width</ATTRIBUTE>=<STRING>"800"</STRING> <ATTRIBUTE>height</ATTRIBUTE>=<STRING>"600"</STRING> <ATTRIBUTE>loading</ATTRIBUTE>=<STRING>"lazy"</STRING><TAG>></TAG>
+                    <TAG><figcaption</TAG><TAG>></TAG>Image caption<TAG></figcaption></TAG>
+                <TAG></figure></TAG>
+
+                <TAG><video</TAG> <ATTRIBUTE>controls</ATTRIBUTE> <ATTRIBUTE>width</ATTRIBUTE>=<STRING>"640"</STRING> <ATTRIBUTE>height</ATTRIBUTE>=<STRING>"360"</STRING> <ATTRIBUTE>poster</ATTRIBUTE>=<STRING>"poster.jpg"</STRING><TAG>></TAG>
+                    <TAG><source</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"video.mp4"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"video/mp4"</STRING><TAG>></TAG>
+                    <TAG><source</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"video.webm"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"video/webm"</STRING><TAG>></TAG>
+                    <TAG><track</TAG> <ATTRIBUTE>kind</ATTRIBUTE>=<STRING>"subtitles"</STRING> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"subs.vtt"</STRING> <ATTRIBUTE>srclang</ATTRIBUTE>=<STRING>"en"</STRING> <ATTRIBUTE>label</ATTRIBUTE>=<STRING>"English"</STRING><TAG>></TAG>
+                    Your browser doesn't support video.
+                <TAG></video></TAG>
+
+                <TAG><audio</TAG> <ATTRIBUTE>controls</ATTRIBUTE><TAG>></TAG>
+                    <TAG><source</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"audio.mp3"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"audio/mpeg"</STRING><TAG>></TAG>
+                <TAG></audio></TAG>
+
+                <iframe src="https://example.com" title="Embedded content"
+                        width="100%" height="400" frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write"
+                        allowfullscreen><TAG></iframe></TAG>
+            <TAG></section></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Table<TAG></h2></TAG>
+                <TAG><table</TAG><TAG>></TAG>
+                    <TAG><caption</TAG><TAG>></TAG>Sample Data<TAG></caption></TAG>
+                    <TAG><thead</TAG><TAG>></TAG>
+                        <TAG><tr</TAG><TAG>></TAG>
+                            <TAG><th</TAG> <ATTRIBUTE>scope</ATTRIBUTE>=<STRING>"col"</STRING><TAG>></TAG>Name<TAG></th></TAG>
+                            <TAG><th</TAG> <ATTRIBUTE>scope</ATTRIBUTE>=<STRING>"col"</STRING><TAG>></TAG>Value<TAG></th></TAG>
+                        <TAG></tr></TAG>
+                    <TAG></thead></TAG>
+                    <TAG><tbody</TAG><TAG>></TAG>
+                        <TAG><tr</TAG><TAG>></TAG>
+                            <TAG><td</TAG><TAG>></TAG>Item 1<TAG></td></TAG>
+                            <TAG><td</TAG><TAG>></TAG>100<TAG></td></TAG>
+                        <TAG></tr></TAG>
+                        <TAG><tr</TAG><TAG>></TAG>
+                            <TAG><td</TAG> <ATTRIBUTE>colspan</ATTRIBUTE>=<STRING>"2"</STRING><TAG>></TAG>Merged cell<TAG></td></TAG>
+                        <TAG></tr></TAG>
+                    <TAG></tbody></TAG>
+                    <TAG><tfoot</TAG><TAG>></TAG>
+                        <TAG><tr</TAG><TAG>></TAG>
+                            <TAG><td</TAG><TAG>></TAG>Total<TAG></td></TAG>
+                            <TAG><td</TAG><TAG>></TAG>100<TAG></td></TAG>
+                        <TAG></tr></TAG>
+                    <TAG></tfoot></TAG>
+                <TAG></table></TAG>
+            <TAG></section></TAG>
+
+            <TAG><section</TAG><TAG>></TAG>
+                <TAG><h2</TAG><TAG>></TAG>Interactive Elements<TAG></h2></TAG>
+                <TAG><details</TAG><TAG>></TAG>
+                    <TAG><summary</TAG><TAG>></TAG>Click to expand<TAG></summary></TAG>
+                    <TAG><p</TAG><TAG>></TAG>Hidden content revealed on click.<TAG></p></TAG>
+                <TAG></details></TAG>
+
+                <TAG><dialog</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"dialog"</STRING><TAG>></TAG>
+                    <TAG><p</TAG><TAG>></TAG>This is a dialog<TAG></p></TAG>
+                    <TAG><button</TAG> <ATTRIBUTE>onclick</ATTRIBUTE>=<STRING>"this.parentElement.close()"</STRING><TAG>></TAG>Close<TAG></button></TAG>
+                <TAG></dialog></TAG>
+
+                <TAG><progress</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"70"</STRING> <ATTRIBUTE>max</ATTRIBUTE>=<STRING>"100"</STRING><TAG>></TAG>70%<TAG></progress></TAG>
+                <TAG><meter</TAG> <ATTRIBUTE>value</ATTRIBUTE>=<STRING>"0.7"</STRING> <ATTRIBUTE>min</ATTRIBUTE>=<STRING>"0"</STRING> <ATTRIBUTE>max</ATTRIBUTE>=<STRING>"1"</STRING><TAG>></TAG>70%<TAG></meter></TAG>
+            <TAG></section></TAG>
+        <TAG></article></TAG>
+    <TAG></main></TAG>
+
+    <TAG><footer</TAG><TAG>></TAG>
+        <TAG><p</TAG><TAG>></TAG><CONSTANT>&copy;</CONSTANT> 2024 Example Site. All rights reserved.<TAG></p></TAG>
+        <TAG><address</TAG><TAG>></TAG>
+            Contact: <TAG><a</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"mailto:info@example.com"</STRING><TAG>></TAG>info@example.com<TAG></a></TAG>
+        <TAG></address></TAG>
+    <TAG></footer></TAG>
+
+    <TAG><script</TAG><TAG>></TAG>
+<FUNCTION>        // Embedded JavaScript</FUNCTION>
+<FUNCTION>        document.addEventListener('DOMContentLoaded', () => {</FUNCTION>
+<FUNCTION>            console.log('Page loaded');</FUNCTION>
+<FUNCTION>        });</FUNCTION>
+<FUNCTION>    </FUNCTION><TAG></script></TAG>
+<TAG></body></TAG>
+<TAG></html></TAG>

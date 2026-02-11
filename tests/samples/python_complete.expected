@@ -1,0 +1,149 @@
+# Expected syntax highlighting for python_complete.py
+# Generated from Python grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>#!/usr/bin/env python3</COMMENT>
+<STRING>"""A complete Python program demonstrating various syntax elements."""</STRING>
+
+<KEYWORD>import</KEYWORD> os
+<KEYWORD>import</KEYWORD> sys
+<KEYWORD>from</KEYWORD> typing <KEYWORD>import</KEYWORD> <TYPE>List</TYPE>, <TYPE>Dict</TYPE>, <TYPE>Optional</TYPE>
+<KEYWORD>from</KEYWORD> dataclasses <KEYWORD>import</KEYWORD> data<KEYWORD>class</KEYWORD>
+
+<COMMENT># Constants</COMMENT>
+<CONSTANT>MAX_VALUE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>
+<CONSTANT>PI</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>
+
+<COMMENT># Type-annotated variables</COMMENT>
+name: str <OPERATOR>=</OPERATOR> <STRING>"World"</STRING>
+count: int <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+items: <TYPE>List</TYPE>[int] <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>]
+config: <TYPE>Dict</TYPE>[str, any] <OPERATOR>=</OPERATOR> {
+    <STRING>'host'</STRING>: <STRING>'localhost'</STRING>,
+    <STRING>'port'</STRING>: <NUMBER>8080</NUMBER>,
+}
+
+<COMMENT># Dataclass</COMMENT>
+<ATTRIBUTE>@dataclass</ATTRIBUTE>
+<KEYWORD>class</KEYWORD> <TYPE>Person</TYPE>:
+    name: str
+    age: int
+    email: <TYPE>Optional</TYPE>[str] <OPERATOR>=</OPERATOR> <KEYWORD>None</KEYWORD>
+
+<COMMENT># Function definition</COMMENT>
+<KEYWORD>def</KEYWORD> <FUNCTION>greet</FUNCTION>(who: str) <OPERATOR>-></OPERATOR> str:
+    <STRING>"""Return a greeting message."""</STRING>
+    <KEYWORD>return</KEYWORD> <STRING>f"Hello, {who}!"</STRING>
+
+<COMMENT># Control structures</COMMENT>
+<KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>:
+    <FUNCTION>print</FUNCTION>(<STRING>"Positive"</STRING>)
+<KEYWORD>elif</KEYWORD> count <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>:
+    <FUNCTION>print</FUNCTION>(<STRING>"Zero"</STRING>)
+<KEYWORD>else</KEYWORD>:
+    <FUNCTION>print</FUNCTION>(<STRING>"Negative"</STRING>)
+
+<COMMENT># Loops</COMMENT>
+<KEYWORD>for</KEYWORD> i <KEYWORD>in</KEYWORD> <FUNCTION>range</FUNCTION>(<NUMBER>10</NUMBER>):
+    <KEYWORD>if</KEYWORD> i <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>:
+        <KEYWORD>continue</KEYWORD>
+    <KEYWORD>if</KEYWORD> i <OPERATOR>></OPERATOR> <NUMBER>5</NUMBER>:
+        <KEYWORD>break</KEYWORD>
+    <FUNCTION>print</FUNCTION>(i)
+
+<KEYWORD>while</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>:
+    count <OPERATOR>-</OPERATOR><OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>
+
+<KEYWORD>for</KEYWORD> item <KEYWORD>in</KEYWORD> items:
+    <FUNCTION>print</FUNCTION>(item)
+
+<COMMENT># List comprehension</COMMENT>
+squares <OPERATOR>=</OPERATOR> [x<OPERATOR>**</OPERATOR><NUMBER>2</NUMBER> <KEYWORD>for</KEYWORD> x <KEYWORD>in</KEYWORD> <FUNCTION>range</FUNCTION>(<NUMBER>10</NUMBER>) <KEYWORD>if</KEYWORD> x <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>]
+
+<COMMENT># Dictionary comprehension</COMMENT>
+square_dict <OPERATOR>=</OPERATOR> {x: x<OPERATOR>**</OPERATOR><NUMBER>2</NUMBER> <KEYWORD>for</KEYWORD> x <KEYWORD>in</KEYWORD> <FUNCTION>range</FUNCTION>(<NUMBER>5</NUMBER>)}
+
+<COMMENT># Lambda function</COMMENT>
+add <OPERATOR>=</OPERATOR> <KEYWORD>lambda</KEYWORD> a, b: a <OPERATOR>+</OPERATOR> b
+
+<COMMENT># Class definition</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Calculator</TYPE>:
+    <STRING>"""A simple calculator class."""</STRING>
+
+    <KEYWORD>def</KEYWORD> <FUNCTION>__init__</FUNCTION>(<VARIABLE>self</VARIABLE>, initial: int <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>):
+        <VARIABLE>self</VARIABLE>._value <OPERATOR>=</OPERATOR> initial
+
+    <ATTRIBUTE>@property</ATTRIBUTE>
+    <KEYWORD>def</KEYWORD> <FUNCTION>value</FUNCTION>(<VARIABLE>self</VARIABLE>) <OPERATOR>-></OPERATOR> int:
+        <KEYWORD>return</KEYWORD> <VARIABLE>self</VARIABLE>._value
+
+    <ATTRIBUTE>@staticmethod</ATTRIBUTE>
+    <KEYWORD>def</KEYWORD> <FUNCTION>multiply</FUNCTION>(a: int, b: int) <OPERATOR>-></OPERATOR> int:
+        <KEYWORD>return</KEYWORD> a <OPERATOR>*</OPERATOR> b
+
+    <ATTRIBUTE>@classmethod</ATTRIBUTE>
+    <KEYWORD>def</KEYWORD> <FUNCTION>from_string</FUNCTION>(<VARIABLE>cls</VARIABLE>, s: str) <OPERATOR>-></OPERATOR> <STRING>'Calculator'</STRING>:
+        <KEYWORD>return</KEYWORD> <VARIABLE>cls</VARIABLE>(<FUNCTION>int</FUNCTION>(s))
+
+<COMMENT># Exception handling</COMMENT>
+<KEYWORD>try</KEYWORD>:
+    result <OPERATOR>=</OPERATOR> <NUMBER>10</NUMBER> <OPERATOR>/</OPERATOR> <NUMBER>0</NUMBER>
+<KEYWORD>except</KEYWORD> <TYPE>ZeroDivisionError</TYPE> <KEYWORD>as</KEYWORD> e:
+    <FUNCTION>print</FUNCTION>(<STRING>f"Error: {e}"</STRING>)
+<KEYWORD>except</KEYWORD> <TYPE>Exception</TYPE>:
+    <KEYWORD>raise</KEYWORD>
+<KEYWORD>finally</KEYWORD>:
+    <FUNCTION>print</FUNCTION>(<STRING>"Cleanup"</STRING>)
+
+<COMMENT># Context manager</COMMENT>
+<KEYWORD>with</KEYWORD> <FUNCTION>open</FUNCTION>(<STRING>'/tmp/test.txt'</STRING>, <STRING>'w'</STRING>) <KEYWORD>as</KEYWORD> f:
+    f.<FUNCTION>write</FUNCTION>(<STRING>"Hello"</STRING>)
+
+<COMMENT># Async/await (syntax only)</COMMENT>
+<KEYWORD>async</KEYWORD> <KEYWORD>def</KEYWORD> <FUNCTION>fetch_data</FUNCTION>(url: str) <OPERATOR>-></OPERATOR> bytes:
+    <KEYWORD>await</KEYWORD> <FUNCTION>some_async_call</FUNCTION>()
+    <KEYWORD>return</KEYWORD> <STRING>b"data"</STRING>
+
+<COMMENT># Numbers</COMMENT>
+integer <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+floating <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>
+hexadecimal <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>
+octal <OPERATOR>=</OPERATOR> <NUMBER>0o755</NUMBER>
+binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>
+scientific <OPERATOR>=</OPERATOR> <NUMBER>1.5e10</NUMBER>
+complex_num <OPERATOR>=</OPERATOR> <NUMBER>3</NUMBER> <OPERATOR>+</OPERATOR> <NUMBER>4j</NUMBER>
+
+<COMMENT># Operators</COMMENT>
+total <OPERATOR>=</OPERATOR> integer <OPERATOR>+</OPERATOR> floating
+concatenated <OPERATOR>=</OPERATOR> name <OPERATOR>+</OPERATOR> <STRING>"!"</STRING>
+boolean <OPERATOR>=</OPERATOR> (count <KEYWORD>and</KEYWORD> integer) <KEYWORD>or</KEYWORD> <NUMBER>0</NUMBER>
+ternary <OPERATOR>=</OPERATOR> <STRING>'yes'</STRING> <KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> <KEYWORD>else</KEYWORD> <STRING>'no'</STRING>
+
+<COMMENT># F-strings</COMMENT>
+message <OPERATOR>=</OPERATOR> <STRING>f"Count is {count}, name is {name.upper()}"</STRING>
+
+<COMMENT># Raw and byte strings</COMMENT>
+raw <OPERATOR>=</OPERATOR> <STRING>r"C:\Users\test"</STRING>
+byte_string <OPERATOR>=</OPERATOR> <STRING>b"binary data"</STRING>
+
+<COMMENT># Multiline string</COMMENT>
+multiline <OPERATOR>=</OPERATOR> <STRING>"""</STRING>
+<STRING>This is a</STRING>
+<STRING>multiline string</STRING>
+<STRING>"""</STRING>
+
+<COMMENT># Walrus operator (Python 3.8+)</COMMENT>
+<KEYWORD>if</KEYWORD> (n <OPERATOR>:=</OPERATOR> <FUNCTION>len</FUNCTION>(items)) <OPERATOR>></OPERATOR> <NUMBER>3</NUMBER>:
+    <FUNCTION>print</FUNCTION>(<STRING>f"List has {n} items"</STRING>)
+
+<COMMENT># Match statement (Python 3.10+)</COMMENT>
+match count:
+    case <NUMBER>0</NUMBER>:
+        <FUNCTION>print</FUNCTION>(<STRING>"zero"</STRING>)
+    case <NUMBER>1</NUMBER> <OPERATOR>|</OPERATOR> <NUMBER>2</NUMBER>:
+        <FUNCTION>print</FUNCTION>(<STRING>"one or two"</STRING>)
+    case _:
+        <FUNCTION>print</FUNCTION>(<STRING>"other"</STRING>)
+
+<KEYWORD>if</KEYWORD> __name__ <OPERATOR>==</OPERATOR> <STRING>"__main__"</STRING>:
+    <FUNCTION>print</FUNCTION>(<FUNCTION>greet</FUNCTION>(<STRING>"World"</STRING>))

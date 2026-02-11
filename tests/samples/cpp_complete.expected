@@ -1,0 +1,156 @@
+# Expected syntax highlighting for cpp_complete.cpp
+# Generated from Cpp grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete C++ example demonstrating syntax highlighting</COMMENT>
+<KEYWORD>#include</KEYWORD> <STRING><iostream></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><vector></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><string></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><memory></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><algorithm></STRING>
+<KEYWORD>#include</KEYWORD> <STRING><functional></STRING>
+
+<COMMENT>// Namespace</COMMENT>
+<KEYWORD>namespace</KEYWORD> <TYPE>demo</TYPE> {
+
+<COMMENT>// Template class</COMMENT>
+<KEYWORD>template</KEYWORD><OPERATOR><</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR>
+<KEYWORD>class</KEYWORD> <TYPE>Container</TYPE> {
+<KEYWORD>private</KEYWORD>:
+    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> items_;
+
+<KEYWORD>public</KEYWORD>:
+    <FUNCTION>Container</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    ~<FUNCTION>Container</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+
+    <COMMENT>// Rule of five</COMMENT>
+    <FUNCTION>Container</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <FUNCTION>Container</FUNCTION>(<TYPE>Container</TYPE><OPERATOR>&&</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<TYPE>Container</TYPE><OPERATOR>&&</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+
+    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&</OPERATOR> item) {
+        items_.<FUNCTION>push_back</FUNCTION>(item);
+    }
+
+    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<TYPE>T</TYPE><OPERATOR>&&</OPERATOR> item) {
+        items_.<FUNCTION>push_back</FUNCTION>(<TYPE>std::</TYPE><FUNCTION>move</FUNCTION>(item));
+    }
+
+    <TYPE>size_t</TYPE> <FUNCTION>size</FUNCTION>() <KEYWORD>const</KEYWORD> <KEYWORD>noexcept</KEYWORD> {
+        <KEYWORD>return</KEYWORD> items_.<FUNCTION>size</FUNCTION>();
+    }
+
+    <KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD>[](<TYPE>size_t</TYPE> index) <KEYWORD>const</KEYWORD> {
+        <KEYWORD>return</KEYWORD> items_[index];
+    }
+};
+
+<COMMENT>// Enum class (C++11)</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>class</TYPE> <TYPE>Status</TYPE> {
+    <TYPE>Ok</TYPE>,
+    <TYPE>Error</TYPE>,
+    <TYPE>Pending</TYPE>
+};
+
+<COMMENT>// Struct with default member initializers</COMMENT>
+<KEYWORD>struct</KEYWORD> <TYPE>Config</TYPE> {
+    <TYPE>std::</TYPE><TYPE>string</TYPE> name <OPERATOR>=</OPERATOR> <STRING>"default"</STRING>;
+    <KEYWORD>int</KEYWORD> count <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>bool</KEYWORD> enabled <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>;
+};
+
+<COMMENT>// Abstract base class</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Shape</TYPE> {
+<KEYWORD>public</KEYWORD>:
+    <KEYWORD>virtual</KEYWORD> ~<FUNCTION>Shape</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <KEYWORD>virtual</KEYWORD> <KEYWORD>double</KEYWORD> <FUNCTION>area</FUNCTION>() <KEYWORD>const</KEYWORD> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>virtual</KEYWORD> <KEYWORD>void</KEYWORD> <FUNCTION>draw</FUNCTION>() <KEYWORD>const</KEYWORD> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+};
+
+<COMMENT>// Derived class</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Circle</TYPE> : <KEYWORD>public</KEYWORD> <TYPE>Shape</TYPE> {
+<KEYWORD>private</KEYWORD>:
+    <KEYWORD>double</KEYWORD> radius_;
+
+<KEYWORD>public</KEYWORD>:
+    <KEYWORD>explicit</KEYWORD> <FUNCTION>Circle</FUNCTION>(<KEYWORD>double</KEYWORD> radius) : <FUNCTION>radius_</FUNCTION>(radius) {}
+
+    <KEYWORD>double</KEYWORD> <FUNCTION>area</FUNCTION>() <KEYWORD>const</KEYWORD> <KEYWORD>override</KEYWORD> {
+        <KEYWORD>return</KEYWORD> <NUMBER>3.14159265358979</NUMBER> <OPERATOR>*</OPERATOR> radius_ <OPERATOR>*</OPERATOR> radius_;
+    }
+
+    <KEYWORD>void</KEYWORD> <FUNCTION>draw</FUNCTION>() <KEYWORD>const</KEYWORD> <KEYWORD>override</KEYWORD> {
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <STRING>"Drawing circle with radius "</STRING> <OPERATOR><<</OPERATOR> <FUNCTION>radius_</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+    }
+};
+
+<COMMENT>// Function template</COMMENT>
+<KEYWORD>template</KEYWORD><OPERATOR><</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR>
+<TYPE>T</TYPE> <FUNCTION>max_value</FUNCTION>(<TYPE>T</TYPE> a, <TYPE>T</TYPE> b) {
+    <KEYWORD>return</KEYWORD> (a <OPERATOR>></OPERATOR> b) ? a : b;
+}
+
+<COMMENT>// Lambda and auto</COMMENT>
+<KEYWORD>auto</KEYWORD> process <OPERATOR>=</OPERATOR> [](<KEYWORD>int</KEYWORD> x) <OPERATOR>-></OPERATOR> <KEYWORD>int</KEYWORD> {
+    <KEYWORD>return</KEYWORD> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
+};
+
+} <COMMENT>// namespace demo</COMMENT>
+
+<KEYWORD>int</KEYWORD> <FUNCTION>main</FUNCTION>() {
+    <KEYWORD>using</KEYWORD> <KEYWORD>namespace</KEYWORD> <TYPE>demo</TYPE>;
+
+    <COMMENT>// Variable declarations</COMMENT>
+    <KEYWORD>int</KEYWORD> count <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+    <KEYWORD>double</KEYWORD> pi <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>;
+    <KEYWORD>bool</KEYWORD> flag <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>;
+    <KEYWORD>char</KEYWORD> letter <OPERATOR>=</OPERATOR> <STRING>'A'</STRING>;
+    <TYPE>std::</TYPE><TYPE>string</TYPE> message <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+
+    <COMMENT>// Auto and range-based for</COMMENT>
+    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR><</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>></OPERATOR> numbers <OPERATOR>=</OPERATOR> {<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>};
+    <KEYWORD>for</KEYWORD> (<KEYWORD>auto</KEYWORD><OPERATOR>&</OPERATOR> num : numbers) {
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <FUNCTION>num</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+    }
+
+    <COMMENT>// Smart pointers</COMMENT>
+    <KEYWORD>auto</KEYWORD> ptr <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_unique</FUNCTION><OPERATOR><</OPERATOR><TYPE>Circle</TYPE><OPERATOR>></OPERATOR>(<NUMBER>5.0</NUMBER>);
+    <TYPE>std::</TYPE><TYPE>shared_ptr</TYPE><OPERATOR><</OPERATOR><TYPE>Shape</TYPE><OPERATOR>></OPERATOR> shape <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_shared</FUNCTION><OPERATOR><</OPERATOR><TYPE>Circle</TYPE><OPERATOR>></OPERATOR>(<NUMBER>3.0</NUMBER>);
+
+    <COMMENT>// Lambda with capture</COMMENT>
+    <KEYWORD>int</KEYWORD> multiplier <OPERATOR>=</OPERATOR> <NUMBER>10</NUMBER>;
+    <KEYWORD>auto</KEYWORD> lambda <OPERATOR>=</OPERATOR> [multiplier](<KEYWORD>int</KEYWORD> x) {
+        <KEYWORD>return</KEYWORD> x <OPERATOR>*</OPERATOR> multiplier;
+    };
+
+    <COMMENT>// STL algorithms</COMMENT>
+    <TYPE>std::</TYPE><FUNCTION>sort</FUNCTION>(numbers.<FUNCTION>begin</FUNCTION>(), numbers.<FUNCTION>end</FUNCTION>(), <TYPE>std::</TYPE><FUNCTION>greater</FUNCTION><OPERATOR><</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>></OPERATOR>());
+
+    <COMMENT>// Template usage</COMMENT>
+    <FUNCTION>Container</FUNCTION><OPERATOR><</OPERATOR><TYPE>std::</TYPE><TYPE>string</TYPE><OPERATOR>></OPERATOR> container;
+    container.<FUNCTION>add</FUNCTION>(<STRING>"hello"</STRING>);
+    container.<FUNCTION>add</FUNCTION>(<STRING>"world"</STRING>);
+
+    <COMMENT>// Structured bindings (C++17)</COMMENT>
+    <KEYWORD>auto</KEYWORD> [name, value, enabled] <OPERATOR>=</OPERATOR> <TYPE>Config</TYPE>{};
+
+    <COMMENT>// If with initializer (C++17)</COMMENT>
+    <KEYWORD>if</KEYWORD> (<KEYWORD>auto</KEYWORD> result <OPERATOR>=</OPERATOR> <FUNCTION>lambda</FUNCTION>(<NUMBER>5</NUMBER>); result <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <STRING>"Result: "</STRING> <OPERATOR><<</OPERATOR> <FUNCTION>result</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+    }
+
+    <COMMENT>// Constexpr</COMMENT>
+    <KEYWORD>constexpr</KEYWORD> <KEYWORD>int</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>1024</NUMBER>;
+    <KEYWORD>constexpr</KEYWORD> <KEYWORD>double</KEYWORD> <TYPE>E</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>2.71828</NUMBER>;
+
+    <COMMENT>// nullptr</COMMENT>
+    <KEYWORD>int</KEYWORD><OPERATOR>*</OPERATOR> null_ptr <OPERATOR>=</OPERATOR> <KEYWORD>nullptr</KEYWORD>;
+
+    <KEYWORD>return</KEYWORD> <NUMBER>0</NUMBER>;
+}
+
+<COMMENT>/*</COMMENT>
+<COMMENT> * Multi-line comment</COMMENT>
+<COMMENT> * demonstrating C++ features</COMMENT>
+<COMMENT> */</COMMENT>

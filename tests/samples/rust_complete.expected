@@ -1,0 +1,324 @@
+# Expected syntax highlighting for rust_complete.rs
+# Generated from Rust grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Complete Rust example demonstrating syntax highlighting</COMMENT>
+
+<KEYWORD>use</KEYWORD> std<OPERATOR>::</OPERATOR>collections<OPERATOR>::</OPERATOR><TYPE>HashMap</TYPE>;
+<KEYWORD>use</KEYWORD> std<OPERATOR>::</OPERATOR>io<OPERATOR>::</OPERATOR>{<KEYWORD>self</KEYWORD>, <TYPE>Read</TYPE>, <TYPE>Write</TYPE>};
+<KEYWORD>use</KEYWORD> std<OPERATOR>::</OPERATOR>sync<OPERATOR>::</OPERATOR>{<TYPE>Arc</TYPE>, <TYPE>Mutex</TYPE>};
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT>: <TYPE>usize</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>1024</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>PI</CONSTANT>: <TYPE>f64</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14159265358979</NUMBER>;
+<KEYWORD>static</KEYWORD> <CONSTANT>GREETING</CONSTANT>: <OPERATOR>&</OPERATOR><TYPE>str</TYPE> <OPERATOR>=</OPERATOR> <STRING>"Hello, Rust!"</STRING>;
+
+<COMMENT>// Type alias</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> std<OPERATOR>::</OPERATOR>result<OPERATOR>::</OPERATOR><TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>Box</TYPE><OPERATOR><</OPERATOR><KEYWORD>dyn</KEYWORD> std<OPERATOR>::</OPERATOR>error<OPERATOR>::</OPERATOR><TYPE>Error</TYPE><OPERATOR>>></OPERATOR>;
+
+<COMMENT>// Struct definition</COMMENT>
+<ATTRIBUTE>#[derive(Debug, Clone)]</ATTRIBUTE>
+<KEYWORD>pub</KEYWORD> <KEYWORD>struct</KEYWORD> <TYPE>Person</TYPE> {
+    name: <TYPE>String</TYPE>,
+    age: <TYPE>u32</TYPE>,
+    email: <TYPE>Option</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR>,
+}
+
+<COMMENT>// Implementation block</COMMENT>
+<KEYWORD>impl</KEYWORD> <TYPE>Person</TYPE> {
+    <COMMENT>// Associated function (constructor)</COMMENT>
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>new</FUNCTION>(name: <OPERATOR>&</OPERATOR><TYPE>str</TYPE>, age: <TYPE>u32</TYPE>) <OPERATOR>-></OPERATOR> <KEYWORD>Self</KEYWORD> {
+        <KEYWORD>Self</KEYWORD> {
+            name: name.<FUNCTION>to_string</FUNCTION>(),
+            age,
+            email: <TYPE>None</TYPE>,
+        }
+    }
+
+    <COMMENT>// Method with &self</COMMENT>
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>greet</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>) <OPERATOR>-></OPERATOR> <TYPE>String</TYPE> {
+        <FUNCTION>format!</FUNCTION>(<STRING>"Hello, I'm {} and I'm {} years old"</STRING>, <KEYWORD>self</KEYWORD>.name, <KEYWORD>self</KEYWORD>.age)
+    }
+
+    <COMMENT>// Method with &mut self</COMMENT>
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>set_email</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>mut</KEYWORD> <KEYWORD>self</KEYWORD>, email: <OPERATOR>&</OPERATOR><TYPE>str</TYPE>) {
+        <KEYWORD>self</KEYWORD>.email <OPERATOR>=</OPERATOR> <TYPE>Some</TYPE>(email.<FUNCTION>to_string</FUNCTION>());
+    }
+
+    <COMMENT>// Method consuming self</COMMENT>
+    <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>into_name</FUNCTION>(<KEYWORD>self</KEYWORD>) <OPERATOR>-></OPERATOR> <TYPE>String</TYPE> {
+        <KEYWORD>self</KEYWORD>.name
+    }
+}
+
+<COMMENT>// Trait definition</COMMENT>
+<KEYWORD>pub</KEYWORD> <KEYWORD>trait</KEYWORD> <TYPE>Drawable</TYPE> {
+    <KEYWORD>fn</KEYWORD> <FUNCTION>draw</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>);
+    <KEYWORD>fn</KEYWORD> <FUNCTION>area</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>) <OPERATOR>-></OPERATOR> <TYPE>f64</TYPE>;
+}
+
+<COMMENT>// Enum with variants</COMMENT>
+<ATTRIBUTE>#[derive(Debug)]</ATTRIBUTE>
+<KEYWORD>pub</KEYWORD> <KEYWORD>enum</KEYWORD> <TYPE>Shape</TYPE> {
+    <TYPE>Circle</TYPE> { radius: <TYPE>f64</TYPE> },
+    <TYPE>Rectangle</TYPE> { width: <TYPE>f64</TYPE>, height: <TYPE>f64</TYPE> },
+    <FUNCTION>Triangle</FUNCTION>(<TYPE>f64</TYPE>, <TYPE>f64</TYPE>, <TYPE>f64</TYPE>),  <COMMENT>// sides</COMMENT>
+}
+
+<COMMENT>// Trait implementation</COMMENT>
+<KEYWORD>impl</KEYWORD> <TYPE>Drawable</TYPE> <KEYWORD>for</KEYWORD> <TYPE>Shape</TYPE> {
+    <KEYWORD>fn</KEYWORD> <FUNCTION>draw</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>) {
+        <KEYWORD>match</KEYWORD> <KEYWORD>self</KEYWORD> {
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Circle</TYPE> { radius } <OPERATOR>=></OPERATOR> <FUNCTION>println!</FUNCTION>(<STRING>"Drawing circle with radius {}"</STRING>, radius),
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Rectangle</TYPE> { width, height } <OPERATOR>=></OPERATOR> {
+                <FUNCTION>println!</FUNCTION>(<STRING>"Drawing {}x{} rectangle"</STRING>, width, height)
+            }
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><FUNCTION>Triangle</FUNCTION>(a, b, c) <OPERATOR>=></OPERATOR> <FUNCTION>println!</FUNCTION>(<STRING>"Drawing triangle with sides {}, {}, {}"</STRING>, a, b, c),
+        }
+    }
+
+    <KEYWORD>fn</KEYWORD> <FUNCTION>area</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>) <OPERATOR>-></OPERATOR> <TYPE>f64</TYPE> {
+        <KEYWORD>match</KEYWORD> <KEYWORD>self</KEYWORD> {
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Circle</TYPE> { radius } <OPERATOR>=></OPERATOR> <CONSTANT>PI</CONSTANT> <OPERATOR>*</OPERATOR> radius <OPERATOR>*</OPERATOR> radius,
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Rectangle</TYPE> { width, height } <OPERATOR>=></OPERATOR> width <OPERATOR>*</OPERATOR> height,
+            <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><FUNCTION>Triangle</FUNCTION>(a, b, c) <OPERATOR>=></OPERATOR> {
+                <COMMENT>// Heron's formula</COMMENT>
+                <KEYWORD>let</KEYWORD> s <OPERATOR>=</OPERATOR> (a <OPERATOR>+</OPERATOR> b <OPERATOR>+</OPERATOR> c) <OPERATOR>/</OPERATOR> <NUMBER>2.0</NUMBER>;
+                (s <OPERATOR>*</OPERATOR> (s <OPERATOR>-</OPERATOR> a) <OPERATOR>*</OPERATOR> (s <OPERATOR>-</OPERATOR> b) <OPERATOR>*</OPERATOR> (s <OPERATOR>-</OPERATOR> c)).<FUNCTION>sqrt</FUNCTION>()
+            }
+        }
+    }
+}
+
+<COMMENT>// Generic function with trait bounds</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>print_area</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE>: <TYPE>Drawable</TYPE><OPERATOR>></OPERATOR>(shape: <OPERATOR>&</OPERATOR><TYPE>T</TYPE>) {
+    <FUNCTION>println!</FUNCTION>(<STRING>"Area: {}"</STRING>, shape.<FUNCTION>area</FUNCTION>());
+}
+
+<COMMENT>// Generic struct</COMMENT>
+<KEYWORD>struct</KEYWORD> <TYPE>Container</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> {
+    value: <TYPE>T</TYPE>,
+}
+
+<KEYWORD>impl</KEYWORD><OPERATOR><</OPERATOR><TYPE>T</TYPE>: <TYPE>Clone</TYPE><OPERATOR>></OPERATOR> <FUNCTION>Container</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> {
+    <KEYWORD>fn</KEYWORD> <FUNCTION>get</FUNCTION>(<OPERATOR>&</OPERATOR><KEYWORD>self</KEYWORD>) <OPERATOR>-></OPERATOR> <TYPE>T</TYPE> {
+        <KEYWORD>self</KEYWORD>.value.<FUNCTION>clone</FUNCTION>()
+    }
+}
+
+<COMMENT>// Lifetime annotations</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>longest</FUNCTION><OPERATOR><</OPERATOR><VARIABLE>'a</VARIABLE><OPERATOR>></OPERATOR>(x: <OPERATOR>&</OPERATOR><VARIABLE>'a</VARIABLE> <TYPE>str</TYPE>, y: <OPERATOR>&</OPERATOR><VARIABLE>'a</VARIABLE> <TYPE>str</TYPE>) <OPERATOR>-></OPERATOR> <OPERATOR>&</OPERATOR><VARIABLE>'a</VARIABLE> <TYPE>str</TYPE> {
+    <KEYWORD>if</KEYWORD> x.<FUNCTION>len</FUNCTION>() <OPERATOR>></OPERATOR> y.<FUNCTION>len</FUNCTION>() { x } <KEYWORD>else</KEYWORD> { y }
+}
+
+<COMMENT>// Async function</COMMENT>
+<KEYWORD>async</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>fetch_data</FUNCTION>(url: <OPERATOR>&</OPERATOR><TYPE>str</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> {
+    <COMMENT>// Simulated async operation</COMMENT>
+    <TYPE>Ok</TYPE>(<FUNCTION>format!</FUNCTION>(<STRING>"Data from {}"</STRING>, url))
+}
+
+<COMMENT>// Error handling</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>divide</FUNCTION>(a: <TYPE>f64</TYPE>, b: <TYPE>f64</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>f64</TYPE><OPERATOR>></OPERATOR> {
+    <KEYWORD>if</KEYWORD> b <OPERATOR>==</OPERATOR> <NUMBER>0.0</NUMBER> {
+        <TYPE>Err</TYPE>(<STRING>"Division by zero"</STRING>.<FUNCTION>into</FUNCTION>())
+    } <KEYWORD>else</KEYWORD> {
+        <TYPE>Ok</TYPE>(a <OPERATOR>/</OPERATOR> b)
+    }
+}
+
+<COMMENT>// Closures and iterators</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>process_numbers</FUNCTION>(numbers: <TYPE>Vec</TYPE><OPERATOR><</OPERATOR><TYPE>i32</TYPE><OPERATOR>></OPERATOR>) <OPERATOR>-></OPERATOR> <TYPE>Vec</TYPE><OPERATOR><</OPERATOR><TYPE>i32</TYPE><OPERATOR>></OPERATOR> {
+    numbers
+        .<FUNCTION>iter</FUNCTION>()
+        .<FUNCTION>filter</FUNCTION>(<OPERATOR>|</OPERATOR><OPERATOR>&&</OPERATOR>x<OPERATOR>|</OPERATOR> x <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>)
+        .<FUNCTION>map</FUNCTION>(<OPERATOR>|</OPERATOR><OPERATOR>&</OPERATOR>x<OPERATOR>|</OPERATOR> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>)
+        .<FUNCTION>collect</FUNCTION>()
+}
+
+<COMMENT>// Pattern matching</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>describe_number</FUNCTION>(n: <TYPE>i32</TYPE>) <OPERATOR>-></OPERATOR> <OPERATOR>&</OPERATOR><VARIABLE>'static</VARIABLE> <TYPE>str</TYPE> {
+    <KEYWORD>match</KEYWORD> n {
+        <NUMBER>0</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"zero"</STRING>,
+        <NUMBER>1.</NUMBER>.<OPERATOR>=</OPERATOR><NUMBER>9</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"single digit"</STRING>,
+        <NUMBER>10.</NUMBER>.<OPERATOR>=</OPERATOR><NUMBER>99</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"double digit"</STRING>,
+        <NUMBER>100.</NUMBER>.<OPERATOR>=</OPERATOR><NUMBER>999</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"triple digit"</STRING>,
+        _ <OPERATOR>=></OPERATOR> <STRING>"large number"</STRING>,
+    }
+}
+
+<COMMENT>// Macro usage</COMMENT>
+<FUNCTION>macro_rules!</FUNCTION> say_hello {
+    () <OPERATOR>=></OPERATOR> {
+        <FUNCTION>println!</FUNCTION>(<STRING>"Hello!"</STRING>);
+    };
+    ($name:expr) <OPERATOR>=></OPERATOR> {
+        <FUNCTION>println!</FUNCTION>(<STRING>"Hello, {}!"</STRING>, $name);
+    };
+}
+
+<COMMENT>// Main function</COMMENT>
+<KEYWORD>fn</KEYWORD> <FUNCTION>main</FUNCTION>() {
+    <COMMENT>// Variable bindings</COMMENT>
+    <KEYWORD>let</KEYWORD> x <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+    <KEYWORD>let</KEYWORD> <KEYWORD>mut</KEYWORD> y <OPERATOR>=</OPERATOR> <NUMBER>10</NUMBER>;
+    <KEYWORD>let</KEYWORD> (a, b) <OPERATOR>=</OPERATOR> (<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>);
+
+    <COMMENT>// Type annotations</COMMENT>
+    <KEYWORD>let</KEYWORD> float: <TYPE>f64</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>;
+    <KEYWORD>let</KEYWORD> array: [<TYPE>i32</TYPE>; <NUMBER>5</NUMBER>] <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>];
+    <KEYWORD>let</KEYWORD> tuple: (<TYPE>i32</TYPE>, <OPERATOR>&</OPERATOR><TYPE>str</TYPE>, <TYPE>bool</TYPE>) <OPERATOR>=</OPERATOR> (<NUMBER>1</NUMBER>, <STRING>"hello"</STRING>, <KEYWORD>true</KEYWORD>);
+
+    <COMMENT>// String types</COMMENT>
+    <KEYWORD>let</KEYWORD> string_literal <OPERATOR>=</OPERATOR> <STRING>"Hello, world!"</STRING>;
+    <KEYWORD>let</KEYWORD> string_owned <OPERATOR>=</OPERATOR> <TYPE>String</TYPE><OPERATOR>::</OPERATOR><FUNCTION>from</FUNCTION>(<STRING>"Owned string"</STRING>);
+    <KEYWORD>let</KEYWORD> raw_string <OPERATOR>=</OPERATOR> <STRING>r#"Raw "string" with quotes"#</STRING>;
+    <KEYWORD>let</KEYWORD> byte_string <OPERATOR>=</OPERATOR> <STRING>b"byte string"</STRING>;
+
+    <COMMENT>// Numbers</COMMENT>
+    <KEYWORD>let</KEYWORD> decimal <OPERATOR>=</OPERATOR> <NUMBER>1_000_000</NUMBER>;
+    <KEYWORD>let</KEYWORD> hex <OPERATOR>=</OPERATOR> <NUMBER>0xDEAD_BEEF</NUMBER>;
+    <KEYWORD>let</KEYWORD> octal <OPERATOR>=</OPERATOR> <NUMBER>0o755</NUMBER>;
+    <KEYWORD>let</KEYWORD> binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010_1010</NUMBER>;
+    <KEYWORD>let</KEYWORD> float_exp <OPERATOR>=</OPERATOR> <NUMBER>1.5e-10</NUMBER>;
+
+    <COMMENT>// Control flow</COMMENT>
+    <KEYWORD>if</KEYWORD> x <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+        <FUNCTION>println!</FUNCTION>(<STRING>"positive"</STRING>);
+    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> <FUNCTION>x</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER> {
+        <FUNCTION>println!</FUNCTION>(<STRING>"negative"</STRING>);
+    } <KEYWORD>else</KEYWORD> {
+        <FUNCTION>println!</FUNCTION>(<STRING>"zero"</STRING>);
+    }
+
+    <COMMENT>// Loop expressions</COMMENT>
+    <KEYWORD>let</KEYWORD> result <OPERATOR>=</OPERATOR> <KEYWORD>loop</KEYWORD> {
+        y <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>;
+        <KEYWORD>if</KEYWORD> y <OPERATOR>></OPERATOR> <NUMBER>20</NUMBER> {
+            <KEYWORD>break</KEYWORD> y <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
+        }
+    };
+
+    <COMMENT>// While loop</COMMENT>
+    <KEYWORD>while</KEYWORD> y <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+        y <OPERATOR>-=</OPERATOR> <NUMBER>1</NUMBER>;
+    }
+
+    <COMMENT>// For loop with range</COMMENT>
+    <KEYWORD>for</KEYWORD> i <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<NUMBER>10</NUMBER> {
+        <FUNCTION>print!</FUNCTION>(<STRING>"{} "</STRING>, i);
+    }
+
+    <COMMENT>// For loop with iterator</COMMENT>
+    <KEYWORD>for</KEYWORD> (idx, val) <KEYWORD>in</KEYWORD> array.<FUNCTION>iter</FUNCTION>().<FUNCTION>enumerate</FUNCTION>() {
+        <FUNCTION>println!</FUNCTION>(<STRING>"array[{}] = {}"</STRING>, idx, val);
+    }
+
+    <COMMENT>// Match expression</COMMENT>
+    <KEYWORD>let</KEYWORD> message <OPERATOR>=</OPERATOR> <KEYWORD>match</KEYWORD> x {
+        <NUMBER>0</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"zero"</STRING>,
+        <NUMBER>1</NUMBER> <OPERATOR>|</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"one or two"</STRING>,
+        <NUMBER>3.</NUMBER>.<OPERATOR>=</OPERATOR><NUMBER>10</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"three to ten"</STRING>,
+        n <KEYWORD>if</KEYWORD> <FUNCTION>n</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER> <OPERATOR>=></OPERATOR> <STRING>"negative"</STRING>,
+        _ <OPERATOR>=></OPERATOR> <STRING>"something else"</STRING>,
+    };
+
+    <COMMENT>// If let</COMMENT>
+    <KEYWORD>let</KEYWORD> optional: <TYPE>Option</TYPE><OPERATOR><</OPERATOR><TYPE>i32</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>Some</TYPE>(<NUMBER>42</NUMBER>);
+    <KEYWORD>if</KEYWORD> <KEYWORD>let</KEYWORD> <TYPE>Some</TYPE>(value) <OPERATOR>=</OPERATOR> optional {
+        <FUNCTION>println!</FUNCTION>(<STRING>"Got value: {}"</STRING>, value);
+    }
+
+    <COMMENT>// While let</COMMENT>
+    <KEYWORD>let</KEYWORD> <KEYWORD>mut</KEYWORD> stack <OPERATOR>=</OPERATOR> <FUNCTION>vec!</FUNCTION>[<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>];
+    <KEYWORD>while</KEYWORD> <KEYWORD>let</KEYWORD> <TYPE>Some</TYPE>(top) <OPERATOR>=</OPERATOR> stack.<FUNCTION>pop</FUNCTION>() {
+        <FUNCTION>println!</FUNCTION>(<STRING>"Popped: {}"</STRING>, top);
+    }
+
+    <COMMENT>// Struct usage</COMMENT>
+    <KEYWORD>let</KEYWORD> <KEYWORD>mut</KEYWORD> person <OPERATOR>=</OPERATOR> <TYPE>Person</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>(<STRING>"Alice"</STRING>, <NUMBER>30</NUMBER>);
+    person.<FUNCTION>set_email</FUNCTION>(<STRING>"alice@example.com"</STRING>);
+    <FUNCTION>println!</FUNCTION>(<STRING>"{}"</STRING>, person.<FUNCTION>greet</FUNCTION>());
+
+    <COMMENT>// Enum usage</COMMENT>
+    <KEYWORD>let</KEYWORD> shapes <OPERATOR>=</OPERATOR> <FUNCTION>vec!</FUNCTION>[
+        <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Circle</TYPE> { radius: <NUMBER>5.0</NUMBER> },
+        <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><TYPE>Rectangle</TYPE> { width: <NUMBER>4.0</NUMBER>, height: <NUMBER>3.0</NUMBER> },
+        <TYPE>Shape</TYPE><OPERATOR>::</OPERATOR><FUNCTION>Triangle</FUNCTION>(<NUMBER>3.0</NUMBER>, <NUMBER>4.0</NUMBER>, <NUMBER>5.0</NUMBER>),
+    ];
+
+    <KEYWORD>for</KEYWORD> shape <KEYWORD>in</KEYWORD> <OPERATOR>&</OPERATOR>shapes {
+        shape.<FUNCTION>draw</FUNCTION>();
+        <FUNCTION>print_area</FUNCTION>(shape);
+    }
+
+    <COMMENT>// HashMap</COMMENT>
+    <KEYWORD>let</KEYWORD> <KEYWORD>mut</KEYWORD> map: <TYPE>HashMap</TYPE><OPERATOR><</OPERATOR><OPERATOR>&</OPERATOR><TYPE>str</TYPE>, <TYPE>i32</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>HashMap</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>();
+    map.<FUNCTION>insert</FUNCTION>(<STRING>"one"</STRING>, <NUMBER>1</NUMBER>);
+    map.<FUNCTION>insert</FUNCTION>(<STRING>"two"</STRING>, <NUMBER>2</NUMBER>);
+
+    <KEYWORD>if</KEYWORD> <KEYWORD>let</KEYWORD> <TYPE>Some</TYPE>(value) <OPERATOR>=</OPERATOR> map.<FUNCTION>get</FUNCTION>(<STRING>"one"</STRING>) {
+        <FUNCTION>println!</FUNCTION>(<STRING>"Found: {}"</STRING>, value);
+    }
+
+    <COMMENT>// Error handling with ?</COMMENT>
+    <KEYWORD>let</KEYWORD> _ <OPERATOR>=</OPERATOR> <FUNCTION>divide</FUNCTION>(<NUMBER>10.0</NUMBER>, <NUMBER>2.0</NUMBER>).<FUNCTION>unwrap_or</FUNCTION>(<NUMBER>0.0</NUMBER>);
+
+    <COMMENT>// Closures</COMMENT>
+    <KEYWORD>let</KEYWORD> add <OPERATOR>=</OPERATOR> <OPERATOR>|</OPERATOR>a, b<OPERATOR>|</OPERATOR> a <OPERATOR>+</OPERATOR> b;
+    <KEYWORD>let</KEYWORD> multiply <OPERATOR>=</OPERATOR> <OPERATOR>|</OPERATOR>a: <TYPE>i32</TYPE>, b: <TYPE>i32</TYPE><OPERATOR>|</OPERATOR> <OPERATOR>-></OPERATOR> <TYPE>i32</TYPE> { a <OPERATOR>*</OPERATOR> b };
+    <KEYWORD>let</KEYWORD> capture <OPERATOR>=</OPERATOR> <OPERATOR>|</OPERATOR>x<OPERATOR>|</OPERATOR> x <OPERATOR>+</OPERATOR> y;
+
+    <COMMENT>// Using closures</COMMENT>
+    <KEYWORD>let</KEYWORD> numbers <OPERATOR>=</OPERATOR> <FUNCTION>vec!</FUNCTION>[<NUMBER>1</NUMBER>, <OPERATOR>-</OPERATOR><NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <OPERATOR>-</OPERATOR><NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>];
+    <KEYWORD>let</KEYWORD> positives: <TYPE>Vec</TYPE><OPERATOR><</OPERATOR>_<OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> numbers.<FUNCTION>iter</FUNCTION>().<FUNCTION>filter</FUNCTION>(<OPERATOR>|</OPERATOR><OPERATOR>&&</OPERATOR>n<OPERATOR>|</OPERATOR> n <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>).<FUNCTION>collect</FUNCTION>();
+
+    <COMMENT>// Unsafe block</COMMENT>
+    <KEYWORD>unsafe</KEYWORD> {
+        <KEYWORD>let</KEYWORD> ptr <OPERATOR>=</OPERATOR> <OPERATOR>&</OPERATOR>x <KEYWORD>as</KEYWORD> <OPERATOR>*</OPERATOR><KEYWORD>const</KEYWORD> <TYPE>i32</TYPE>;
+        <FUNCTION>println!</FUNCTION>(<STRING>"Raw pointer value: {}"</STRING>, <OPERATOR>*</OPERATOR>ptr);
+    }
+
+    <COMMENT>// Box and smart pointers</COMMENT>
+    <KEYWORD>let</KEYWORD> boxed: <TYPE>Box</TYPE><OPERATOR><</OPERATOR><TYPE>i32</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>Box</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>(<NUMBER>42</NUMBER>);
+    <KEYWORD>let</KEYWORD> arc <OPERATOR>=</OPERATOR> <TYPE>Arc</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>(<TYPE>Mutex</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>(<NUMBER>0</NUMBER>));
+
+    <COMMENT>// Macro invocation</COMMENT>
+    <FUNCTION>say_hello!</FUNCTION>();
+    <FUNCTION>say_hello!</FUNCTION>(<STRING>"World"</STRING>);
+
+    <COMMENT>// Vector macros</COMMENT>
+    <KEYWORD>let</KEYWORD> vec<NUMBER>1</NUMBER> <OPERATOR>=</OPERATOR> <FUNCTION>vec!</FUNCTION>[<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>];
+    <KEYWORD>let</KEYWORD> formatted <OPERATOR>=</OPERATOR> <FUNCTION>format!</FUNCTION>(<STRING>"x = {}, y = {}"</STRING>, x, y);
+    <FUNCTION>println!</FUNCTION>(<STRING>"{}"</STRING>, formatted);
+
+    <COMMENT>// Attributes</COMMENT>
+    <ATTRIBUTE>#[allow(unused_variables)]</ATTRIBUTE>
+    <KEYWORD>let</KEYWORD> unused <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+
+    <COMMENT>// Documentation comment</COMMENT>
+    <COMMENT>/// This is a doc comment</COMMENT>
+    <KEYWORD>fn</KEYWORD> <FUNCTION>documented</FUNCTION>() {}
+
+    <COMMENT>/*</COMMENT>
+<COMMENT>     * Multi-line comment</COMMENT>
+<COMMENT>     * spanning multiple lines</COMMENT>
+<COMMENT>     */</COMMENT>
+}
+
+<COMMENT>// Tests module</COMMENT>
+<ATTRIBUTE>#[cfg(test)]</ATTRIBUTE>
+<KEYWORD>mod</KEYWORD> <TYPE>tests</TYPE> {
+    <KEYWORD>use</KEYWORD> <KEYWORD>super</KEYWORD><OPERATOR>::</OPERATOR><OPERATOR>*</OPERATOR>;
+
+    <ATTRIBUTE>#[test]</ATTRIBUTE>
+    <KEYWORD>fn</KEYWORD> <FUNCTION>test_person</FUNCTION>() {
+        <KEYWORD>let</KEYWORD> person <OPERATOR>=</OPERATOR> <TYPE>Person</TYPE><OPERATOR>::</OPERATOR><FUNCTION>new</FUNCTION>(<STRING>"Test"</STRING>, <NUMBER>25</NUMBER>);
+        <FUNCTION>assert_eq!</FUNCTION>(person.age, <NUMBER>25</NUMBER>);
+    }
+
+    <ATTRIBUTE>#[test]</ATTRIBUTE>
+    <ATTRIBUTE>#[should_panic]</ATTRIBUTE>
+    <KEYWORD>fn</KEYWORD> <FUNCTION>test_panic</FUNCTION>() {
+        <FUNCTION>panic!</FUNCTION>(<STRING>"This test panics!"</STRING>);
+    }
+}

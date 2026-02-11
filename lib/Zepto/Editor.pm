@@ -33,6 +33,7 @@ use Zepto::InputParser;
 use Zepto::Preferences;
 use Zepto::Theme;
 use Zepto::FilePicker;
+use Zepto::Highlighter;
 
 # Editor states
 use constant {
@@ -61,12 +62,13 @@ sub new {
 
     my $self = bless {
         # Core components
-        document  => undef,
-        view      => undef,
-        terminal  => $opts{terminal} // Zepto::Terminal->new(),
-        parser    => Zepto::InputParser->new(),
-        prefs     => $opts{prefs} // Zepto::Preferences->new(),
-        theme     => undef,
+        document    => undef,
+        view        => undef,
+        terminal    => $opts{terminal} // Zepto::Terminal->new(),
+        parser      => Zepto::InputParser->new(),
+        prefs       => $opts{prefs} // Zepto::Preferences->new(),
+        theme       => undef,
+        highlighter => Zepto::Highlighter->new(),
 
         # UI state
         state        => STATE_EDITING,
@@ -153,6 +155,15 @@ sub init {
         if ($self->{file_path}) {
             $self->show_message("New file: " . $self->{file_path});
         }
+    }
+
+    # Initialize syntax highlighting for the file
+    $self->{highlighter}->set_file($self->{file_path});
+
+    # If no grammar detected from extension, try shebang detection
+    if (!$self->{highlighter}->has_grammar && $self->{document}->line_count() > 0) {
+        my $first_line = $self->{document}->get_line_content(0);
+        $self->{highlighter}->detect_from_shebang($first_line);
     }
 
     # Set terminal title
@@ -1311,14 +1322,15 @@ sub render {
     $self->{view}->ensure_cursor_visible();
 
     my $output = Zepto::Renderer->render(
-        document => $self->{document},
-        view     => $self->{view},
-        theme    => $self->{theme},
-        prefs    => $self->{prefs},
-        rows     => $rows,
-        cols     => $cols,
-        message  => $self->{message},
-        ui       => {
+        document    => $self->{document},
+        view        => $self->{view},
+        theme       => $self->{theme},
+        prefs       => $self->{prefs},
+        rows        => $rows,
+        cols        => $cols,
+        message     => $self->{message},
+        highlighter => $self->{highlighter},
+        ui          => {
             menu_open => $self->{menu_open},
             menu_selected => $self->{menu_selected},
             dialog => $self->{dialog},

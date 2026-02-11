@@ -701,16 +701,18 @@ subtest 'Mouse drag selection' => sub {
     my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
 
     # Simulate press at column 6 (start of "World")
-    my $x_start = $gutter_width + 6;  # gutter + col 6
-    my $press = { type => 'mouse', action => 'press', x => $x_start, y => 2, modifiers => [] };
+    # Row 3 is the first text line (after menu bar on 1 and ruler bar on 2)
+    # Terminal coordinates are 1-indexed, so x = gutter_width + col + 1
+    my $x_start = $gutter_width + 6 + 1;  # gutter + col 6 + 1 for 1-indexed
+    my $press = { type => 'mouse', action => 'press', x => $x_start, y => 3, modifiers => [] };
     $editor->handle_mouse_event($press);
 
     ok(!$editor->{view}->has_selection(), 'No selection after press');
     is($editor->{view}->cursor_col(), 6, 'Cursor at column 6 after press');
 
     # Simulate drag to column 11 (end of "World")
-    my $x_end = $gutter_width + 11;
-    my $drag = { type => 'mouse', action => 'drag', x => $x_end, y => 2, modifiers => [] };
+    my $x_end = $gutter_width + 11 + 1;  # gutter + col 11 + 1 for 1-indexed
+    my $drag = { type => 'mouse', action => 'drag', x => $x_end, y => 3, modifiers => [] };
     $editor->handle_mouse_event($drag);
 
     ok($editor->{view}->has_selection(), 'Selection exists after drag');

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="transform.xsl"?>
+<!DOCTYPE catalog SYSTEM "catalog.dtd">
+<!--
+  Complete XML Example
+  Demonstrating various XML syntax elements
+-->
+<catalog xmlns="http://example.com/catalog"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns:dc="http://purl.org/dc/elements/1.1/"
+         xsi:schemaLocation="http://example.com/catalog catalog.xsd">
+
+    <!-- Simple elements -->
+    <title>Product Catalog</title>
+    <description>A comprehensive list of products</description>
+    <version>2.0</version>
+    <lastUpdated>2024-01-15T10:30:00Z</lastUpdated>
+
+    <!-- Element with attributes -->
+    <metadata author="John Doe" created="2024-01-01" status="active">
+        <dc:creator>John Doe</dc:creator>
+        <dc:publisher>Example Corp</dc:publisher>
+        <dc:rights>Copyright 2024</dc:rights>
+    </metadata>
+
+    <!-- CDATA section -->
+    <script><![CDATA[
+        function process(data) {
+            if (data < 10 && data > 0) {
+                return data * 2;
+            }
+            return data;
+        }
+    ]]></script>
+
+    <!-- Products list -->
+    <products count="3">
+        <product id="001" category="electronics" featured="true">
+            <name lang="en">Wireless Headphones</name>
+            <name lang="es">Auriculares Inalámbricos</name>
+            <price currency="USD">99.99</price>
+            <price currency="EUR">89.99</price>
+            <stock>150</stock>
+            <description>
+                High-quality wireless headphones with
+                noise cancellation &amp; long battery life.
+                Special chars: &lt;tag&gt; &quot;quoted&quot; &apos;apostrophe&apos;
+            </description>
+            <specifications>
+                <spec name="battery">30 hours</spec>
+                <spec name="weight">250g</spec>
+                <spec name="connectivity">Bluetooth 5.0</spec>
+            </specifications>
+            <tags>
+                <tag>audio</tag>
+                <tag>wireless</tag>
+                <tag>bluetooth</tag>
+            </tags>
+            <reviews>
+                <review rating="5" verified="true">
+                    <author>Alice</author>
+                    <date>2024-01-10</date>
+                    <content>Excellent sound quality!</content>
+                </review>
+                <review rating="4" verified="false">
+                    <author>Bob</author>
+                    <date>2024-01-12</date>
+                    <content>Good value for money.</content>
+                </review>
+            </reviews>
+        </product>
+
+        <product id="002" category="computers" featured="false">
+            <name lang="en">Laptop Stand</name>
+            <price currency="USD">49.99</price>
+            <stock>300</stock>
+            <description>Ergonomic aluminum laptop stand.</description>
+            <specifications>
+                <spec name="material">Aluminum</spec>
+                <spec name="weight">500g</spec>
+                <spec name="compatibility">All laptops up to 17"</spec>
+            </specifications>
+            <!-- Empty element -->
+            <tags/>
+        </product>
+
+        <product id="003" category="accessories">
+            <name>USB-C Hub</name>
+            <price currency="USD" discount="10%">79.99</price>
+            <stock>0</stock>
+            <availability status="out-of-stock" restock-date="2024-02-01"/>
+            <description>Multi-port USB-C hub with HDMI output.</description>
+        </product>
+    </products>
+
+    <!-- Nested structure with mixed content -->
+    <documentation>
+        <chapter id="ch1" title="Getting Started">
+            <para>Welcome to the <emphasis>product catalog</emphasis> system.</para>
+            <para>This document contains <link href="#ch2">important information</link>.</para>
+            <note type="warning">
+                Please read all instructions carefully.
+            </note>
+        </chapter>
+        <chapter id="ch2" title="Advanced Usage">
+            <para>For advanced users:</para>
+            <list type="ordered">
+                <item>Configure settings</item>
+                <item>Import data</item>
+                <item>Run reports</item>
+            </list>
+        </chapter>
+    </documentation>
+
+    <!-- Processing instructions -->
+    <?custom-processor option="value"?>
+
+    <!-- Numeric and boolean values -->
+    <settings>
+        <setting name="maxItems" type="integer">100</setting>
+        <setting name="threshold" type="decimal">0.75</setting>
+        <setting name="enabled" type="boolean">true</setting>
+        <setting name="disabled" type="boolean">false</setting>
+        <setting name="empty" type="null"/>
+    </settings>
+
+</catalog>

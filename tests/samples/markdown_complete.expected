@@ -1,0 +1,324 @@
+# Expected syntax highlighting for markdown_complete.md
+# Generated from Markdown grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<PUNCTUATION>#</PUNCTUATION> <HEADING>Complete Markdown Example</HEADING>
+
+This document demonstrates various Markdown syntax elements.
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Table of Contents</HEADING>
+
+<KEYWORD>1.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Headers</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>2.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Emphasis</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#emphasis</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>3.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Lists</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#lists</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>4.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Links and Images</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#links-and-images</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>5.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Code</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#code</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>6.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Tables</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#tables</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>7.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Blockquotes</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#blockquotes</TAG><PUNCTUATION>)</PUNCTUATION>
+
+<HEADING>---</HEADING>
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Headers</HEADING>
+
+<PUNCTUATION>#</PUNCTUATION> <HEADING>Heading 1</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Heading 2</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Heading 3</HEADING>
+<PUNCTUATION>####</PUNCTUATION> <HEADING>Heading 4</HEADING>
+<PUNCTUATION>#####</PUNCTUATION> <HEADING>Heading 5</HEADING>
+<PUNCTUATION>######</PUNCTUATION> <HEADING>Heading 6</HEADING>
+
+Alternative H1
+<HEADING>==============</HEADING>
+
+Alternative H2
+<HEADING>--------------</HEADING>
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Emphasis</HEADING>
+
+This is <PUNCTUATION>**</PUNCTUATION><CONSTANT>bold text</CONSTANT><PUNCTUATION>**</PUNCTUATION> and this is also <PUNCTUATION>__</PUNCTUATION><CONSTANT>bold</CONSTANT><PUNCTUATION>__</PUNCTUATION>.
+
+This is <PUNCTUATION>*</PUNCTUATION><STRING>italic text</STRING><PUNCTUATION>*</PUNCTUATION> and this is also <PUNCTUATION>_</PUNCTUATION><STRING>italic</STRING><PUNCTUATION>_</PUNCTUATION>.
+
+This is <PUNCTUATION>**</PUNCTUATION><CONSTANT>*bold and italic</CONSTANT><PUNCTUATION>**</PUNCTUATION>* and also <PUNCTUATION>__</PUNCTUATION><CONSTANT>_bold italic</CONSTANT><PUNCTUATION>__</PUNCTUATION>_.
+
+This is ~~strikethrough~~ text.
+
+This is ==highlighted== text (some flavors).
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Lists</HEADING>
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Unordered Lists</HEADING>
+
+<KEYWORD>-</KEYWORD> Item 1
+<KEYWORD>-</KEYWORD> Item 2
+  <KEYWORD>-</KEYWORD> Nested item 2.1
+  <KEYWORD>-</KEYWORD> Nested item 2.2
+    <KEYWORD>-</KEYWORD> Deeply nested 2.2.1
+<KEYWORD>-</KEYWORD> Item 3
+
+<KEYWORD>*</KEYWORD> Alternative marker 1
+<KEYWORD>*</KEYWORD> Alternative marker 2
+
+<KEYWORD>+</KEYWORD> Another marker 1
+<KEYWORD>+</KEYWORD> Another marker 2
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Ordered Lists</HEADING>
+
+<KEYWORD>1.</KEYWORD> First item
+<KEYWORD>2.</KEYWORD> Second item
+   <KEYWORD>1.</KEYWORD> Nested 2.1
+   <KEYWORD>2.</KEYWORD> Nested 2.2
+<KEYWORD>3.</KEYWORD> Third item
+
+1) Alternative style 1
+2) Alternative style 2
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Task Lists</HEADING>
+
+<KEYWORD>-</KEYWORD> [x] Completed task
+<KEYWORD>-</KEYWORD> [ ] Incomplete task
+<KEYWORD>-</KEYWORD> [x] Another completed task
+  <KEYWORD>-</KEYWORD> [ ] Nested incomplete
+  <KEYWORD>-</KEYWORD> [x] Nested complete
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Definition Lists</HEADING>
+
+Term 1
+: Definition for term 1
+
+Term 2
+: Definition for term 2
+: Another definition
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Links and Images</HEADING>
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Links</HEADING>
+
+<PUNCTUATION>[</PUNCTUATION><STRING>Inline link</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://example.com</TAG><PUNCTUATION>)</PUNCTUATION>
+
+<PUNCTUATION>[</PUNCTUATION><STRING>Inline link with title</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://example.com "Title text"</TAG><PUNCTUATION>)</PUNCTUATION>
+
+[Reference link][ref1]
+
+[Numbered reference][1]
+
+<PUNCTUATION>[</PUNCTUATION><STRING>Link to heading</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
+
+<PUNCTUATION><</PUNCTUATION><TAG>https://autolink-example.com</TAG><PUNCTUATION>></PUNCTUATION>
+
+<PUNCTUATION><</PUNCTUATION><TAG>email@example.com</TAG><PUNCTUATION>></PUNCTUATION>
+
+[ref1]: https://example.com "Reference 1"
+[1]: https://example.com "Numbered Reference"
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Images</HEADING>
+
+!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png</TAG><PUNCTUATION>)</PUNCTUATION>
+
+!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text with title</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png "Image title"</TAG><PUNCTUATION>)</PUNCTUATION>
+
+<PUNCTUATION>[</PUNCTUATION><STRING>![Linked image</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png</TAG><PUNCTUATION>)</PUNCTUATION>](https://example.com)
+
+![Reference image][img1]
+
+[img1]: image.png "Reference image title"
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Code</HEADING>
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Inline Code</HEADING>
+
+Use <FUNCTION>`console.log()`</FUNCTION> for debugging.
+
+The <FUNCTION>`<html>`</FUNCTION> element is the root.
+
+Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Code Blocks</HEADING>
+
+<PUNCTUATION>```</PUNCTUATION>
+<FUNCTION>Plain code block</FUNCTION>
+<FUNCTION>No syntax highlighting</FUNCTION>
+<PUNCTUATION>```</PUNCTUATION>
+
+<PUNCTUATION>```</PUNCTUATION><TYPE>javascript</TYPE>
+<FUNCTION>// JavaScript code block</FUNCTION>
+<FUNCTION>function greet(name) {</FUNCTION>
+<FUNCTION>    console.log(`Hello, ${name}!`);</FUNCTION>
+<FUNCTION>}</FUNCTION>
+<FUNCTION></FUNCTION>
+<FUNCTION>const items = [1, 2, 3];</FUNCTION>
+<FUNCTION>items.forEach(item => console.log(item));</FUNCTION>
+<PUNCTUATION>```</PUNCTUATION>
+
+<PUNCTUATION>```</PUNCTUATION><TYPE>python</TYPE>
+<FUNCTION># Python code block</FUNCTION>
+<FUNCTION>def factorial(n):</FUNCTION>
+<FUNCTION>    """Calculate factorial recursively."""</FUNCTION>
+<FUNCTION>    if n <= 1:</FUNCTION>
+<FUNCTION>        return 1</FUNCTION>
+<FUNCTION>    return n * factorial(n - 1)</FUNCTION>
+<FUNCTION></FUNCTION>
+<FUNCTION>result = factorial(5)</FUNCTION>
+<FUNCTION>print(f"5! = {result}")</FUNCTION>
+<PUNCTUATION>```</PUNCTUATION>
+
+<PUNCTUATION>```</PUNCTUATION><TYPE>rust</TYPE>
+<FUNCTION>// Rust code block</FUNCTION>
+<FUNCTION>fn main() {</FUNCTION>
+<FUNCTION>    let x: i32 = 42;</FUNCTION>
+<FUNCTION>    println!("The answer is {}", x);</FUNCTION>
+<FUNCTION>}</FUNCTION>
+<PUNCTUATION>```</PUNCTUATION>
+
+<FUNCTION>    Indented code block (4 spaces)</FUNCTION>
+<FUNCTION>    Also works for code</FUNCTION>
+<FUNCTION>    No syntax highlighting</FUNCTION>
+
+<PUNCTUATION>###</PUNCTUATION> <HEADING>Diff Syntax</HEADING>
+
+<PUNCTUATION>```</PUNCTUATION><TYPE>diff</TYPE>
+<FUNCTION>- Removed line</FUNCTION>
+<FUNCTION>+ Added line</FUNCTION>
+<FUNCTION>  Unchanged line</FUNCTION>
+<FUNCTION>! Changed line</FUNCTION>
+<FUNCTION># Comment</FUNCTION>
+<PUNCTUATION>```</PUNCTUATION>
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Tables</HEADING>
+
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| Cell 1   | Cell 2   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+
+| Left | Center | Right |
+|:-----|:------:|------:|
+| L1   |   C1   |    R1 |
+| L2   |   C2   |    R2 |
+
+| Compact | Table |
+|-|-|
+| A | B |
+| C | D |
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Blockquotes</HEADING>
+
+<PUNCTUATION>></PUNCTUATION> Simple blockquote
+
+<PUNCTUATION>></PUNCTUATION> Multi-line blockquote
+<PUNCTUATION>></PUNCTUATION> continues here
+<PUNCTUATION>></PUNCTUATION> and here.
+
+<PUNCTUATION>></PUNCTUATION> Blockquote with other elements
+<PUNCTUATION>></PUNCTUATION>
+<PUNCTUATION>></PUNCTUATION> - List item 1
+<PUNCTUATION>></PUNCTUATION> - List item 2
+<PUNCTUATION>></PUNCTUATION>
+<PUNCTUATION>></PUNCTUATION> ```python
+<PUNCTUATION>></PUNCTUATION> print("Code in blockquote")
+<PUNCTUATION>></PUNCTUATION> ```
+
+<PUNCTUATION>></PUNCTUATION> Nested blockquote
+<PUNCTUATION>></PUNCTUATION>
+<PUNCTUATION>>></PUNCTUATION> Inner level
+<PUNCTUATION>>></PUNCTUATION>
+<PUNCTUATION>>>></PUNCTUATION> Even deeper
+<PUNCTUATION>>></PUNCTUATION>
+<PUNCTUATION>>></PUNCTUATION> Back to second level
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Horizontal Rules</HEADING>
+
+<HEADING>---</HEADING>
+
+<PUNCTUATION>***</PUNCTUATION>
+
+<PUNCTUATION>___</PUNCTUATION>
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Footnotes</HEADING>
+
+Here is a footnote reference[^1] and another[^2].
+
+Here is a named footnote[^named].
+
+[^1]: This is the first footnote.
+[^2]: This is the second footnote with multiple paragraphs.
+
+<FUNCTION>    Indented content belongs to the footnote.</FUNCTION>
+
+[^named]: A named footnote for clarity.
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Math (LaTeX)</HEADING>
+
+Inline math: $E = mc^2$
+
+Display math:
+
+$$
+\frac{n!}{k!(n-k)!} = \binom{n}{k}
+$$
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>HTML in Markdown</HEADING>
+
+<details>
+<summary>Click to expand</summary>
+
+Hidden content that can be expanded.
+
+<KEYWORD>-</KEYWORD> Can contain <PUNCTUATION>**</PUNCTUATION><CONSTANT>Markdown</CONSTANT><PUNCTUATION>**</PUNCTUATION>
+<KEYWORD>-</KEYWORD> With <FUNCTION>`code`</FUNCTION> and other elements
+
+</details>
+
+<div align="center">
+  <strong>Centered content</strong>
+</div>
+
+<kbd>Ctrl</kbd> + <kbd>C</kbd>
+
+Text with <mark>highlighted</mark> content.
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Escaping</HEADING>
+
+\<PUNCTUATION>*</PUNCTUATION><STRING>Not italic\</STRING><PUNCTUATION>*</PUNCTUATION>
+
+\<PUNCTUATION>**</PUNCTUATION><CONSTANT>Not bold\</CONSTANT><PUNCTUATION>**</PUNCTUATION>
+
+\# Not a header
+
+\<PUNCTUATION>[</PUNCTUATION><STRING>Not a link\</STRING><PUNCTUATION>](</PUNCTUATION><TAG>url</TAG><PUNCTUATION>)</PUNCTUATION>
+
+\<FUNCTION>`Not code\`</FUNCTION>
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Abbreviations</HEADING>
+
+HTML is a markup language.
+
+*[HTML]: Hypertext Markup Language
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Emoji</HEADING>
+
+:smile: :heart: :thumbsup: :rocket:
+
+😀 ❤️ 👍 🚀 (Unicode emoji)
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Comments</HEADING>
+
+[//]: # (This is a comment)
+[comment]: <> (Another comment style)
+
+<!-- HTML comment also works -->
+
+<PUNCTUATION>##</PUNCTUATION> <HEADING>Admonitions (Some flavors)</HEADING>
+
+!!! note "Title"
+<FUNCTION>    This is a note admonition.</FUNCTION>
+
+!!! warning
+<FUNCTION>    This is a warning without title.</FUNCTION>
+
+!!! danger "Important"
+<FUNCTION>    Critical information here.</FUNCTION>
+
+<HEADING>---</HEADING>
+
+<PUNCTUATION>*</PUNCTUATION><STRING>Document end</STRING><PUNCTUATION>*</PUNCTUATION>

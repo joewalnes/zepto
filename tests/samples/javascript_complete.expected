@@ -1,0 +1,220 @@
+# Expected syntax highlighting for javascript_complete.js
+# Generated from JavaScript grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+#<OPERATOR>!</OPERATOR><REGEX>/usr/</REGEX>bin<OPERATOR>/</OPERATOR>env node
+<COMMENT>/**</COMMENT>
+<COMMENT> * A complete JavaScript program demonstrating various syntax elements.</COMMENT>
+<COMMENT> * @module example</COMMENT>
+<COMMENT> */</COMMENT>
+
+<STRING>'use strict'</STRING>;
+
+<COMMENT>// Imports (ES6 modules)</COMMENT>
+<KEYWORD>import</KEYWORD> { readFile, writeFile } from <STRING>'fs/promises'</STRING>;
+<KEYWORD>import</KEYWORD> path from <STRING>'path'</STRING>;
+<KEYWORD>import</KEYWORD> defaultExport, { namedExport } from <STRING>'./module.js'</STRING>;
+
+<COMMENT>// CommonJS require (for comparison)</COMMENT>
+<KEYWORD>const</KEYWORD> express <OPERATOR>=</OPERATOR> <KEYWORD>require</KEYWORD>(<STRING>'express'</STRING>);
+<KEYWORD>const</KEYWORD> { <TYPE>Router</TYPE> } <OPERATOR>=</OPERATOR> <KEYWORD>require</KEYWORD>(<STRING>'express'</STRING>);
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> <CONSTANT>MAX_VALUE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>PI</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>GREETING</CONSTANT> <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+
+<COMMENT>// Variables with different declarations</COMMENT>
+<KEYWORD>let</KEYWORD> count <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+<KEYWORD>var</KEYWORD> legacy <OPERATOR>=</OPERATOR> <STRING>"old style"</STRING>;  <COMMENT>// var is still valid</COMMENT>
+
+<COMMENT>// Array and object literals</COMMENT>
+<KEYWORD>const</KEYWORD> items <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <STRING>'four'</STRING>, <STRING>"five"</STRING>];
+<KEYWORD>const</KEYWORD> config <OPERATOR>=</OPERATOR> {
+    host<OPERATOR>:</OPERATOR> <STRING>'localhost'</STRING>,
+    port<OPERATOR>:</OPERATOR> <NUMBER>8080</NUMBER>,
+    nested<OPERATOR>:</OPERATOR> {
+        deep<OPERATOR>:</OPERATOR> <KEYWORD>true</KEYWORD>,
+    },
+};
+
+<COMMENT>// Destructuring</COMMENT>
+<KEYWORD>const</KEYWORD> { host, port } <OPERATOR>=</OPERATOR> config;
+<KEYWORD>const</KEYWORD> [first, second, <OPERATOR>...</OPERATOR>rest] <OPERATOR>=</OPERATOR> items;
+
+<COMMENT>// Template literals</COMMENT>
+<KEYWORD>const</KEYWORD> message <OPERATOR>=</OPERATOR> <STRING>`Hello, ${host}:${port}!`</STRING>;
+<KEYWORD>const</KEYWORD> multiline <OPERATOR>=</OPERATOR> <STRING>`</STRING>
+<STRING>  This is a</STRING>
+<STRING>  multiline template literal</STRING>
+<STRING>`</STRING>;
+
+<COMMENT>// Functions</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>greet</FUNCTION>(who) {
+    <KEYWORD>return</KEYWORD> <STRING>`Hello, ${who}!`</STRING>;
+}
+
+<COMMENT>// Arrow functions</COMMENT>
+<KEYWORD>const</KEYWORD> add <OPERATOR>=</OPERATOR> (a, b) <OPERATOR>=></OPERATOR> a <OPERATOR>+</OPERATOR> b;
+<KEYWORD>const</KEYWORD> square <OPERATOR>=</OPERATOR> x <OPERATOR>=></OPERATOR> x <OPERATOR>*</OPERATOR> x;
+<KEYWORD>const</KEYWORD> <TYPE>process</TYPE> <OPERATOR>=</OPERATOR> (data) <OPERATOR>=></OPERATOR> {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(data);
+    <KEYWORD>return</KEYWORD> data;
+};
+
+<COMMENT>// Async/await</COMMENT>
+<KEYWORD>async</KEYWORD> <KEYWORD>function</KEYWORD> <FUNCTION>fetchData</FUNCTION>(url) {
+    <KEYWORD>try</KEYWORD> {
+        <KEYWORD>const</KEYWORD> response <OPERATOR>=</OPERATOR> <KEYWORD>await</KEYWORD> <FUNCTION>fetch</FUNCTION>(url);
+        <KEYWORD>const</KEYWORD> data <OPERATOR>=</OPERATOR> <KEYWORD>await</KEYWORD> response.<FUNCTION>json</FUNCTION>();
+        <KEYWORD>return</KEYWORD> data;
+    } <KEYWORD>catch</KEYWORD> (error) {
+        <TYPE>console</TYPE>.<FUNCTION>error</FUNCTION>(<STRING>'Failed:'</STRING>, error.message);
+        <KEYWORD>throw</KEYWORD> error;
+    }
+}
+
+<COMMENT>// Promises</COMMENT>
+<KEYWORD>const</KEYWORD> promise <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>Promise</TYPE>((resolve, reject) <OPERATOR>=></OPERATOR> {
+    <FUNCTION>setTimeout</FUNCTION>(() <OPERATOR>=></OPERATOR> <FUNCTION>resolve</FUNCTION>(<STRING>'done'</STRING>), <NUMBER>1000</NUMBER>);
+});
+
+promise
+    .<FUNCTION>then</FUNCTION>(result <OPERATOR>=></OPERATOR> <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(result))
+    .<KEYWORD>catch</KEYWORD>(err <OPERATOR>=></OPERATOR> <TYPE>console</TYPE>.<FUNCTION>error</FUNCTION>(err))
+    .<KEYWORD>finally</KEYWORD>(() <OPERATOR>=></OPERATOR> <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'cleanup'</STRING>));
+
+<COMMENT>// Classes</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Calculator</TYPE> {
+    #privateField <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;  <COMMENT>// Private field</COMMENT>
+    <KEYWORD>static</KEYWORD> count <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;   <COMMENT>// Static field</COMMENT>
+
+    <FUNCTION>constructor</FUNCTION>(initial <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>) {
+        <KEYWORD>this</KEYWORD>.value <OPERATOR>=</OPERATOR> initial;
+        <TYPE>Calculator</TYPE>.count<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>;
+    }
+
+    get <FUNCTION>current</FUNCTION>() {
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>.value;
+    }
+
+    set <FUNCTION>current</FUNCTION>(val) {
+        <KEYWORD>this</KEYWORD>.value <OPERATOR>=</OPERATOR> val;
+    }
+
+    <FUNCTION>add</FUNCTION>(n) {
+        <KEYWORD>this</KEYWORD>.value <OPERATOR>+</OPERATOR><OPERATOR>=</OPERATOR> n;
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>;  <COMMENT>// Method chaining</COMMENT>
+    }
+
+    <KEYWORD>static</KEYWORD> <FUNCTION>multiply</FUNCTION>(a, b) {
+        <KEYWORD>return</KEYWORD> a <OPERATOR>*</OPERATOR> b;
+    }
+}
+
+<COMMENT>// Class inheritance</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>ScientificCalculator</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>Calculator</TYPE> {
+    <FUNCTION>constructor</FUNCTION>(initial) {
+        <KEYWORD>super</KEYWORD>(initial);
+    }
+
+    <FUNCTION>sqrt</FUNCTION>() {
+        <KEYWORD>this</KEYWORD>.value <OPERATOR>=</OPERATOR> <TYPE>Math</TYPE>.<FUNCTION>sqrt</FUNCTION>(<KEYWORD>this</KEYWORD>.value);
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>;
+    }
+}
+
+<COMMENT>// Control structures</COMMENT>
+<KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"Positive"</STRING>);
+} <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER>) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"Zero"</STRING>);
+} <KEYWORD>else</KEYWORD> {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"Negative"</STRING>);
+}
+
+<COMMENT>// Switch</COMMENT>
+<KEYWORD>switch</KEYWORD> (count) {
+    <KEYWORD>case</KEYWORD> <NUMBER>0</NUMBER><OPERATOR>:</OPERATOR>
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"zero"</STRING>);
+        <KEYWORD>break</KEYWORD>;
+    <KEYWORD>case</KEYWORD> <NUMBER>1</NUMBER><OPERATOR>:</OPERATOR>
+    <KEYWORD>case</KEYWORD> <NUMBER>2</NUMBER><OPERATOR>:</OPERATOR>
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"one or two"</STRING>);
+        <KEYWORD>break</KEYWORD>;
+    <KEYWORD>default</KEYWORD><OPERATOR>:</OPERATOR>
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>"other"</STRING>);
+}
+
+<COMMENT>// Loops</COMMENT>
+<KEYWORD>for</KEYWORD> (<KEYWORD>let</KEYWORD> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; <FUNCTION>i</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>) {
+    <KEYWORD>if</KEYWORD> (i <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER>) <KEYWORD>continue</KEYWORD>;
+    <KEYWORD>if</KEYWORD> (i <OPERATOR>></OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>break</KEYWORD>;
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(i);
+}
+
+<KEYWORD>for</KEYWORD> (<KEYWORD>const</KEYWORD> item <KEYWORD>of</KEYWORD> items) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(item);
+}
+
+<KEYWORD>for</KEYWORD> (<KEYWORD>const</KEYWORD> key <KEYWORD>in</KEYWORD> config) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(key, config[key]);
+}
+
+<KEYWORD>while</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    count<OPERATOR>-</OPERATOR><OPERATOR>-</OPERATOR>;
+}
+
+<KEYWORD>do</KEYWORD> {
+    count<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>;
+} <KEYWORD>while</KEYWORD> (<FUNCTION>count</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>5</NUMBER>);
+
+<COMMENT>// Array methods</COMMENT>
+<KEYWORD>const</KEYWORD> doubled <OPERATOR>=</OPERATOR> items.<FUNCTION>filter</FUNCTION>(x <OPERATOR>=></OPERATOR> <KEYWORD>typeof</KEYWORD> x <OPERATOR>===</OPERATOR> <STRING>'number'</STRING>).<FUNCTION>map</FUNCTION>(x <OPERATOR>=></OPERATOR> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>);
+<KEYWORD>const</KEYWORD> sum <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>].<FUNCTION>reduce</FUNCTION>((acc, x) <OPERATOR>=></OPERATOR> acc <OPERATOR>+</OPERATOR> x, <NUMBER>0</NUMBER>);
+
+<COMMENT>// Spread operator</COMMENT>
+<KEYWORD>const</KEYWORD> combined <OPERATOR>=</OPERATOR> [<OPERATOR>...</OPERATOR>items, <OPERATOR>...</OPERATOR>doubled];
+<KEYWORD>const</KEYWORD> cloned <OPERATOR>=</OPERATOR> { <OPERATOR>...</OPERATOR>config, extra<OPERATOR>:</OPERATOR> <KEYWORD>true</KEYWORD> };
+
+<COMMENT>// Optional chaining and nullish coalescing</COMMENT>
+<KEYWORD>const</KEYWORD> value <OPERATOR>=</OPERATOR> config<OPERATOR>?.</OPERATOR>nested<OPERATOR>?.</OPERATOR>deep <OPERATOR>??</OPERATOR> <STRING>'default'</STRING>;
+<KEYWORD>const</KEYWORD> callback <OPERATOR>=</OPERATOR> config.onSuccess<OPERATOR>?.</OPERATOR>();
+
+<COMMENT>// Regular expressions</COMMENT>
+<KEYWORD>const</KEYWORD> pattern <OPERATOR>=</OPERATOR> <REGEX>/^[a-z]+$/gi</REGEX>;
+<KEYWORD>const</KEYWORD> matches <OPERATOR>=</OPERATOR> <STRING>"hello"</STRING>.<FUNCTION>match</FUNCTION>(pattern);
+<KEYWORD>const</KEYWORD> replaced <OPERATOR>=</OPERATOR> <STRING>"hello"</STRING>.<FUNCTION>replace</FUNCTION>(<REGEX>/l/g</REGEX>, <STRING>'L'</STRING>);
+
+<COMMENT>// Numbers</COMMENT>
+<KEYWORD>const</KEYWORD> integer <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+<KEYWORD>const</KEYWORD> float <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>;
+<KEYWORD>const</KEYWORD> hex <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>;
+<KEYWORD>const</KEYWORD> octal <OPERATOR>=</OPERATOR> <NUMBER>0o755</NUMBER>;
+<KEYWORD>const</KEYWORD> binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>;
+<KEYWORD>const</KEYWORD> scientific <OPERATOR>=</OPERATOR> <NUMBER>1.5e10</NUMBER>;
+<KEYWORD>const</KEYWORD> bigInt <OPERATOR>=</OPERATOR> <NUMBER>9007199254740991n</NUMBER>;
+
+<COMMENT>// Symbols and WeakMap</COMMENT>
+<KEYWORD>const</KEYWORD> sym <OPERATOR>=</OPERATOR> <TYPE>Symbol</TYPE>(<STRING>'description'</STRING>);
+<KEYWORD>const</KEYWORD> weakMap <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>WeakMap</TYPE>();
+
+<COMMENT>// Generators</COMMENT>
+<KEYWORD>function</KEYWORD><OPERATOR>*</OPERATOR> <FUNCTION>numberGenerator</FUNCTION>() {
+    <KEYWORD>yield</KEYWORD> <NUMBER>1</NUMBER>;
+    <KEYWORD>yield</KEYWORD> <NUMBER>2</NUMBER>;
+    <KEYWORD>yield</KEYWORD><OPERATOR>*</OPERATOR> [<NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>];
+    <KEYWORD>return</KEYWORD> <STRING>'done'</STRING>;
+}
+
+<COMMENT>// Tagged template literal</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>highlight</FUNCTION>(strings, <OPERATOR>...</OPERATOR>values) {
+    <KEYWORD>return</KEYWORD> strings.<FUNCTION>reduce</FUNCTION>((acc, str, i) <OPERATOR>=></OPERATOR>
+        acc <OPERATOR>+</OPERATOR> str <OPERATOR>+</OPERATOR> (values[i] <OPERATOR>!==</OPERATOR> <TYPE>undefined</TYPE> <OPERATOR>?</OPERATOR> <STRING>`<b>${values[i]}</b>`</STRING> <OPERATOR>:</OPERATOR> <STRING>''</STRING>), <STRING>''</STRING>);
+}
+
+<KEYWORD>const</KEYWORD> highlighted <OPERATOR>=</OPERATOR> highlight<STRING>`Hello ${name}, count is ${count}`</STRING>;
+
+<COMMENT>// Export</COMMENT>
+<KEYWORD>export</KEYWORD> { greet, add };
+<KEYWORD>export</KEYWORD> <KEYWORD>default</KEYWORD> <TYPE>Calculator</TYPE>;

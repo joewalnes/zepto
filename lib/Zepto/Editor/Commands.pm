@@ -191,6 +191,7 @@ sub _load_file {
         $self->{document} = Zepto::Document->load($path);
         $self->{view} = Zepto::View->new(document => $self->{document});
         $self->{file_path} = $path;
+        $self->{highlighter}->set_file($path);  # Update syntax highlighting
         $self->update_title();
         $self->show_message("Opened: $path");
     };

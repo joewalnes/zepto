@@ -1,0 +1,369 @@
+# Expected syntax highlighting for react_complete.tsx
+# Generated from TypeScript grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>/**</COMMENT>
+<COMMENT> * Complete React TSX example demonstrating various syntax elements</COMMENT>
+<COMMENT> */</COMMENT>
+
+<KEYWORD>import</KEYWORD> <TYPE>React</TYPE>, {
+    useState,
+    useEffect,
+    useCallback,
+    useMemo,
+    useRef,
+    useContext,
+    createContext,
+    forwardRef,
+    memo,
+    lazy,
+    <TYPE>Suspense</TYPE>,
+} from <STRING>'react'</STRING>;
+<KEYWORD>import</KEYWORD> <KEYWORD>type</KEYWORD> { <CONSTANT>FC</CONSTANT>, <TYPE>ReactNode</TYPE>, <TYPE>MouseEvent</TYPE>, <TYPE>ChangeEvent</TYPE>, <TYPE>FormEvent</TYPE> } from <STRING>'react'</STRING>;
+
+<COMMENT>// Types and interfaces</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>User</TYPE> {
+    id<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    email<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+}
+
+<KEYWORD>interface</KEYWORD> <TYPE>Props</TYPE> {
+    title<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    children<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>ReactNode</TYPE>;
+    onClick<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> () <OPERATOR>=></OPERATOR> <TYPE>void</TYPE>;
+}
+
+<KEYWORD>type</KEYWORD> <TYPE>ButtonVariant</TYPE> <OPERATOR>=</OPERATOR> <STRING>'primary'</STRING> <OPERATOR>|</OPERATOR> <STRING>'secondary'</STRING> <OPERATOR>|</OPERATOR> <STRING>'danger'</STRING>;
+
+<COMMENT>// Context</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>ThemeContextType</TYPE> {
+    theme<OPERATOR>:</OPERATOR> <STRING>'light'</STRING> <OPERATOR>|</OPERATOR> <STRING>'dark'</STRING>;
+    toggleTheme<OPERATOR>:</OPERATOR> () <OPERATOR>=></OPERATOR> <TYPE>void</TYPE>;
+}
+
+<KEYWORD>const</KEYWORD> <TYPE>ThemeContext</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>createContext</FUNCTION><OPERATOR><</OPERATOR><TYPE>ThemeContextType</TYPE> <OPERATOR>|</OPERATOR> <TYPE>null</TYPE><OPERATOR>></OPERATOR>(<TYPE>null</TYPE>);
+
+<COMMENT>// Custom hook</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>useTheme</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>ThemeContextType</TYPE> {
+    <KEYWORD>const</KEYWORD> context <OPERATOR>=</OPERATOR> <FUNCTION>useContext</FUNCTION>(<TYPE>ThemeContext</TYPE>);
+    <KEYWORD>if</KEYWORD> (<OPERATOR>!</OPERATOR>context) {
+        <KEYWORD>throw</KEYWORD> <KEYWORD>new</KEYWORD> <TYPE>Error</TYPE>(<STRING>'useTheme must be used within ThemeProvider'</STRING>);
+    }
+    <KEYWORD>return</KEYWORD> context;
+}
+
+<COMMENT>// Functional component with props</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>Button</TYPE><OPERATOR>:</OPERATOR> <FUNCTION>FC</FUNCTION><OPERATOR><</OPERATOR>{
+    variant<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>ButtonVariant</TYPE>;
+    disabled<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>boolean</TYPE>;
+    onClick<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> (e<OPERATOR>:</OPERATOR> <FUNCTION>MouseEvent</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLButtonElement</TYPE><OPERATOR>></OPERATOR>) <OPERATOR>=></OPERATOR> <TYPE>void</TYPE>;
+    children<OPERATOR>:</OPERATOR> <TYPE>ReactNode</TYPE>;
+}<OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> ({ variant <OPERATOR>=</OPERATOR> <STRING>'primary'</STRING>, disabled, onClick, children }) <OPERATOR>=></OPERATOR> {
+    <KEYWORD>const</KEYWORD> className <OPERATOR>=</OPERATOR> <STRING>`btn btn-${variant}`</STRING>;
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>button
+            className<OPERATOR>=</OPERATOR>{className}
+            disabled<OPERATOR>=</OPERATOR>{disabled}
+            onClick<OPERATOR>=</OPERATOR>{onClick}
+            <KEYWORD>type</KEYWORD><OPERATOR>=</OPERATOR><STRING>"button"</STRING>
+        <OPERATOR>></OPERATOR>
+            {children}
+        <PUNCTUATION></</PUNCTUATION><TAG>button</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+};
+
+<COMMENT>// Component with useState and useEffect</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>Counter</FUNCTION>({ initial <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER> }<OPERATOR>:</OPERATOR> { initial<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>number</TYPE> }) {
+    <KEYWORD>const</KEYWORD> [count, setCount] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION><OPERATOR><</OPERATOR><TYPE>number</TYPE><OPERATOR>></OPERATOR>(initial);
+    <KEYWORD>const</KEYWORD> [isEven, setIsEven] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION><OPERATOR><</OPERATOR><TYPE>boolean</TYPE><OPERATOR>></OPERATOR>(initial <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER>);
+
+    <FUNCTION>useEffect</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <FUNCTION>setIsEven</FUNCTION>(count <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER>);
+    }, [count]);
+
+    <FUNCTION>useEffect</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Counter mounted'</STRING>);
+        <KEYWORD>return</KEYWORD> () <OPERATOR>=></OPERATOR> {
+            <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Counter unmounted'</STRING>);
+        };
+    }, []);
+
+    <KEYWORD>const</KEYWORD> increment <OPERATOR>=</OPERATOR> <FUNCTION>useCallback</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <FUNCTION>setCount</FUNCTION>((prev) <OPERATOR>=></OPERATOR> prev <OPERATOR>+</OPERATOR> <NUMBER>1</NUMBER>);
+    }, []);
+
+    <KEYWORD>const</KEYWORD> decrement <OPERATOR>=</OPERATOR> <FUNCTION>useCallback</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <FUNCTION>setCount</FUNCTION>((prev) <OPERATOR>=></OPERATOR> prev <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>);
+    }, []);
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>div className<OPERATOR>=</OPERATOR><STRING>"counter"</STRING><OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>span<OPERATOR>></OPERATOR><TYPE>Count</TYPE><OPERATOR>:</OPERATOR> {count}<PUNCTUATION></</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION>
+            <OPERATOR><</OPERATOR>span<OPERATOR>></OPERATOR>{isEven <OPERATOR>?</OPERATOR> <STRING>'Even'</STRING> <OPERATOR>:</OPERATOR> <STRING>'Odd'</STRING>}<PUNCTUATION></</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION>
+            <OPERATOR><</OPERATOR><TYPE>Button</TYPE> onClick<OPERATOR>=</OPERATOR>{decrement}<OPERATOR>></OPERATOR><OPERATOR>-</OPERATOR><PUNCTUATION></</PUNCTUATION><TYPE>Button</TYPE><PUNCTUATION>></PUNCTUATION>
+            <OPERATOR><</OPERATOR><TYPE>Button</TYPE> onClick<OPERATOR>=</OPERATOR>{increment}<OPERATOR>></OPERATOR><OPERATOR>+</OPERATOR><PUNCTUATION></</PUNCTUATION><TYPE>Button</TYPE><PUNCTUATION>></PUNCTUATION>
+        <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// Component with useRef</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>InputWithFocus</FUNCTION>() {
+    <KEYWORD>const</KEYWORD> inputRef <OPERATOR>=</OPERATOR> <FUNCTION>useRef</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLInputElement</TYPE><OPERATOR>></OPERATOR>(<TYPE>null</TYPE>);
+
+    <KEYWORD>const</KEYWORD> focusInput <OPERATOR>=</OPERATOR> () <OPERATOR>=></OPERATOR> {
+        inputRef.current<OPERATOR>?.</OPERATOR><FUNCTION>focus</FUNCTION>();
+    };
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>input ref<OPERATOR>=</OPERATOR>{inputRef} <KEYWORD>type</KEYWORD><OPERATOR>=</OPERATOR><STRING>"text"</STRING> placeholder<OPERATOR>=</OPERATOR><STRING>"Type here..."</STRING> <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR><TYPE>Button</TYPE> onClick<OPERATOR>=</OPERATOR>{focusInput}<OPERATOR>></OPERATOR><TYPE>Focus</TYPE> <FUNCTION>Input</FUNCTION><PUNCTUATION></</PUNCTUATION><TYPE>Button</TYPE><PUNCTUATION>></PUNCTUATION>
+        <OPERATOR><</OPERATOR><OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+    );
+}
+
+<COMMENT>// Component with useMemo</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>ExpensiveList</FUNCTION>({ items }<OPERATOR>:</OPERATOR> { items<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>[] }) {
+    <KEYWORD>const</KEYWORD> sortedItems <OPERATOR>=</OPERATOR> <FUNCTION>useMemo</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Sorting items...'</STRING>);
+        <KEYWORD>return</KEYWORD> [<OPERATOR>...</OPERATOR>items].<FUNCTION>sort</FUNCTION>();
+    }, [items]);
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>ul<OPERATOR>></OPERATOR>
+            {sortedItems.<FUNCTION>map</FUNCTION>((item, index) <OPERATOR>=></OPERATOR> (
+                <OPERATOR><</OPERATOR>li key<OPERATOR>=</OPERATOR>{index}<OPERATOR>></OPERATOR>{item}<PUNCTUATION></</PUNCTUATION><TAG>li</TAG><PUNCTUATION>></PUNCTUATION>
+            ))}
+        <PUNCTUATION></</PUNCTUATION><TAG>ul</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// forwardRef component</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>FancyInput</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>forwardRef</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLInputElement</TYPE>, { label<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> }<OPERATOR>></OPERATOR>(
+    ({ label }, ref) <OPERATOR>=></OPERATOR> (
+        <OPERATOR><</OPERATOR>label<OPERATOR>></OPERATOR>
+            {label}
+            <OPERATOR><</OPERATOR>input ref<OPERATOR>=</OPERATOR>{ref} <KEYWORD>type</KEYWORD><OPERATOR>=</OPERATOR><STRING>"text"</STRING> <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+        <PUNCTUATION></</PUNCTUATION><TAG>label</TAG><PUNCTUATION>></PUNCTUATION>
+    )
+);
+
+<TYPE>FancyInput</TYPE>.displayName <OPERATOR>=</OPERATOR> <STRING>'FancyInput'</STRING>;
+
+<COMMENT>// memo component</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>UserCard</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>memo</FUNCTION><OPERATOR><</OPERATOR>{ user<OPERATOR>:</OPERATOR> <TYPE>User</TYPE> }<OPERATOR>></OPERATOR>(({ user }) <OPERATOR>=></OPERATOR> (
+    <OPERATOR><</OPERATOR>div className<OPERATOR>=</OPERATOR><STRING>"user-card"</STRING><OPERATOR>></OPERATOR>
+        <OPERATOR><</OPERATOR>h3<OPERATOR>></OPERATOR>{user.name}<PUNCTUATION></</PUNCTUATION><TAG>h3</TAG><PUNCTUATION>></PUNCTUATION>
+        <OPERATOR><</OPERATOR>p<OPERATOR>></OPERATOR>{user.email}<PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>
+    <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+));
+
+<TYPE>UserCard</TYPE>.displayName <OPERATOR>=</OPERATOR> <STRING>'UserCard'</STRING>;
+
+<COMMENT>// Lazy loaded component</COMMENT>
+<KEYWORD>const</KEYWORD> <TYPE>LazyComponent</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>lazy</FUNCTION>(() <OPERATOR>=></OPERATOR> <KEYWORD>import</KEYWORD>(<STRING>'./HeavyComponent'</STRING>));
+
+<COMMENT>// Form component with controlled inputs</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>ContactForm</FUNCTION>() {
+    <KEYWORD>const</KEYWORD> [formData, setFormData] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION>({
+        name<OPERATOR>:</OPERATOR> <STRING>''</STRING>,
+        email<OPERATOR>:</OPERATOR> <STRING>''</STRING>,
+        message<OPERATOR>:</OPERATOR> <STRING>''</STRING>,
+    });
+    <KEYWORD>const</KEYWORD> [errors, setErrors] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION><OPERATOR><</OPERATOR><TYPE>Record</TYPE><OPERATOR><</OPERATOR><TYPE>string</TYPE>, <TYPE>string</TYPE><OPERATOR>>></OPERATOR>({});
+    <KEYWORD>const</KEYWORD> [isSubmitting, setIsSubmitting] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION>(<KEYWORD>false</KEYWORD>);
+
+    <KEYWORD>const</KEYWORD> handleChange <OPERATOR>=</OPERATOR> (
+        e<OPERATOR>:</OPERATOR> <FUNCTION>ChangeEvent</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLInputElement</TYPE> <OPERATOR>|</OPERATOR> <TYPE>HTMLTextAreaElement</TYPE><OPERATOR>></OPERATOR>
+    ) <OPERATOR>=></OPERATOR> {
+        <KEYWORD>const</KEYWORD> { name, value } <OPERATOR>=</OPERATOR> e.target;
+        <FUNCTION>setFormData</FUNCTION>((prev) <OPERATOR>=></OPERATOR> ({ <OPERATOR>...</OPERATOR>prev, [name]<OPERATOR>:</OPERATOR> value }));
+    };
+
+    <KEYWORD>const</KEYWORD> handleSubmit <OPERATOR>=</OPERATOR> <KEYWORD>async</KEYWORD> (e<OPERATOR>:</OPERATOR> <FUNCTION>FormEvent</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLFormElement</TYPE><OPERATOR>></OPERATOR>) <OPERATOR>=></OPERATOR> {
+        e.<FUNCTION>preventDefault</FUNCTION>();
+        <FUNCTION>setIsSubmitting</FUNCTION>(<KEYWORD>true</KEYWORD>);
+
+        <KEYWORD>try</KEYWORD> {
+            <COMMENT>// Simulate API call</COMMENT>
+            <KEYWORD>await</KEYWORD> <KEYWORD>new</KEYWORD> <TYPE>Promise</TYPE>((resolve) <OPERATOR>=></OPERATOR> <FUNCTION>setTimeout</FUNCTION>(resolve, <NUMBER>1000</NUMBER>));
+            <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Form submitted:'</STRING>, formData);
+        } <KEYWORD>catch</KEYWORD> (error) {
+            <FUNCTION>setErrors</FUNCTION>({ submit<OPERATOR>:</OPERATOR> <STRING>'Failed to submit form'</STRING> });
+        } <KEYWORD>finally</KEYWORD> {
+            <FUNCTION>setIsSubmitting</FUNCTION>(<KEYWORD>false</KEYWORD>);
+        }
+    };
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>form onSubmit<OPERATOR>=</OPERATOR>{handleSubmit}<OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>div<OPERATOR>></OPERATOR>
+                <OPERATOR><</OPERATOR>label htmlFor<OPERATOR>=</OPERATOR><STRING>"name"</STRING><OPERATOR>></OPERATOR><TYPE>Name</TYPE><OPERATOR>:</OPERATOR><PUNCTUATION></</PUNCTUATION><TAG>label</TAG><PUNCTUATION>></PUNCTUATION>
+                <OPERATOR><</OPERATOR>input
+                    id<OPERATOR>=</OPERATOR><STRING>"name"</STRING>
+                    name<OPERATOR>=</OPERATOR><STRING>"name"</STRING>
+                    <KEYWORD>type</KEYWORD><OPERATOR>=</OPERATOR><STRING>"text"</STRING>
+                    value<OPERATOR>=</OPERATOR>{formData.name}
+                    onChange<OPERATOR>=</OPERATOR>{handleChange}
+                    required
+                <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+            <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+
+            <OPERATOR><</OPERATOR>div<OPERATOR>></OPERATOR>
+                <OPERATOR><</OPERATOR>label htmlFor<OPERATOR>=</OPERATOR><STRING>"email"</STRING><OPERATOR>></OPERATOR><TYPE>Email</TYPE><OPERATOR>:</OPERATOR><PUNCTUATION></</PUNCTUATION><TAG>label</TAG><PUNCTUATION>></PUNCTUATION>
+                <OPERATOR><</OPERATOR>input
+                    id<OPERATOR>=</OPERATOR><STRING>"email"</STRING>
+                    name<OPERATOR>=</OPERATOR><STRING>"email"</STRING>
+                    <KEYWORD>type</KEYWORD><OPERATOR>=</OPERATOR><STRING>"email"</STRING>
+                    value<OPERATOR>=</OPERATOR>{formData.email}
+                    onChange<OPERATOR>=</OPERATOR>{handleChange}
+                    required
+                <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+            <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+
+            <OPERATOR><</OPERATOR>div<OPERATOR>></OPERATOR>
+                <OPERATOR><</OPERATOR>label htmlFor<OPERATOR>=</OPERATOR><STRING>"message"</STRING><OPERATOR>></OPERATOR><TYPE>Message</TYPE><OPERATOR>:</OPERATOR><PUNCTUATION></</PUNCTUATION><TAG>label</TAG><PUNCTUATION>></PUNCTUATION>
+                <OPERATOR><</OPERATOR>textarea
+                    id<OPERATOR>=</OPERATOR><STRING>"message"</STRING>
+                    name<OPERATOR>=</OPERATOR><STRING>"message"</STRING>
+                    value<OPERATOR>=</OPERATOR>{formData.message}
+                    onChange<OPERATOR>=</OPERATOR>{handleChange}
+                    rows<OPERATOR>=</OPERATOR>{<NUMBER>4</NUMBER>}
+                <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+            <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+
+            {errors.submit <OPERATOR>&&</OPERATOR> <PUNCTUATION><</PUNCTUATION><TAG>p</TAG> <ATTRIBUTE>className</ATTRIBUTE><OPERATOR>=</OPERATOR><STRING>"error"</STRING><PUNCTUATION>></PUNCTUATION>{errors.submit}<PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>}
+
+            <OPERATOR><</OPERATOR><TYPE>Button</TYPE> variant<OPERATOR>=</OPERATOR><STRING>"primary"</STRING> disabled<OPERATOR>=</OPERATOR>{isSubmitting}<OPERATOR>></OPERATOR>
+                {isSubmitting <OPERATOR>?</OPERATOR> <STRING>'Submitting...'</STRING> <OPERATOR>:</OPERATOR> <STRING>'Submit'</STRING>}
+            <PUNCTUATION></</PUNCTUATION><TYPE>Button</TYPE><PUNCTUATION>></PUNCTUATION>
+        <PUNCTUATION></</PUNCTUATION><TAG>form</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// Conditional rendering examples</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>ConditionalExamples</FUNCTION>({ show, items }<OPERATOR>:</OPERATOR> { show<OPERATOR>:</OPERATOR> <TYPE>boolean</TYPE>; items<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>[] }) {
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>
+            {<COMMENT>/* Boolean condition */</COMMENT>}
+            {show <OPERATOR>&&</OPERATOR> <PUNCTUATION><</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION><TYPE>Visible</TYPE> when show <KEYWORD>is</KEYWORD> <KEYWORD>true</KEYWORD><PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>}
+
+            {<COMMENT>/* Ternary operator */</COMMENT>}
+            {show <OPERATOR>?</OPERATOR> <PUNCTUATION><</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION><FUNCTION>Yes</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION> <OPERATOR>:</OPERATOR> <PUNCTUATION><</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION><FUNCTION>No</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>span</TAG><PUNCTUATION>></PUNCTUATION>}
+
+            {<COMMENT>/* Null check */</COMMENT>}
+            {items<OPERATOR>?.</OPERATOR>length <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> <OPERATOR>&&</OPERATOR> (
+                <OPERATOR><</OPERATOR>ul<OPERATOR>></OPERATOR>
+                    {items.<FUNCTION>map</FUNCTION>((item) <OPERATOR>=></OPERATOR> (
+                        <OPERATOR><</OPERATOR>li key<OPERATOR>=</OPERATOR>{item}<OPERATOR>></OPERATOR>{item}<PUNCTUATION></</PUNCTUATION><TAG>li</TAG><PUNCTUATION>></PUNCTUATION>
+                    ))}
+                <PUNCTUATION></</PUNCTUATION><TAG>ul</TAG><PUNCTUATION>></PUNCTUATION>
+            )}
+
+            {<COMMENT>/* Empty state */</COMMENT>}
+            {items.length <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER> <OPERATOR>?</OPERATOR> (
+                <OPERATOR><</OPERATOR>p<OPERATOR>></OPERATOR><TYPE>No</TYPE> items <FUNCTION>found</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>
+            ) <OPERATOR>:</OPERATOR> (
+                <OPERATOR><</OPERATOR>p<OPERATOR>></OPERATOR>{items.length} <FUNCTION>items</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>
+            )}
+        <OPERATOR><</OPERATOR><OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+    );
+}
+
+<COMMENT>// Component with inline styles</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>StyledBox</FUNCTION>() {
+    <KEYWORD>const</KEYWORD> style<OPERATOR>:</OPERATOR> <TYPE>React</TYPE>.<TYPE>CSSProperties</TYPE> <OPERATOR>=</OPERATOR> {
+        backgroundColor<OPERATOR>:</OPERATOR> <STRING>'#f0f0f0'</STRING>,
+        padding<OPERATOR>:</OPERATOR> <STRING>'20px'</STRING>,
+        borderRadius<OPERATOR>:</OPERATOR> <STRING>'8px'</STRING>,
+        boxShadow<OPERATOR>:</OPERATOR> <STRING>'0 2px 4px rgba(0, 0, 0, 0.1)'</STRING>,
+    };
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>div style<OPERATOR>=</OPERATOR>{style}<OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>p style<OPERATOR>=</OPERATOR>{{ color<OPERATOR>:</OPERATOR> <STRING>'blue'</STRING>, fontWeight<OPERATOR>:</OPERATOR> <STRING>'bold'</STRING> }}<OPERATOR>></OPERATOR>
+                <TYPE>Styled</TYPE> content
+            <PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>
+        <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// Event handling examples</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>EventExamples</FUNCTION>() {
+    <KEYWORD>const</KEYWORD> handleClick <OPERATOR>=</OPERATOR> (e<OPERATOR>:</OPERATOR> <FUNCTION>MouseEvent</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLButtonElement</TYPE><OPERATOR>></OPERATOR>) <OPERATOR>=></OPERATOR> {
+        e.<FUNCTION>preventDefault</FUNCTION>();
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Button clicked'</STRING>);
+    };
+
+    <KEYWORD>const</KEYWORD> handleKeyDown <OPERATOR>=</OPERATOR> (e<OPERATOR>:</OPERATOR> <TYPE>React</TYPE>.<FUNCTION>KeyboardEvent</FUNCTION><OPERATOR><</OPERATOR><TYPE>HTMLInputElement</TYPE><OPERATOR>></OPERATOR>) <OPERATOR>=></OPERATOR> {
+        <KEYWORD>if</KEYWORD> (e.key <OPERATOR>===</OPERATOR> <STRING>'Enter'</STRING>) {
+            <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Enter pressed'</STRING>);
+        }
+    };
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR>div<OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>button onClick<OPERATOR>=</OPERATOR>{handleClick}<OPERATOR>></OPERATOR><TYPE>Click</TYPE> <FUNCTION>me</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>button</TAG><PUNCTUATION>></PUNCTUATION>
+            <OPERATOR><</OPERATOR>button onClick<OPERATOR>=</OPERATOR>{() <OPERATOR>=></OPERATOR> <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Inline handler'</STRING>)}<OPERATOR>></OPERATOR>
+                <TYPE>Inline</TYPE>
+            <PUNCTUATION></</PUNCTUATION><TAG>button</TAG><PUNCTUATION>></PUNCTUATION>
+            <OPERATOR><</OPERATOR>input onKeyDown<OPERATOR>=</OPERATOR>{handleKeyDown} <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+        <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// Main App component</COMMENT>
+<KEYWORD>export</KEYWORD> <KEYWORD>default</KEYWORD> <KEYWORD>function</KEYWORD> <FUNCTION>App</FUNCTION>() {
+    <KEYWORD>const</KEYWORD> [theme, setTheme] <OPERATOR>=</OPERATOR> <FUNCTION>useState</FUNCTION><OPERATOR><</OPERATOR><STRING>'light'</STRING> <OPERATOR>|</OPERATOR> <STRING>'dark'</STRING><OPERATOR>></OPERATOR>(<STRING>'light'</STRING>);
+
+    <KEYWORD>const</KEYWORD> toggleTheme <OPERATOR>=</OPERATOR> <FUNCTION>useCallback</FUNCTION>(() <OPERATOR>=></OPERATOR> {
+        <FUNCTION>setTheme</FUNCTION>((prev) <OPERATOR>=></OPERATOR> (prev <OPERATOR>===</OPERATOR> <STRING>'light'</STRING> <OPERATOR>?</OPERATOR> <STRING>'dark'</STRING> <OPERATOR>:</OPERATOR> <STRING>'light'</STRING>));
+    }, []);
+
+    <KEYWORD>const</KEYWORD> themeValue <OPERATOR>=</OPERATOR> <FUNCTION>useMemo</FUNCTION>(
+        () <OPERATOR>=></OPERATOR> ({ theme, toggleTheme }),
+        [theme, toggleTheme]
+    );
+
+    <KEYWORD>return</KEYWORD> (
+        <OPERATOR><</OPERATOR><TYPE>ThemeContext</TYPE>.<TYPE>Provider</TYPE> value<OPERATOR>=</OPERATOR>{themeValue}<OPERATOR>></OPERATOR>
+            <OPERATOR><</OPERATOR>div className<OPERATOR>=</OPERATOR>{<STRING>`app theme-${theme}`</STRING>}<OPERATOR>></OPERATOR>
+                <OPERATOR><</OPERATOR>header<OPERATOR>></OPERATOR>
+                    <OPERATOR><</OPERATOR>h1<OPERATOR>></OPERATOR><TYPE>React</TYPE> <CONSTANT>TSX</CONSTANT> <FUNCTION>Example</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>h1</TAG><PUNCTUATION>></PUNCTUATION>
+                    <OPERATOR><</OPERATOR><TYPE>Button</TYPE> onClick<OPERATOR>=</OPERATOR>{toggleTheme}<OPERATOR>></OPERATOR>
+                        <TYPE>Toggle</TYPE> <FUNCTION>Theme</FUNCTION> ({theme})
+                    <PUNCTUATION></</PUNCTUATION><TYPE>Button</TYPE><PUNCTUATION>></PUNCTUATION>
+                <PUNCTUATION></</PUNCTUATION><TAG>header</TAG><PUNCTUATION>></PUNCTUATION>
+
+                <OPERATOR><</OPERATOR>main<OPERATOR>></OPERATOR>
+                    <OPERATOR><</OPERATOR>section<OPERATOR>></OPERATOR>
+                        <OPERATOR><</OPERATOR>h2<OPERATOR>></OPERATOR><FUNCTION>Counter</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>h2</TAG><PUNCTUATION>></PUNCTUATION>
+                        <OPERATOR><</OPERATOR><TYPE>Counter</TYPE> initial<OPERATOR>=</OPERATOR>{<NUMBER>10</NUMBER>} <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+                    <PUNCTUATION></</PUNCTUATION><TAG>section</TAG><PUNCTUATION>></PUNCTUATION>
+
+                    <OPERATOR><</OPERATOR>section<OPERATOR>></OPERATOR>
+                        <OPERATOR><</OPERATOR>h2<OPERATOR>></OPERATOR><FUNCTION>Form</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>h2</TAG><PUNCTUATION>></PUNCTUATION>
+                        <OPERATOR><</OPERATOR><TYPE>ContactForm</TYPE> <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+                    <PUNCTUATION></</PUNCTUATION><TAG>section</TAG><PUNCTUATION>></PUNCTUATION>
+
+                    <OPERATOR><</OPERATOR>section<OPERATOR>></OPERATOR>
+                        <OPERATOR><</OPERATOR>h2<OPERATOR>></OPERATOR><TYPE>Lazy</TYPE> <FUNCTION>Component</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>h2</TAG><PUNCTUATION>></PUNCTUATION>
+                        <OPERATOR><</OPERATOR><TYPE>Suspense</TYPE> fallback<OPERATOR>=</OPERATOR>{<PUNCTUATION><</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION><TYPE>Loading</TYPE><OPERATOR>...</OPERATOR><PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>}<OPERATOR>></OPERATOR>
+                            <OPERATOR><</OPERATOR><TYPE>LazyComponent</TYPE> <OPERATOR>/</OPERATOR><OPERATOR>></OPERATOR>
+                        <PUNCTUATION></</PUNCTUATION><TYPE>Suspense</TYPE><PUNCTUATION>></PUNCTUATION>
+                    <PUNCTUATION></</PUNCTUATION><TAG>section</TAG><PUNCTUATION>></PUNCTUATION>
+                <PUNCTUATION></</PUNCTUATION><TAG>main</TAG><PUNCTUATION>></PUNCTUATION>
+
+                <OPERATOR><</OPERATOR>footer<OPERATOR>></OPERATOR>
+                    <OPERATOR><</OPERATOR>p<OPERATOR>></OPERATOR><OPERATOR>&</OPERATOR>copy; <NUMBER>2024</NUMBER> <TYPE>Example</TYPE> <FUNCTION>App</FUNCTION><PUNCTUATION></</PUNCTUATION><TAG>p</TAG><PUNCTUATION>></PUNCTUATION>
+                <PUNCTUATION></</PUNCTUATION><TAG>footer</TAG><PUNCTUATION>></PUNCTUATION>
+            <PUNCTUATION></</PUNCTUATION><TAG>div</TAG><PUNCTUATION>></PUNCTUATION>
+        <PUNCTUATION></</PUNCTUATION><TYPE>ThemeContext.Provider</TYPE><PUNCTUATION>></PUNCTUATION>
+    );
+}
+
+<COMMENT>// Named exports</COMMENT>
+<KEYWORD>export</KEYWORD> { <TYPE>Button</TYPE>, <TYPE>Counter</TYPE>, <TYPE>ThemeContext</TYPE>, useTheme };
+<KEYWORD>export</KEYWORD> <KEYWORD>type</KEYWORD> { <TYPE>Props</TYPE>, <TYPE>User</TYPE>, <TYPE>ButtonVariant</TYPE> };

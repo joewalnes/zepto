@@ -1,0 +1,293 @@
+# Expected syntax highlighting for typescript_complete.ts
+# Generated from TypeScript grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+#<OPERATOR>!</OPERATOR><REGEX>/usr/</REGEX>bin<OPERATOR>/</OPERATOR>env ts<OPERATOR>-</OPERATOR>node
+<COMMENT>/**</COMMENT>
+<COMMENT> * Complete TypeScript example demonstrating various syntax elements</COMMENT>
+<COMMENT> * @module example</COMMENT>
+<COMMENT> */</COMMENT>
+
+<COMMENT>// Imports</COMMENT>
+<KEYWORD>import</KEYWORD> { readFile, writeFile } from <STRING>'fs/promises'</STRING>;
+<KEYWORD>import</KEYWORD> <KEYWORD>type</KEYWORD> { <TYPE>Config</TYPE>, <TYPE>Handler</TYPE> } from <STRING>'./types'</STRING>;
+<KEYWORD>import</KEYWORD> defaultExport, { namedExport } from <STRING>'./module'</STRING>;
+
+<COMMENT>// Re-exports</COMMENT>
+<KEYWORD>export</KEYWORD> { readFile } from <STRING>'fs/promises'</STRING>;
+<KEYWORD>export</KEYWORD> <OPERATOR>*</OPERATOR> from <STRING>'./utils'</STRING>;
+<KEYWORD>export</KEYWORD> <KEYWORD>type</KEYWORD> { <TYPE>Config</TYPE> };
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> <CONSTANT>MAX_VALUE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>PI</CONSTANT><OPERATOR>:</OPERATOR> <TYPE>number</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>;
+<KEYWORD>const</KEYWORD> <CONSTANT>GREETING</CONSTANT><OPERATOR>:</OPERATOR> <TYPE>string</TYPE> <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+
+<COMMENT>// Type aliases</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>ID</TYPE> <OPERATOR>=</OPERATOR> <TYPE>string</TYPE> <OPERATOR>|</OPERATOR> <TYPE>number</TYPE>;
+<KEYWORD>type</KEYWORD> <TYPE>Nullable</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>T</TYPE> <OPERATOR>|</OPERATOR> <TYPE>null</TYPE>;
+<KEYWORD>type</KEYWORD> <TYPE>ReadOnly</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> { <KEYWORD>readonly</KEYWORD> [<TYPE>K</TYPE> <KEYWORD>in</KEYWORD> <KEYWORD>keyof</KEYWORD> <TYPE>T</TYPE>]<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[<TYPE>K</TYPE>] };
+
+<COMMENT>// Interfaces</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>User</TYPE> {
+    id<OPERATOR>:</OPERATOR> <CONSTANT>ID</CONSTANT>;
+    name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    email<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    <KEYWORD>readonly</KEYWORD> createdAt<OPERATOR>:</OPERATOR> <TYPE>Date</TYPE>;
+}
+
+<KEYWORD>interface</KEYWORD> <TYPE>ApiResponse</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> {
+    data<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>;
+    status<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>;
+    message<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+}
+
+<COMMENT>// Extending interfaces</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Admin</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>User</TYPE> {
+    permissions<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>[];
+}
+
+<COMMENT>// Enums</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE> {
+    <TYPE>Pending</TYPE> <OPERATOR>=</OPERATOR> <STRING>'PENDING'</STRING>,
+    <TYPE>Active</TYPE> <OPERATOR>=</OPERATOR> <STRING>'ACTIVE'</STRING>,
+    <TYPE>Completed</TYPE> <OPERATOR>=</OPERATOR> <STRING>'COMPLETED'</STRING>,
+}
+
+<KEYWORD>const</KEYWORD> <KEYWORD>enum</KEYWORD> <TYPE>Direction</TYPE> {
+    <TYPE>Up</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>,
+    <TYPE>Down</TYPE>,
+    <TYPE>Left</TYPE>,
+    <TYPE>Right</TYPE>,
+}
+
+<COMMENT>// Classes</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Person</TYPE> <KEYWORD>implements</KEYWORD> <TYPE>User</TYPE> {
+    <KEYWORD>readonly</KEYWORD> id<OPERATOR>:</OPERATOR> <CONSTANT>ID</CONSTANT>;
+    name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    email<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    <KEYWORD>readonly</KEYWORD> createdAt<OPERATOR>:</OPERATOR> <TYPE>Date</TYPE>;
+
+    <KEYWORD>private</KEYWORD> _age<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+    <KEYWORD>protected</KEYWORD> address<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+    <KEYWORD>static</KEYWORD> count<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
+
+    <FUNCTION>constructor</FUNCTION>(id<OPERATOR>:</OPERATOR> <CONSTANT>ID</CONSTANT>, name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>) {
+        <KEYWORD>this</KEYWORD>.id <OPERATOR>=</OPERATOR> id;
+        <KEYWORD>this</KEYWORD>.name <OPERATOR>=</OPERATOR> name;
+        <KEYWORD>this</KEYWORD>.createdAt <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>Date</TYPE>();
+        <TYPE>Person</TYPE>.count<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>;
+    }
+
+    get <FUNCTION>age</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> {
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>._age;
+    }
+
+    set <FUNCTION>age</FUNCTION>(value<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>) {
+        <KEYWORD>if</KEYWORD> (value <OPERATOR>>=</OPERATOR> <NUMBER>0</NUMBER>) {
+            <KEYWORD>this</KEYWORD>._age <OPERATOR>=</OPERATOR> value;
+        }
+    }
+
+    <FUNCTION>greet</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> {
+        <KEYWORD>return</KEYWORD> <STRING>`Hello, I'm ${this.name}`</STRING>;
+    }
+
+    <KEYWORD>static</KEYWORD> <FUNCTION>create</FUNCTION>(name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>Person</TYPE> {
+        <KEYWORD>return</KEYWORD> <KEYWORD>new</KEYWORD> <FUNCTION>Person</FUNCTION>(<TYPE>Date</TYPE>.<FUNCTION>now</FUNCTION>().<FUNCTION>toString</FUNCTION>(), name);
+    }
+}
+
+<COMMENT>// Abstract class</COMMENT>
+<KEYWORD>abstract</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Animal</TYPE> {
+    <KEYWORD>abstract</KEYWORD> <FUNCTION>makeSound</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+
+    <FUNCTION>move</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>void</TYPE> {
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Moving...'</STRING>);
+    }
+}
+
+<KEYWORD>class</KEYWORD> <TYPE>Dog</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>Animal</TYPE> {
+    <FUNCTION>makeSound</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> {
+        <KEYWORD>return</KEYWORD> <STRING>'Woof!'</STRING>;
+    }
+}
+
+<COMMENT>// Generic class</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Stack</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> {
+    <KEYWORD>private</KEYWORD> items<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[] <OPERATOR>=</OPERATOR> [];
+
+    <FUNCTION>push</FUNCTION>(item<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>void</TYPE> {
+        <KEYWORD>this</KEYWORD>.items.<FUNCTION>push</FUNCTION>(item);
+    }
+
+    <FUNCTION>pop</FUNCTION>()<OPERATOR>:</OPERATOR> <TYPE>T</TYPE> <OPERATOR>|</OPERATOR> <TYPE>undefined</TYPE> {
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>.items.<FUNCTION>pop</FUNCTION>();
+    }
+}
+
+<COMMENT>// Functions</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>greet</FUNCTION>(name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> {
+    <KEYWORD>return</KEYWORD> <STRING>`Hello, ${name}!`</STRING>;
+}
+
+<COMMENT>// Function with optional and default parameters</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>createUser</FUNCTION>(
+    name<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>,
+    age<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>number</TYPE>,
+    status<OPERATOR>:</OPERATOR> <TYPE>Status</TYPE> <OPERATOR>=</OPERATOR> <TYPE>Status</TYPE>.<TYPE>Pending</TYPE>
+)<OPERATOR>:</OPERATOR> <TYPE>User</TYPE> {
+    <KEYWORD>return</KEYWORD> {
+        id<OPERATOR>:</OPERATOR> <TYPE>Date</TYPE>.<FUNCTION>now</FUNCTION>().<FUNCTION>toString</FUNCTION>(),
+        name,
+        createdAt<OPERATOR>:</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>Date</TYPE>(),
+    };
+}
+
+<COMMENT>// Generic function</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>identity</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR>(arg<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>T</TYPE> {
+    <KEYWORD>return</KEYWORD> arg;
+}
+
+<COMMENT>// Function with constraints</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>getProperty</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>K</TYPE> <KEYWORD>extends</KEYWORD> <KEYWORD>keyof</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR>(obj<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>, key<OPERATOR>:</OPERATOR> <TYPE>K</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[<TYPE>K</TYPE>] {
+    <KEYWORD>return</KEYWORD> obj[key];
+}
+
+<COMMENT>// Arrow functions</COMMENT>
+<KEYWORD>const</KEYWORD> add <OPERATOR>=</OPERATOR> (a<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>, b<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> <OPERATOR>=></OPERATOR> a <OPERATOR>+</OPERATOR> b;
+<KEYWORD>const</KEYWORD> square <OPERATOR>=</OPERATOR> (x<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>) <OPERATOR>=></OPERATOR> x <OPERATOR>*</OPERATOR> x;
+
+<COMMENT>// Async functions</COMMENT>
+<KEYWORD>async</KEYWORD> <KEYWORD>function</KEYWORD> <FUNCTION>fetchData</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR>(url<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>Promise</TYPE><OPERATOR><</OPERATOR><FUNCTION>ApiResponse</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>>></OPERATOR> {
+    <KEYWORD>const</KEYWORD> response <OPERATOR>=</OPERATOR> <KEYWORD>await</KEYWORD> <FUNCTION>fetch</FUNCTION>(url);
+    <KEYWORD>const</KEYWORD> data <OPERATOR>=</OPERATOR> <KEYWORD>await</KEYWORD> response.<FUNCTION>json</FUNCTION>();
+    <KEYWORD>return</KEYWORD> { data, status<OPERATOR>:</OPERATOR> response.status, message<OPERATOR>:</OPERATOR> <STRING>'OK'</STRING> };
+}
+
+<COMMENT>// Function overloads</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>process</FUNCTION>(x<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>;
+<KEYWORD>function</KEYWORD> <FUNCTION>process</FUNCTION>(x<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>;
+<KEYWORD>function</KEYWORD> <FUNCTION>process</FUNCTION>(x<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> <OPERATOR>|</OPERATOR> <TYPE>number</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>string</TYPE> <OPERATOR>|</OPERATOR> <TYPE>number</TYPE> {
+    <KEYWORD>if</KEYWORD> (<KEYWORD>typeof</KEYWORD> x <OPERATOR>===</OPERATOR> <STRING>'string'</STRING>) {
+        <KEYWORD>return</KEYWORD> x.<FUNCTION>toUpperCase</FUNCTION>();
+    }
+    <KEYWORD>return</KEYWORD> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
+}
+
+<COMMENT>// Decorators (requires experimentalDecorators)</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>logged</FUNCTION>(target<OPERATOR>:</OPERATOR> <TYPE>any</TYPE>, key<OPERATOR>:</OPERATOR> <TYPE>string</TYPE>, descriptor<OPERATOR>:</OPERATOR> <TYPE>PropertyDescriptor</TYPE>) {
+    <KEYWORD>const</KEYWORD> original <OPERATOR>=</OPERATOR> descriptor.value;
+    descriptor.value <OPERATOR>=</OPERATOR> <KEYWORD>function</KEYWORD> (<OPERATOR>...</OPERATOR>args<OPERATOR>:</OPERATOR> <TYPE>any</TYPE>[]) {
+        <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>`Calling ${key} with`</STRING>, args);
+        <KEYWORD>return</KEYWORD> original.<FUNCTION>apply</FUNCTION>(<KEYWORD>this</KEYWORD>, args);
+    };
+    <KEYWORD>return</KEYWORD> descriptor;
+}
+
+<KEYWORD>class</KEYWORD> <TYPE>Calculator</TYPE> {
+    <ATTRIBUTE>@logged</ATTRIBUTE>
+    <FUNCTION>add</FUNCTION>(a<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>, b<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> {
+        <KEYWORD>return</KEYWORD> a <OPERATOR>+</OPERATOR> b;
+    }
+}
+
+<COMMENT>// Type guards</COMMENT>
+<KEYWORD>function</KEYWORD> <FUNCTION>isString</FUNCTION>(value<OPERATOR>:</OPERATOR> <KEYWORD>unknown</KEYWORD>)<OPERATOR>:</OPERATOR> value <KEYWORD>is</KEYWORD> <TYPE>string</TYPE> {
+    <KEYWORD>return</KEYWORD> <KEYWORD>typeof</KEYWORD> value <OPERATOR>===</OPERATOR> <STRING>'string'</STRING>;
+}
+
+<KEYWORD>function</KEYWORD> <FUNCTION>isUser</FUNCTION>(obj<OPERATOR>:</OPERATOR> <TYPE>any</TYPE>)<OPERATOR>:</OPERATOR> obj <KEYWORD>is</KEYWORD> <TYPE>User</TYPE> {
+    <KEYWORD>return</KEYWORD> obj <OPERATOR>&&</OPERATOR> <KEYWORD>typeof</KEYWORD> obj.name <OPERATOR>===</OPERATOR> <STRING>'string'</STRING> <OPERATOR>&&</OPERATOR> <STRING>'id'</STRING> <KEYWORD>in</KEYWORD> obj;
+}
+
+<COMMENT>// Discriminated unions</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Circle</TYPE> {
+    kind<OPERATOR>:</OPERATOR> <STRING>'circle'</STRING>;
+    radius<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>;
+}
+
+<KEYWORD>interface</KEYWORD> <TYPE>Rectangle</TYPE> {
+    kind<OPERATOR>:</OPERATOR> <STRING>'rectangle'</STRING>;
+    width<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>;
+    height<OPERATOR>:</OPERATOR> <TYPE>number</TYPE>;
+}
+
+<KEYWORD>type</KEYWORD> <TYPE>Shape</TYPE> <OPERATOR>=</OPERATOR> <TYPE>Circle</TYPE> <OPERATOR>|</OPERATOR> <TYPE>Rectangle</TYPE>;
+
+<KEYWORD>function</KEYWORD> <FUNCTION>getArea</FUNCTION>(shape<OPERATOR>:</OPERATOR> <TYPE>Shape</TYPE>)<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> {
+    <KEYWORD>switch</KEYWORD> (shape.kind) {
+        <KEYWORD>case</KEYWORD> <STRING>'circle'</STRING><OPERATOR>:</OPERATOR>
+            <KEYWORD>return</KEYWORD> <TYPE>Math</TYPE>.<CONSTANT>PI</CONSTANT> <OPERATOR>*</OPERATOR> shape.radius <OPERATOR>**</OPERATOR> <NUMBER>2</NUMBER>;
+        <KEYWORD>case</KEYWORD> <STRING>'rectangle'</STRING><OPERATOR>:</OPERATOR>
+            <KEYWORD>return</KEYWORD> shape.width <OPERATOR>*</OPERATOR> shape.height;
+    }
+}
+
+<COMMENT>// Mapped types</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>Partial</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> { [<TYPE>P</TYPE> <KEYWORD>in</KEYWORD> <KEYWORD>keyof</KEYWORD> <TYPE>T</TYPE>]<OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[<TYPE>P</TYPE>] };
+<KEYWORD>type</KEYWORD> <TYPE>Required</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> { [<TYPE>P</TYPE> <KEYWORD>in</KEYWORD> <KEYWORD>keyof</KEYWORD> <TYPE>T</TYPE>]<OPERATOR>-</OPERATOR><OPERATOR>?</OPERATOR><OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[<TYPE>P</TYPE>] };
+<KEYWORD>type</KEYWORD> <TYPE>Pick</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>K</TYPE> <KEYWORD>extends</KEYWORD> <KEYWORD>keyof</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> { [<TYPE>P</TYPE> <KEYWORD>in</KEYWORD> <TYPE>K</TYPE>]<OPERATOR>:</OPERATOR> <TYPE>T</TYPE>[<TYPE>P</TYPE>] };
+
+<COMMENT>// Conditional types</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>NonNullable</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>null</TYPE> <OPERATOR>|</OPERATOR> <TYPE>undefined</TYPE> <OPERATOR>?</OPERATOR> <KEYWORD>never</KEYWORD> <OPERATOR>:</OPERATOR> <TYPE>T</TYPE>;
+<KEYWORD>type</KEYWORD> <TYPE>ReturnType</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> (<OPERATOR>...</OPERATOR>args<OPERATOR>:</OPERATOR> <TYPE>any</TYPE>) <OPERATOR>=></OPERATOR> <TYPE>any</TYPE><OPERATOR>></OPERATOR> <OPERATOR>=</OPERATOR> <TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> (<OPERATOR>...</OPERATOR>args<OPERATOR>:</OPERATOR> <TYPE>any</TYPE>) <OPERATOR>=></OPERATOR> <KEYWORD>infer</KEYWORD> <TYPE>R</TYPE> <OPERATOR>?</OPERATOR> <TYPE>R</TYPE> <OPERATOR>:</OPERATOR> <TYPE>any</TYPE>;
+
+<COMMENT>// Template literal types</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>EventName</TYPE> <OPERATOR>=</OPERATOR> <STRING>`on${Capitalize<string>}`</STRING>;
+<KEYWORD>type</KEYWORD> <TYPE>CSSValue</TYPE> <OPERATOR>=</OPERATOR> <STRING>`${number}px`</STRING> <OPERATOR>|</OPERATOR> <STRING>`${number}em`</STRING> <OPERATOR>|</OPERATOR> <STRING>`${number}%`</STRING>;
+
+<COMMENT>// Utility types</COMMENT>
+<KEYWORD>type</KEYWORD> <TYPE>UserKeys</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>keyof</KEYWORD> <TYPE>User</TYPE>;
+<KEYWORD>type</KEYWORD> <TYPE>UserValues</TYPE> <OPERATOR>=</OPERATOR> <TYPE>User</TYPE>[<KEYWORD>keyof</KEYWORD> <TYPE>User</TYPE>];
+
+<COMMENT>// As const</COMMENT>
+<KEYWORD>const</KEYWORD> config <OPERATOR>=</OPERATOR> {
+    host<OPERATOR>:</OPERATOR> <STRING>'localhost'</STRING>,
+    port<OPERATOR>:</OPERATOR> <NUMBER>8080</NUMBER>,
+} <KEYWORD>as</KEYWORD> <KEYWORD>const</KEYWORD>;
+
+<COMMENT>// Satisfies operator (TS 4.9+)</COMMENT>
+<KEYWORD>const</KEYWORD> palette <OPERATOR>=</OPERATOR> {
+    red<OPERATOR>:</OPERATOR> [<NUMBER>255</NUMBER>, <NUMBER>0</NUMBER>, <NUMBER>0</NUMBER>],
+    green<OPERATOR>:</OPERATOR> <STRING>'#00ff00'</STRING>,
+} <KEYWORD>satisfies</KEYWORD> <TYPE>Record</TYPE><OPERATOR><</OPERATOR><TYPE>string</TYPE>, <TYPE>string</TYPE> <OPERATOR>|</OPERATOR> <TYPE>number</TYPE>[]<OPERATOR>></OPERATOR>;
+
+<COMMENT>// Control flow</COMMENT>
+<KEYWORD>const</KEYWORD> count<OPERATOR>:</OPERATOR> <TYPE>number</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+
+<KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Positive'</STRING>);
+} <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR>===</OPERATOR> <NUMBER>0</NUMBER>) {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Zero'</STRING>);
+} <KEYWORD>else</KEYWORD> {
+    <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Negative'</STRING>);
+}
+
+<COMMENT>// Nullish coalescing and optional chaining</COMMENT>
+<KEYWORD>const</KEYWORD> user<OPERATOR>:</OPERATOR> <TYPE>User</TYPE> <OPERATOR>|</OPERATOR> <TYPE>null</TYPE> <OPERATOR>=</OPERATOR> <TYPE>null</TYPE>;
+<KEYWORD>const</KEYWORD> name <OPERATOR>=</OPERATOR> user<OPERATOR>?.</OPERATOR>name <OPERATOR>??</OPERATOR> <STRING>'Anonymous'</STRING>;
+
+<COMMENT>// Type assertions</COMMENT>
+<KEYWORD>const</KEYWORD> element <OPERATOR>=</OPERATOR> <TYPE>document</TYPE>.<FUNCTION>getElementById</FUNCTION>(<STRING>'app'</STRING>) <KEYWORD>as</KEYWORD> <TYPE>HTMLDivElement</TYPE>;
+<KEYWORD>const</KEYWORD> value <OPERATOR>=</OPERATOR> <PUNCTUATION><</PUNCTUATION><TAG>string</TAG><PUNCTUATION>></PUNCTUATION>someValue;
+
+<COMMENT>// Non-null assertion</COMMENT>
+<KEYWORD>const</KEYWORD> definitelyString <OPERATOR>=</OPERATOR> possiblyNull<OPERATOR>!</OPERATOR>;
+
+<COMMENT>// Numbers</COMMENT>
+<KEYWORD>const</KEYWORD> integer <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+<KEYWORD>const</KEYWORD> float <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>;
+<KEYWORD>const</KEYWORD> hex <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>;
+<KEYWORD>const</KEYWORD> octal <OPERATOR>=</OPERATOR> <NUMBER>0o755</NUMBER>;
+<KEYWORD>const</KEYWORD> binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>;
+<KEYWORD>const</KEYWORD> bigInt <OPERATOR>=</OPERATOR> <NUMBER>9007199254740991n</NUMBER>;
+
+<COMMENT>// Template strings</COMMENT>
+<KEYWORD>const</KEYWORD> message <OPERATOR>=</OPERATOR> <STRING>`Hello, ${name}! Count is ${count}`</STRING>;
+
+<COMMENT>// Regex</COMMENT>
+<KEYWORD>const</KEYWORD> pattern<OPERATOR>:</OPERATOR> <TYPE>RegExp</TYPE> <OPERATOR>=</OPERATOR> <REGEX>/^[a-z]+$/gi</REGEX>;
+
+<KEYWORD>export</KEYWORD> { <TYPE>Person</TYPE>, <TYPE>Status</TYPE>, greet };
+<KEYWORD>export</KEYWORD> <KEYWORD>default</KEYWORD> <TYPE>Calculator</TYPE>;

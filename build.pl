@@ -2,24 +2,65 @@
 # Build script: assembles single-file zepto from modules
 use strict;
 use warnings;
+use File::Find;
 
-# Order matters for dependencies
-my @modules = qw(
-    lib/Zepto/Buffer.pm
-    lib/Zepto/Document.pm
-    lib/Zepto/View.pm
-    lib/Zepto/InputParser.pm
-    lib/Zepto/Theme.pm
-    lib/Zepto/Preferences.pm
-    lib/Zepto/Terminal.pm
-    lib/Zepto/Config.pm
-    lib/Zepto/FilePicker.pm
-    lib/Zepto/Chars.pm
-    lib/Zepto/Renderer.pm
-    lib/Zepto/Editor.pm
-    lib/Zepto/Editor/Commands.pm
-    lib/Zepto/Editor/Menu.pm
+# Recursively find all .pm files under lib/
+my @all_modules;
+find(sub {
+    return unless /\.pm$/;
+    push @all_modules, $File::Find::name;
+}, 'lib');
+
+# Sort modules by dependency order:
+# 1. Core modules (no subdir) - sorted alphabetically but with specific order
+# 2. Syntax/Base.pm must come before other Syntax modules
+# 3. Syntax/* modules alphabetically
+# 4. Editor.pm before Editor/* submodules
+# 5. Highlighter and Renderer after Syntax modules
+# 6. Everything else
+
+my %priority = (
+    # Core modules first (lower number = higher priority)
+    'lib/Zepto/Buffer.pm'      => 10,
+    'lib/Zepto/Document.pm'    => 11,
+    'lib/Zepto/View.pm'        => 12,
+    'lib/Zepto/InputParser.pm' => 13,
+    'lib/Zepto/Theme.pm'       => 14,
+    'lib/Zepto/Preferences.pm' => 15,
+    'lib/Zepto/Terminal.pm'    => 16,
+    'lib/Zepto/Config.pm'      => 17,
+    'lib/Zepto/FilePicker.pm'  => 18,
+    'lib/Zepto/Chars.pm'       => 19,
+    # Syntax/Base must come first among Syntax modules
+    'lib/Zepto/Syntax/Base.pm' => 50,
+    # Highlighter needs all Syntax modules loaded
+    'lib/Zepto/Highlighter.pm' => 100,
+    # Renderer needs Highlighter
+    'lib/Zepto/Renderer.pm'    => 110,
+    # Editor needs everything above
+    'lib/Zepto/Editor.pm'      => 120,
 );
+
+sub module_priority {
+    my ($path) = @_;
+
+    # Check explicit priority
+    return $priority{$path} if exists $priority{$path};
+
+    # Syntax modules (except Base) get priority 60
+    return 60 if $path =~ m{lib/Zepto/Syntax/};
+
+    # Editor submodules get priority 130
+    return 130 if $path =~ m{lib/Zepto/Editor/};
+
+    # Everything else gets 200
+    return 200;
+}
+
+my @modules = sort {
+    module_priority($a) <=> module_priority($b)
+    || $a cmp $b  # Alphabetical within same priority
+} @all_modules;
 
 # Header
 print <<'HEADER';
@@ -47,14 +88,21 @@ for my $file (@modules) {
     open my $fh, '<', $file or die "Cannot open $file: $!";
     my $content = do { local $/; <$fh> };
     close $fh;
-    
+
     # Remove shebang if present
     $content =~ s/^#!.*\n//;
-    
-    # Remove 'use Zepto::*' lines (they're all inline now)
-    # Handles both 'use Zepto::Foo;' and 'use Zepto::Foo qw(...);'
-    $content =~ s/^use Zepto::\w+(?:::\w+)*(?:\s+qw\([^)]*\))?;\n//gm;
-    
+
+    # Convert 'use parent' to @ISA (parent pragma tries to load from filesystem)
+    $content =~ s/^use parent\s+'(Zepto::\S+)';\n/our \@ISA = ('$1');\n/gm;
+
+    # Convert Zepto::Syntax::Base import to explicit import call (for Exporter constants)
+    # This must happen before removing other use statements
+    $content =~ s/^use Zepto::Syntax::Base;[^\n]*\n/BEGIN { Zepto::Syntax::Base->import(); }\n/gm;
+
+    # Remove other 'use Zepto::*' lines (they're all inline now)
+    # Handles 'use Zepto::Foo;', 'use Zepto::Foo qw(...);', and lines with trailing comments
+    $content =~ s/^use Zepto::\w+(?:::\w+)*(?:\s+qw\([^)]*\))?;[^\n]*\n//gm;
+
     # Remove __END__ and POD (keep it compact)
     $content =~ s/\n__END__.*//s;
 
@@ -67,7 +115,13 @@ for my $file (@modules) {
     print "# " . "=" x 77 . "\n";
     print "# $pkg\n";
     print "# " . "=" x 77 . "\n";
+
+    # Wrap content in a block to create separate lexical scope for each module.
+    # This prevents "my variable $X masks earlier declaration" warnings when
+    # modules like Syntax::Perl and Syntax::Python both declare my $KEYWORDS.
+    print "{\n";
     print $content;
+    print "}\n";
     print "\n";
 }
 

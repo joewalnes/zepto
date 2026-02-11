@@ -30,7 +30,9 @@ clean:
 # Build single-file distribution (to be implemented)
 build: zepto
 
-zepto: lib/Zepto/*.pm
+MODULES := $(shell find lib -name '*.pm')
+
+zepto: $(MODULES)
 	@echo "Building single-file zepto..."
 	@perl build.pl > zepto
 	@chmod +x zepto
@@ -44,7 +46,7 @@ install: zepto
 
 # Check Perl syntax of all modules
 check:
-	@for f in lib/Zepto/*.pm; do perl -c -Ilib $$f || exit 1; done
+	@for f in $$(find lib -name '*.pm'); do perl -c -Ilib $$f || exit 1; done
 	@echo "All modules OK"
 
 # Count lines of code

@@ -93,8 +93,8 @@ sub dark_theme {
         # Cursor line (subtle highlight)
         cursor_line_bg => bg_rgb(41, 46, 66),
 
-        # Cursor column (subtle vertical highlight for crosshair effect)
-        cursor_col_bg => bg_rgb(35, 39, 55),
+        # Cursor column (vertical highlight for crosshair effect)
+        cursor_col_bg => bg_rgb(45, 50, 70),
 
         # Empty lines (beyond end of file)
         empty_line_bg => bg_rgb(20, 21, 30),
@@ -161,6 +161,24 @@ sub dark_theme {
         ruler_cursor_fg   => fg_rgb(255, 255, 255),
         ruler_cursor_bg   => bg_rgb(52, 79, 138),  # Matches active pill
         ruler_cursor_edge => fg_rgb(52, 79, 138),
+
+        # Syntax highlighting (Tokyo Night inspired)
+        # Comments are prominent - they're documentation, not noise!
+        syntax_keyword     => fg_rgb(187, 154, 247),  # Purple - control flow
+        syntax_string      => fg_rgb(158, 206, 106),  # Green - string literals
+        syntax_comment     => fg_rgb(150, 175, 200),  # Bold blue-gray - PROMINENT comments
+        syntax_number      => fg_rgb(255, 158, 100),  # Orange - numeric literals
+        syntax_function    => fg_rgb(125, 207, 255),  # Cyan - function names
+        syntax_variable    => fg_rgb(224, 175, 104),  # Yellow - variables
+        syntax_type        => fg_rgb(138, 173, 244),  # Light blue - types/classes
+        syntax_operator    => fg_rgb(137, 221, 255),  # Light cyan - operators
+        syntax_regex       => fg_rgb(245, 169, 127),  # Peach - regex
+        syntax_constant    => fg_rgb(255, 158, 100),  # Orange - constants
+        syntax_attribute   => fg_rgb(180, 190, 254),  # Lavender - decorators
+        syntax_tag         => fg_rgb(242, 143, 173),  # Pink - HTML/JSX tags
+        syntax_punctuation => fg_rgb(166, 173, 200),  # Subtle gray - brackets
+        syntax_escape      => fg_rgb(245, 169, 127),  # Peach - escape sequences
+        syntax_heading     => fg_rgb(122, 162, 247),  # Blue - markdown headings
     });
 }
 
@@ -252,6 +270,24 @@ sub light_theme {
         ruler_cursor_fg   => fg_rgb(255, 255, 255),
         ruler_cursor_bg   => bg_rgb(114, 135, 253),  # Matches active pill
         ruler_cursor_edge => fg_rgb(114, 135, 253),
+
+        # Syntax highlighting - high contrast for light backgrounds
+        # Comments are prominent - they're documentation, not noise!
+        syntax_keyword     => fg_rgb(136, 23, 152),   # Deep purple - high contrast
+        syntax_string      => fg_rgb(22, 120, 55),    # Deep green - readable on white
+        syntax_comment     => fg_rgb(70, 90, 120),    # Bold steel blue - PROMINENT
+        syntax_number      => fg_rgb(180, 60, 10),    # Deep orange - high contrast
+        syntax_function    => fg_rgb(10, 80, 190),    # Deep blue - high contrast
+        syntax_variable    => fg_rgb(160, 95, 10),    # Deep amber - high contrast
+        syntax_type        => fg_rgb(170, 75, 70),    # Deep flamingo - high contrast
+        syntax_operator    => fg_rgb(0, 130, 180),    # Deep teal - high contrast
+        syntax_regex       => fg_rgb(180, 60, 10),    # Deep orange - high contrast
+        syntax_constant    => fg_rgb(180, 60, 10),    # Deep orange - high contrast
+        syntax_attribute   => fg_rgb(95, 60, 190),    # Deep lavender - high contrast
+        syntax_tag         => fg_rgb(180, 60, 130),   # Deep pink - high contrast
+        syntax_punctuation => fg_rgb(90, 95, 115),    # Dark gray - readable
+        syntax_escape      => fg_rgb(180, 60, 10),    # Deep orange - high contrast
+        syntax_heading     => fg_rgb(10, 80, 190),    # Deep blue - high contrast
     });
 }
 
