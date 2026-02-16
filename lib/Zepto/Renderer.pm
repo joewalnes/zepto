@@ -224,11 +224,14 @@ sub _move_to {
 
 # Calculate gutter width based on line count
 # Exported so Editor.pm can use same calculation for mouse position mapping
+# Gutter must fit: cursor line badge (round_left + digits + arrow_right = digits + 2)
+# and normal lines (right-aligned digits + space)
 sub get_gutter_width {
     my ($class, $line_count) = @_;
     $line_count //= 1;  # Default if undef
-    my $gutter_width = length("$line_count") + 1;  # +1 for padding
-    $gutter_width = MIN_GUTTER_WIDTH if $gutter_width < MIN_GUTTER_WIDTH;        # Minimum width
+    my $max_digits = length("$line_count");
+    my $gutter_width = $max_digits + 2;  # +2 for badge chars (round_left + arrow_right)
+    $gutter_width = MIN_GUTTER_WIDTH if $gutter_width < MIN_GUTTER_WIDTH;
     return $gutter_width;
 }
 
