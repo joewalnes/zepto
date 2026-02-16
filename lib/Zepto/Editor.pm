@@ -528,7 +528,6 @@ sub handle_ctrl_char {
     elsif ($char eq 'f') { $self->cmd_find(); }
     elsif ($char eq 'j') { $self->cmd_find_next(); }
     elsif ($char eq 'k') { $self->cmd_find_prev(); }
-    elsif ($char eq 'r') { $self->enter_find_mode(); }  # Unified find/replace
     elsif ($char eq 'g') { $self->cmd_goto_line(); }
 
     # View
