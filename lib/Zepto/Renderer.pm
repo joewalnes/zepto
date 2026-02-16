@@ -742,9 +742,11 @@ sub _render_text_area {
                 $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
             } else {
                 # Normal line: standard gutter
+                # Use (gutter_width - 2) for digits + 2 trailing spaces to align with badge
+                # Badge is: [pad][rl][digits][space][ar] - digits end at (gutter_width - 2)
                 $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
-                my $line_num = sprintf("%*d", $gutter_width - 1, $doc_line + 1);
-                $output .= $line_num . ' ';
+                my $line_num = sprintf("%*d", $gutter_width - 2, $doc_line + 1);
+                $output .= $line_num . '  ';
             }
         }
         else {

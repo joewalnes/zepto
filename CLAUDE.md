@@ -102,6 +102,11 @@ utf8::encode($output) if utf8::is_utf8($output);
 - Make minimal changes - don't refactor unrelated code
 - Keep related changes together in logical commits
 
+### Git Commits
+- **NEVER commit until the user explicitly says "commit" or similar**
+- Always wait for user to verify changes work before committing
+- Tests passing is not sufficient - user must confirm
+
 ## Documentation Requirements
 
 ### README.md Feature List
