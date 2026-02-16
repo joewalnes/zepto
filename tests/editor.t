@@ -699,7 +699,7 @@ subtest 'Mouse drag selection' => sub {
     $editor->{document} = Zepto::Document->load($filename);
     $editor->{view} = Zepto::View->new(document => $editor->{document});
 
-    my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
 
     # Simulate press at column 6 (start of "World")
     # Row 3 is the first text line (after menu bar on 1 and ruler bar on 2)
@@ -1225,7 +1225,7 @@ subtest 'Drag without press is ignored' => sub {
     $editor->{document} = Zepto::Document->load($filename);
     $editor->{view} = Zepto::View->new(document => $editor->{document});
 
-    my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
 
     # Ensure mouse button is up
     is($editor->{mouse_button_down}, 0, 'Mouse button initially up');
@@ -1248,7 +1248,7 @@ subtest 'Drag after press creates selection' => sub {
     $editor->{document} = Zepto::Document->load($filename);
     $editor->{view} = Zepto::View->new(document => $editor->{document});
 
-    my $gutter_width = Zepto::Renderer::get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
 
     # Press first
     my $press = { type => 'mouse', action => 'press', x => $gutter_width + 0, y => 2, modifiers => [] };
@@ -1261,6 +1261,56 @@ subtest 'Drag after press creates selection' => sub {
 
     # Should create selection
     ok($editor->{view}->has_selection(), 'Selection created after proper press+drag');
+};
+
+# ============================================================================
+# Mouse click with tabs - cursor should account for tab display width
+# ============================================================================
+subtest 'Mouse click accounts for tab display width' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    # Content: "a\tb" - 'a' at doc col 0, tab at doc col 1, 'b' at doc col 2
+    # With tab width 4: 'a' displays at col 0, tab expands to cols 1-3, 'b' at col 4
+    my $filename = create_temp_file("a\tb\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+
+    # Click at display column 4 (where 'b' visually appears)
+    # Terminal coordinates are 1-indexed, so x = gutter_width + display_col + 1
+    # Row 3 is the first text line (after menu bar on 1 and ruler bar on 2)
+    my $display_col = 4;  # Where 'b' appears visually
+    my $x = $gutter_width + $display_col + 1;
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    $editor->handle_mouse_event($press);
+
+    # Cursor should be at document column 2 (after 'a' and tab), not display column 4
+    is($editor->{view}->cursor_col(), 2, 'Cursor at doc column 2 (after a and tab), not display column 4');
+};
+
+subtest 'Mouse click in middle of tab jumps to tab position' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    # Content: "a\tb" - clicking in the middle of the tab's visual space
+    my $filename = create_temp_file("a\tb\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+
+    # Click at display column 2 (in the middle of the tab's visual space, columns 1-3)
+    my $display_col = 2;
+    my $x = $gutter_width + $display_col + 1;
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    $editor->handle_mouse_event($press);
+
+    # Cursor should be at document column 1 (the tab character position)
+    is($editor->{view}->cursor_col(), 1, 'Clicking in tab space positions cursor at tab character');
 };
 
 done_testing();

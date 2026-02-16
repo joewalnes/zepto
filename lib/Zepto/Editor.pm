@@ -189,7 +189,7 @@ sub init {
     # Create view - account for gutter width in text area
     my ($rows, $cols) = $term->get_size();
     my $line_count = $self->{document}->line_count();
-    my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+    my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
     my $text_width = $cols - $gutter_width;
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
@@ -584,21 +584,22 @@ sub handle_mouse_event {
         # Click in text area
         my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
-        my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
+        my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
+        my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
-        if ($text_col >= 0) {
+        if ($visual_col >= 0) {
             my $doc_line = $view->scroll_line() + $text_row;
-            my $doc_col = $view->scroll_col() + $text_col;
 
-            # Clamp to document bounds
+            # Clamp line to document bounds
             $doc_line = 0 if $doc_line < 0;
             $doc_line = $self->{document}->line_count() - 1
                 if $doc_line >= $self->{document}->line_count();
 
-            my $line_len = $self->{document}->line_length($doc_line);
-            $doc_col = $line_len if $doc_col > $line_len;
-            $doc_col = 0 if $doc_col < 0;
+            # Convert visual column to document column, accounting for tabs
+            # Need to add scroll_col to visual position first
+            my $absolute_visual_col = $view->scroll_col() + $visual_col;
+            my $line_content = $self->{document}->get_line($doc_line) // '';
+            my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
             $view->set_cursor($doc_line, $doc_col, $shift);
         }
@@ -623,19 +624,28 @@ sub handle_mouse_event {
         # Handle drag for selection
         my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
-        my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
-        my $text_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
+        my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
+        my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
-        if ($text_col >= 0 && !$view->has_selection()) {
+        if ($visual_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
             $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
         }
 
         my $doc_line = $view->scroll_line() + $text_row;
-        my $doc_col = $view->scroll_col() + $text_col;
+
+        # Clamp line to document bounds
+        $doc_line = 0 if $doc_line < 0;
+        $doc_line = $self->{document}->line_count() - 1
+            if $doc_line >= $self->{document}->line_count();
+
+        # Convert visual column to document column, accounting for tabs
+        my $absolute_visual_col = $view->scroll_col() + $visual_col;
+        my $line_content = $self->{document}->get_line($doc_line) // '';
+        my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
         # Extend selection
-        $view->set_cursor($doc_line, $doc_col, 1) if $text_col >= 0;
+        $view->set_cursor($doc_line, $doc_col, 1) if $visual_col >= 0;
     }
 }
 
@@ -1970,7 +1980,7 @@ sub render {
 
     # Update view size - account for gutter width
     my $line_count = $self->{document}->line_count();
-    my $gutter_width = Zepto::Renderer::get_gutter_width($line_count);
+    my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
     my $text_width = $cols - $gutter_width;
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 

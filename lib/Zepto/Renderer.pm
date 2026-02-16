@@ -178,6 +178,40 @@ sub _char_to_visual_col {
     return $visual_col;
 }
 
+# Convert a visual/display column to character position in text
+# Returns the character index where the visual column falls
+# If visual_col falls within a tab's expanded space, returns the tab's position
+sub visual_to_char_col {
+    my ($text, $visual_col) = @_;
+    return 0 unless defined $text && length($text) > 0;
+    return 0 if $visual_col <= 0;
+
+    my $current_visual = 0;
+    my $len = length($text);
+
+    for my $i (0 .. $len - 1) {
+        my $char = substr($text, $i, 1);
+        my $char_width;
+
+        if ($char eq "\t") {
+            $char_width = TAB_WIDTH - ($current_visual % TAB_WIDTH);
+        } else {
+            $char_width = 1;
+        }
+
+        # If the target visual column falls within this character's display width,
+        # return this character's position
+        if ($visual_col < $current_visual + $char_width) {
+            return $i;
+        }
+
+        $current_visual += $char_width;
+    }
+
+    # Visual column is beyond end of line, return line length
+    return $len;
+}
+
 # Menu bar buttons on the right side
 our @MENU_BAR_BUTTONS = (
     { label => 'Open', key => '^O', action => 'open', icon => 'folder_open' },
