@@ -1376,8 +1376,9 @@ sub _render_footer_input {
 
     my $prompt = $input->{prompt} // '';
     my $value = $input->{value} // '';
+    my $hint = $input->{hint} // '';
 
-    # Render: " Prompt: [input value          ] "
+    # Render: " Prompt: [input value          ] (hint) "
     my $prompt_str = ' ' . $prompt . ' ';
     $output .= $prompt_str;
 
@@ -1385,10 +1386,11 @@ sub _render_footer_input {
     $output .= $theme->color('dialog_input_bg');
     $output .= $theme->color('dialog_input_fg');
 
-    # Calculate available width for input field
+    # Calculate width for input field (fixed width, not stretched)
     my $prompt_len = length($prompt_str);
-    my $input_width = $cols - $prompt_len - 2;  # -2 for padding
-    $input_width = 10 if $input_width < 10;
+    my $hint_str = $hint ? " ($hint)" : '';
+    my $hint_len = length($hint_str);
+    my $input_width = 12;  # Fixed narrow width for input
 
     # Display value (truncate from left if too long)
     my $display_value = $value;
@@ -1401,9 +1403,15 @@ sub _render_footer_input {
     my $fill = $input_width - length($display_value);
     $output .= ' ' x $fill if $fill > 0;
 
+    # Display hint in dimmed text
+    $output .= $theme->color('status_bg');
+    if ($hint) {
+        $output .= $theme->color('status_dim');
+        $output .= $hint_str;
+    }
+
     # Pad rest of status bar
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
-    my $remaining = $cols - $prompt_len - $input_width;
+    my $remaining = $cols - $prompt_len - $input_width - $hint_len;
     $output .= ' ' x $remaining if $remaining > 0;
 
     $output .= RESET;

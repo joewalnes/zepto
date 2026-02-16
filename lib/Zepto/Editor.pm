@@ -799,6 +799,7 @@ sub open_footer_input {
         prompt    => $opts{prompt} // '',
         value     => $opts{value} // '',
         cursor    => length($opts{value} // ''),
+        hint      => $opts{hint},
         on_submit => $opts{on_submit},
         on_cancel => $opts{on_cancel},
     };

@@ -742,6 +742,147 @@ subtest 'Goto line logic' => sub {
     is($editor->{view}->cursor_line(), 1, 'Cursor on line 2');
 };
 
+subtest 'Goto line uses footer input' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2\nLine 3\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_goto_line();
+
+    is($editor->{state}, 'footer_input', 'Goto line uses footer input, not dialog');
+    ok($editor->{footer_input}, 'Footer input is set');
+    like($editor->{footer_input}{prompt}, qr/Go to/i, 'Prompt mentions go to');
+    ok($editor->{footer_input}{hint}, 'Footer input has hint');
+    like($editor->{footer_input}{hint}, qr/line.*:col/i, 'Hint mentions line:col syntax');
+};
+
+subtest 'Goto line parses line number' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_goto_line();
+    $editor->handle_input('3');
+    $editor->handle_input("\r");  # Enter
+
+    is($editor->{view}->cursor_line(), 2, 'Line 3 is 0-indexed line 2');
+    is($editor->{view}->cursor_col(), 0, 'Column is 0');
+};
+
+subtest 'Goto line 0 goes to line 1' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2\nLine 3\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Start on line 2
+    $editor->{view}->set_cursor(1, 3);
+
+    $editor->cmd_goto_line();
+    $editor->handle_input('0');
+    $editor->handle_input("\r");
+
+    is($editor->{view}->cursor_line(), 0, 'Line 0 input goes to first line');
+    is($editor->{view}->cursor_col(), 0, 'Column is 0');
+};
+
+subtest 'Goto line:col parses column' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2 with more text\nLine 3\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_goto_line();
+    $editor->handle_input('2:10');
+    $editor->handle_input("\r");
+
+    is($editor->{view}->cursor_line(), 1, 'Line 2 is 0-indexed line 1');
+    is($editor->{view}->cursor_col(), 9, 'Column 10 is 0-indexed column 9');
+};
+
+subtest 'Goto :col jumps to column on current line' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2 with more text\nLine 3\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Start on line 2 (0-indexed: 1), column 0
+    $editor->{view}->set_cursor(1, 0);
+
+    $editor->cmd_goto_line();
+    $editor->handle_input(':15');
+    $editor->handle_input("\r");
+
+    is($editor->{view}->cursor_line(), 1, 'Stays on current line');
+    is($editor->{view}->cursor_col(), 14, 'Column 15 is 0-indexed column 14');
+};
+
+subtest 'Goto line clamps to valid range' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Line 1\nLine 2\nLine 3\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    # Go to line way beyond end
+    $editor->cmd_goto_line();
+    $editor->handle_input('999');
+    $editor->handle_input("\r");
+
+    my $max_line = $editor->{document}->line_count() - 1;
+    is($editor->{view}->cursor_line(), $max_line, 'Line clamped to max');
+};
+
+subtest 'Goto line:col clamps column to line length' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Short\nLine 2\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    $editor->{document} = Zepto::Document->load($filename);
+    $editor->{view} = Zepto::View->new(document => $editor->{document});
+
+    $editor->cmd_goto_line();
+    $editor->handle_input('1:999');
+    $editor->handle_input("\r");
+
+    is($editor->{view}->cursor_line(), 0, 'On line 1');
+    is($editor->{view}->cursor_col(), 5, 'Column clamped to line length (5 chars in "Short")');
+};
+
 # ============================================================================
 # Stability: Editor should not quit unexpectedly
 # ============================================================================

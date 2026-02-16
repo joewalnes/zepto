@@ -428,18 +428,47 @@ sub do_find_prev {
 sub cmd_goto_line {
     my ($self) = @_;
 
-    $self->open_dialog(
-        title => 'Go to Line',
-        prompt => 'Line number:',
+    my $current_line = $self->{view}->cursor_line();
+
+    $self->open_footer_input(
+        prompt => 'Go to:',
+        hint => 'line or line:col or :col',
         on_submit => sub {
-            my ($num) = @_;
-            if ($num && $num =~ /^\d+$/) {
-                my $line = $num - 1;  # Convert to 0-indexed
-                $line = 0 if $line < 0;
-                my $max = $self->{document}->line_count() - 1;
-                $line = $max if $line > $max;
-                $self->{view}->set_cursor($line, 0);
+            my ($input) = @_;
+            return unless defined $input && $input =~ /\S/;
+
+            my ($line, $col);
+
+            if ($input =~ /^:(\d+)$/) {
+                # :col - jump to column on current line
+                $line = $current_line;
+                $col = $1 - 1;  # Convert to 0-indexed
             }
+            elsif ($input =~ /^(\d+):(\d+)$/) {
+                # line:col - jump to specific line and column
+                $line = $1 <= 0 ? 0 : $1 - 1;  # 0 or negative -> line 0
+                $col = $2 - 1;  # Convert to 0-indexed
+            }
+            elsif ($input =~ /^(\d+)$/) {
+                # line only
+                $line = $1 <= 0 ? 0 : $1 - 1;  # 0 or negative -> line 0
+                $col = 0;
+            }
+            else {
+                return;  # Invalid input
+            }
+
+            # Clamp line to valid range
+            my $max_line = $self->{document}->line_count() - 1;
+            $line = 0 if $line < 0;
+            $line = $max_line if $line > $max_line;
+
+            # Clamp column to line length
+            $col = 0 if $col < 0;
+            my $max_col = $self->{document}->line_length($line);
+            $col = $max_col if $col > $max_col;
+
+            $self->{view}->set_cursor($line, $col);
         },
     );
 }
