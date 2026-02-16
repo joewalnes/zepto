@@ -224,13 +224,13 @@ sub _move_to {
 
 # Calculate gutter width based on line count
 # Exported so Editor.pm can use same calculation for mouse position mapping
-# Gutter must fit: cursor line badge (round_left + digits + arrow_right = digits + 2)
+# Gutter must fit: cursor line badge (round_left + digits + space + arrow_right = digits + 3)
 # and normal lines (right-aligned digits + space)
 sub get_gutter_width {
     my ($class, $line_count) = @_;
     $line_count //= 1;  # Default if undef
     my $max_digits = length("$line_count");
-    my $gutter_width = $max_digits + 2;  # +2 for badge chars (round_left + arrow_right)
+    my $gutter_width = $max_digits + 3;  # +3 for badge chars (round_left + space + arrow_right)
     $gutter_width = MIN_GUTTER_WIDTH if $gutter_width < MIN_GUTTER_WIDTH;
     return $gutter_width;
 }
@@ -725,19 +725,19 @@ sub _render_text_area {
             my $line_num_str = sprintf("%d", $doc_line + 1);
 
             if ($is_cursor_line) {
-                # Cursor line: flag style - round left, arrow right (points into text)
+                # Cursor line: flag style - round left, space, arrow right (points into text)
                 my $rl = Zepto::Chars->get('round_left');
                 my $ar = Zepto::Chars->get('arrow_right');
 
                 # Calculate padding to right-align the badge
-                my $badge_width = length($line_num_str) + 2;  # +2 for edge chars
+                my $badge_width = length($line_num_str) + 3;  # +3 for edge chars and space
                 my $pad = $gutter_width - $badge_width;
                 $pad = 0 if $pad < 0;
 
-                # Gutter background, then badge with round left + arrow right
+                # Gutter background, then badge with round left + digits + space + arrow right
                 $output .= $theme->color('gutter_bg') . (' ' x $pad);
                 $output .= $theme->color('gutter_bg') . $theme->color('ruler_cursor_edge') . $rl;
-                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $line_num_str;
+                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $line_num_str . ' ';
                 # Arrow right: badge color as fg, next area color as bg
                 $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
             } else {

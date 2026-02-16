@@ -721,23 +721,23 @@ subtest 'Dropdown left border has background color' => sub {
 # Gutter width calculation
 # ============================================================================
 subtest 'Gutter width accommodates cursor line badge' => sub {
-    # The cursor line has a badge: round_left + line_number + arrow_right
-    # Badge width = 1 + digits + 1 = digits + 2
+    # The cursor line has a badge: round_left + line_number + space + arrow_right
+    # Badge width = 1 + digits + 1 + 1 = digits + 3
     # Gutter must be wide enough for this
 
     # Test with various line counts
     my @test_cases = (
-        { lines => 99,    max_digits => 2, expected_min => 4 },  # "99" + 2 = 4
-        { lines => 100,   max_digits => 3, expected_min => 5 },  # "100" + 2 = 5
-        { lines => 320,   max_digits => 3, expected_min => 5 },  # "320" + 2 = 5
-        { lines => 999,   max_digits => 3, expected_min => 5 },  # "999" + 2 = 5
-        { lines => 1000,  max_digits => 4, expected_min => 6 },  # "1000" + 2 = 6
-        { lines => 10000, max_digits => 5, expected_min => 7 },  # "10000" + 2 = 7
+        { lines => 99,    max_digits => 2, expected_min => 5 },  # "99" + 3 = 5
+        { lines => 100,   max_digits => 3, expected_min => 6 },  # "100" + 3 = 6
+        { lines => 320,   max_digits => 3, expected_min => 6 },  # "320" + 3 = 6
+        { lines => 999,   max_digits => 3, expected_min => 6 },  # "999" + 3 = 6
+        { lines => 1000,  max_digits => 4, expected_min => 7 },  # "1000" + 3 = 7
+        { lines => 10000, max_digits => 5, expected_min => 8 },  # "10000" + 3 = 8
     );
 
     for my $tc (@test_cases) {
         my $gutter = Zepto::Renderer->get_gutter_width($tc->{lines});
-        my $badge_width = $tc->{max_digits} + 2;  # round_left + digits + arrow_right
+        my $badge_width = $tc->{max_digits} + 3;  # round_left + digits + space + arrow_right
 
         cmp_ok($gutter, '>=', $badge_width,
             "Gutter ($gutter) fits badge ($badge_width) for $tc->{lines} lines");
