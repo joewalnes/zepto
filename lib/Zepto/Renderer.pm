@@ -258,14 +258,15 @@ sub _move_to {
 
 # Calculate gutter width based on line count
 # Exported so Editor.pm can use same calculation for mouse position mapping
-# Gutter must fit: cursor line badge (round_left + digits + space + arrow_right = digits + 3)
-# and normal lines (right-aligned digits + space)
+# Gutter must fit: VCS indicators (2 cols) + cursor line badge (round_left + digits + space + arrow_right)
+# Layout: [vcs_del][vcs_chg][pad][round_left][digits][space][arrow_right] = 2 + digits + 3
+# and normal lines: [vcs_del][vcs_chg][space][right-aligned digits][space]
 sub get_gutter_width {
     my ($class, $line_count) = @_;
     $line_count //= 1;  # Default if undef
     my $max_digits = length("$line_count");
-    my $gutter_width = $max_digits + 3;  # +3 for badge chars (round_left + space + arrow_right)
-    $gutter_width = MIN_GUTTER_WIDTH if $gutter_width < MIN_GUTTER_WIDTH;
+    my $gutter_width = $max_digits + 5;  # +5 for VCS (2) + badge chars (round_left + space + arrow_right = 3)
+    $gutter_width = MIN_GUTTER_WIDTH + 2 if $gutter_width < MIN_GUTTER_WIDTH + 2;
     return $gutter_width;
 }
 
@@ -754,33 +755,75 @@ sub _render_text_area {
         # Position cursor at start of this row (row 3 is first text row, after menu and ruler)
         $output .= _move_to($screen_row + 3, 1);
 
-        # Line number gutter
+        # Line number gutter with VCS indicators (2 columns)
         if ($doc_line < $doc->line_count()) {
             my $line_num_str = sprintf("%d", $doc_line + 1);
 
+            # Get VCS indicators for this line (two columns)
+            # Column 1: deletion indicator (▗ or ▝)
+            # Column 2: change indicator (▐ for added/modified)
+            my $del_status = $doc->vcs_deletion_status($doc_line);
+            my $chg_status = $doc->vcs_change_status($doc_line);
+
+            my ($del_char, $del_color, $chg_char, $chg_color);
+
+            # Deletion indicator (column 1)
+            if ($del_status) {
+                if ($del_status eq 'below') {
+                    $del_char = Zepto::Chars->get('vcs_del_lower');
+                } elsif ($del_status eq 'above') {
+                    $del_char = Zepto::Chars->get('vcs_del_upper');
+                }
+                $del_color = $theme->color('vcs_deleted');
+            }
+            $del_char //= ' ';
+            $del_color //= $theme->color('gutter_fg');
+
+            # Change indicator (column 2)
+            if ($chg_status) {
+                if ($chg_status eq 'added') {
+                    $chg_char = Zepto::Chars->get('vcs_added');
+                    $chg_color = $theme->color('vcs_added');
+                } elsif ($chg_status eq 'modified') {
+                    $chg_char = Zepto::Chars->get('vcs_modified');
+                    $chg_color = $theme->color('vcs_modified');
+                }
+            }
+            $chg_char //= ' ';
+            $chg_color //= $theme->color('gutter_fg');
+
             if ($is_cursor_line) {
-                # Cursor line: flag style - round left, space, arrow right (points into text)
+                # Cursor line: [vcs_del][vcs_chg][pad][rl][digits][space][ar]
                 my $rl = Zepto::Chars->get('round_left');
                 my $ar = Zepto::Chars->get('arrow_right');
 
+                # VCS indicators first (on gutter background)
+                $output .= $theme->color('gutter_bg') . $del_color . $del_char;
+                $output .= $theme->color('gutter_bg') . $chg_color . $chg_char;
+
                 # Calculate padding to right-align the badge
-                my $badge_width = length($line_num_str) + 3;  # +3 for edge chars and space
-                my $pad = $gutter_width - $badge_width;
+                # Badge takes: rl(1) + digits + space(1) + ar(1) = digits + 3
+                # Available: gutter_width - 2 (for VCS columns)
+                my $badge_width = length($line_num_str) + 3;
+                my $pad = $gutter_width - 2 - $badge_width;
                 $pad = 0 if $pad < 0;
 
-                # Gutter background, then badge with round left + digits + space + arrow right
+                # Padding, then badge
                 $output .= $theme->color('gutter_bg') . (' ' x $pad);
                 $output .= $theme->color('gutter_bg') . $theme->color('ruler_cursor_edge') . $rl;
                 $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $line_num_str . ' ';
                 # Arrow right: badge color as fg, next area color as bg
                 $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
             } else {
-                # Normal line: standard gutter
-                # Use (gutter_width - 2) for digits + 2 trailing spaces to align with badge
-                # Badge is: [pad][rl][digits][space][ar] - digits end at (gutter_width - 2)
+                # Normal line: [vcs_del][vcs_chg][space][right-aligned digits][space]
+                # VCS indicators first
+                $output .= $theme->color('gutter_bg') . $del_color . $del_char;
+                $output .= $theme->color('gutter_bg') . $chg_color . $chg_char;
+                # Rest of gutter
                 $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
-                my $line_num = sprintf("%*d", $gutter_width - 2, $doc_line + 1);
-                $output .= $line_num . '  ';
+                # Use (gutter_width - 4) for digits: total = 2(vcs) + 1(space) + digits + 1(space) = gutter_width
+                my $line_num = sprintf("%*d", $gutter_width - 4, $doc_line + 1);
+                $output .= ' ' . $line_num . ' ';
             }
         }
         else {

@@ -1975,6 +1975,9 @@ sub delete_selection {
 sub render {
     my ($self) = @_;
 
+    # Update VCS diff if needed (debounced)
+    $self->{document}->update_vcs_diff();
+
     my $term = $self->{terminal};
     my ($rows, $cols) = $term->get_size();
 

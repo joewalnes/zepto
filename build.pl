@@ -22,15 +22,19 @@ find(sub {
 my %priority = (
     # Core modules first (lower number = higher priority)
     'lib/Zepto/Buffer.pm'      => 10,
-    'lib/Zepto/Document.pm'    => 11,
-    'lib/Zepto/View.pm'        => 12,
-    'lib/Zepto/InputParser.pm' => 13,
-    'lib/Zepto/Theme.pm'       => 14,
-    'lib/Zepto/Preferences.pm' => 15,
-    'lib/Zepto/Terminal.pm'    => 16,
-    'lib/Zepto/Config.pm'      => 17,
-    'lib/Zepto/FilePicker.pm'  => 18,
-    'lib/Zepto/Chars.pm'       => 19,
+    # VCS modules must come before Document (which uses them)
+    'lib/Zepto/VCS/Provider.pm' => 11,  # Provider first (has the registry)
+    'lib/Zepto/VCS/Git.pm'      => 12,  # Git second (registers with Provider)
+    'lib/Zepto/Diff.pm'         => 13,  # Diff module for VCS
+    'lib/Zepto/Document.pm'     => 14,
+    'lib/Zepto/View.pm'         => 15,
+    'lib/Zepto/InputParser.pm'  => 16,
+    'lib/Zepto/Theme.pm'        => 17,
+    'lib/Zepto/Preferences.pm'  => 18,
+    'lib/Zepto/Terminal.pm'     => 19,
+    'lib/Zepto/Config.pm'       => 20,
+    'lib/Zepto/FilePicker.pm'   => 21,
+    'lib/Zepto/Chars.pm'        => 22,
     # Syntax/Base must come first among Syntax modules
     'lib/Zepto/Syntax/Base.pm' => 50,
     # Highlighter needs all Syntax modules loaded

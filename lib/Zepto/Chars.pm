@@ -54,6 +54,14 @@ use constant {
     TOGGLE_OFF          => "\x{25cb}",  # ○ (empty circle)
 };
 
+# VCS gutter indicators
+use constant {
+    VCS_ADDED           => "\x{2590}",  # ▐ Right half block (added line)
+    VCS_MODIFIED        => "\x{2590}",  # ▐ Right half block (modified line)
+    VCS_DEL_UPPER       => "\x{259d}",  # ▝ Upper right quadrant (deletion indicator, upper half)
+    VCS_DEL_LOWER       => "\x{2597}",  # ▗ Lower right quadrant (deletion indicator, lower half)
+};
+
 # Unicode box drawing - rounded corners
 use constant {
     BOX_ROUND_TL        => "\x{256d}",  # ╭
@@ -120,6 +128,12 @@ my %CHARS = (
     check               => [ NF_CHECK,            "\x{2713}"  ],  # ✓
     times               => [ NF_TIMES,            "\x{2717}"  ],  # ✗
     modified            => [ NF_MODIFIED,         "\x{2022}"  ],
+
+    # VCS gutter indicators (same in both modes)
+    vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # +
+    vcs_modified        => [ VCS_MODIFIED,        VCS_MODIFIED  ],  # ~
+    vcs_del_upper       => [ VCS_DEL_UPPER,       VCS_DEL_UPPER ],  # ▝
+    vcs_del_lower       => [ VCS_DEL_LOWER,       VCS_DEL_LOWER ],  # ▗
 
     # Box drawing - corners (rounded when powerline, square when not)
     box_tl              => [ BOX_ROUND_TL,        BOX_SQUARE_TL ],

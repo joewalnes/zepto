@@ -1,14 +1,20 @@
 package Zepto::Document;
-# Document: Buffer + undo/redo + dirty tracking + file metadata
+# Document: Buffer + undo/redo + dirty tracking + file metadata + VCS integration
 # Provides high-level text editing operations
 
 use strict;
 use warnings;
 use utf8;
 use Zepto::Buffer;
+use Zepto::VCS::Provider;
+use Zepto::VCS::Git;  # Ensure Git provider is registered
+use Zepto::Diff;
 
 # Undo grouping timeout in seconds (consecutive edits within this window are grouped)
 use constant UNDO_GROUP_TIMEOUT => 1.0;
+
+# VCS diff debounce delay in seconds
+use constant VCS_DIFF_DEBOUNCE => 0.3;
 
 sub new {
     my ($class, %opts) = @_;
@@ -25,7 +31,18 @@ sub new {
         _last_edit_time => 0,
         _last_edit_type => '',
         _last_edit_pos  => -1,
+        # VCS integration
+        _vcs_provider   => undef,
+        _vcs_base       => undef,  # Cached HEAD content
+        _vcs_diff       => undef,  # { added => [], modified => [], deleted => [] }
+        _vcs_dirty      => 0,      # Buffer changed since last diff
+        _vcs_last_diff  => 0,      # Timestamp of last diff computation
     }, $class;
+
+    # Detect VCS if path is provided
+    if (defined $opts{path}) {
+        $self->_init_vcs();
+    }
 
     return $self;
 }
@@ -200,6 +217,7 @@ sub _push_undo {
     $self->{_last_edit_type} = $action->{type};
     $self->{_last_edit_pos} = $action->{pos};
     $self->{dirty} = 1;
+    $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 }
 
 # Insert text at position
@@ -256,6 +274,7 @@ sub replace {
 
     $self->{redo_stack} = [];
     $self->{dirty} = 1;
+    $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     return $deleted;
 }
@@ -286,6 +305,7 @@ sub undo {
 
     # Mark clean if we've undone everything
     $self->{dirty} = @{$self->{undo_stack}} > 0;
+    $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     # Break grouping
     $self->{_last_edit_type} = '';
@@ -317,6 +337,7 @@ sub redo {
 
     push @{$self->{undo_stack}}, $action;
     $self->{dirty} = 1;
+    $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     # Break grouping
     $self->{_last_edit_type} = '';
@@ -347,4 +368,138 @@ sub break_undo_group {
     $self->{_last_edit_type} = '';
 }
 
+# ============================================================================
+# VCS Integration
+# ============================================================================
+
+# Initialize VCS provider for this document
+sub _init_vcs {
+    my ($self) = @_;
+    return unless defined $self->{path};
+
+    $self->{_vcs_provider} = Zepto::VCS::Provider->detect($self->{path});
+
+    if ($self->{_vcs_provider}) {
+        # Get base content from HEAD
+        $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+        # Compute initial diff
+        $self->_compute_vcs_diff();
+    }
+}
+
+# Check if VCS is available for this document
+sub has_vcs {
+    my ($self) = @_;
+    return defined $self->{_vcs_provider};
+}
+
+# Get VCS provider name (e.g., "git")
+sub vcs_name {
+    my ($self) = @_;
+    return $self->{_vcs_provider} ? $self->{_vcs_provider}->name : undef;
+}
+
+# Mark VCS diff as needing recomputation
+sub _mark_vcs_dirty {
+    my ($self) = @_;
+    $self->{_vcs_dirty} = 1;
+}
+
+# Compute VCS diff (call after edits, debounced)
+sub _compute_vcs_diff {
+    my ($self) = @_;
+    return unless $self->{_vcs_provider};
+
+    my $current_text = $self->{buffer}->text();
+    $self->{_vcs_diff} = Zepto::Diff->diff($self->{_vcs_base}, $current_text);
+    $self->{_vcs_dirty} = 0;
+    $self->{_vcs_last_diff} = time();
+}
+
+# Update VCS diff if needed (debounced)
+# Call this periodically (e.g., on idle or before render)
+sub update_vcs_diff {
+    my ($self) = @_;
+    return unless $self->{_vcs_provider};
+    return unless $self->{_vcs_dirty};
+
+    my $now = time();
+    if ($now - $self->{_vcs_last_diff} >= VCS_DIFF_DEBOUNCE) {
+        $self->_compute_vcs_diff();
+    }
+}
+
+# Force immediate VCS diff recomputation
+sub refresh_vcs_diff {
+    my ($self) = @_;
+    return unless $self->{_vcs_provider};
+    $self->_compute_vcs_diff();
+}
+
+# Get VCS deletion status for a specific line (0-indexed)
+# Returns: 'above', 'below', or undef
+# Used for column 1 of the two-column VCS gutter
+sub vcs_deletion_status {
+    my ($self, $line) = @_;
+    return undef unless $self->{_vcs_diff};
+
+    my $diff = $self->{_vcs_diff};
+
+    # deleted array contains line indices AFTER which deletions occurred
+    for my $l (@{$diff->{deleted}}) {
+        # Line $l has deletion after it (show lower block ▗)
+        return 'below' if $l == $line;
+        # Line $l+1 has deletion before it (show upper block ▝)
+        return 'above' if $l + 1 == $line;
+    }
+
+    return undef;
+}
+
+# Get VCS change status for a specific line (0-indexed)
+# Returns: 'added', 'modified', or undef
+# Used for column 2 of the two-column VCS gutter
+sub vcs_change_status {
+    my ($self, $line) = @_;
+    return undef unless $self->{_vcs_diff};
+
+    my $diff = $self->{_vcs_diff};
+
+    # Check if line is added
+    for my $l (@{$diff->{added}}) {
+        return 'added' if $l == $line;
+    }
+
+    # Check if line is modified
+    for my $l (@{$diff->{modified}}) {
+        return 'modified' if $l == $line;
+    }
+
+    return undef;
+}
+
+# Legacy wrapper for compatibility - returns first applicable status
+sub vcs_line_status {
+    my ($self, $line) = @_;
+    return $self->vcs_deletion_status($line) ? 'deleted_' . $self->vcs_deletion_status($line)
+         : $self->vcs_change_status($line);
+}
+
+# Get full VCS diff data (for advanced use)
+sub vcs_diff {
+    my ($self) = @_;
+    return $self->{_vcs_diff};
+}
+
+# Invalidate VCS cache (call after save to refresh base content)
+sub invalidate_vcs_cache {
+    my ($self) = @_;
+    return unless $self->{_vcs_provider};
+
+    $self->{_vcs_provider}->invalidate_cache($self->{path});
+    $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+    $self->_compute_vcs_diff();
+}
+
 1;
+

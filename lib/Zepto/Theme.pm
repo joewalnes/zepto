@@ -165,6 +165,11 @@ sub dark_theme {
         ruler_cursor_bg   => bg_rgb(52, 79, 138),  # Matches active pill
         ruler_cursor_edge => fg_rgb(52, 79, 138),
 
+        # VCS gutter indicators
+        vcs_added    => fg_rgb(158, 206, 106),  # Green - new lines
+        vcs_modified => fg_rgb(224, 175, 104),  # Yellow - modified lines
+        vcs_deleted  => fg_rgb(247, 118, 142),  # Red - deleted lines
+
         # Syntax highlighting (Tokyo Night inspired)
         # Comments are prominent - they're documentation, not noise!
         syntax_keyword     => fg_rgb(187, 154, 247),  # Purple - control flow
@@ -276,6 +281,11 @@ sub light_theme {
         ruler_cursor_fg   => fg_rgb(255, 255, 255),
         ruler_cursor_bg   => bg_rgb(114, 135, 253),  # Matches active pill
         ruler_cursor_edge => fg_rgb(114, 135, 253),
+
+        # VCS gutter indicators (bright/saturated for visibility on white)
+        vcs_added    => fg_rgb(40, 180, 80),    # Bright green - new lines
+        vcs_modified => fg_rgb(230, 140, 0),    # Bright orange - modified lines
+        vcs_deleted  => fg_rgb(230, 60, 80),    # Bright red - deleted lines
 
         # Syntax highlighting - high contrast for light backgrounds
         # Comments are prominent - they're documentation, not noise!
