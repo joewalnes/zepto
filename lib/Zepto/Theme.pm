@@ -192,11 +192,11 @@ sub light_theme {
     return $class->new('light', {
         # Main text area
         fg          => fg_rgb(76, 79, 105),    # Dark blue-gray text
-        bg          => bg_rgb(239, 241, 245),  # Warm light gray (Base)
+        bg          => bg_rgb(255, 255, 255),  # Pure white
 
         # Line numbers gutter
         gutter_fg   => fg_rgb(156, 160, 176),  # Overlay0
-        gutter_bg   => bg_rgb(230, 233, 239),  # Mantle
+        gutter_bg   => bg_rgb(255, 255, 255),  # Match main bg
 
         # Selection
         selection_fg => fg_rgb(76, 79, 105),
