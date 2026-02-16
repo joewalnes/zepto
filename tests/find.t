@@ -379,4 +379,40 @@ subtest 'Tab toggles focus between fields' => sub {
     is($editor->{find_focus}, 'find', 'Tab moves back to find');
 };
 
+# ============================================================================
+# Bug regression: Find after opening different file
+# ============================================================================
+subtest 'Find searches new document after loading different file' => sub {
+    # Create editor with initial content
+    my $editor = create_editor_with_content("apple banana cherry\n");
+
+    # Verify initial content works
+    $editor->enter_find_mode();
+    $editor->{find_input} = 'apple';
+    $editor->_update_find_matches();
+    is(scalar @{$editor->{find_matches}}, 1, 'Found "apple" in initial file');
+    $editor->exit_find_mode(0);
+
+    # Create a new temp file with different content
+    my ($fh, $newfile) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "dog elephant fox\n";
+    close $fh;
+
+    # Load the new file (simulates Ctrl-O -> select file)
+    $editor->_load_file($newfile);
+
+    # Search for content that's only in the NEW file
+    $editor->enter_find_mode();
+    $editor->{find_input} = 'elephant';
+    $editor->_update_find_matches();
+
+    is(scalar @{$editor->{find_matches}}, 1, 'Found "elephant" in new file');
+
+    # Search for content that was only in the OLD file
+    $editor->{find_input} = 'apple';
+    $editor->_update_find_matches();
+
+    is(scalar @{$editor->{find_matches}}, 0, 'No "apple" in new file (old content gone)');
+};
+
 done_testing();

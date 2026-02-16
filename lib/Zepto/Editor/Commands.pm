@@ -192,6 +192,13 @@ sub _load_file {
         $self->{view} = Zepto::View->new(document => $self->{document});
         $self->{file_path} = $path;
         $self->{highlighter}->set_file($path);  # Update syntax highlighting
+
+        # Update find engine to use new document
+        $self->{find_engine} = Zepto::FindEngine->new(
+            document => $self->{document},
+        );
+        $self->{find_matches} = [];  # Clear stale matches
+
         $self->update_title();
         $self->show_message("Opened: $path");
     };
