@@ -294,14 +294,23 @@ sub offset_to_line_col {
     my $len = $self->length();
     $offset = $len if $offset > $len;
 
-    for my $i (0 .. $#{$self->{_line_index}}) {
-        my ($start, $line_len) = @{$self->{_line_index}[$i]};
-        if ($offset < $start + $line_len || $i == $#{$self->{_line_index}}) {
-            return ($i, $offset - $start);
+    my $index = $self->{_line_index};
+    my $num_lines = scalar @$index;
+    return (0, 0) unless $num_lines;
+
+    # Binary search for the line containing offset
+    my ($lo, $hi) = (0, $num_lines - 1);
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi + 1) / 2);
+        if ($index->[$mid][0] <= $offset) {
+            $lo = $mid;
+        } else {
+            $hi = $mid - 1;
         }
     }
 
-    return (0, 0);  # Fallback
+    my ($start, $line_len) = @{$index->[$lo]};
+    return ($lo, $offset - $start);
 }
 
 # Convert (line, column) to byte offset, both 0-indexed

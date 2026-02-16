@@ -129,6 +129,7 @@ sub dark_theme {
         status_bg    => bg_rgb(36, 40, 59),
         status_bg_fg => fg_rgb(36, 40, 59),     # Status bg as foreground
         status_accent => fg_rgb(125, 207, 255), # Cyan
+        status_dim    => fg_rgb(100, 106, 134), # Dimmed text for unfocused input
         # Status bar segments
         status_file_fg   => fg_rgb(255, 255, 255),
         status_file_bg   => bg_rgb(52, 79, 138),    # Blue segment
@@ -146,8 +147,10 @@ sub dark_theme {
         dialog_input_bg => bg_rgb(26, 27, 38),
 
         # Search highlights
-        match_fg     => fg_rgb(26, 27, 38),
-        match_bg     => bg_rgb(224, 175, 104),  # Warm yellow
+        match_fg     => fg_rgb(255, 255, 255),  # White text for visibility
+        match_bg     => bg_rgb(80, 70, 45),     # Amber/brown - visible but not overwhelming
+        current_match_fg => fg_rgb(26, 27, 38),     # Dark text for contrast
+        current_match_bg => bg_rgb(255, 200, 100),  # Bright yellow - very prominent
 
         # Messages
         error_fg     => fg_rgb(247, 118, 142),
@@ -238,6 +241,7 @@ sub light_theme {
         status_bg    => bg_rgb(220, 224, 232),
         status_bg_fg => fg_rgb(220, 224, 232),  # Status bg as foreground
         status_accent => bg_rgb(30, 102, 245),
+        status_dim    => fg_rgb(156, 160, 176), # Dimmed text for unfocused input
         # Status bar segments
         status_file_fg   => fg_rgb(255, 255, 255),
         status_file_bg   => bg_rgb(114, 135, 253),  # Lavender segment
@@ -255,8 +259,10 @@ sub light_theme {
         dialog_input_bg => bg_rgb(255, 255, 255),
 
         # Search highlights
-        match_fg     => fg_rgb(76, 79, 105),
-        match_bg     => bg_rgb(223, 142, 29),   # Yellow/peach
+        match_fg     => fg_rgb(50, 50, 60),     # Dark text for visibility
+        match_bg     => bg_rgb(255, 220, 150),  # Light amber - visible but not overwhelming
+        current_match_fg => fg_rgb(30, 30, 30),     # Dark text for contrast
+        current_match_bg => bg_rgb(255, 180, 50),   # Bright orange-yellow - very prominent
 
         # Messages
         error_fg     => fg_rgb(210, 15, 57),    # Red

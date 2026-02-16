@@ -104,13 +104,8 @@ our %MENU_ITEMS = (
         { label => 'Select All',   shortcut => 'Ctrl+A', action => 'select_all' },
     ],
     s => [
-        { label => 'Find',          shortcut => 'Ctrl+F', action => 'find' },
-        { label => 'Find Next',     shortcut => 'Ctrl+J', action => 'find_next' },
-        { label => 'Find Previous', shortcut => 'Ctrl+K', action => 'find_prev' },
-        { separator => 1 },
-        { label => 'Replace',       shortcut => 'Ctrl+R', action => 'replace' },
-        { separator => 1 },
-        { label => 'Go to Line',    shortcut => 'Ctrl+G', action => 'goto' },
+        { label => 'Find/Replace', shortcut => 'Ctrl+F', action => 'find' },
+        { label => 'Go to Line',   shortcut => 'Ctrl+G', action => 'goto' },
     ],
     v => [
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
@@ -297,15 +292,20 @@ sub render {
         # Normal text area with line numbers (rows 2 to 2+text_height-1)
         $output .= $class->_render_text_area(
             $doc, $view, $theme,
-            $text_height, $text_width, $gutter_width, $highlighter
+            $text_height, $text_width, $gutter_width, $highlighter,
+            $ui->{find_mode}
         );
     }
 
-    # Render status bar (last row) - prompt/footer_input replace normal content
+    # Render status bar (last row) - prompt/footer_input/find replace normal content
     $output .= _move_to($rows, 1);
     if ($ui->{prompt}) {
         $output .= $class->_render_prompt(
             $theme, $ui->{prompt}, $cols, $rows
+        );
+    } elsif ($ui->{find_mode}) {
+        $output .= $class->_render_find_bar(
+            $theme, $ui->{find_mode}, $cols
         );
     } elsif ($ui->{footer_input}) {
         $output .= $class->_render_footer_input(
@@ -347,6 +347,53 @@ sub render {
         my $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
         my $cursor_pos = $input->{cursor} // 0;
         $output .= _move_to($rows, $prompt_len + $cursor_pos + 1);
+        $output .= SHOW_CURSOR;
+    } elsif ($ui->{find_mode}) {
+        # Position cursor in find or replace input field based on focus
+        my $find = $ui->{find_mode};
+        my $focus = $find->{focus} // 'find';
+        my $value = $find->{value} // '';
+        my $replace_value = $find->{replace_value} // '';
+
+        # Calculate input_width using same formula as _render_find_bar
+        my $match_count = $find->{match_count} // 0;
+        my $current = $find->{current} // 0;
+        my $match_text = $match_count == 0
+            ? (length($value) ? 'No matches' : '')
+            : (($current + 1) . ' of ' . $match_count);
+        my $right_side_width = 45 + length($match_text);
+        my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
+        my $input_width = int($available / 2);
+        $input_width = 8 if $input_width < 8;
+        $input_width = 40 if $input_width > 40;
+
+        if ($focus eq 'replace') {
+            # Replace cursor position - handle text longer than field
+            my $cursor_pos = $find->{replace_cursor} // 0;
+            my $display_offset = 0;
+            if (length($replace_value) > $input_width) {
+                $display_offset = length($replace_value) - $input_width;
+            }
+            my $cursor_in_field = $cursor_pos - $display_offset;
+            $cursor_in_field = 0 if $cursor_in_field < 0;
+            $cursor_in_field = $input_width if $cursor_in_field > $input_width;
+            # Replace field position: " Find:" (6) + input_width + " Replace:" (9)
+            my $replace_start = 1 + 5 + $input_width + 1 + 8;
+            $output .= _move_to($rows, $replace_start + $cursor_in_field + 1);
+        } else {
+            # Find cursor position - handle text longer than field
+            my $cursor_pos = $find->{cursor} // 0;
+            my $display_offset = 0;
+            if (length($value) > $input_width) {
+                $display_offset = length($value) - $input_width;
+            }
+            my $cursor_in_field = $cursor_pos - $display_offset;
+            $cursor_in_field = 0 if $cursor_in_field < 0;
+            $cursor_in_field = $input_width if $cursor_in_field > $input_width;
+            # Find field starts at column 7 (" Find:")
+            my $label_len = 6;  # "Find:"
+            $output .= _move_to($rows, $label_len + $cursor_in_field + 1);
+        }
         $output .= SHOW_CURSOR;
     } elsif ($ui->{menu_open}) {
         # Hide cursor when menu is open so it doesn't shine through
@@ -571,13 +618,86 @@ sub _render_ruler_bar {
 
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode) = @_;
 
     my $output = '';
 
     return $output unless $doc && $view;
 
     my $scroll_line = $view->scroll_line();
+    my $visible_start = $scroll_line;
+    my $visible_end = $scroll_line + $height;
+
+    # Precompute match ranges by line if in find mode (only visible lines)
+    # Use viewport_matches for O(viewport) instead of O(all_matches)
+    my %line_matches;  # line_num => [{start, end, is_current}, ...]
+    if ($find_mode && $find_mode->{matches} && @{$find_mode->{matches}}) {
+        my $matches = $find_mode->{matches};
+        my $current = $find_mode->{current} // 0;
+
+        # Find current match line for highlighting
+        my $current_line = $matches->[$current]{line} if $current < @$matches;
+        my $current_col = $matches->[$current]{col} if $current < @$matches;
+
+        # Only iterate visible matches - use binary search to find range
+        # Since matches are sorted by (line, col), find first visible
+        my $first_visible = 0;
+        my $last_visible = $#$matches;
+
+        # Binary search for first match in visible range
+        my ($lo, $hi) = (0, $#$matches);
+        while ($lo < $hi) {
+            my $mid = int(($lo + $hi) / 2);
+            if ($matches->[$mid]{line} < $visible_start) {
+                $lo = $mid + 1;
+            } else {
+                $hi = $mid;
+            }
+        }
+        $first_visible = $lo;
+
+        # Process only visible matches
+        for my $idx ($first_visible .. $#$matches) {
+            my $match = $matches->[$idx];
+            my $line = $match->{line};
+            last if $line >= $visible_end;  # Past visible range
+
+            my $col = $match->{col};
+            my $end_col = $col + $match->{length};
+
+            my $is_current = ($idx == $current);
+
+            $line_matches{$line} //= [];
+            push @{$line_matches{$line}}, {
+                start => $col,
+                end => $end_col,
+                is_current => $is_current,
+            };
+        }
+    }
+
+    # Also include replaced text positions (shown as current match highlight)
+    if ($find_mode && $find_mode->{replaced} && @{$find_mode->{replaced}}) {
+        my $replaced = $find_mode->{replaced};
+        for my $rep (@$replaced) {
+            # Calculate line/col from offset if not cached
+            my $line = $rep->{line};
+            my $col = $rep->{col};
+            if (!defined $line) {
+                ($line, $col) = $doc->offset_to_line_col($rep->{offset});
+            }
+            next if $line < $visible_start || $line >= $visible_end;  # Skip non-visible
+
+            my $end_col = $col + $rep->{length};
+
+            $line_matches{$line} //= [];
+            push @{$line_matches{$line}}, {
+                start => $col,
+                end => $end_col,
+                is_current => 1,  # Replaced text shown prominently
+            };
+        }
+    }
     my $scroll_col = $view->scroll_col();
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
@@ -638,6 +758,14 @@ sub _render_text_area {
             my $line_content = $doc->get_line_content($doc_line);
             my $full_line_content = $line_content;  # Keep full line for tokenization
 
+            # Check for virtual replace preview (shows replaced text without modifying buffer)
+            my $preview_data;
+            if ($find_mode && $find_mode->{replace_preview} && exists $find_mode->{replace_preview}{$doc_line}) {
+                $preview_data = $find_mode->{replace_preview}{$doc_line};
+                $line_content = $preview_data->{text};
+                $full_line_content = $preview_data->{text};
+            }
+
             # Get syntax tokens for this line (before tab expansion)
             my $tokens = [];
             if ($highlighter) {
@@ -661,6 +789,31 @@ sub _render_text_area {
                 };
             }
 
+            # Convert find match positions from character to visual positions
+            my @visual_matches;
+            if ($preview_data && $preview_data->{highlights}) {
+                # Use virtual preview highlights (positions already in preview text)
+                for my $h (@{$preview_data->{highlights}}) {
+                    push @visual_matches, {
+                        start => $h->{start},
+                        end => $h->{end},
+                        is_current => 1,  # All replacements shown prominently
+                    };
+                }
+            } elsif ($line_matches{$doc_line}) {
+                for my $m (@{$line_matches{$doc_line}}) {
+                    my $vis_start = $char_to_visual->[$m->{start}] // 0;
+                    my $vis_end = $m->{end} < @$char_to_visual
+                        ? $char_to_visual->[$m->{end}]
+                        : length($expanded_content);
+                    push @visual_matches, {
+                        start => $vis_start,
+                        end => $vis_end,
+                        is_current => $m->{is_current},
+                    };
+                }
+            }
+
             # Note: visual_cursor_col and visible_cursor_col are calculated once before the loop
             # to ensure a straight vertical crosshair regardless of tab content on different lines
 
@@ -677,11 +830,11 @@ sub _render_text_area {
                 $expanded_content = substr($expanded_content, 0, $width);
             }
 
-            # Render with selection, syntax, and cursor highlighting
+            # Render with selection, syntax, match, and cursor highlighting
             $output .= $class->_render_line_with_highlights(
                 $expanded_content, $doc_line, $scroll_col, $width,
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
-                $full_line_content
+                $full_line_content, \@visual_matches
             );
 
             # Fill remaining space with appropriate backgrounds (crosshair column highlight)
@@ -723,12 +876,13 @@ sub _render_text_area {
     return $output;
 }
 
-# Render a line with selection, syntax, and crosshair highlighting
+# Render a line with selection, syntax, match, and crosshair highlighting
 # $content: tab-expanded content for this line
 # $orig_content: original content (with tabs) for position conversion
 # $cursor_col: visual cursor column (already converted)
+# $matches: array of {start, end, is_current} for find matches on this line
 sub _render_line_with_highlights {
-    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content) = @_;
+    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches) = @_;
 
     my $output = '';
     my $len = length($content);
@@ -738,6 +892,36 @@ sub _render_line_with_highlights {
     my $line_bg = $theme->color('cursor_line_bg');
     my $col_bg = $theme->color('cursor_col_bg');
     my $fg = $theme->color('fg');
+    my $match_bg = $theme->color('match_bg');
+    my $match_fg = $theme->color('match_fg');
+    my $current_match_bg = $theme->color('current_match_bg');
+    my $current_match_fg = $theme->color('current_match_fg');
+
+    # Build match highlight lookup (adjusted for scroll)
+    # Maps visible column → 'current' or 'other' or undef
+    my @match_type;
+    if ($matches && @$matches) {
+        for my $m (@$matches) {
+            # Adjust match positions for scroll
+            my $start = $m->{start} - $scroll_col;
+            my $end = $m->{end} - $scroll_col;
+
+            # Clamp to visible range
+            $start = 0 if $start < 0;
+            next if $start >= $len;
+            $end = $len if $end > $len;
+            next if $end <= 0;
+
+            for my $c ($start .. $end - 1) {
+                if ($c >= 0 && $c < $len) {
+                    # Current match takes priority over other matches
+                    if ($m->{is_current} || !$match_type[$c]) {
+                        $match_type[$c] = $m->{is_current} ? 'current' : 'other';
+                    }
+                }
+            }
+        }
+    }
 
     # Build syntax color lookup from tokens (adjusted for scroll)
     # Maps visible column → syntax foreground color
@@ -797,14 +981,26 @@ sub _render_line_with_highlights {
     }
 
     # Render character by character with appropriate backgrounds and foregrounds
-    # Priority: selection > cursor_line/col > syntax > default
+    # Priority: current_match > other_match > selection > cursor_line/col > syntax > default
     my $last_style = '';
     for (my $i = 0; $i < $len; $i++) {
         my $char = substr($content, $i, 1);
         my ($char_bg, $char_fg, $style_key);
 
-        # Check if in selection (use selection bg but preserve syntax fg)
-        if ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
+        # Check if in a find match (highest priority for visibility)
+        if ($match_type[$i]) {
+            if ($match_type[$i] eq 'current') {
+                $char_bg = $current_match_bg;
+                $char_fg = $current_match_fg;  # Use prominent foreground for current match
+                $style_key = "curmatch";
+            } else {
+                $char_bg = $match_bg;
+                $char_fg = $match_fg;  # Muted foreground for other matches
+                $style_key = "match";
+            }
+        }
+        # Check if in selection
+        elsif ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
             $char_bg = $theme->color('selection_bg');
             $char_fg = $syntax_fg[$i] // $fg;  # Preserve syntax highlighting
             $style_key = "sel:" . ($syntax_fg[$i] // 'def');
@@ -1171,6 +1367,214 @@ sub _render_footer_input {
     my $remaining = $cols - $prompt_len - $input_width;
     $output .= ' ' x $remaining if $remaining > 0;
 
+    $output .= RESET;
+    $output .= CLEAR_LINE;
+
+    return $output;
+}
+
+# =============================================================================
+# Find Bar Rendering (incremental search in status bar)
+# =============================================================================
+
+sub _render_find_bar {
+    my ($class, $theme, $find, $cols) = @_;
+
+    my $output = '';
+    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+
+    my $value = $find->{value} // '';
+    my $regex_on = $find->{regex} // 0;
+    my $case_on = $find->{case} // 0;
+    my $replace_value = $find->{replace_value} // '';
+    my $replace_all = $find->{replace_all} // 1;
+    my $focus = $find->{focus} // 'find';
+    my $is_replacing = $find->{is_replacing} // 0;
+    my $replace_progress = $find->{replace_progress} // 0;
+    my $replace_total = $find->{replace_total} // 0;
+    my $current = $find->{current} // 0;
+
+    # Match count text
+    my $match_count = $find->{match_count} // 0;
+    my $is_searching = $find->{is_searching} // 0;
+    my $match_text;
+    if ($is_replacing) {
+        $match_text = "Replacing $replace_progress/$replace_total...";
+    } elsif ($match_count == 0) {
+        $match_text = length($value) ? 'No matches' : '';
+    } else {
+        $match_text = ($current + 1) . ' of ' . $match_count;
+        $match_text .= '...' if $is_searching;
+    }
+
+    # Powerline rounded pill characters
+    my $rl = Zepto::Chars->get('powerline_round_left');
+    my $rr = Zepto::Chars->get('powerline_round_right');
+
+    # Fixed widths for buttons/toggles on right side
+    # ".* ^R" (9+1) + "Aa ^C" (9+1) + "X Esc" (9+1) + "✓ Enter" (11) + spaces
+    my $right_side_width = 45 + length($match_text);
+
+    # Calculate input field widths
+    my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
+    my $input_width = int($available / 2);
+    $input_width = 8 if $input_width < 8;
+    $input_width = 40 if $input_width > 40;  # Cap at reasonable width
+
+    my $content = '';
+    my $x = 1;  # Track position for click regions
+
+    # Leading space
+    $content .= ' ';
+    $x++;
+
+    # Find label
+    $content .= 'Find:';
+    $x += 5;
+
+    # Find input field (clickable)
+    my $find_field_start = $x;
+    if ($focus eq 'find') {
+        $content .= $theme->color('dialog_input_bg') . $theme->color('dialog_input_fg');
+    } else {
+        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+    }
+    my $display_value = $value;
+    if (length($display_value) > $input_width) {
+        $display_value = substr($display_value, length($display_value) - $input_width);
+    }
+    $content .= $display_value;
+    $content .= ' ' x ($input_width - length($display_value));
+    $x += $input_width;
+    
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+    $content .= ' ';
+    $x++;
+
+    # Replace label
+    $content .= 'Replace:';
+    $x += 8;
+
+    # Replace input field (clickable)
+    my $replace_field_start = $x;
+    if ($focus eq 'replace') {
+        $content .= $theme->color('dialog_input_bg') . $theme->color('dialog_input_fg');
+    } else {
+        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+    }
+    my $replace_display = $replace_value;
+    if (length($replace_display) > $input_width) {
+        $replace_display = substr($replace_display, length($replace_display) - $input_width);
+    }
+    $content .= $replace_display;
+    $content .= ' ' x ($input_width - length($replace_display));
+    $x += $input_width;
+    
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+    $content .= ' ';
+    $x++;
+
+    # Get icons for buttons
+    my $check_icon = Zepto::Chars->get('check');
+    my $times_icon = Zepto::Chars->get('times');
+
+    # Regex toggle pill (clickable) - like menu buttons with icon and shortcut
+    my $regex_start = $x;
+    if ($regex_on) {
+        $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+        $content .= $rl;
+        $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+        $content .= ' .* ';
+        $content .= $theme->color('status_dim') . '^R';
+        $content .= $theme->color('menu_active_text') . ' ';
+        $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+        $content .= $rr;
+    } else {
+        $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+        $content .= $rl;
+        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+        $content .= ' .* ';
+        $content .= $theme->color('status_dim') . '^R';
+        $content .= $theme->color('menu_pill_text') . ' ';
+        $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+        $content .= $rr;
+    }
+    $x += 9;  # pill edges (2) + " .* ^R " (7)
+
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+    $content .= ' ';
+    $x++;
+
+    # Case toggle pill (clickable) - like menu buttons with icon and shortcut
+    my $case_start = $x;
+    if ($case_on) {
+        $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+        $content .= $rl;
+        $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+        $content .= ' Aa ';
+        $content .= $theme->color('status_dim') . '^C';
+        $content .= $theme->color('menu_active_text') . ' ';
+        $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+        $content .= $rr;
+    } else {
+        $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+        $content .= $rl;
+        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+        $content .= ' Aa ';
+        $content .= $theme->color('status_dim') . '^C';
+        $content .= $theme->color('menu_pill_text') . ' ';
+        $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+        $content .= $rr;
+    }
+    $x += 9;  # pill edges (2) + " Aa ^C " (7)
+
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+    $content .= ' ';
+    $x++;
+
+    # Cancel button pill (clickable) - with X icon
+    my $cancel_start = $x;
+    $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+    $content .= $rl;
+    $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+    $content .= " $times_icon ";
+    $content .= $theme->color('status_dim') . 'Esc';
+    $content .= $theme->color('menu_pill_text') . ' ';
+    $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
+    $content .= $rr;
+    $x += 9;  # pill edges (2) + " X Esc " (7)
+
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+    $content .= ' ';
+    $x++;
+
+    # OK button pill (clickable) - active style with check icon
+    my $ok_start = $x;
+    $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+    $content .= $rl;
+    $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+    $content .= " $check_icon ";
+    $content .= $theme->color('status_dim') . 'Enter';
+    $content .= $theme->color('menu_active_text') . ' ';
+    $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
+    $content .= $rr;
+    $x += 11;  # pill edges (2) + " ✓ Enter " (9)
+    
+    $content .= $theme->color('status_bg') . $theme->color('status_fg');
+
+    # Calculate visible width (strip ANSI codes)
+    my $visible = $content;
+    $visible =~ s/\x1b\[[0-9;]*m//g;
+    my $visible_width = length($visible);
+
+    # Add padding and match text
+    my $padding_needed = $cols - $visible_width - length($match_text) - 1;
+    $padding_needed = 1 if $padding_needed < 1;
+    $content .= ' ' x $padding_needed;
+    $content .= $match_text;
+    $content .= ' ';
+
+    $output .= $content;
     $output .= RESET;
     $output .= CLEAR_LINE;
 

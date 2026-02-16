@@ -20,7 +20,7 @@ use utf8;
 use Carp;
 
 use Exporter 'import';
-our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FILE_PICKER STATE_QUIT);
+our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FILE_PICKER STATE_FIND STATE_QUIT);
 
 # Version for crash reports
 our $VERSION = '0.1.0';
@@ -34,6 +34,7 @@ use Zepto::Preferences;
 use Zepto::Theme;
 use Zepto::FilePicker;
 use Zepto::Highlighter;
+use Zepto::FindEngine;
 
 # Editor states
 use constant {
@@ -43,6 +44,7 @@ use constant {
     STATE_PROMPT       => 'prompt',        # Simple choice in status bar
     STATE_FOOTER_INPUT => 'footer_input',  # Text input in status bar
     STATE_FILE_PICKER  => 'file_picker',   # Fuzzy file finder
+    STATE_FIND         => 'find',          # Incremental find in status bar
     STATE_QUIT         => 'quit',
 };
 
@@ -82,6 +84,21 @@ sub new {
         search_term   => '',
         search_replace => '',
         last_search_pos => 0,
+
+        # Incremental find state
+        find_engine       => undef,   # FindEngine for async search
+        find_input        => '',      # Current search input
+        find_input_cursor => 0,       # Cursor position in input
+        find_current      => 0,       # Index of current match (0-based)
+        find_regex        => 0,       # Regex mode enabled
+        find_case         => 0,       # Case-sensitive enabled
+
+        # Replace state (extension of find)
+        find_replace_input  => '',      # Replacement text
+        find_replace_cursor => 0,       # Cursor position in replace input
+        find_replace_active => 0,       # Is replace field visible?
+        find_focus          => 'find',  # Which field has focus: 'find' or 'replace'
+        find_replace_all    => 1,       # Replace all mode (vs replace one)
 
         # Clipboard
         clipboard    => '',
@@ -182,6 +199,11 @@ sub init {
         viewport_cols => $text_width,
     );
 
+    # Create find engine for async search
+    $self->{find_engine} = Zepto::FindEngine->new(
+        document => $self->{document},
+    );
+
     return $self;
 }
 
@@ -198,9 +220,15 @@ sub run {
         $self->init();
         $self->render();
 
+        my $last_search_render = 0;  # Track last render during search
+
         while ($self->{state} ne STATE_QUIT) {
-            # Read input with timeout for message clearing
-            my $input = $self->{terminal}->read_blocking(INPUT_TIMEOUT_SEC);
+            # Use shorter timeout when background search is active
+            my $searching = $self->{find_engine} && $self->{find_engine}->is_searching;
+            my $timeout = $searching ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
+
+            # Read input with timeout
+            my $input = $self->{terminal}->read_blocking($timeout);
 
             my $needs_render = 0;
 
@@ -213,6 +241,37 @@ sub run {
             if (length $input) {
                 $self->handle_input($input);
                 $needs_render = 1;
+                $last_search_render = 0;  # Reset throttle on user input
+            }
+
+            # Continue background search if active
+            if ($searching) {
+                my $term = $self->{terminal};
+                my $engine = $self->{find_engine};
+
+                # Run ticks aggressively until input available or time limit
+                my $batch_start = time();
+                while ($engine->is_searching) {
+                    $engine->tick(10);
+
+                    # Check for input every few ticks to stay responsive
+                    last if $term->has_input();
+
+                    # Don't batch for more than 30ms to keep UI updating
+                    last if (time() - $batch_start) > 0.03;
+                }
+
+                # Throttle render during search - only every 100ms
+                my $now = time();
+                if ($now - $last_search_render > 0.1) {
+                    $needs_render = 1;
+                    $last_search_render = $now;
+                }
+
+                # Always render when search completes
+                if (!$engine->is_searching) {
+                    $needs_render = 1;
+                }
             }
 
             # Only render when needed to preserve cursor blink animation
@@ -344,6 +403,9 @@ sub handle_event {
     elsif ($self->{state} eq STATE_FILE_PICKER) {
         $self->handle_file_picker_event($event);
     }
+    elsif ($self->{state} eq STATE_FIND) {
+        $self->handle_find_event($event);
+    }
     else {
         $self->handle_editing_event($event);
     }
@@ -466,7 +528,7 @@ sub handle_ctrl_char {
     elsif ($char eq 'f') { $self->cmd_find(); }
     elsif ($char eq 'j') { $self->cmd_find_next(); }
     elsif ($char eq 'k') { $self->cmd_find_prev(); }
-    elsif ($char eq 'r') { $self->cmd_replace(); }
+    elsif ($char eq 'r') { $self->enter_find_mode(); }  # Unified find/replace
     elsif ($char eq 'g') { $self->cmd_goto_line(); }
 
     # View
@@ -511,6 +573,13 @@ sub handle_mouse_event {
 
         # Ignore clicks on ruler bar (row 2)
         return if $y == 2;
+
+        # Check if click is on status bar (last row) in find mode
+        my ($rows, $cols) = $term->get_size();
+        if ($y == $rows && $self->{state} eq STATE_FIND) {
+            $self->handle_find_bar_click($x);
+            return;
+        }
 
         # Click in text area
         my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
@@ -789,6 +858,593 @@ sub handle_footer_input_event {
             $input->{cursor}++;
         }
     }
+}
+
+# =============================================================================
+# Incremental Find Handling
+# =============================================================================
+
+sub enter_find_mode {
+    my ($self) = @_;
+    $self->{state} = STATE_FIND;
+    $self->{find_input} = $self->{search_term};  # Pre-fill with last search
+    $self->{find_input_cursor} = length($self->{find_input});
+    $self->{find_replace_input} = $self->{search_replace};  # Pre-fill replace too
+    $self->{find_replace_cursor} = length($self->{find_replace_input});
+    $self->{find_replace_active} = 1;  # Always show replace field
+    $self->{find_focus} = 'find';
+    $self->{find_replace_preview} = undef;  # Virtual preview data
+    $self->{find_replaced} = [];      # Clear replaced highlights
+    $self->_update_find_matches();
+}
+
+sub exit_find_mode {
+    my ($self, $keep_changes) = @_;
+
+    my $engine = $self->{find_engine};
+
+    # If keeping changes and we have matches to replace, apply them now
+    if ($keep_changes && $self->{find_replace_active} && $self->{find_replace_all}) {
+        # Complete background search first to get all matches
+        while ($engine->is_searching) {
+            $engine->tick(100);  # Finish quickly
+        }
+
+        # Use the optimized replace function
+        $self->{find_matches} = $engine->all_matches();
+        $self->_replace_all() if @{$self->{find_matches}};
+    }
+
+    # Abort any background search
+    $engine->abort() if $engine;
+
+    $self->{search_term} = $self->{find_input};  # Save for next time
+    $self->{search_replace} = $self->{find_replace_input};  # Save replace too
+    $self->{find_matches} = [];  # Clear highlights
+    $self->{find_replaced} = [];  # Clear replaced highlights
+    $self->{find_replace_preview} = undef;  # Clear virtual preview
+    $self->{find_replace_active} = 0;
+    $self->{state} = STATE_EDITING;
+}
+
+sub handle_find_event {
+    my ($self, $event) = @_;
+
+    my $type = $event->{type};
+
+    # Determine which input field has focus
+    my $in_replace = $self->{find_replace_active} && $self->{find_focus} eq 'replace';
+    my ($val_ref, $cursor_ref) = $in_replace
+        ? (\$self->{find_replace_input}, \$self->{find_replace_cursor})
+        : (\$self->{find_input}, \$self->{find_input_cursor});
+
+    if ($type eq 'key') {
+        my $key = $event->{key};
+        my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+
+        if ($key eq 'enter') {
+            if ($self->{find_replace_active}) {
+                if ($self->{find_replace_all}) {
+                    # In replace-all mode, Enter confirms and exits
+                    $self->exit_find_mode(1);
+                } else {
+                    # In replace-one mode, Enter replaces current and moves to next
+                    $self->_replace_current() if @{$self->{find_matches}};
+                }
+            } else {
+                # Exit find mode, keep cursor at current match
+                $self->exit_find_mode(1);
+            }
+        }
+        elsif ($key eq 'escape') {
+            # Exit find mode, undo preview if any
+            $self->exit_find_mode(0);
+        }
+        elsif ($key eq 'up') {
+            # Navigate to previous match
+            $self->_find_navigate(-1);
+        }
+        elsif ($key eq 'down') {
+            # Navigate to next match
+            $self->_find_navigate(1);
+        }
+        elsif ($key eq 'backspace') {
+            if ($$cursor_ref > 0) {
+                my $val = $$val_ref;
+                my $pos = $$cursor_ref;
+                $$val_ref = substr($val, 0, $pos - 1) . substr($val, $pos);
+                $$cursor_ref--;
+                if ($in_replace) {
+                    $self->_apply_replace_preview() if $self->{find_replace_all};
+                } else {
+                    $self->_reset_replace_preview();  # Find term changed, reset preview
+                    $self->_update_find_matches(1);  # Skip jump while typing
+                }
+            }
+        }
+        elsif ($key eq 'delete') {
+            if ($$cursor_ref < length($$val_ref)) {
+                my $val = $$val_ref;
+                my $pos = $$cursor_ref;
+                $$val_ref = substr($val, 0, $pos) . substr($val, $pos + 1);
+                if ($in_replace) {
+                    $self->_apply_replace_preview() if $self->{find_replace_all};
+                } else {
+                    $self->_reset_replace_preview();  # Find term changed, reset preview
+                    $self->_update_find_matches(1);  # Skip jump while typing
+                }
+            }
+        }
+        elsif ($key eq 'left') {
+            $$cursor_ref-- if $$cursor_ref > 0;
+        }
+        elsif ($key eq 'right') {
+            $$cursor_ref++ if $$cursor_ref < length($$val_ref);
+        }
+        elsif ($key eq 'home') {
+            $$cursor_ref = 0;
+        }
+        elsif ($key eq 'end') {
+            $$cursor_ref = length($$val_ref);
+        }
+        elsif ($key eq 'tab') {
+            if ($shift) {
+                # Shift+Tab: cycle through modes/toggles
+                # replace-all -> replace-one -> regex -> case -> replace-all
+                if ($self->{find_replace_active} && $self->{find_replace_all}) {
+                    $self->{find_replace_all} = 0;
+                } elsif ($self->{find_replace_active} && !$self->{find_replace_all}) {
+                    $self->{find_replace_all} = 1;
+                    if ($self->{find_regex}) {
+                        $self->{find_regex} = 0;
+                        $self->{find_case} = 1;
+                    } elsif ($self->{find_case}) {
+                        $self->{find_case} = 0;
+                    } else {
+                        $self->{find_regex} = 1;
+                    }
+                    $self->_apply_replace_preview();
+                } else {
+                    # No replace active, just cycle regex/case
+                    if ($self->{find_regex}) {
+                        $self->{find_regex} = 0;
+                        $self->{find_case} = 1;
+                    } elsif ($self->{find_case}) {
+                        $self->{find_case} = 0;
+                    } else {
+                        $self->{find_regex} = 1;
+                    }
+                }
+                $self->_update_find_matches(1);  # Skip jump when toggling options
+            } else {
+                # Tab: toggle between find/replace fields, or show replace
+                if (!$self->{find_replace_active}) {
+                    # Show replace field, prepopulate with find string
+                    $self->{find_replace_active} = 1;
+                    $self->{find_focus} = 'replace';
+                    $self->{find_replace_input} = $self->{find_input};
+                    $self->{find_replace_cursor} = length($self->{find_replace_input});
+                } elsif ($self->{find_focus} eq 'find') {
+                    $self->{find_focus} = 'replace';
+                } else {
+                    $self->{find_focus} = 'find';
+                }
+            }
+        }
+    }
+    elsif ($type eq 'char') {
+        my $char = $event->{char};
+        my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
+
+        if ($ctrl && lc($char) eq 'r') {
+            # Ctrl+R: Toggle regex mode
+            $self->{find_regex} = !$self->{find_regex};
+            $self->_reset_replace_preview();
+            $self->_update_find_matches(1);
+        }
+        elsif ($ctrl && lc($char) eq 'c') {
+            # Ctrl+C: Toggle case-sensitive mode
+            $self->{find_case} = !$self->{find_case};
+            $self->_reset_replace_preview();
+            $self->_update_find_matches(1);
+        }
+        elsif (!$ctrl) {
+            my $val = $$val_ref;
+            my $pos = $$cursor_ref;
+            $$val_ref = substr($val, 0, $pos) . $char . substr($val, $pos);
+            $$cursor_ref++;
+            if ($in_replace) {
+                $self->_apply_replace_preview() if $self->{find_replace_all};
+            } else {
+                $self->_reset_replace_preview();  # Find term changed, reset preview
+                $self->_update_find_matches(1);  # Skip jump while typing
+            }
+        }
+    }
+}
+
+# Handle clicks on the find bar (status bar in find mode)
+sub handle_find_bar_click {
+    my ($self, $x) = @_;
+
+    # Compute click regions based on current state (must match _render_find_bar layout)
+    my ($rows, $cols) = $self->{terminal}->get_size();
+
+    # Calculate match text width
+    my $match_count = $self->{find_engine} ? $self->{find_engine}->match_count() : 0;
+    my $current = $self->{find_current} // 0;
+    my $match_text = $match_count == 0
+        ? (length($self->{find_input}) ? 'No matches' : '')
+        : (($current + 1) . ' of ' . $match_count);
+    my $match_text_len = length($match_text);
+
+    # Right side width (same formula as renderer)
+    my $right_side_width = 45 + $match_text_len;
+
+    # Input field width (same formula as renderer)
+    my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
+    my $input_width = int($available / 2);
+    $input_width = 8 if $input_width < 8;
+    $input_width = 40 if $input_width > 40;
+
+    # Click region positions (1-indexed, matching renderer)
+    my $pos = 1;  # Leading space
+    $pos++;
+    my $find_start = $pos + 5;  # After "Find:"
+    my $find_end = $find_start + $input_width - 1;
+    my $replace_start = $find_end + 1 + 1 + 8;  # space + "Replace:"
+    my $replace_end = $replace_start + $input_width - 1;
+
+    # Check which region was clicked
+    if ($x >= $find_start && $x <= $find_end) {
+        $self->{find_focus} = 'find';
+    }
+    elsif ($x >= $replace_start && $x <= $replace_end) {
+        $self->{find_focus} = 'replace';
+    }
+    else {
+        # For buttons on the right side, scan from the right
+        # Layout after replace field: " " + ".* ^R" + " " + "Aa ^C" + " " + "X Esc" + " " + "✓ Enter"
+        # Pill widths: regex = 9, case = 9, cancel = 9, ok = 11
+        my $button_start = $replace_end + 2;  # space after replace field
+
+        my $regex_start = $button_start;
+        my $regex_end = $regex_start + 8;  # 9 chars
+
+        my $case_start = $regex_end + 2;  # space between
+        my $case_end = $case_start + 8;  # 9 chars
+
+        my $cancel_start = $case_end + 2;  # space between
+        my $cancel_end = $cancel_start + 8;  # 9 chars
+
+        my $ok_start = $cancel_end + 2;  # space
+        my $ok_end = $ok_start + 10;  # 11 chars
+
+        if ($x >= $regex_start && $x <= $regex_end) {
+            $self->{find_regex} = !$self->{find_regex};
+            $self->_reset_replace_preview();
+            $self->_update_find_matches(1);
+        }
+        elsif ($x >= $case_start && $x <= $case_end) {
+            $self->{find_case} = !$self->{find_case};
+            $self->_reset_replace_preview();
+            $self->_update_find_matches(1);
+        }
+        elsif ($x >= $cancel_start && $x <= $cancel_end) {
+            $self->exit_find_mode(0);
+        }
+        elsif ($x >= $ok_start && $x <= $ok_end) {
+            $self->exit_find_mode(1);
+        }
+    }
+}
+
+# Reset replace preview state when find term changes
+sub _reset_replace_preview {
+    my ($self) = @_;
+
+    # Clear virtual preview state (no buffer modification to undo!)
+    $self->{find_replace_preview} = undef;
+    $self->{find_replaced} = [];
+}
+
+
+sub _update_find_matches {
+    my ($self, $skip_jump) = @_;
+    my $doc = $self->{document};
+    my $term = $self->{find_input};
+    my $view = $self->{view};
+    my $engine = $self->{find_engine};
+
+    # Empty search = no matches
+    if (!length($term)) {
+        $self->{find_matches} = [];
+        $self->{find_current} = 0;
+        return;
+    }
+
+    # Get viewport bounds
+    my $viewport_start = $view->scroll_line();
+    my $viewport_end = $viewport_start + $view->viewport_rows();
+
+    # Use FindEngine for viewport-first search
+    # This returns viewport matches synchronously (<5ms)
+    # and starts background search for the rest
+    my $viewport_matches = $engine->search(
+        $term,
+        $viewport_start,
+        $viewport_end,
+        case_sensitive => $self->{find_case},
+        use_regex      => $self->{find_regex},
+    );
+
+    # Get all available matches (viewport + any completed background)
+    # Note: if background search is still running, this returns partial results
+    $self->{find_matches} = $engine->matches();
+
+    $self->_find_nearest_match() unless $skip_jump;
+}
+
+sub _find_nearest_match {
+    my ($self) = @_;
+
+    my $matches = $self->{find_matches};
+    return unless @$matches;
+
+    # Get current cursor position (line/col)
+    my $view = $self->{view};
+    my $cursor_line = $view->cursor_line();
+    my $cursor_col = $view->cursor_col();
+
+    # Find the match nearest to cursor (prefer match at or after cursor)
+    my $nearest_idx = 0;
+
+    # Helper to compare positions: returns -1 if a < cursor, 0 if equal, 1 if > cursor
+    my $cmp_to_cursor = sub {
+        my ($m) = @_;
+        return $m->{line} <=> $cursor_line || $m->{col} <=> $cursor_col;
+    };
+
+    # Helper to compute "distance" (simple line+col diff)
+    my $dist = sub {
+        my ($m) = @_;
+        return abs($m->{line} - $cursor_line) * 10000 + abs($m->{col} - $cursor_col);
+    };
+
+    my $nearest_cmp = $cmp_to_cursor->($matches->[0]);
+    my $nearest_dist = $dist->($matches->[0]);
+
+    for my $i (1 .. $#$matches) {
+        my $m = $matches->[$i];
+        my $m_cmp = $cmp_to_cursor->($m);
+        my $m_dist = $dist->($m);
+
+        # Prefer matches at or after cursor
+        if ($m_cmp >= 0 && $nearest_cmp < 0) {
+            $nearest_idx = $i;
+            $nearest_cmp = $m_cmp;
+            $nearest_dist = $m_dist;
+        } elsif (($m_cmp >= 0) == ($nearest_cmp >= 0)) {
+            if ($m_dist < $nearest_dist) {
+                $nearest_idx = $i;
+                $nearest_cmp = $m_cmp;
+                $nearest_dist = $m_dist;
+            }
+        }
+    }
+
+    $self->{find_current} = $nearest_idx;
+    $self->_jump_to_match($nearest_idx);
+}
+
+sub _find_navigate {
+    my ($self, $direction) = @_;
+
+    # Get latest matches from engine (includes completed background results)
+    my $engine = $self->{find_engine};
+    if ($engine) {
+        $self->{find_matches} = $engine->matches();
+    }
+
+    my $matches = $self->{find_matches};
+    return unless @$matches;
+
+    my $new_idx = $self->{find_current} + $direction;
+
+    # Wrap around
+    if ($new_idx < 0) {
+        $new_idx = $#$matches;
+    } elsif ($new_idx > $#$matches) {
+        $new_idx = 0;
+    }
+
+    $self->{find_current} = $new_idx;
+    $self->_jump_to_match($new_idx);
+}
+
+sub _jump_to_match {
+    my ($self, $idx) = @_;
+
+    my $matches = $self->{find_matches};
+    return unless $idx >= 0 && $idx < @$matches;
+
+    my $match = $matches->[$idx];
+    my $view = $self->{view};
+
+    # Use line/col directly from FindEngine match
+    my $line = $match->{line};
+    my $col = $match->{col};
+
+    # Move cursor and select the match
+    $view->clear_selection();
+    $view->set_cursor($line, $col);
+    $view->set_cursor($line, $col + $match->{length}, 1);  # extend selection
+
+    # Ensure match is visible
+    $view->ensure_cursor_visible();
+}
+
+sub _replace_current {
+    my ($self) = @_;
+
+    my $matches = $self->{find_matches};
+    return unless @$matches;
+
+    my $idx = $self->{find_current};
+    return unless $idx >= 0 && $idx < @$matches;
+
+    my $match = $matches->[$idx];
+    my $doc = $self->{document};
+    my $replacement = $self->{find_replace_input};
+
+    # Convert line/col to byte offset for document operations
+    my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
+
+    # Replace the match in the document
+    $doc->replace($offset, $offset + $match->{length}, $replacement);
+
+    # Update matches after replacement
+    $self->_update_find_matches();
+
+    # Navigate to next match (or stay at same index if matches remain)
+    if (@{$self->{find_matches}}) {
+        # Clamp to valid range
+        $self->{find_current} = 0 if $self->{find_current} >= @{$self->{find_matches}};
+        $self->_jump_to_match($self->{find_current});
+    }
+}
+
+sub _replace_all {
+    my ($self) = @_;
+
+    my $matches = $self->{find_matches};
+    return unless @$matches;
+
+    my $doc = $self->{document};
+    my $replacement = $self->{find_replace_input};
+    my $total = scalar @$matches;
+
+    # For small numbers of matches, do it synchronously
+    if ($total <= 100) {
+        $self->_replace_all_sync();
+        return;
+    }
+
+    # Set up progress state and show initial UI
+    $self->{_replace_active} = 1;
+    $self->{_replace_total} = $total;
+    $self->{_replace_progress} = 0;
+    $self->render();
+
+    # Get full text and build line offset cache (much faster than repeated API calls)
+    my $text = $doc->text();
+    my @line_offsets = (0);  # Line 0 starts at offset 0
+    my $pos = 0;
+    while (($pos = index($text, "\n", $pos)) >= 0) {
+        push @line_offsets, $pos + 1;  # Next line starts after newline
+        $pos++;
+    }
+
+    # Convert matches to offsets using cache (fast)
+    my @offsets;
+    for my $m (@$matches) {
+        my $line_start = $line_offsets[$m->{line}] // 0;
+        push @offsets, {
+            offset => $line_start + $m->{col},
+            length => $m->{length},
+        };
+    }
+
+    # Sort by offset ascending to build new string left-to-right
+    @offsets = sort { $a->{offset} <=> $b->{offset} } @offsets;
+
+    # Build new string by concatenating: non-match regions + replacements
+    # This is O(n) vs O(n*k) for in-place substr modifications
+    my $result = '';
+    my $last_end = 0;
+    for my $m (@offsets) {
+        # Add text between last match and this one
+        $result .= substr($text, $last_end, $m->{offset} - $last_end);
+        # Add replacement
+        $result .= $replacement;
+        $last_end = $m->{offset} + $m->{length};
+    }
+    # Add remaining text after last match
+    $result .= substr($text, $last_end);
+    $text = $result;
+
+    # Replace entire document content in one operation
+    $doc->replace(0, $doc->length(), $text);
+
+    # Clear progress state
+    $self->{_replace_active} = 0;
+
+    # Update matches (should be empty after replace all)
+    $self->_update_find_matches();
+
+    # Show message
+    $self->{message} = "Replaced $total occurrence" . ($total == 1 ? '' : 's');
+    $self->{message_time} = time();
+}
+
+# Synchronous replace for small numbers of matches
+sub _replace_all_sync {
+    my ($self) = @_;
+
+    my $matches = $self->{find_matches};
+    return unless @$matches;
+
+    my $doc = $self->{document};
+    my $replacement = $self->{find_replace_input};
+
+    # Sort by line/col descending to preserve offsets
+    my @sorted = sort {
+        $b->{line} <=> $a->{line} ||
+        $b->{col} <=> $a->{col}
+    } @$matches;
+
+    for my $match (@sorted) {
+        my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
+        $doc->replace($offset, $offset + $match->{length}, $replacement);
+    }
+
+    # Update matches
+    $self->_update_find_matches();
+
+    my $count = scalar @sorted;
+    $self->{message} = "Replaced $count occurrence" . ($count == 1 ? '' : 's');
+    $self->{message_time} = time();
+}
+
+sub _apply_replace_preview {
+    my ($self) = @_;
+
+    my $view = $self->{view};
+    my $engine = $self->{find_engine};
+    my $replacement = $self->{find_replace_input};
+
+    # Get viewport bounds
+    my $viewport_start = $view->scroll_line();
+    my $viewport_end = $viewport_start + $view->viewport_rows();
+
+    # Use FindEngine's virtual preview (no buffer modification!)
+    # This returns a hash of line_num => { text => "...", highlights => [...] }
+    my $preview = $engine->preview_viewport($replacement, $viewport_start, $viewport_end);
+
+    # Store preview data for Renderer
+    $self->{find_replace_preview} = $preview;
+
+    # Build find_replaced from viewport matches for current highlighting
+    my $viewport_matches = $engine->viewport_matches();
+    my @replaced;
+    for my $match (@$viewport_matches) {
+        push @replaced, {
+            line   => $match->{line},
+            col    => $match->{col},
+            length => length($replacement),  # Replacement length, not original match length
+        };
+    }
+    $self->{find_replaced} = \@replaced;
 }
 
 # =============================================================================
@@ -1337,6 +1993,26 @@ sub render {
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
             file_picker => $self->{file_picker},
+            find_mode => ($self->{state} eq STATE_FIND) ? {
+                value          => $self->{find_input},
+                cursor         => $self->{find_input_cursor},
+                matches        => $self->{find_matches},
+                replaced       => $self->{find_replaced},
+                replace_preview => $self->{find_replace_preview},  # Virtual preview data
+                current        => $self->{find_current},
+                regex          => $self->{find_regex},
+                case           => $self->{find_case},
+                replace_value  => $self->{find_replace_input},
+                replace_cursor => $self->{find_replace_cursor},
+                replace_active => $self->{find_replace_active},
+                replace_all    => $self->{find_replace_all},
+                focus          => $self->{find_focus},
+                match_count    => $self->{find_engine} ? $self->{find_engine}->match_count() : 0,
+                is_searching   => $self->{find_engine} ? $self->{find_engine}->is_searching() : 0,
+                is_replacing   => $self->{_replace_active} // 0,
+                replace_progress => $self->{_replace_progress} // 0,
+                replace_total  => $self->{_replace_total} // 0,
+            } : undef,
         },
     );
 

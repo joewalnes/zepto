@@ -245,9 +245,6 @@ sub execute_menu_item {
     elsif ($action eq 'dup_line_down')  { $self->do_duplicate_line_down(); }
     elsif ($action eq 'select_all') { $self->cmd_select_all(); }
     elsif ($action eq 'find')       { $self->cmd_find(); }
-    elsif ($action eq 'find_next')  { $self->cmd_find_next(); }
-    elsif ($action eq 'find_prev')  { $self->cmd_find_prev(); }
-    elsif ($action eq 'replace')    { $self->cmd_replace(); }
     elsif ($action eq 'goto')       { $self->cmd_goto_line(); }
     elsif ($action eq 'toggle_theme') { $self->cmd_toggle_theme(); }
     elsif ($action eq 'toggle_powerline') { $self->cmd_toggle_powerline(); }

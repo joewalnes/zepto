@@ -191,6 +191,6 @@ Find:[query    ]→[replace   ] [.*]^R[Aa]^I 1/17 ↑↓ Enter:all Esc
 ## Implementation Files
 
 - `lib/Zepto/Editor.pm` - State management, event handling
-- `lib/Zepto/Editor/Commands.pm` - cmd_find, cmd_replace entry points
+- `lib/Zepto/Editor/Commands.pm` - cmd_find entry point (unified find/replace)
 - `lib/Zepto/Renderer.pm` - Find footer rendering, match highlighting
 - `lib/Zepto/Theme.pm` - Match highlight colors

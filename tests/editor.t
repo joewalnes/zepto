@@ -67,6 +67,7 @@ subtest 'State constants' => sub {
     is(Zepto::Editor::STATE_PROMPT, 'prompt', 'STATE_PROMPT');
     is(Zepto::Editor::STATE_FOOTER_INPUT, 'footer_input', 'STATE_FOOTER_INPUT');
     is(Zepto::Editor::STATE_FILE_PICKER, 'file_picker', 'STATE_FILE_PICKER');
+    is(Zepto::Editor::STATE_FIND, 'find', 'STATE_FIND');
     is(Zepto::Editor::STATE_QUIT, 'quit', 'STATE_QUIT');
 };
 

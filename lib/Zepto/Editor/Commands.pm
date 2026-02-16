@@ -318,26 +318,16 @@ sub cmd_select_all {
 
 sub cmd_find {
     my ($self) = @_;
-
-    $self->open_dialog(
-        title => 'Find',
-        prompt => 'Search for:',
-        value => $self->{search_term},
-        on_submit => sub {
-            my ($term) = @_;
-            if ($term) {
-                $self->{search_term} = $term;
-                $self->do_find_next();
-            }
-        },
-    );
+    $self->enter_find_mode();
 }
 
 sub cmd_find_next {
     my ($self) = @_;
 
     if ($self->{search_term}) {
-        $self->do_find_next();
+        # Enter find mode and navigate to next match
+        $self->enter_find_mode();
+        $self->_find_navigate(1);
     }
     else {
         $self->cmd_find();
@@ -348,7 +338,9 @@ sub cmd_find_prev {
     my ($self) = @_;
 
     if ($self->{search_term}) {
-        $self->do_find_prev();
+        # Enter find mode and navigate to prev match
+        $self->enter_find_mode();
+        $self->_find_navigate(-1);
     }
     else {
         $self->cmd_find();
@@ -431,56 +423,6 @@ sub do_find_prev {
     else {
         $self->show_message("Not found: $term");
     }
-}
-
-sub cmd_replace {
-    my ($self) = @_;
-
-    $self->open_dialog(
-        title => 'Replace',
-        prompt => 'Find:',
-        value => $self->{search_term},
-        on_submit => sub {
-            my ($find) = @_;
-            if ($find) {
-                $self->{search_term} = $find;
-                $self->open_dialog(
-                    title => 'Replace',
-                    prompt => 'Replace with:',
-                    value => $self->{search_replace},
-                    on_submit => sub {
-                        my ($replace) = @_;
-                        $self->{search_replace} = $replace // '';
-                        $self->do_replace_all();
-                    },
-                );
-            }
-        },
-    );
-}
-
-sub do_replace_all {
-    my ($self) = @_;
-
-    my $doc = $self->{document};
-    my $find = $self->{search_term};
-    my $replace = $self->{search_replace};
-
-    return unless $find;
-
-    my $text = $doc->text();
-    my $count = 0;
-    my $offset = 0;
-
-    while ((my $pos = index($text, $find, $offset)) >= 0) {
-        $doc->delete($pos, length($find));
-        $doc->insert($pos, $replace);
-        $text = $doc->text();  # Refresh
-        $offset = $pos + length($replace);
-        $count++;
-    }
-
-    $self->show_message("Replaced $count occurrences");
 }
 
 sub cmd_goto_line {

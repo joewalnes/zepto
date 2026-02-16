@@ -117,8 +117,8 @@ my %CHARS = (
     pencil              => [ NF_PENCIL,           "\x{2022}"  ],
     eye                 => [ NF_EYE,              "\x{2022}"  ],
     settings            => [ NF_COG,              "\x{2022}"  ],
-    check               => [ NF_CHECK,            "\x{2022}"  ],
-    times               => [ NF_TIMES,            "\x{2022}"  ],
+    check               => [ NF_CHECK,            "\x{2713}"  ],  # ✓
+    times               => [ NF_TIMES,            "\x{2717}"  ],  # ✗
     modified            => [ NF_MODIFIED,         "\x{2022}"  ],
 
     # Box drawing - corners (rounded when powerline, square when not)
