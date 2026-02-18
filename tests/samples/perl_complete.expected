@@ -57,8 +57,25 @@
 
 <COMMENT># Regular expressions</COMMENT>
 <KEYWORD>if</KEYWORD> (<VARIABLE>$name</VARIABLE> <OPERATOR>=~</OPERATOR> <REGEX>/^[A-Z]/</REGEX>) {
-    <VARIABLE>$name</VARIABLE> <OPERATOR>=~</OPERATOR> s<REGEX>/World/</REGEX>Universe<OPERATOR>/</OPERATOR>g;
+    <VARIABLE>$name</VARIABLE> <OPERATOR>=~</OPERATOR> <REGEX>s/World/Universe/g</REGEX>;
 }
+
+<COMMENT># Complex substitution patterns (shell quoting, escapes)</COMMENT>
+<KEYWORD>sub</KEYWORD> <FUNCTION>shell_quote</FUNCTION> {
+    <KEYWORD>my</KEYWORD> (<VARIABLE>$str</VARIABLE>) <OPERATOR>=</OPERATOR> <VARIABLE>@_</VARIABLE>;
+    <VARIABLE>$str</VARIABLE> <OPERATOR>=~</OPERATOR> <REGEX>s/'/'\\''/g</REGEX>;  <COMMENT># Escape single quotes for shell</COMMENT>
+    <KEYWORD>return</KEYWORD> <STRING>"'$str'"</STRING>;
+}
+
+<COMMENT># Transliteration</COMMENT>
+<KEYWORD>my</KEYWORD> <VARIABLE>$text</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>"Hello World"</STRING>;
+<VARIABLE>$text</VARIABLE> <OPERATOR>=~</OPERATOR> <REGEX>tr/a-z/A-Z/</REGEX>;  <COMMENT># Uppercase</COMMENT>
+<VARIABLE>$text</VARIABLE> <OPERATOR>=~</OPERATOR> <REGEX>y/A-Z/a-z/</REGEX>;   <COMMENT># Lowercase</COMMENT>
+
+<COMMENT># More regex patterns</COMMENT>
+<KEYWORD>my</KEYWORD> <VARIABLE>$path</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>"/usr/local/bin"</STRING>;
+<VARIABLE>$path</VARIABLE> <OPERATOR>=~</OPERATOR> <STRING>s{/}{\\}g</STRING>;    <COMMENT># Different delimiters</COMMENT>
+<VARIABLE>$path</VARIABLE> <OPERATOR>=~</OPERATOR> <STRING>m{^/usr}</STRING>;     <COMMENT># Match with braces</COMMENT>
 
 <COMMENT># Here-doc</COMMENT>
 <KEYWORD>my</KEYWORD> <VARIABLE>$html</VARIABLE> <OPERATOR>=</OPERATOR> <OPERATOR><</OPERATOR><OPERATOR><</OPERATOR><STRING>'HTML'</STRING>;

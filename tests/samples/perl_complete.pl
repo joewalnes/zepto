@@ -56,6 +56,23 @@ if ($name =~ /^[A-Z]/) {
     $name =~ s/World/Universe/g;
 }
 
+# Complex substitution patterns (shell quoting, escapes)
+sub shell_quote {
+    my ($str) = @_;
+    $str =~ s/'/'\\''/g;  # Escape single quotes for shell
+    return "'$str'";
+}
+
+# Transliteration
+my $text = "Hello World";
+$text =~ tr/a-z/A-Z/;  # Uppercase
+$text =~ y/A-Z/a-z/;   # Lowercase
+
+# More regex patterns
+my $path = "/usr/local/bin";
+$path =~ s{/}{\\}g;    # Different delimiters
+$path =~ m{^/usr};     # Match with braces
+
 # Here-doc
 my $html = <<'HTML';
 <html>

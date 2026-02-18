@@ -178,8 +178,24 @@ sub tokenize {
             }
         }
 
-        # Regex match m// or //
-        if ($rest =~ m{^(m?\s*/(?:[^/\\]|\\.)*/)([msixpodualngc]*)}) {
+        # Substitution s///, transliteration tr///, y///
+        # Must come before regex match to avoid partial matching
+        if ($rest =~ m{^((s|tr|y)\s*/(?:[^/\\]|\\.)*/((?:[^/\\]|\\.)*)/)([msixpodualngcer]*)}) {
+            push @tokens, _token($pos, $pos + length($1) + length($4), TOKEN_REGEX);
+            $pos += length($1) + length($4);
+            next;
+        }
+
+        # Regex match m// or bare //
+        # m// is explicit, bare // is matched here too (may sometimes match division, but that's rare)
+        if ($rest =~ m{^(m\s*/(?:[^/\\]|\\.)*/)([msixpodualngc]*)}) {
+            push @tokens, _token($pos, $pos + length($1) + length($2), TOKEN_REGEX);
+            $pos += length($1) + length($2);
+            next;
+        }
+
+        # Bare /regex/ - only if it looks like a regex (has content and closing /)
+        if ($rest =~ m{^(/(?:[^/\\]|\\.)+/)([msixpodualngc]*)}) {
             push @tokens, _token($pos, $pos + length($1) + length($2), TOKEN_REGEX);
             $pos += length($1) + length($2);
             next;
