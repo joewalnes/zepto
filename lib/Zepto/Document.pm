@@ -421,6 +421,14 @@ sub _compute_vcs_diff {
 sub update_vcs_diff {
     my ($self) = @_;
     return unless $self->{_vcs_provider};
+
+    # Check if HEAD changed (e.g., commit in another window)
+    if ($self->{_vcs_provider}->head_changed()) {
+        $self->{_vcs_provider}->invalidate_cache($self->{path});
+        $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+        $self->{_vcs_dirty} = 1;  # Force recompute
+    }
+
     return unless $self->{_vcs_dirty};
 
     my $now = time();

@@ -85,6 +85,19 @@ sub get_staged_content {
     return undef;
 }
 
+# Check if HEAD has changed since last check (for cache invalidation)
+# Returns true if changed, false otherwise
+# Default: always returns false (subclasses override with actual check)
+sub head_changed {
+    return 0;
+}
+
+# Invalidate cached content (call after save or external changes)
+sub invalidate_cache {
+    my ($self, $file_path) = @_;
+    # Default: no-op, subclasses override if they cache
+}
+
 # Convert absolute file path to repo-relative path
 sub _relative_path {
     my ($self, $file_path) = @_;

@@ -41,6 +41,7 @@ sub new {
     my ($class, %opts) = @_;
     my $self = $class->SUPER::new(%opts);
     $self->{_content_cache} = {};  # Cache for HEAD content
+    $self->{_head_mtime} = $self->_get_head_mtime();  # Track HEAD changes
     return $self;
 }
 
@@ -163,6 +164,25 @@ sub _shell_quote {
     my ($str) = @_;
     $str =~ s/'/'\\''/g;
     return "'$str'";
+}
+
+# Get mtime of .git/HEAD file
+sub _get_head_mtime {
+    my ($self) = @_;
+    my $head_file = $self->{repo_root} . "/.git/HEAD";
+    return (stat($head_file))[9] // 0;
+}
+
+# Check if HEAD has changed since last check
+# Returns true if changed, and updates stored mtime
+sub head_changed {
+    my ($self) = @_;
+    my $current_mtime = $self->_get_head_mtime();
+    if ($current_mtime != $self->{_head_mtime}) {
+        $self->{_head_mtime} = $current_mtime;
+        return 1;
+    }
+    return 0;
 }
 
 1;
