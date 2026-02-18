@@ -242,59 +242,107 @@ sub _backtrack {
 # Convert edit script to gutter indicators
 # =============================================================================
 
+# First, group consecutive non-equal edits into "hunks"
+# Then classify each hunk:
+#   - Only inserts → added lines
+#   - Only deletes → deletion marker
+#   - Both → modified lines (NO separate deletion marker)
+#
+# This ensures deletion markers never appear adjacent to added/modified lines.
+
 sub _edits_to_indicators {
     my ($class, $edits, $current_line_count) = @_;
 
-    my @added;
-    my @modified;
-    my @deleted;  # Lines AFTER which deletions occurred
-
-    # Track consecutive operations for modification detection
-    my $pending_delete_at = undef;  # Current line after pending deletion
+    # Step 1: Group edits into hunks
+    # We need to track the current line number as we process edits
+    my @hunks;
+    my $current_hunk = undef;
+    my $last_curr_line = -1;  # Track last seen current line number
 
     for my $i (0 .. $#$edits) {
         my $edit = $edits->[$i];
         my ($op, $base_line, $curr_line) = @$edit;
 
-        if ($op eq 'delete') {
-            # Look ahead: if next op is insert at same position, it's a modification
-            if ($i + 1 <= $#$edits) {
-                my $next = $edits->[$i + 1];
-                if ($next->[0] eq 'insert') {
-                    # Delete followed by insert = modification
-                    push @modified, $next->[2];
-                    $edits->[$i + 1] = ['_skip'];  # Mark as processed
-                    next;
+        if ($op eq 'equal') {
+            # End current hunk if any
+            if ($current_hunk) {
+                # Find the next current line number to determine deletion position
+                if (!defined $current_hunk->{next_curr_line}) {
+                    $current_hunk->{next_curr_line} = $curr_line;
                 }
+                push @hunks, $current_hunk;
+                $current_hunk = undef;
+            }
+            $last_curr_line = $curr_line;
+        } else {
+            # Start new hunk or continue existing one
+            if (!$current_hunk) {
+                $current_hunk = {
+                    deletes => [],           # Base line numbers deleted
+                    inserts => [],           # Current line numbers inserted
+                    prev_curr_line => $last_curr_line,  # Line before this hunk
+                    next_curr_line => undef,            # Line after this hunk (filled when hunk ends)
+                };
             }
 
-            # Pure deletion - record line number after which deletion occurred
-            # Find the next valid current line number
-            my $after_line;
-            for my $j ($i + 1 .. $#$edits) {
-                if (defined $edits->[$j][2]) {
-                    $after_line = $edits->[$j][2];
-                    last;
-                }
+            if ($op eq 'delete') {
+                push @{$current_hunk->{deletes}}, $base_line;
+            } elsif ($op eq 'insert') {
+                push @{$current_hunk->{inserts}}, $curr_line;
+                $last_curr_line = $curr_line;
             }
+        }
+    }
 
-            # If deletion at end, use last line
-            if (!defined $after_line) {
-                $after_line = $current_line_count > 0 ? $current_line_count - 1 : 0;
+    # Don't forget last hunk
+    if ($current_hunk) {
+        # No next line - hunk is at end of file
+        $current_hunk->{next_curr_line} = undef;
+        push @hunks, $current_hunk;
+    }
+
+    # Step 2: Convert hunks to indicators
+    my @added;
+    my @modified;
+    my @deleted;
+
+    for my $hunk (@hunks) {
+        my $has_deletes = @{$hunk->{deletes}} > 0;
+        my $has_inserts = @{$hunk->{inserts}} > 0;
+
+        if ($has_deletes && $has_inserts) {
+            # Both deletions and insertions = all inserted lines are "modified"
+            # NO deletion marker (the deletions are "absorbed" into the modification)
+            push @modified, @{$hunk->{inserts}};
+        }
+        elsif ($has_inserts) {
+            # Only insertions = added lines
+            push @added, @{$hunk->{inserts}};
+        }
+        elsif ($has_deletes) {
+            # Only deletions = deletion marker
+            # Marker is placed on the line AFTER which content was deleted
+            # - If deletion at start (prev_curr_line == -1), marker goes on line 0
+            # - If deletion at end (next_curr_line is undef), marker on last line
+            # - Otherwise, marker on prev_curr_line (the line before the deletion point)
+
+            my $marker_line;
+            if ($hunk->{prev_curr_line} == -1) {
+                # Deletion at start of file - mark line 0
+                $marker_line = 0;
+            } elsif (!defined $hunk->{next_curr_line}) {
+                # Deletion at end of file - mark last line
+                $marker_line = $current_line_count > 0 ? $current_line_count - 1 : 0;
             } else {
-                # Deletion occurred BEFORE this line, so mark the previous line
-                $after_line = $after_line > 0 ? $after_line - 1 : 0;
+                # Deletion in middle - mark line before deletion point
+                $marker_line = $hunk->{prev_curr_line};
             }
 
-            # Avoid duplicates
-            if (!@deleted || $deleted[-1] != $after_line) {
-                push @deleted, $after_line;
+            # Avoid duplicate markers at same position
+            if (!@deleted || $deleted[-1] != $marker_line) {
+                push @deleted, $marker_line;
             }
         }
-        elsif ($op eq 'insert') {
-            push @added, $curr_line;
-        }
-        # 'equal' and '_skip' are ignored
     }
 
     return {

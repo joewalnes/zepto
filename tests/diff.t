@@ -197,8 +197,10 @@ subtest 'Deletion and modification' => sub {
     my $current = "modified\nline3";
     my $result = Zepto::Diff->diff($base, $current);
 
+    # Both line1->modified and line2 deletion are in same hunk
+    # The deletion is absorbed into the modification (no separate marker)
     is_deeply($result->{modified}, [0], 'Line 0 is modified');
-    is_deeply($result->{deleted}, [0], 'Deletion after line 0');
+    is_deeply($result->{deleted}, [], 'Deletion absorbed into modification');
     is_deeply($result->{added}, [], 'No additions');
 };
 

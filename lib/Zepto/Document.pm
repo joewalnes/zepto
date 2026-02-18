@@ -466,7 +466,6 @@ sub vcs_deletion_status {
 
 # Get VCS change status for a specific line (0-indexed)
 # Returns: 'added', 'modified', or undef
-# Used for column 2 of the two-column VCS gutter
 sub vcs_change_status {
     my ($self, $line) = @_;
     return undef unless $self->{_vcs_diff};
