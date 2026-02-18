@@ -258,14 +258,14 @@ sub _move_to {
 
 # Calculate gutter width based on line count
 # Exported so Editor.pm can use same calculation for mouse position mapping
-# Gutter must fit: VCS indicators (2 cols) + cursor line badge (round_left + digits + space + arrow_right)
-# Layout: [vcs_del][vcs_chg][pad][round_left][digits][space][arrow_right] = 2 + digits + 3
+# Gutter must fit: VCS indicators (2 cols) + cursor line badge (round_left + digits + arrow_right)
+# Layout: [vcs_del][vcs_chg][pad][round_left][digits][arrow_right] = 2 + pad + digits + 2
 # and normal lines: [vcs_del][vcs_chg][space][right-aligned digits][space]
 sub get_gutter_width {
     my ($class, $line_count) = @_;
     $line_count //= 1;  # Default if undef
     my $max_digits = length("$line_count");
-    my $gutter_width = $max_digits + 5;  # +5 for VCS (2) + badge chars (round_left + space + arrow_right = 3)
+    my $gutter_width = $max_digits + 4;  # +4 for VCS (2) + badge chars (round_left + arrow_right = 2)
     $gutter_width = MIN_GUTTER_WIDTH + 2 if $gutter_width < MIN_GUTTER_WIDTH + 2;
     return $gutter_width;
 }
@@ -793,7 +793,8 @@ sub _render_text_area {
             $chg_color //= $theme->color('gutter_fg');
 
             if ($is_cursor_line) {
-                # Cursor line: [vcs_del][vcs_chg][pad][rl][digits][space][ar]
+                # Cursor line: [vcs_del][vcs_chg][pad][rl][space][digits][ar]
+                # The space before digits ensures right-alignment with normal lines
                 my $rl = Zepto::Chars->get('round_left');
                 my $ar = Zepto::Chars->get('arrow_right');
 
@@ -801,17 +802,15 @@ sub _render_text_area {
                 $output .= $theme->color('gutter_bg') . $del_color . $del_char;
                 $output .= $theme->color('gutter_bg') . $chg_color . $chg_char;
 
-                # Calculate padding to right-align the badge
-                # Badge takes: rl(1) + digits + space(1) + ar(1) = digits + 3
-                # Available: gutter_width - 2 (for VCS columns)
-                my $badge_width = length($line_num_str) + 3;
-                my $pad = $gutter_width - 2 - $badge_width;
-                $pad = 0 if $pad < 0;
+                # Right-align: match the sprintf padding used in normal lines
+                # Normal line uses sprintf("%*d", gutter_width - 4, num) which right-aligns
+                # We need same visual width: gutter_width - 4 total for content area
+                my $num_width = $gutter_width - 4;  # Same as normal line sprintf width
+                my $padded_num = sprintf("%*d", $num_width, $doc_line + 1);
 
-                # Padding, then badge
-                $output .= $theme->color('gutter_bg') . (' ' x $pad);
+                # Badge: rl + padded_num + ar
                 $output .= $theme->color('gutter_bg') . $theme->color('ruler_cursor_edge') . $rl;
-                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $line_num_str . ' ';
+                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
                 # Arrow right: badge color as fg, next area color as bg
                 $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
             } else {
