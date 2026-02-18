@@ -45,10 +45,10 @@
 
     <KEYWORD>pub</KEYWORD> <KEYWORD>fn</KEYWORD> <FUNCTION>format</FUNCTION>(self: <TYPE>Value</TYPE>) <TYPE>void</TYPE> {
         <KEYWORD>switch</KEYWORD> (self) {
-            .int <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>i<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"int: {}\n"</STRING>, .{i}),
-            .float <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>f<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"float: {d}\n"</STRING>, .{f}),
-            .boolean <OPERATOR>=></OPERATOR> <OPERATOR>|</OPERATOR>b<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"bool: {}\n"</STRING>, .{b}),
-            .none <OPERATOR>=></OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"none\n"</STRING>, .{}),
+            .int <OPERATOR>=&gt;</OPERATOR> <OPERATOR>|</OPERATOR>i<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"int: {}\n"</STRING>, .{i}),
+            .float <OPERATOR>=&gt;</OPERATOR> <OPERATOR>|</OPERATOR>f<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"float: {d}\n"</STRING>, .{f}),
+            .boolean <OPERATOR>=&gt;</OPERATOR> <OPERATOR>|</OPERATOR>b<OPERATOR>|</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"bool: {}\n"</STRING>, .{b}),
+            .none <OPERATOR>=&gt;</OPERATOR> std.debug.<FUNCTION>print</FUNCTION>(<STRING>"none\n"</STRING>, .{}),
         }
     }
 };
@@ -66,7 +66,7 @@
 
 <COMMENT>// Generic function</COMMENT>
 <KEYWORD>fn</KEYWORD> <FUNCTION>max</FUNCTION>(<KEYWORD>comptime</KEYWORD> <TYPE>T</TYPE>: <TYPE>type</TYPE>, a: <TYPE>T</TYPE>, b: <TYPE>T</TYPE>) <TYPE>T</TYPE> {
-    <KEYWORD>return</KEYWORD> <KEYWORD>if</KEYWORD> (a <OPERATOR>></OPERATOR> b) a <KEYWORD>else</KEYWORD> b;
+    <KEYWORD>return</KEYWORD> <KEYWORD>if</KEYWORD> (a <OPERATOR>&gt;</OPERATOR> b) a <KEYWORD>else</KEYWORD> b;
 }
 
 <COMMENT>// Function with error handling</COMMENT>
@@ -83,7 +83,7 @@
 
 <COMMENT>// Comptime function</COMMENT>
 <KEYWORD>fn</KEYWORD> <FUNCTION>fibonacci</FUNCTION>(<KEYWORD>comptime</KEYWORD> n: <TYPE>u32</TYPE>) <TYPE>u32</TYPE> {
-    <KEYWORD>if</KEYWORD> (n <OPERATOR><=</OPERATOR> <NUMBER>1</NUMBER>) <KEYWORD>return</KEYWORD> n;
+    <KEYWORD>if</KEYWORD> (n <OPERATOR>&lt;=</OPERATOR> <NUMBER>1</NUMBER>) <KEYWORD>return</KEYWORD> n;
     <KEYWORD>return</KEYWORD> <KEYWORD>comptime</KEYWORD> <FUNCTION>fibonacci</FUNCTION>(n <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>) <OPERATOR>+</OPERATOR> <FUNCTION>fibonacci</FUNCTION>(n <OPERATOR>-</OPERATOR> <NUMBER>2</NUMBER>);
 }
 
@@ -112,7 +112,7 @@
     <KEYWORD>const</KEYWORD> slice: []<TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> array[<NUMBER>0.</NUMBER>.<NUMBER>3</NUMBER>];
 
     <COMMENT>// Pointer operations</COMMENT>
-    <KEYWORD>const</KEYWORD> ptr: <OPERATOR>*</OPERATOR><TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <OPERATOR>&</OPERATOR>mutable;
+    <KEYWORD>const</KEYWORD> ptr: <OPERATOR>*</OPERATOR><TYPE>i32</TYPE> <OPERATOR>=</OPERATOR> <OPERATOR>&amp;</OPERATOR>mutable;
     ptr.<OPERATOR>*</OPERATOR> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
 
     <COMMENT>// Optional type</COMMENT>
@@ -130,9 +130,9 @@
     };
 
     <COMMENT>// Control flow</COMMENT>
-    <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    <KEYWORD>if</KEYWORD> (count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
         <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Positive\n"</STRING>, .{});
-    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR>&lt;</OPERATOR> <NUMBER>0</NUMBER>) {
         <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Negative\n"</STRING>, .{});
     } <KEYWORD>else</KEYWORD> {
         <KEYWORD>try</KEYWORD> stdout.<FUNCTION>print</FUNCTION>(<STRING>"Zero\n"</STRING>, .{});
@@ -141,9 +141,9 @@
     <COMMENT>// Switch expression</COMMENT>
     <KEYWORD>const</KEYWORD> status <OPERATOR>=</OPERATOR> <TYPE>Status</TYPE>.active;
     <KEYWORD>const</KEYWORD> message <OPERATOR>=</OPERATOR> <KEYWORD>switch</KEYWORD> (status) {
-        .pending <OPERATOR>=></OPERATOR> <STRING>"Waiting..."</STRING>,
-        .active <OPERATOR>=></OPERATOR> <STRING>"Running"</STRING>,
-        .completed <OPERATOR>=></OPERATOR> <STRING>"Done"</STRING>,
+        .pending <OPERATOR>=&gt;</OPERATOR> <STRING>"Waiting..."</STRING>,
+        .active <OPERATOR>=&gt;</OPERATOR> <STRING>"Running"</STRING>,
+        .completed <OPERATOR>=&gt;</OPERATOR> <STRING>"Done"</STRING>,
     };
 
     <COMMENT>// Loops</COMMENT>
@@ -153,7 +153,7 @@
     }
 
     <KEYWORD>var</KEYWORD> i: <TYPE>u32</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
-    <KEYWORD>while</KEYWORD> (i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>) : (i <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>) {
+    <KEYWORD>while</KEYWORD> (i <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>) : (i <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>) {
         <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
         <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
     }
@@ -166,7 +166,7 @@
 
     <COMMENT>// Inline assembly</COMMENT>
     <KEYWORD>const</KEYWORD> result_<KEYWORD>asm</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>asm</KEYWORD> <KEYWORD>volatile</KEYWORD> (<STRING>"syscall"</STRING>
-        : [ret] <STRING>"={rax}"</STRING> (<OPERATOR>-></OPERATOR> <TYPE>usize</TYPE>),
+        : [ret] <STRING>"={rax}"</STRING> (<OPERATOR>-&gt;</OPERATOR> <TYPE>usize</TYPE>),
         : [number] <STRING>"{rax}"</STRING> (<FUNCTION>@as</FUNCTION>(<TYPE>usize</TYPE>, <NUMBER>1</NUMBER>)),
         : <STRING>"rcx"</STRING>, <STRING>"r11"</STRING>, <STRING>"memory"</STRING>
     );

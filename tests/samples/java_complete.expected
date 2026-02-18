@@ -18,9 +18,9 @@
 }
 
 <COMMENT>// Generic interface</COMMENT>
-<KEYWORD>interface</KEYWORD> <TYPE>Repository</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <CONSTANT>ID</CONSTANT><OPERATOR>></OPERATOR> {
+<KEYWORD>interface</KEYWORD> <TYPE>Repository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE>, <CONSTANT>ID</CONSTANT><OPERATOR>&gt;</OPERATOR> {
     <TYPE>T</TYPE> <FUNCTION>findById</FUNCTION>(<CONSTANT>ID</CONSTANT> id);
-    <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <FUNCTION>findAll</FUNCTION>();
+    <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <FUNCTION>findAll</FUNCTION>();
     <TYPE>T</TYPE> <FUNCTION>save</FUNCTION>(<TYPE>T</TYPE> entity);
     <TYPE>void</TYPE> <FUNCTION>delete</FUNCTION>(<TYPE>T</TYPE> entity);
 }
@@ -57,17 +57,17 @@
 }
 
 <COMMENT>// Main class with generics</COMMENT>
-<KEYWORD>public</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>Comparable</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>>></OPERATOR> <KEYWORD>extends</KEYWORD> <TYPE>BaseEntity</TYPE> <KEYWORD>implements</KEYWORD> <TYPE>Constants</TYPE> {
+<KEYWORD>public</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE> <KEYWORD>extends</KEYWORD> <TYPE>Comparable</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;&gt;</OPERATOR> <KEYWORD>extends</KEYWORD> <TYPE>BaseEntity</TYPE> <KEYWORD>implements</KEYWORD> <TYPE>Constants</TYPE> {
 
     <COMMENT>// Static constant</COMMENT>
     <KEYWORD>public</KEYWORD> <KEYWORD>static</KEYWORD> <KEYWORD>final</KEYWORD> <TYPE>double</TYPE> <CONSTANT>PI</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159265358979</NUMBER>;
 
     <COMMENT>// Instance fields</COMMENT>
     <KEYWORD>private</KEYWORD> <TYPE>String</TYPE> name;
-    <KEYWORD>private</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> items;
-    <KEYWORD>private</KEYWORD> <TYPE>Map</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE>, <TYPE>Object</TYPE><OPERATOR>></OPERATOR> metadata;
+    <KEYWORD>private</KEYWORD> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> items;
+    <KEYWORD>private</KEYWORD> <TYPE>Map</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>String</TYPE>, <TYPE>Object</TYPE><OPERATOR>&gt;</OPERATOR> metadata;
     <ATTRIBUTE>@Autowired</ATTRIBUTE>
-    <KEYWORD>private</KEYWORD> <TYPE>Repository</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>Long</TYPE><OPERATOR>></OPERATOR> repository;
+    <KEYWORD>private</KEYWORD> <TYPE>Repository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE>, <TYPE>Long</TYPE><OPERATOR>&gt;</OPERATOR> repository;
 
     <COMMENT>// Static initializer</COMMENT>
     <KEYWORD>static</KEYWORD> {
@@ -77,8 +77,8 @@
     <COMMENT>// Constructor</COMMENT>
     <KEYWORD>public</KEYWORD> <FUNCTION>JavaExample</FUNCTION>(<TYPE>String</TYPE> name) {
         <KEYWORD>this</KEYWORD>.name <OPERATOR>=</OPERATOR> name;
-        <KEYWORD>this</KEYWORD>.items <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>ArrayList</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>();
-        <KEYWORD>this</KEYWORD>.metadata <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>HashMap</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>();
+        <KEYWORD>this</KEYWORD>.items <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>ArrayList</TYPE><OPERATOR>&lt;</OPERATOR><OPERATOR>&gt;</OPERATOR>();
+        <KEYWORD>this</KEYWORD>.metadata <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>HashMap</TYPE><OPERATOR>&lt;</OPERATOR><OPERATOR>&gt;</OPERATOR>();
         <KEYWORD>this</KEYWORD>.created<TYPE>At</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Date</FUNCTION>();
     }
 
@@ -91,7 +91,7 @@
     }
 
     <COMMENT>// Generic method</COMMENT>
-    <KEYWORD>public</KEYWORD> <OPERATOR><</OPERATOR><TYPE>U</TYPE><OPERATOR>></OPERATOR> <TYPE>Optional</TYPE><OPERATOR><</OPERATOR><TYPE>U</TYPE><OPERATOR>></OPERATOR> <FUNCTION>transform</FUNCTION>(<TYPE>T</TYPE> item, java.util.function.<TYPE>Function</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE>, <TYPE>U</TYPE><OPERATOR>></OPERATOR> mapper) {
+    <KEYWORD>public</KEYWORD> <OPERATOR>&lt;</OPERATOR><TYPE>U</TYPE><OPERATOR>&gt;</OPERATOR> <TYPE>Optional</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>U</TYPE><OPERATOR>&gt;</OPERATOR> <FUNCTION>transform</FUNCTION>(<TYPE>T</TYPE> item, java.util.function.<TYPE>Function</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE>, <TYPE>U</TYPE><OPERATOR>&gt;</OPERATOR> mapper) {
         <KEYWORD>if</KEYWORD> (item <OPERATOR>==</OPERATOR> <KEYWORD>null</KEYWORD>) {
             <KEYWORD>return</KEYWORD> <TYPE>Optional</TYPE>.<FUNCTION>empty</FUNCTION>();
         }
@@ -106,7 +106,7 @@
     }
 
     <COMMENT>// Lambda and stream operations</COMMENT>
-    <KEYWORD>public</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> <FUNCTION>getFilteredItems</FUNCTION>(java.util.function.<TYPE>Predicate</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> filter) {
+    <KEYWORD>public</KEYWORD> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <FUNCTION>getFilteredItems</FUNCTION>(java.util.function.<TYPE>Predicate</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> filter) {
         <KEYWORD>return</KEYWORD> items.<FUNCTION>stream</FUNCTION>()
             .<FUNCTION>filter</FUNCTION>(filter)
             .<FUNCTION>sorted</FUNCTION>()
@@ -128,9 +128,9 @@
     <COMMENT>// Switch expression (Java 14+)</COMMENT>
     <KEYWORD>public</KEYWORD> <TYPE>String</TYPE> <FUNCTION>getStatusMessage</FUNCTION>(<TYPE>Status</TYPE> status) {
         <KEYWORD>return</KEYWORD> <KEYWORD>switch</KEYWORD> (status) {
-            <KEYWORD>case</KEYWORD> <CONSTANT>PENDING</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Waiting for processing"</STRING>;
-            <KEYWORD>case</KEYWORD> <CONSTANT>ACTIVE</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Currently processing"</STRING>;
-            <KEYWORD>case</KEYWORD> <CONSTANT>COMPLETED</CONSTANT> <OPERATOR>-></OPERATOR> <STRING>"Processing complete"</STRING>;
+            <KEYWORD>case</KEYWORD> <CONSTANT>PENDING</CONSTANT> <OPERATOR>-&gt;</OPERATOR> <STRING>"Waiting for processing"</STRING>;
+            <KEYWORD>case</KEYWORD> <CONSTANT>ACTIVE</CONSTANT> <OPERATOR>-&gt;</OPERATOR> <STRING>"Currently processing"</STRING>;
+            <KEYWORD>case</KEYWORD> <CONSTANT>COMPLETED</CONSTANT> <OPERATOR>-&gt;</OPERATOR> <STRING>"Processing complete"</STRING>;
         };
     }
 
@@ -147,7 +147,7 @@
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"String length: "</STRING> <OPERATOR>+</OPERATOR> s.<FUNCTION>length</FUNCTION>());
         } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>Integer</TYPE> i) {
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Integer value: "</STRING> <OPERATOR>+</OPERATOR> i);
-        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>List</TYPE><OPERATOR><</OPERATOR>?<OPERATOR>></OPERATOR> list) {
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (obj <KEYWORD>instanceof</KEYWORD> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR>?<OPERATOR>&gt;</OPERATOR> list) {
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"List size: "</STRING> <OPERATOR>+</OPERATOR> list.<FUNCTION>size</FUNCTION>());
         }
     }
@@ -174,23 +174,23 @@
         <TYPE>String</TYPE>[] names <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>String</TYPE>[]{<STRING>"Alice"</STRING>, <STRING>"Bob"</STRING>, <STRING>"Charlie"</STRING>};
 
         <COMMENT>// Object creation</COMMENT>
-        <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> example <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR><</OPERATOR><OPERATOR>></OPERATOR>(<STRING>"Test"</STRING>);
+        <TYPE>JavaExample</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>String</TYPE><OPERATOR>&gt;</OPERATOR> example <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>JavaExample</TYPE><OPERATOR>&lt;</OPERATOR><OPERATOR>&gt;</OPERATOR>(<STRING>"Test"</STRING>);
         example.<FUNCTION>addItems</FUNCTION>(<STRING>"one"</STRING>, <STRING>"two"</STRING>, <STRING>"three"</STRING>);
 
         <COMMENT>// Null checks and ternary</COMMENT>
         <TYPE>String</TYPE> result <OPERATOR>=</OPERATOR> example.name <OPERATOR>!=</OPERATOR> <KEYWORD>null</KEYWORD> ? example.name : <STRING>"default"</STRING>;
 
         <COMMENT>// Control flow</COMMENT>
-        <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        <KEYWORD>if</KEYWORD> (count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Positive"</STRING>);
-        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR>&lt;</OPERATOR> <NUMBER>0</NUMBER>) {
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Negative"</STRING>);
         } <KEYWORD>else</KEYWORD> {
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Zero"</STRING>);
         }
 
         <COMMENT>// Loops</COMMENT>
-        <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>) {
+        <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>) {
             <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
             <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(i);
@@ -200,13 +200,13 @@
             <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(item);
         }
 
-        <KEYWORD>while</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+        <KEYWORD>while</KEYWORD> (count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
             count<OPERATOR>-</OPERATOR><OPERATOR>-</OPERATOR>;
         }
 
         <KEYWORD>do</KEYWORD> {
             count<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR>;
-        } <KEYWORD>while</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>);
+        } <KEYWORD>while</KEYWORD> (count <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>);
 
         <COMMENT>// Try-with-resources</COMMENT>
         <KEYWORD>try</KEYWORD> (var scanner <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> java.util.<FUNCTION>Scanner</FUNCTION>(<TYPE>System</TYPE>.in)) {
@@ -225,12 +225,12 @@
         };
 
         <COMMENT>// Lambda expressions</COMMENT>
-        <TYPE>Runnable</TYPE> lambda <OPERATOR>=</OPERATOR> () <OPERATOR>-></OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Lambda"</STRING>);
-        java.util.function.<TYPE>Consumer</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> consumer <OPERATOR>=</OPERATOR> s <OPERATOR>-></OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(s);
-        java.util.function.<TYPE>BiFunction</TYPE><OPERATOR><</OPERATOR><TYPE>Integer</TYPE>, <TYPE>Integer</TYPE>, <TYPE>Integer</TYPE><OPERATOR>></OPERATOR> add <OPERATOR>=</OPERATOR> (a, b) <OPERATOR>-></OPERATOR> a <OPERATOR>+</OPERATOR> b;
+        <TYPE>Runnable</TYPE> lambda <OPERATOR>=</OPERATOR> () <OPERATOR>-&gt;</OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(<STRING>"Lambda"</STRING>);
+        java.util.function.<TYPE>Consumer</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>String</TYPE><OPERATOR>&gt;</OPERATOR> consumer <OPERATOR>=</OPERATOR> s <OPERATOR>-&gt;</OPERATOR> <TYPE>System</TYPE>.out.<FUNCTION>println</FUNCTION>(s);
+        java.util.function.<TYPE>BiFunction</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Integer</TYPE>, <TYPE>Integer</TYPE>, <TYPE>Integer</TYPE><OPERATOR>&gt;</OPERATOR> add <OPERATOR>=</OPERATOR> (a, b) <OPERATOR>-&gt;</OPERATOR> a <OPERATOR>+</OPERATOR> b;
 
         <COMMENT>// Method reference</COMMENT>
-        <TYPE>List</TYPE><OPERATOR><</OPERATOR><TYPE>String</TYPE><OPERATOR>></OPERATOR> list <OPERATOR>=</OPERATOR> <TYPE>Arrays</TYPE>.<FUNCTION>asList</FUNCTION>(<STRING>"a"</STRING>, <STRING>"b"</STRING>, <STRING>"c"</STRING>);
+        <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>String</TYPE><OPERATOR>&gt;</OPERATOR> list <OPERATOR>=</OPERATOR> <TYPE>Arrays</TYPE>.<FUNCTION>asList</FUNCTION>(<STRING>"a"</STRING>, <STRING>"b"</STRING>, <STRING>"c"</STRING>);
         list.<FUNCTION>forEach</FUNCTION>(<TYPE>System</TYPE>.out<OPERATOR>::</OPERATOR>println);
 
         <COMMENT>// Synchronized block</COMMENT>
@@ -239,7 +239,7 @@
         }
 
         <COMMENT>// Assertions</COMMENT>
-        <KEYWORD>assert</KEYWORD> count <OPERATOR>>=</OPERATOR> <NUMBER>0</NUMBER> : <STRING>"Count must be non-negative"</STRING>;
+        <KEYWORD>assert</KEYWORD> count <OPERATOR>&gt;=</OPERATOR> <NUMBER>0</NUMBER> : <STRING>"Count must be non-negative"</STRING>;
     }
 }
 

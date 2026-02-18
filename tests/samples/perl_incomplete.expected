@@ -17,27 +17,27 @@
 <STRING># Missing closing brace</STRING>
 <STRING>sub process_data {</STRING>
 <STRING>    my ($data) = @_;</STRING>
-<STRING>    if ($data > 0) {</STRING>
+<STRING>    if ($data &gt; 0) {</STRING>
 <STRING>        print "</STRING>Processing<OPERATOR>...</OPERATOR>
 
 <COMMENT># Incomplete hash</COMMENT>
 <KEYWORD>my</KEYWORD> <VARIABLE>%config</VARIABLE> <OPERATOR>=</OPERATOR> (
-    host <OPERATOR>=></OPERATOR> <STRING>'localhost'</STRING>,
-    port <OPERATOR>=></OPERATOR>
+    host <OPERATOR>=&gt;</OPERATOR> <STRING>'localhost'</STRING>,
+    port <OPERATOR>=&gt;</OPERATOR>
 
 <COMMENT># Incomplete array assignment</COMMENT>
 <KEYWORD>my</KEYWORD> <VARIABLE>@items</VARIABLE> <OPERATOR>=</OPERATOR> (<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>,
 
 <COMMENT># Incomplete method chain</COMMENT>
-<KEYWORD>my</KEYWORD> <VARIABLE>$result</VARIABLE> <OPERATOR>=</OPERATOR> Some::Class<OPERATOR>-></OPERATOR><FUNCTION>new</FUNCTION>()<OPERATOR>-></OPERATOR>
+<KEYWORD>my</KEYWORD> <VARIABLE>$result</VARIABLE> <OPERATOR>=</OPERATOR> Some::Class<OPERATOR>-&gt;</OPERATOR><FUNCTION>new</FUNCTION>()<OPERATOR>-&gt;</OPERATOR>
 
 <COMMENT># Unterminated here-doc</COMMENT>
-<KEYWORD>my</KEYWORD> <VARIABLE>$text</VARIABLE> <OPERATOR>=</OPERATOR> <OPERATOR><</OPERATOR><OPERATOR><</OPERATOR><STRING>'END'</STRING>;
+<KEYWORD>my</KEYWORD> <VARIABLE>$text</VARIABLE> <OPERATOR>=</OPERATOR> <OPERATOR>&lt;</OPERATOR><OPERATOR>&lt;</OPERATOR><STRING>'END'</STRING>;
 This here<OPERATOR>-</OPERATOR>doc has <KEYWORD>no</KEYWORD> <TYPE>terminator</TYPE>
 It just keeps going
 
 <COMMENT># Incomplete conditional</COMMENT>
-<KEYWORD>if</KEYWORD> (<VARIABLE>$count</VARIABLE> <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>
+<KEYWORD>if</KEYWORD> (<VARIABLE>$count</VARIABLE> <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>
 
 <COMMENT># Partially typed keyword</COMMENT>
 fore

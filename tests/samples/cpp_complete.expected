@@ -3,37 +3,37 @@
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
 <COMMENT>// Complete C++ example demonstrating syntax highlighting</COMMENT>
-<KEYWORD>#include</KEYWORD> <STRING><iostream></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><vector></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><string></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><memory></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><algorithm></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><functional></STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;iostream&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;vector&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;string&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;memory&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;algorithm&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;functional&gt;</STRING>
 
 <COMMENT>// Namespace</COMMENT>
 <KEYWORD>namespace</KEYWORD> <TYPE>demo</TYPE> {
 
 <COMMENT>// Template class</COMMENT>
-<KEYWORD>template</KEYWORD><OPERATOR><</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR>
+<KEYWORD>template</KEYWORD><OPERATOR>&lt;</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>
 <KEYWORD>class</KEYWORD> <TYPE>Container</TYPE> {
 <KEYWORD>private</KEYWORD>:
-    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR> items_;
+    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> items_;
 
 <KEYWORD>public</KEYWORD>:
     <FUNCTION>Container</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
     ~<FUNCTION>Container</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
 
     <COMMENT>// Rule of five</COMMENT>
-    <FUNCTION>Container</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
-    <FUNCTION>Container</FUNCTION>(<TYPE>Container</TYPE><OPERATOR>&&</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
-    <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
-    <TYPE>Container</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<TYPE>Container</TYPE><OPERATOR>&&</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <FUNCTION>Container</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&amp;</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <FUNCTION>Container</FUNCTION>(<TYPE>Container</TYPE><OPERATOR>&amp;&amp;</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <TYPE>Container</TYPE><OPERATOR>&amp;</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<KEYWORD>const</KEYWORD> <TYPE>Container</TYPE><OPERATOR>&amp;</OPERATOR> other) <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
+    <TYPE>Container</TYPE><OPERATOR>&amp;</OPERATOR> <KEYWORD>operator</KEYWORD><OPERATOR>=</OPERATOR>(<TYPE>Container</TYPE><OPERATOR>&amp;&amp;</OPERATOR> other) <KEYWORD>noexcept</KEYWORD> <OPERATOR>=</OPERATOR> <KEYWORD>default</KEYWORD>;
 
-    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&</OPERATOR> item) {
+    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&amp;</OPERATOR> item) {
         items_.<FUNCTION>push_back</FUNCTION>(item);
     }
 
-    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<TYPE>T</TYPE><OPERATOR>&&</OPERATOR> item) {
+    <KEYWORD>void</KEYWORD> <FUNCTION>add</FUNCTION>(<TYPE>T</TYPE><OPERATOR>&amp;&amp;</OPERATOR> item) {
         items_.<FUNCTION>push_back</FUNCTION>(<TYPE>std::</TYPE><FUNCTION>move</FUNCTION>(item));
     }
 
@@ -41,7 +41,7 @@
         <KEYWORD>return</KEYWORD> items_.<FUNCTION>size</FUNCTION>();
     }
 
-    <KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&</OPERATOR> <KEYWORD>operator</KEYWORD>[](<TYPE>size_t</TYPE> index) <KEYWORD>const</KEYWORD> {
+    <KEYWORD>const</KEYWORD> <TYPE>T</TYPE><OPERATOR>&amp;</OPERATOR> <KEYWORD>operator</KEYWORD>[](<TYPE>size_t</TYPE> index) <KEYWORD>const</KEYWORD> {
         <KEYWORD>return</KEYWORD> items_[index];
     }
 };
@@ -81,18 +81,18 @@
     }
 
     <KEYWORD>void</KEYWORD> <FUNCTION>draw</FUNCTION>() <KEYWORD>const</KEYWORD> <KEYWORD>override</KEYWORD> {
-        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <STRING>"Drawing circle with radius "</STRING> <OPERATOR><<</OPERATOR> <FUNCTION>radius_</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <STRING>"Drawing circle with radius "</STRING> <OPERATOR>&lt;&lt;</OPERATOR> <FUNCTION>radius_</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <TYPE>std::</TYPE>endl;
     }
 };
 
 <COMMENT>// Function template</COMMENT>
-<KEYWORD>template</KEYWORD><OPERATOR><</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>></OPERATOR>
+<KEYWORD>template</KEYWORD><OPERATOR>&lt;</OPERATOR><KEYWORD>typename</KEYWORD> <TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>
 <TYPE>T</TYPE> <FUNCTION>max_value</FUNCTION>(<TYPE>T</TYPE> a, <TYPE>T</TYPE> b) {
-    <KEYWORD>return</KEYWORD> (a <OPERATOR>></OPERATOR> b) ? a : b;
+    <KEYWORD>return</KEYWORD> (a <OPERATOR>&gt;</OPERATOR> b) ? a : b;
 }
 
 <COMMENT>// Lambda and auto</COMMENT>
-<KEYWORD>auto</KEYWORD> process <OPERATOR>=</OPERATOR> [](<KEYWORD>int</KEYWORD> x) <OPERATOR>-></OPERATOR> <KEYWORD>int</KEYWORD> {
+<KEYWORD>auto</KEYWORD> process <OPERATOR>=</OPERATOR> [](<KEYWORD>int</KEYWORD> x) <OPERATOR>-&gt;</OPERATOR> <KEYWORD>int</KEYWORD> {
     <KEYWORD>return</KEYWORD> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
 };
 
@@ -109,14 +109,14 @@
     <TYPE>std::</TYPE><TYPE>string</TYPE> message <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
 
     <COMMENT>// Auto and range-based for</COMMENT>
-    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR><</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>></OPERATOR> numbers <OPERATOR>=</OPERATOR> {<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>};
-    <KEYWORD>for</KEYWORD> (<KEYWORD>auto</KEYWORD><OPERATOR>&</OPERATOR> num : numbers) {
-        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <FUNCTION>num</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+    <TYPE>std::</TYPE><TYPE>vector</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>&gt;</OPERATOR> numbers <OPERATOR>=</OPERATOR> {<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>};
+    <KEYWORD>for</KEYWORD> (<KEYWORD>auto</KEYWORD><OPERATOR>&amp;</OPERATOR> num : numbers) {
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <FUNCTION>num</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <TYPE>std::</TYPE>endl;
     }
 
     <COMMENT>// Smart pointers</COMMENT>
-    <KEYWORD>auto</KEYWORD> ptr <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_unique</FUNCTION><OPERATOR><</OPERATOR><TYPE>Circle</TYPE><OPERATOR>></OPERATOR>(<NUMBER>5.0</NUMBER>);
-    <TYPE>std::</TYPE><TYPE>shared_ptr</TYPE><OPERATOR><</OPERATOR><TYPE>Shape</TYPE><OPERATOR>></OPERATOR> shape <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_shared</FUNCTION><OPERATOR><</OPERATOR><TYPE>Circle</TYPE><OPERATOR>></OPERATOR>(<NUMBER>3.0</NUMBER>);
+    <KEYWORD>auto</KEYWORD> ptr <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_unique</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>Circle</TYPE><OPERATOR>&gt;</OPERATOR>(<NUMBER>5.0</NUMBER>);
+    <TYPE>std::</TYPE><TYPE>shared_ptr</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Shape</TYPE><OPERATOR>&gt;</OPERATOR> shape <OPERATOR>=</OPERATOR> <TYPE>std::</TYPE><FUNCTION>make_shared</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>Circle</TYPE><OPERATOR>&gt;</OPERATOR>(<NUMBER>3.0</NUMBER>);
 
     <COMMENT>// Lambda with capture</COMMENT>
     <KEYWORD>int</KEYWORD> multiplier <OPERATOR>=</OPERATOR> <NUMBER>10</NUMBER>;
@@ -125,10 +125,10 @@
     };
 
     <COMMENT>// STL algorithms</COMMENT>
-    <TYPE>std::</TYPE><FUNCTION>sort</FUNCTION>(numbers.<FUNCTION>begin</FUNCTION>(), numbers.<FUNCTION>end</FUNCTION>(), <TYPE>std::</TYPE><FUNCTION>greater</FUNCTION><OPERATOR><</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>></OPERATOR>());
+    <TYPE>std::</TYPE><FUNCTION>sort</FUNCTION>(numbers.<FUNCTION>begin</FUNCTION>(), numbers.<FUNCTION>end</FUNCTION>(), <TYPE>std::</TYPE><FUNCTION>greater</FUNCTION><OPERATOR>&lt;</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>&gt;</OPERATOR>());
 
     <COMMENT>// Template usage</COMMENT>
-    <FUNCTION>Container</FUNCTION><OPERATOR><</OPERATOR><TYPE>std::</TYPE><TYPE>string</TYPE><OPERATOR>></OPERATOR> container;
+    <FUNCTION>Container</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>std::</TYPE><TYPE>string</TYPE><OPERATOR>&gt;</OPERATOR> container;
     container.<FUNCTION>add</FUNCTION>(<STRING>"hello"</STRING>);
     container.<FUNCTION>add</FUNCTION>(<STRING>"world"</STRING>);
 
@@ -136,8 +136,8 @@
     <KEYWORD>auto</KEYWORD> [name, value, enabled] <OPERATOR>=</OPERATOR> <TYPE>Config</TYPE>{};
 
     <COMMENT>// If with initializer (C++17)</COMMENT>
-    <KEYWORD>if</KEYWORD> (<KEYWORD>auto</KEYWORD> result <OPERATOR>=</OPERATOR> <FUNCTION>lambda</FUNCTION>(<NUMBER>5</NUMBER>); result <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
-        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR><<</OPERATOR> <STRING>"Result: "</STRING> <OPERATOR><<</OPERATOR> <FUNCTION>result</FUNCTION> <OPERATOR><<</OPERATOR> <TYPE>std::</TYPE>endl;
+    <KEYWORD>if</KEYWORD> (<KEYWORD>auto</KEYWORD> result <OPERATOR>=</OPERATOR> <FUNCTION>lambda</FUNCTION>(<NUMBER>5</NUMBER>); result <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
+        <TYPE>std::</TYPE><FUNCTION>cout</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <STRING>"Result: "</STRING> <OPERATOR>&lt;&lt;</OPERATOR> <FUNCTION>result</FUNCTION> <OPERATOR>&lt;&lt;</OPERATOR> <TYPE>std::</TYPE>endl;
     }
 
     <COMMENT>// Constexpr</COMMENT>

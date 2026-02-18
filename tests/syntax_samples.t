@@ -53,8 +53,9 @@ if (@sample_files == 0) {
     exit;
 }
 
-# Plan tests: 2 per sample file + 2 subtests
-plan tests => scalar(@sample_files) * 2 + 2;
+# Plan tests: 2 or 3 per sample file depending on validation + 2 subtests
+my $tests_per_file = $ENV{SKIP_EXPECTED_VALIDATION} ? 2 : 3;
+plan tests => scalar(@sample_files) * $tests_per_file + 2;
 
 # Test each sample file
 for my $sample_file (sort @sample_files) {
@@ -71,7 +72,7 @@ for my $sample_file (sort @sample_files) {
     ok(-f $expected_path, "Expected file exists for $sample_file");
 
     SKIP: {
-        skip "No expected file for $sample_file", 1 unless -f $expected_path;
+        skip "No expected file for $sample_file", $tests_per_file - 1 unless -f $expected_path;
 
         # Create highlighter and set file
         my $highlighter = Zepto::Highlighter->new();
@@ -89,7 +90,7 @@ for my $sample_file (sort @sample_files) {
 
         # Skip if no grammar available
         if (!$highlighter->has_grammar) {
-            skip "No grammar available for $sample_file", 1;
+            skip "No grammar available for $sample_file", $tests_per_file - 1;
             next;
         }
 
@@ -121,8 +122,8 @@ for my $sample_file (sort @sample_files) {
             fail("Tokenization failed for $sample_file ($token_count tokens, ${coverage}% coverage)");
         }
 
-        # Optional detailed validation with VALIDATE_EXPECTED=1
-        if ($ENV{VALIDATE_EXPECTED} && -f $expected_path) {
+        # Detailed validation against expected file (skip with SKIP_EXPECTED_VALIDATION=1)
+        if (!$ENV{SKIP_EXPECTED_VALIDATION} && -f $expected_path) {
             # Build actual tokens per position
             my %actual_tokens;
             for my $i (0 .. $#lines) {
@@ -141,13 +142,15 @@ for my $sample_file (sort @sample_files) {
             close($efh);
 
             my $errors = 0;
+            my @error_details;
             my $sample_line_num = 0;
             my $in_header = 1;
 
             for my $expected_line (@expected_lines) {
                 chomp($expected_line);
                 if ($in_header) {
-                    next if $expected_line =~ /^#/ || $expected_line =~ /^\s*$/;
+                    # Header lines start with "# " (hash space) - content lines with "#" but no space are not headers
+                    next if $expected_line =~ /^# / || $expected_line =~ /^\s*$/;
                     $in_header = 0;
                 }
                 $sample_line_num++;
@@ -157,18 +160,40 @@ for my $sample_file (sort @sample_files) {
                 while ($expected_line =~ /(<([A-Z_]+)>([^<]*)<\/\2>|([^<]+))/g) {
                     my ($match, $type, $text, $plain) = ($1, $2, $3, $4);
                     if (defined $type && defined $text) {
+                        # Unescape XML entities
+                        $text =~ s/&lt;/</g;
+                        $text =~ s/&gt;/>/g;
+                        $text =~ s/&amp;/&/g;
                         my $norm_type = lc($type);
                         for my $j (0 .. length($text) - 1) {
                             my $actual = $actual_tokens{$sample_line_num}{$col + $j} // 'NONE';
-                            $errors++ if $actual ne $norm_type;
+                            if ($actual ne $norm_type) {
+                                $errors++;
+                                # Collect first few errors for diagnostics
+                                if (@error_details < 5) {
+                                    my $char = substr($text, $j, 1);
+                                    push @error_details, "  Line $sample_line_num col $col: expected $norm_type, got $actual (char '$char')";
+                                }
+                            }
                         }
                         $col += length($text);
                     } elsif (defined $plain) {
+                        # Unescape XML entities in plain text too
+                        $plain =~ s/&lt;/</g;
+                        $plain =~ s/&gt;/>/g;
+                        $plain =~ s/&amp;/&/g;
                         $col += length($plain);
                     }
                 }
             }
-            diag("Expected validation: $errors mismatches for $sample_file") if $errors > 0;
+            if ($errors > 0) {
+                fail("Expected tokens match for $sample_file ($errors mismatches)");
+                diag(join("\n", @error_details));
+                diag("  ... and " . ($errors - 5) . " more") if $errors > 5;
+                diag("  Run: scripts/regenerate_expected.pl $sample_file");
+            } else {
+                pass("Expected tokens match for $sample_file");
+            }
         }
     }
 }

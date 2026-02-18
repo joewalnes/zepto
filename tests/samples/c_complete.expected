@@ -3,14 +3,14 @@
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
 <COMMENT>// Complete C example demonstrating syntax highlighting</COMMENT>
-<KEYWORD>#include</KEYWORD> <STRING><stdio.h></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><stdlib.h></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><string.h></STRING>
-<KEYWORD>#include</KEYWORD> <STRING><stdbool.h></STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;stdio.h&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;stdlib.h&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;string.h&gt;</STRING>
+<KEYWORD>#include</KEYWORD> <STRING>&lt;stdbool.h&gt;</STRING>
 
 <COMMENT>// Macro definitions</COMMENT>
 <KEYWORD>#define</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT> <NUMBER>1024</NUMBER>
-<KEYWORD>#define</KEYWORD> <FUNCTION>MIN</FUNCTION>(a, b) ((a) <OPERATOR><</OPERATOR> (b) ? (a) : (b))
+<KEYWORD>#define</KEYWORD> <FUNCTION>MIN</FUNCTION>(a, b) ((a) <OPERATOR>&lt;</OPERATOR> (b) ? (a) : (b))
 
 <COMMENT>// Type definitions</COMMENT>
 <KEYWORD>typedef</KEYWORD> <TYPE>unsigned</TYPE> <TYPE>int</TYPE> u<TYPE>int</TYPE>;
@@ -71,9 +71,9 @@
     <TYPE>unsigned</TYPE> <TYPE>long</TYPE> u<TYPE>long</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0xDEADBEEFUL</NUMBER>;
 
     <COMMENT>// Control flow</COMMENT>
-    <KEYWORD>if</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    <KEYWORD>if</KEYWORD> (count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
         <FUNCTION>printf</FUNCTION>(<STRING>"Positive: %d\n"</STRING>, count);
-    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER>) {
+    } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> (count <OPERATOR>&lt;</OPERATOR> <NUMBER>0</NUMBER>) {
         <FUNCTION>printf</FUNCTION>(<STRING>"Negative\n"</STRING>);
     } <KEYWORD>else</KEYWORD> {
         <FUNCTION>printf</FUNCTION>(<STRING>"Zero\n"</STRING>);
@@ -93,23 +93,23 @@
     }
 
     <COMMENT>// Loops</COMMENT>
-    <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>++</OPERATOR>) {
+    <KEYWORD>for</KEYWORD> (<TYPE>int</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>++</OPERATOR>) {
         <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER>) <KEYWORD>continue</KEYWORD>;
         <KEYWORD>if</KEYWORD> (i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER>) <KEYWORD>break</KEYWORD>;
         <FUNCTION>printf</FUNCTION>(<STRING>"%d\n"</STRING>, i);
     }
 
-    <KEYWORD>while</KEYWORD> (count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER>) {
+    <KEYWORD>while</KEYWORD> (count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
         count<OPERATOR>--</OPERATOR>;
     }
 
     <KEYWORD>do</KEYWORD> {
         count<OPERATOR>++</OPERATOR>;
-    } <KEYWORD>while</KEYWORD> (count <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>);
+    } <KEYWORD>while</KEYWORD> (count <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>);
 
     <COMMENT>// Struct usage</COMMENT>
     <TYPE>Node</TYPE> <OPERATOR>*</OPERATOR>node <OPERATOR>=</OPERATOR> <FUNCTION>create_node</FUNCTION>(<NUMBER>42</NUMBER>, <STRING>"test"</STRING>);
-    <FUNCTION>printf</FUNCTION>(<STRING>"Node: %s = %d\n"</STRING>, node<OPERATOR>-></OPERATOR>name, node<OPERATOR>-></OPERATOR>value);
+    <FUNCTION>printf</FUNCTION>(<STRING>"Node: %s = %d\n"</STRING>, node<OPERATOR>-&gt;</OPERATOR>name, node<OPERATOR>-&gt;</OPERATOR>value);
 
     <COMMENT>// Memory management</COMMENT>
     <FUNCTION>free</FUNCTION>(dynamic_arr);
@@ -125,16 +125,16 @@
         <FUNCTION>perror</FUNCTION>(<STRING>"malloc failed"</STRING>);
         <KEYWORD>return</KEYWORD> <KEYWORD>NULL</KEYWORD>;
     }
-    node<OPERATOR>-></OPERATOR>value <OPERATOR>=</OPERATOR> value;
-    <FUNCTION>strncpy</FUNCTION>(node<OPERATOR>-></OPERATOR>name, name, <KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-></OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>);
-    node<OPERATOR>-></OPERATOR>name[<KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-></OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>] <OPERATOR>=</OPERATOR> <STRING>'\0'</STRING>;
-    node<OPERATOR>-></OPERATOR>next <OPERATOR>=</OPERATOR> <KEYWORD>NULL</KEYWORD>;
+    node<OPERATOR>-&gt;</OPERATOR>value <OPERATOR>=</OPERATOR> value;
+    <FUNCTION>strncpy</FUNCTION>(node<OPERATOR>-&gt;</OPERATOR>name, name, <KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-&gt;</OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>);
+    node<OPERATOR>-&gt;</OPERATOR>name[<KEYWORD>sizeof</KEYWORD>(node<OPERATOR>-&gt;</OPERATOR>name) <OPERATOR>-</OPERATOR> <NUMBER>1</NUMBER>] <OPERATOR>=</OPERATOR> <STRING>'\0'</STRING>;
+    node<OPERATOR>-&gt;</OPERATOR>next <OPERATOR>=</OPERATOR> <KEYWORD>NULL</KEYWORD>;
     <KEYWORD>return</KEYWORD> node;
 }
 
 <TYPE>int</TYPE> <FUNCTION>process_data</FUNCTION>(<TYPE>int</TYPE> <OPERATOR>*</OPERATOR>arr, <TYPE>size_t</TYPE> len) {
     <TYPE>int</TYPE> sum <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>;
-    <KEYWORD>for</KEYWORD> (<TYPE>size_t</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> len; i<OPERATOR>++</OPERATOR>) {
+    <KEYWORD>for</KEYWORD> (<TYPE>size_t</TYPE> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR>&lt;</OPERATOR> len; i<OPERATOR>++</OPERATOR>) {
         sum <OPERATOR>+=</OPERATOR> arr[i];
     }
     <KEYWORD>return</KEYWORD> sum;

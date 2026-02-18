@@ -104,9 +104,9 @@ Term 2
 
 <PUNCTUATION>[</PUNCTUATION><STRING>Link to heading</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
 
-<PUNCTUATION><</PUNCTUATION><TAG>https://autolink-example.com</TAG><PUNCTUATION>></PUNCTUATION>
+<PUNCTUATION>&lt;</PUNCTUATION><TAG>https://autolink-example.com</TAG><PUNCTUATION>&gt;</PUNCTUATION>
 
-<PUNCTUATION><</PUNCTUATION><TAG>email@example.com</TAG><PUNCTUATION>></PUNCTUATION>
+<PUNCTUATION>&lt;</PUNCTUATION><TAG>email@example.com</TAG><PUNCTUATION>&gt;</PUNCTUATION>
 
 [ref1]: https://example.com "Reference 1"
 [1]: https://example.com "Numbered Reference"
@@ -129,7 +129,7 @@ Term 2
 
 Use <FUNCTION>`console.log()`</FUNCTION> for debugging.
 
-The <FUNCTION>`<html>`</FUNCTION> element is the root.
+The <FUNCTION>`&lt;html&gt;`</FUNCTION> element is the root.
 
 Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 
@@ -147,14 +147,14 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 <FUNCTION>}</FUNCTION>
 <FUNCTION></FUNCTION>
 <FUNCTION>const items = [1, 2, 3];</FUNCTION>
-<FUNCTION>items.forEach(item => console.log(item));</FUNCTION>
+<FUNCTION>items.forEach(item =&gt; console.log(item));</FUNCTION>
 <PUNCTUATION>```</PUNCTUATION>
 
 <PUNCTUATION>```</PUNCTUATION><TYPE>python</TYPE>
 <FUNCTION># Python code block</FUNCTION>
 <FUNCTION>def factorial(n):</FUNCTION>
 <FUNCTION>    """Calculate factorial recursively."""</FUNCTION>
-<FUNCTION>    if n <= 1:</FUNCTION>
+<FUNCTION>    if n &lt;= 1:</FUNCTION>
 <FUNCTION>        return 1</FUNCTION>
 <FUNCTION>    return n * factorial(n - 1)</FUNCTION>
 <FUNCTION></FUNCTION>
@@ -203,28 +203,28 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING>Blockquotes</HEADING>
 
-<PUNCTUATION>></PUNCTUATION> Simple blockquote
+<PUNCTUATION>&gt;</PUNCTUATION> Simple blockquote
 
-<PUNCTUATION>></PUNCTUATION> Multi-line blockquote
-<PUNCTUATION>></PUNCTUATION> continues here
-<PUNCTUATION>></PUNCTUATION> and here.
+<PUNCTUATION>&gt;</PUNCTUATION> Multi-line blockquote
+<PUNCTUATION>&gt;</PUNCTUATION> continues here
+<PUNCTUATION>&gt;</PUNCTUATION> and here.
 
-<PUNCTUATION>></PUNCTUATION> Blockquote with other elements
-<PUNCTUATION>></PUNCTUATION>
-<PUNCTUATION>></PUNCTUATION> - List item 1
-<PUNCTUATION>></PUNCTUATION> - List item 2
-<PUNCTUATION>></PUNCTUATION>
-<PUNCTUATION>></PUNCTUATION> ```python
-<PUNCTUATION>></PUNCTUATION> print("Code in blockquote")
-<PUNCTUATION>></PUNCTUATION> ```
+<PUNCTUATION>&gt;</PUNCTUATION> Blockquote with other elements
+<PUNCTUATION>&gt;</PUNCTUATION>
+<PUNCTUATION>&gt;</PUNCTUATION> - List item 1
+<PUNCTUATION>&gt;</PUNCTUATION> - List item 2
+<PUNCTUATION>&gt;</PUNCTUATION>
+<PUNCTUATION>&gt;</PUNCTUATION> ```python
+<PUNCTUATION>&gt;</PUNCTUATION> print("Code in blockquote")
+<PUNCTUATION>&gt;</PUNCTUATION> ```
 
-<PUNCTUATION>></PUNCTUATION> Nested blockquote
-<PUNCTUATION>></PUNCTUATION>
-<PUNCTUATION>>></PUNCTUATION> Inner level
-<PUNCTUATION>>></PUNCTUATION>
-<PUNCTUATION>>>></PUNCTUATION> Even deeper
-<PUNCTUATION>>></PUNCTUATION>
-<PUNCTUATION>>></PUNCTUATION> Back to second level
+<PUNCTUATION>&gt;</PUNCTUATION> Nested blockquote
+<PUNCTUATION>&gt;</PUNCTUATION>
+<PUNCTUATION>&gt;&gt;</PUNCTUATION> Inner level
+<PUNCTUATION>&gt;&gt;</PUNCTUATION>
+<PUNCTUATION>&gt;&gt;&gt;</PUNCTUATION> Even deeper
+<PUNCTUATION>&gt;&gt;</PUNCTUATION>
+<PUNCTUATION>&gt;&gt;</PUNCTUATION> Back to second level
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING>Horizontal Rules</HEADING>
 
@@ -259,23 +259,23 @@ $$
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING>HTML in Markdown</HEADING>
 
-<details>
-<summary>Click to expand</summary>
+&lt;details&gt;
+&lt;summary&gt;Click to expand&lt;/summary&gt;
 
 Hidden content that can be expanded.
 
 <KEYWORD>-</KEYWORD> Can contain <PUNCTUATION>**</PUNCTUATION><CONSTANT>Markdown</CONSTANT><PUNCTUATION>**</PUNCTUATION>
 <KEYWORD>-</KEYWORD> With <FUNCTION>`code`</FUNCTION> and other elements
 
-</details>
+&lt;/details&gt;
 
-<div align="center">
-  <strong>Centered content</strong>
-</div>
+&lt;div align="center"&gt;
+  &lt;strong&gt;Centered content&lt;/strong&gt;
+&lt;/div&gt;
 
-<kbd>Ctrl</kbd> + <kbd>C</kbd>
+&lt;kbd&gt;Ctrl&lt;/kbd&gt; + &lt;kbd&gt;C&lt;/kbd&gt;
 
-Text with <mark>highlighted</mark> content.
+Text with &lt;mark&gt;highlighted&lt;/mark&gt; content.
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING>Escaping</HEADING>
 
@@ -304,9 +304,9 @@ HTML is a markup language.
 <PUNCTUATION>##</PUNCTUATION> <HEADING>Comments</HEADING>
 
 [//]: # (This is a comment)
-[comment]: <> (Another comment style)
+[comment]: &lt;&gt; (Another comment style)
 
-<!-- HTML comment also works -->
+&lt;!-- HTML comment also works --&gt;
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING>Admonitions (Some flavors)</HEADING>
 

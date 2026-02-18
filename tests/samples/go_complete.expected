@@ -97,10 +97,10 @@
 	}
 	min, max <OPERATOR>=</OPERATOR> numbers[<NUMBER>0</NUMBER>], numbers[<NUMBER>0</NUMBER>]
 	<KEYWORD>for</KEYWORD> _, n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> numbers {
-		<KEYWORD>if</KEYWORD> n <OPERATOR><</OPERATOR> min {
+		<KEYWORD>if</KEYWORD> n <OPERATOR>&lt;</OPERATOR> min {
 			min <OPERATOR>=</OPERATOR> n
 		}
-		<KEYWORD>if</KEYWORD> n <OPERATOR>></OPERATOR> max {
+		<KEYWORD>if</KEYWORD> n <OPERATOR>&gt;</OPERATOR> max {
 			max <OPERATOR>=</OPERATOR> n
 		}
 	}
@@ -132,7 +132,7 @@
 }
 
 <KEYWORD>func</KEYWORD> <FUNCTION>NewPerson</FUNCTION>(name <TYPE>string</TYPE>, age <TYPE>int</TYPE>) <OPERATOR>*</OPERATOR><TYPE>Person</TYPE> {
-	<KEYWORD>return</KEYWORD> <OPERATOR>&</OPERATOR><TYPE>Person</TYPE>{<TYPE>Name</TYPE>: name, <TYPE>Age</TYPE>: age}
+	<KEYWORD>return</KEYWORD> <OPERATOR>&amp;</OPERATOR><TYPE>Person</TYPE>{<TYPE>Name</TYPE>: name, <TYPE>Age</TYPE>: age}
 }
 
 <KEYWORD>func</KEYWORD> (p *Person) <FUNCTION>Greet</FUNCTION>() <TYPE>string</TYPE> {
@@ -147,7 +147,7 @@
 <KEYWORD>func</KEYWORD> <FUNCTION>handleRequest</FUNCTION>(w http.<TYPE>ResponseWriter</TYPE>, r <OPERATOR>*</OPERATOR>http.<TYPE>Request</TYPE>) {
 	ctx <OPERATOR>:=</OPERATOR> r.<FUNCTION>Context</FUNCTION>()
 	<KEYWORD>select</KEYWORD> {
-	<KEYWORD>case</KEYWORD> <OPERATOR><-</OPERATOR>ctx.<FUNCTION>Done</FUNCTION>():
+	<KEYWORD>case</KEYWORD> <OPERATOR>&lt;-</OPERATOR>ctx.<FUNCTION>Done</FUNCTION>():
 		http.<FUNCTION>Error</FUNCTION>(w, <STRING>"Request cancelled"</STRING>, http.<TYPE>StatusRequestTimeout</TYPE>)
 		<KEYWORD>return</KEYWORD>
 	<KEYWORD>default</KEYWORD>:
@@ -164,12 +164,12 @@
 }
 
 <COMMENT>// Goroutine and channel example</COMMENT>
-<KEYWORD>func</KEYWORD> <FUNCTION>worker</FUNCTION>(id <TYPE>int</TYPE>, jobs <OPERATOR><-</OPERATOR><KEYWORD>chan</KEYWORD> <TYPE>int</TYPE>, results <KEYWORD>chan</KEYWORD><OPERATOR><-</OPERATOR> <TYPE>int</TYPE>, wg <OPERATOR>*</OPERATOR>sync.<TYPE>WaitGroup</TYPE>) {
+<KEYWORD>func</KEYWORD> <FUNCTION>worker</FUNCTION>(id <TYPE>int</TYPE>, jobs <OPERATOR>&lt;-</OPERATOR><KEYWORD>chan</KEYWORD> <TYPE>int</TYPE>, results <KEYWORD>chan</KEYWORD><OPERATOR>&lt;-</OPERATOR> <TYPE>int</TYPE>, wg <OPERATOR>*</OPERATOR>sync.<TYPE>WaitGroup</TYPE>) {
 	<KEYWORD>defer</KEYWORD> wg.<FUNCTION>Done</FUNCTION>()
 	<KEYWORD>for</KEYWORD> job <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> jobs {
 		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Worker %d processing job %d\n"</STRING>, id, job)
 		time.<FUNCTION>Sleep</FUNCTION>(<NUMBER>100</NUMBER> <OPERATOR>*</OPERATOR> time.<TYPE>Millisecond</TYPE>)
-		results <OPERATOR><-</OPERATOR> job <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>
+		results <OPERATOR>&lt;-</OPERATOR> job <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>
 	}
 }
 
@@ -213,7 +213,7 @@
 	<FUNCTION>copy</FUNCTION>(copied, slice)
 
 	<COMMENT>// Control structures</COMMENT>
-	<KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+	<KEYWORD>if</KEYWORD> count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER> {
 		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Positive"</STRING>)
 	} <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> count <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
 		fmt.<FUNCTION>Println</FUNCTION>(<STRING>"Zero"</STRING>)
@@ -222,7 +222,7 @@
 	}
 
 	<COMMENT>// If with initialization</COMMENT>
-	<KEYWORD>if</KEYWORD> n <OPERATOR>:=</OPERATOR> <FUNCTION>len</FUNCTION>(items); n <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+	<KEYWORD>if</KEYWORD> n <OPERATOR>:=</OPERATOR> <FUNCTION>len</FUNCTION>(items); n <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER> {
 		fmt.<FUNCTION>Printf</FUNCTION>(<STRING>"Items: %d\n"</STRING>, n)
 	}
 
@@ -248,11 +248,11 @@
 	}
 
 	<COMMENT>// For loops</COMMENT>
-	<KEYWORD>for</KEYWORD> i <OPERATOR>:=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR> {
+	<KEYWORD>for</KEYWORD> i <OPERATOR>:=</OPERATOR> <NUMBER>0</NUMBER>; i <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>+</OPERATOR><OPERATOR>+</OPERATOR> {
 		<KEYWORD>if</KEYWORD> i<OPERATOR>%</OPERATOR><NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER> {
 			<KEYWORD>continue</KEYWORD>
 		}
-		<KEYWORD>if</KEYWORD> i <OPERATOR>></OPERATOR> <NUMBER>5</NUMBER> {
+		<KEYWORD>if</KEYWORD> i <OPERATOR>&gt;</OPERATOR> <NUMBER>5</NUMBER> {
 			<KEYWORD>break</KEYWORD>
 		}
 		fmt.<FUNCTION>Println</FUNCTION>(i)
@@ -267,7 +267,7 @@
 	<KEYWORD>go</KEYWORD> <KEYWORD>func</KEYWORD>() {
 		<KEYWORD>for</KEYWORD> {
 			<KEYWORD>select</KEYWORD> {
-			<KEYWORD>case</KEYWORD> <OPERATOR><-</OPERATOR>time.<FUNCTION>After</FUNCTION>(<NUMBER>1</NUMBER> <OPERATOR>*</OPERATOR> time.<TYPE>Second</TYPE>):
+			<KEYWORD>case</KEYWORD> <OPERATOR>&lt;-</OPERATOR>time.<FUNCTION>After</FUNCTION>(<NUMBER>1</NUMBER> <OPERATOR>*</OPERATOR> time.<TYPE>Second</TYPE>):
 				<KEYWORD>return</KEYWORD>
 			}
 		}
@@ -284,7 +284,7 @@
 	ch <OPERATOR>:=</OPERATOR> <FUNCTION>make</FUNCTION>(<KEYWORD>chan</KEYWORD> <TYPE>int</TYPE>, <NUMBER>10</NUMBER>)
 	<KEYWORD>go</KEYWORD> <KEYWORD>func</KEYWORD>() {
 		<KEYWORD>for</KEYWORD> _, n <OPERATOR>:=</OPERATOR> <KEYWORD>range</KEYWORD> numbers {
-			ch <OPERATOR><-</OPERATOR> n
+			ch <OPERATOR>&lt;-</OPERATOR> n
 		}
 		<FUNCTION>close</FUNCTION>(ch)
 	}()

@@ -2,130 +2,130 @@
 # Generated from XML grammar
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
-<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="transform.xsl"?>
-<KEYWORD><!DOCTYPE catalog SYSTEM "catalog.dtd"></KEYWORD>
-<COMMENT><!--</COMMENT>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;?xml-stylesheet type="text/xsl" href="transform.xsl"?&gt;
+<KEYWORD>&lt;!DOCTYPE catalog SYSTEM "catalog.dtd"&gt;</KEYWORD>
+<COMMENT>&lt;!--</COMMENT>
 <COMMENT>  Complete XML Example</COMMENT>
 <COMMENT>  Demonstrating various XML syntax elements</COMMENT>
-<COMMENT>--></COMMENT>
-<catalog xmlns="http://example.com/catalog"
+<COMMENT>--&gt;</COMMENT>
+&lt;catalog xmlns="http://example.com/catalog"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns:dc="http://purl.org/dc/elements/1.1/"
-         xsi:schemaLocation="http://example.com/catalog catalog.xsd">
+         xsi:schemaLocation="http://example.com/catalog catalog.xsd"&gt;
 
-    <COMMENT><!-- Simple elements --></COMMENT>
-    <TAG><title</TAG><TAG>></TAG>Product Catalog<TAG></title></TAG>
-    <TAG><description</TAG><TAG>></TAG>A comprehensive list of products<TAG></description></TAG>
-    <TAG><version</TAG><TAG>></TAG>2.0<TAG></version></TAG>
-    <TAG><lastUpdated</TAG><TAG>></TAG>2024-01-15T10:30:00Z<TAG></lastUpdated></TAG>
+    <COMMENT>&lt;!-- Simple elements --&gt;</COMMENT>
+    <TAG>&lt;title</TAG><TAG>&gt;</TAG>Product Catalog<TAG>&lt;/title&gt;</TAG>
+    <TAG>&lt;description</TAG><TAG>&gt;</TAG>A comprehensive list of products<TAG>&lt;/description&gt;</TAG>
+    <TAG>&lt;version</TAG><TAG>&gt;</TAG>2.0<TAG>&lt;/version&gt;</TAG>
+    <TAG>&lt;lastUpdated</TAG><TAG>&gt;</TAG>2024-01-15T10:30:00Z<TAG>&lt;/lastUpdated&gt;</TAG>
 
-    <COMMENT><!-- Element with attributes --></COMMENT>
-    <TAG><metadata</TAG> <ATTRIBUTE>author</ATTRIBUTE>=<STRING>"John Doe"</STRING> <ATTRIBUTE>created</ATTRIBUTE>=<STRING>"2024-01-01"</STRING> <ATTRIBUTE>status</ATTRIBUTE>=<STRING>"active"</STRING><TAG>></TAG>
-        <TAG><dc:creator</TAG><TAG>></TAG>John Doe<TAG></dc:creator></TAG>
-        <TAG><dc:publisher</TAG><TAG>></TAG>Example Corp<TAG></dc:publisher></TAG>
-        <TAG><dc:rights</TAG><TAG>></TAG>Copyright 2024<TAG></dc:rights></TAG>
-    <TAG></metadata></TAG>
+    <COMMENT>&lt;!-- Element with attributes --&gt;</COMMENT>
+    <TAG>&lt;metadata</TAG> <ATTRIBUTE>author</ATTRIBUTE>=<STRING>"John Doe"</STRING> <ATTRIBUTE>created</ATTRIBUTE>=<STRING>"2024-01-01"</STRING> <ATTRIBUTE>status</ATTRIBUTE>=<STRING>"active"</STRING><TAG>&gt;</TAG>
+        <TAG>&lt;dc:creator</TAG><TAG>&gt;</TAG>John Doe<TAG>&lt;/dc:creator&gt;</TAG>
+        <TAG>&lt;dc:publisher</TAG><TAG>&gt;</TAG>Example Corp<TAG>&lt;/dc:publisher&gt;</TAG>
+        <TAG>&lt;dc:rights</TAG><TAG>&gt;</TAG>Copyright 2024<TAG>&lt;/dc:rights&gt;</TAG>
+    <TAG>&lt;/metadata&gt;</TAG>
 
-    <COMMENT><!-- CDATA section --></COMMENT>
-    <TAG><script</TAG><TAG>></TAG><![CDATA[
+    <COMMENT>&lt;!-- CDATA section --&gt;</COMMENT>
+    <TAG>&lt;script</TAG><TAG>&gt;</TAG>&lt;![CDATA[
 <FUNCTION>        function process(data) {</FUNCTION>
-<FUNCTION>            if (data < 10 && data > 0) {</FUNCTION>
+<FUNCTION>            if (data &lt; 10 &amp;&amp; data &gt; 0) {</FUNCTION>
 <FUNCTION>                return data * 2;</FUNCTION>
 <FUNCTION>            }</FUNCTION>
 <FUNCTION>            return data;</FUNCTION>
 <FUNCTION>        }</FUNCTION>
-<FUNCTION>    ]]></FUNCTION><TAG></script></TAG>
+<FUNCTION>    ]]&gt;</FUNCTION><TAG>&lt;/script&gt;</TAG>
 
-    <COMMENT><!-- Products list --></COMMENT>
-    <TAG><products</TAG> <ATTRIBUTE>count</ATTRIBUTE>=<STRING>"3"</STRING><TAG>></TAG>
-        <TAG><product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"001"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"electronics"</STRING> <ATTRIBUTE>featured</ATTRIBUTE>=<STRING>"true"</STRING><TAG>></TAG>
-            <TAG><name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"en"</STRING><TAG>></TAG>Wireless Headphones<TAG></name></TAG>
-            <TAG><name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"es"</STRING><TAG>></TAG>Auriculares Inalámbricos<TAG></name></TAG>
-            <TAG><price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING><TAG>></TAG>99.99<TAG></price></TAG>
-            <TAG><price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"EUR"</STRING><TAG>></TAG>89.99<TAG></price></TAG>
-            <TAG><stock</TAG><TAG>></TAG>150<TAG></stock></TAG>
-            <TAG><description</TAG><TAG>></TAG>
+    <COMMENT>&lt;!-- Products list --&gt;</COMMENT>
+    <TAG>&lt;products</TAG> <ATTRIBUTE>count</ATTRIBUTE>=<STRING>"3"</STRING><TAG>&gt;</TAG>
+        <TAG>&lt;product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"001"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"electronics"</STRING> <ATTRIBUTE>featured</ATTRIBUTE>=<STRING>"true"</STRING><TAG>&gt;</TAG>
+            <TAG>&lt;name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"en"</STRING><TAG>&gt;</TAG>Wireless Headphones<TAG>&lt;/name&gt;</TAG>
+            <TAG>&lt;name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"es"</STRING><TAG>&gt;</TAG>Auriculares Inalámbricos<TAG>&lt;/name&gt;</TAG>
+            <TAG>&lt;price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING><TAG>&gt;</TAG>99.99<TAG>&lt;/price&gt;</TAG>
+            <TAG>&lt;price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"EUR"</STRING><TAG>&gt;</TAG>89.99<TAG>&lt;/price&gt;</TAG>
+            <TAG>&lt;stock</TAG><TAG>&gt;</TAG>150<TAG>&lt;/stock&gt;</TAG>
+            <TAG>&lt;description</TAG><TAG>&gt;</TAG>
                 High-quality wireless headphones with
-                noise cancellation <CONSTANT>&amp;</CONSTANT> long battery life.
-                Special chars: <CONSTANT>&lt;</CONSTANT>tag<CONSTANT>&gt;</CONSTANT> <CONSTANT>&quot;</CONSTANT>quoted<CONSTANT>&quot;</CONSTANT> <CONSTANT>&apos;</CONSTANT>apostrophe<CONSTANT>&apos;</CONSTANT>
-            <TAG></description></TAG>
-            <TAG><specifications</TAG><TAG>></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"battery"</STRING><TAG>></TAG>30 hours<TAG></spec></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"weight"</STRING><TAG>></TAG>250g<TAG></spec></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"connectivity"</STRING><TAG>></TAG>Bluetooth 5.0<TAG></spec></TAG>
-            <TAG></specifications></TAG>
-            <TAG><tags</TAG><TAG>></TAG>
-                <TAG><tag</TAG><TAG>></TAG>audio<TAG></tag></TAG>
-                <TAG><tag</TAG><TAG>></TAG>wireless<TAG></tag></TAG>
-                <TAG><tag</TAG><TAG>></TAG>bluetooth<TAG></tag></TAG>
-            <TAG></tags></TAG>
-            <TAG><reviews</TAG><TAG>></TAG>
-                <TAG><review</TAG> <ATTRIBUTE>rating</ATTRIBUTE>=<STRING>"5"</STRING> <ATTRIBUTE>verified</ATTRIBUTE>=<STRING>"true"</STRING><TAG>></TAG>
-                    <TAG><author</TAG><TAG>></TAG>Alice<TAG></author></TAG>
-                    <TAG><date</TAG><TAG>></TAG>2024-01-10<TAG></date></TAG>
-                    <TAG><content</TAG><TAG>></TAG>Excellent sound quality!<TAG></content></TAG>
-                <TAG></review></TAG>
-                <TAG><review</TAG> <ATTRIBUTE>rating</ATTRIBUTE>=<STRING>"4"</STRING> <ATTRIBUTE>verified</ATTRIBUTE>=<STRING>"false"</STRING><TAG>></TAG>
-                    <TAG><author</TAG><TAG>></TAG>Bob<TAG></author></TAG>
-                    <TAG><date</TAG><TAG>></TAG>2024-01-12<TAG></date></TAG>
-                    <TAG><content</TAG><TAG>></TAG>Good value for money.<TAG></content></TAG>
-                <TAG></review></TAG>
-            <TAG></reviews></TAG>
-        <TAG></product></TAG>
+                noise cancellation <CONSTANT>&amp;amp;</CONSTANT> long battery life.
+                Special chars: <CONSTANT>&amp;lt;</CONSTANT>tag<CONSTANT>&amp;gt;</CONSTANT> <CONSTANT>&amp;quot;</CONSTANT>quoted<CONSTANT>&amp;quot;</CONSTANT> <CONSTANT>&amp;apos;</CONSTANT>apostrophe<CONSTANT>&amp;apos;</CONSTANT>
+            <TAG>&lt;/description&gt;</TAG>
+            <TAG>&lt;specifications</TAG><TAG>&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"battery"</STRING><TAG>&gt;</TAG>30 hours<TAG>&lt;/spec&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"weight"</STRING><TAG>&gt;</TAG>250g<TAG>&lt;/spec&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"connectivity"</STRING><TAG>&gt;</TAG>Bluetooth 5.0<TAG>&lt;/spec&gt;</TAG>
+            <TAG>&lt;/specifications&gt;</TAG>
+            <TAG>&lt;tags</TAG><TAG>&gt;</TAG>
+                <TAG>&lt;tag</TAG><TAG>&gt;</TAG>audio<TAG>&lt;/tag&gt;</TAG>
+                <TAG>&lt;tag</TAG><TAG>&gt;</TAG>wireless<TAG>&lt;/tag&gt;</TAG>
+                <TAG>&lt;tag</TAG><TAG>&gt;</TAG>bluetooth<TAG>&lt;/tag&gt;</TAG>
+            <TAG>&lt;/tags&gt;</TAG>
+            <TAG>&lt;reviews</TAG><TAG>&gt;</TAG>
+                <TAG>&lt;review</TAG> <ATTRIBUTE>rating</ATTRIBUTE>=<STRING>"5"</STRING> <ATTRIBUTE>verified</ATTRIBUTE>=<STRING>"true"</STRING><TAG>&gt;</TAG>
+                    <TAG>&lt;author</TAG><TAG>&gt;</TAG>Alice<TAG>&lt;/author&gt;</TAG>
+                    <TAG>&lt;date</TAG><TAG>&gt;</TAG>2024-01-10<TAG>&lt;/date&gt;</TAG>
+                    <TAG>&lt;content</TAG><TAG>&gt;</TAG>Excellent sound quality!<TAG>&lt;/content&gt;</TAG>
+                <TAG>&lt;/review&gt;</TAG>
+                <TAG>&lt;review</TAG> <ATTRIBUTE>rating</ATTRIBUTE>=<STRING>"4"</STRING> <ATTRIBUTE>verified</ATTRIBUTE>=<STRING>"false"</STRING><TAG>&gt;</TAG>
+                    <TAG>&lt;author</TAG><TAG>&gt;</TAG>Bob<TAG>&lt;/author&gt;</TAG>
+                    <TAG>&lt;date</TAG><TAG>&gt;</TAG>2024-01-12<TAG>&lt;/date&gt;</TAG>
+                    <TAG>&lt;content</TAG><TAG>&gt;</TAG>Good value for money.<TAG>&lt;/content&gt;</TAG>
+                <TAG>&lt;/review&gt;</TAG>
+            <TAG>&lt;/reviews&gt;</TAG>
+        <TAG>&lt;/product&gt;</TAG>
 
-        <TAG><product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"002"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"computers"</STRING> <ATTRIBUTE>featured</ATTRIBUTE>=<STRING>"false"</STRING><TAG>></TAG>
-            <TAG><name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"en"</STRING><TAG>></TAG>Laptop Stand<TAG></name></TAG>
-            <TAG><price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING><TAG>></TAG>49.99<TAG></price></TAG>
-            <TAG><stock</TAG><TAG>></TAG>300<TAG></stock></TAG>
-            <TAG><description</TAG><TAG>></TAG>Ergonomic aluminum laptop stand.<TAG></description></TAG>
-            <TAG><specifications</TAG><TAG>></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"material"</STRING><TAG>></TAG>Aluminum<TAG></spec></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"weight"</STRING><TAG>></TAG>500g<TAG></spec></TAG>
-                <TAG><spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"compatibility"</STRING><TAG>></TAG>All laptops up to 17"<TAG></spec></TAG>
-            <TAG></specifications></TAG>
-            <COMMENT><!-- Empty element --></COMMENT>
-            <TAG><tags</TAG><TAG>/></TAG>
-        <TAG></product></TAG>
+        <TAG>&lt;product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"002"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"computers"</STRING> <ATTRIBUTE>featured</ATTRIBUTE>=<STRING>"false"</STRING><TAG>&gt;</TAG>
+            <TAG>&lt;name</TAG> <ATTRIBUTE>lang</ATTRIBUTE>=<STRING>"en"</STRING><TAG>&gt;</TAG>Laptop Stand<TAG>&lt;/name&gt;</TAG>
+            <TAG>&lt;price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING><TAG>&gt;</TAG>49.99<TAG>&lt;/price&gt;</TAG>
+            <TAG>&lt;stock</TAG><TAG>&gt;</TAG>300<TAG>&lt;/stock&gt;</TAG>
+            <TAG>&lt;description</TAG><TAG>&gt;</TAG>Ergonomic aluminum laptop stand.<TAG>&lt;/description&gt;</TAG>
+            <TAG>&lt;specifications</TAG><TAG>&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"material"</STRING><TAG>&gt;</TAG>Aluminum<TAG>&lt;/spec&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"weight"</STRING><TAG>&gt;</TAG>500g<TAG>&lt;/spec&gt;</TAG>
+                <TAG>&lt;spec</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"compatibility"</STRING><TAG>&gt;</TAG>All laptops up to 17"<TAG>&lt;/spec&gt;</TAG>
+            <TAG>&lt;/specifications&gt;</TAG>
+            <COMMENT>&lt;!-- Empty element --&gt;</COMMENT>
+            <TAG>&lt;tags</TAG><TAG>/&gt;</TAG>
+        <TAG>&lt;/product&gt;</TAG>
 
-        <TAG><product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"003"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"accessories"</STRING><TAG>></TAG>
-            <TAG><name</TAG><TAG>></TAG>USB-C Hub<TAG></name></TAG>
-            <TAG><price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING> <ATTRIBUTE>discount</ATTRIBUTE>=<STRING>"10%"</STRING><TAG>></TAG>79.99<TAG></price></TAG>
-            <TAG><stock</TAG><TAG>></TAG>0<TAG></stock></TAG>
-            <TAG><availability</TAG> <ATTRIBUTE>status</ATTRIBUTE>=<STRING>"out-of-stock"</STRING> <ATTRIBUTE>restock-date</ATTRIBUTE>=<STRING>"2024-02-01"</STRING><TAG>/></TAG>
-            <TAG><description</TAG><TAG>></TAG>Multi-port USB-C hub with HDMI output.<TAG></description></TAG>
-        <TAG></product></TAG>
-    <TAG></products></TAG>
+        <TAG>&lt;product</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"003"</STRING> <ATTRIBUTE>category</ATTRIBUTE>=<STRING>"accessories"</STRING><TAG>&gt;</TAG>
+            <TAG>&lt;name</TAG><TAG>&gt;</TAG>USB-C Hub<TAG>&lt;/name&gt;</TAG>
+            <TAG>&lt;price</TAG> <ATTRIBUTE>currency</ATTRIBUTE>=<STRING>"USD"</STRING> <ATTRIBUTE>discount</ATTRIBUTE>=<STRING>"10%"</STRING><TAG>&gt;</TAG>79.99<TAG>&lt;/price&gt;</TAG>
+            <TAG>&lt;stock</TAG><TAG>&gt;</TAG>0<TAG>&lt;/stock&gt;</TAG>
+            <TAG>&lt;availability</TAG> <ATTRIBUTE>status</ATTRIBUTE>=<STRING>"out-of-stock"</STRING> <ATTRIBUTE>restock-date</ATTRIBUTE>=<STRING>"2024-02-01"</STRING><TAG>/&gt;</TAG>
+            <TAG>&lt;description</TAG><TAG>&gt;</TAG>Multi-port USB-C hub with HDMI output.<TAG>&lt;/description&gt;</TAG>
+        <TAG>&lt;/product&gt;</TAG>
+    <TAG>&lt;/products&gt;</TAG>
 
-    <COMMENT><!-- Nested structure with mixed content --></COMMENT>
-    <TAG><documentation</TAG><TAG>></TAG>
-        <TAG><chapter</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"ch1"</STRING> <ATTRIBUTE>title</ATTRIBUTE>=<STRING>"Getting Started"</STRING><TAG>></TAG>
-            <TAG><para</TAG><TAG>></TAG>Welcome to the <TAG><emphasis</TAG><TAG>></TAG>product catalog<TAG></emphasis></TAG> system.<TAG></para></TAG>
-            <TAG><para</TAG><TAG>></TAG>This document contains <TAG><link</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"#ch2"</STRING><TAG>></TAG>important information<TAG></link></TAG>.<TAG></para></TAG>
-            <TAG><note</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"warning"</STRING><TAG>></TAG>
+    <COMMENT>&lt;!-- Nested structure with mixed content --&gt;</COMMENT>
+    <TAG>&lt;documentation</TAG><TAG>&gt;</TAG>
+        <TAG>&lt;chapter</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"ch1"</STRING> <ATTRIBUTE>title</ATTRIBUTE>=<STRING>"Getting Started"</STRING><TAG>&gt;</TAG>
+            <TAG>&lt;para</TAG><TAG>&gt;</TAG>Welcome to the <TAG>&lt;emphasis</TAG><TAG>&gt;</TAG>product catalog<TAG>&lt;/emphasis&gt;</TAG> system.<TAG>&lt;/para&gt;</TAG>
+            <TAG>&lt;para</TAG><TAG>&gt;</TAG>This document contains <TAG>&lt;link</TAG> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"#ch2"</STRING><TAG>&gt;</TAG>important information<TAG>&lt;/link&gt;</TAG>.<TAG>&lt;/para&gt;</TAG>
+            <TAG>&lt;note</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"warning"</STRING><TAG>&gt;</TAG>
                 Please read all instructions carefully.
-            <TAG></note></TAG>
-        <TAG></chapter></TAG>
-        <TAG><chapter</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"ch2"</STRING> <ATTRIBUTE>title</ATTRIBUTE>=<STRING>"Advanced Usage"</STRING><TAG>></TAG>
-            <TAG><para</TAG><TAG>></TAG>For advanced users:<TAG></para></TAG>
-            <TAG><list</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"ordered"</STRING><TAG>></TAG>
-                <TAG><item</TAG><TAG>></TAG>Configure settings<TAG></item></TAG>
-                <TAG><item</TAG><TAG>></TAG>Import data<TAG></item></TAG>
-                <TAG><item</TAG><TAG>></TAG>Run reports<TAG></item></TAG>
-            <TAG></list></TAG>
-        <TAG></chapter></TAG>
-    <TAG></documentation></TAG>
+            <TAG>&lt;/note&gt;</TAG>
+        <TAG>&lt;/chapter&gt;</TAG>
+        <TAG>&lt;chapter</TAG> <ATTRIBUTE>id</ATTRIBUTE>=<STRING>"ch2"</STRING> <ATTRIBUTE>title</ATTRIBUTE>=<STRING>"Advanced Usage"</STRING><TAG>&gt;</TAG>
+            <TAG>&lt;para</TAG><TAG>&gt;</TAG>For advanced users:<TAG>&lt;/para&gt;</TAG>
+            <TAG>&lt;list</TAG> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"ordered"</STRING><TAG>&gt;</TAG>
+                <TAG>&lt;item</TAG><TAG>&gt;</TAG>Configure settings<TAG>&lt;/item&gt;</TAG>
+                <TAG>&lt;item</TAG><TAG>&gt;</TAG>Import data<TAG>&lt;/item&gt;</TAG>
+                <TAG>&lt;item</TAG><TAG>&gt;</TAG>Run reports<TAG>&lt;/item&gt;</TAG>
+            <TAG>&lt;/list&gt;</TAG>
+        <TAG>&lt;/chapter&gt;</TAG>
+    <TAG>&lt;/documentation&gt;</TAG>
 
-    <COMMENT><!-- Processing instructions --></COMMENT>
-    <?custom-processor option="value"?>
+    <COMMENT>&lt;!-- Processing instructions --&gt;</COMMENT>
+    &lt;?custom-processor option="value"?&gt;
 
-    <COMMENT><!-- Numeric and boolean values --></COMMENT>
-    <TAG><settings</TAG><TAG>></TAG>
-        <TAG><setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"maxItems"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"integer"</STRING><TAG>></TAG>100<TAG></setting></TAG>
-        <TAG><setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"threshold"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"decimal"</STRING><TAG>></TAG>0.75<TAG></setting></TAG>
-        <TAG><setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"enabled"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"boolean"</STRING><TAG>></TAG>true<TAG></setting></TAG>
-        <TAG><setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"disabled"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"boolean"</STRING><TAG>></TAG>false<TAG></setting></TAG>
-        <TAG><setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"empty"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"null"</STRING><TAG>/></TAG>
-    <TAG></settings></TAG>
+    <COMMENT>&lt;!-- Numeric and boolean values --&gt;</COMMENT>
+    <TAG>&lt;settings</TAG><TAG>&gt;</TAG>
+        <TAG>&lt;setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"maxItems"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"integer"</STRING><TAG>&gt;</TAG>100<TAG>&lt;/setting&gt;</TAG>
+        <TAG>&lt;setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"threshold"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"decimal"</STRING><TAG>&gt;</TAG>0.75<TAG>&lt;/setting&gt;</TAG>
+        <TAG>&lt;setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"enabled"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"boolean"</STRING><TAG>&gt;</TAG>true<TAG>&lt;/setting&gt;</TAG>
+        <TAG>&lt;setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"disabled"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"boolean"</STRING><TAG>&gt;</TAG>false<TAG>&lt;/setting&gt;</TAG>
+        <TAG>&lt;setting</TAG> <ATTRIBUTE>name</ATTRIBUTE>=<STRING>"empty"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"null"</STRING><TAG>/&gt;</TAG>
+    <TAG>&lt;/settings&gt;</TAG>
 
-<TAG></catalog></TAG>
+<TAG>&lt;/catalog&gt;</TAG>

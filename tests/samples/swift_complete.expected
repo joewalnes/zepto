@@ -16,11 +16,11 @@
     <KEYWORD>associatedtype</KEYWORD> <TYPE>Item</TYPE>
     <KEYWORD>mutating</KEYWORD> <KEYWORD>func</KEYWORD> <FUNCTION>append</FUNCTION>(_ item: <TYPE>Item</TYPE>)
     <KEYWORD>var</KEYWORD> count: <TYPE>Int</TYPE> { <KEYWORD>get</KEYWORD> }
-    <KEYWORD>subscript</KEYWORD>(i: <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Item</TYPE> { <KEYWORD>get</KEYWORD> }
+    <KEYWORD>subscript</KEYWORD>(i: <TYPE>Int</TYPE>) <OPERATOR>-&gt;</OPERATOR> <TYPE>Item</TYPE> { <KEYWORD>get</KEYWORD> }
 }
 
 <COMMENT>// Enum with associated values</COMMENT>
-<KEYWORD>enum</KEYWORD> <TYPE>Result</TYPE><OPERATOR><</OPERATOR><TYPE>Success</TYPE>, <TYPE>Failure</TYPE>: <TYPE>Error</TYPE><OPERATOR>></OPERATOR> {
+<KEYWORD>enum</KEYWORD> <TYPE>Result</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Success</TYPE>, <TYPE>Failure</TYPE>: <TYPE>Error</TYPE><OPERATOR>&gt;</OPERATOR> {
     <KEYWORD>case</KEYWORD> <FUNCTION>success</FUNCTION>(<TYPE>Success</TYPE>)
     <KEYWORD>case</KEYWORD> <FUNCTION>failure</FUNCTION>(<TYPE>Failure</TYPE>)
 }
@@ -79,7 +79,7 @@
         <FUNCTION>print</FUNCTION>(<STRING>"Drawing circle with radius \(radius)"</STRING>)
     }
 
-    <KEYWORD>func</KEYWORD> <FUNCTION>area</FUNCTION>() <OPERATOR>-></OPERATOR> <TYPE>Double</TYPE> {
+    <KEYWORD>func</KEYWORD> <FUNCTION>area</FUNCTION>() <OPERATOR>-&gt;</OPERATOR> <TYPE>Double</TYPE> {
         <KEYWORD>return</KEYWORD> <TYPE>Double</TYPE>.pi <OPERATOR>*</OPERATOR> radius <OPERATOR>*</OPERATOR> radius
     }
 }
@@ -92,20 +92,20 @@
         value <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>
     }
 
-    <KEYWORD>func</KEYWORD> <FUNCTION>getValue</FUNCTION>() <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> {
+    <KEYWORD>func</KEYWORD> <FUNCTION>getValue</FUNCTION>() <OPERATOR>-&gt;</OPERATOR> <TYPE>Int</TYPE> {
         <KEYWORD>return</KEYWORD> value
     }
 }
 
 <COMMENT>// Generic function</COMMENT>
-<KEYWORD>func</KEYWORD> <FUNCTION>swap</FUNCTION><OPERATOR><</OPERATOR><TYPE>T</TYPE><OPERATOR>></OPERATOR>(_ a: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>, _ b: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>) {
+<KEYWORD>func</KEYWORD> <FUNCTION>swap</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>(_ a: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>, _ b: <KEYWORD>inout</KEYWORD> <TYPE>T</TYPE>) {
     <KEYWORD>let</KEYWORD> temp <OPERATOR>=</OPERATOR> a
     a <OPERATOR>=</OPERATOR> b
     b <OPERATOR>=</OPERATOR> temp
 }
 
 <COMMENT>// Function with closures</COMMENT>
-<KEYWORD>func</KEYWORD> <FUNCTION>performOperation</FUNCTION>(_ operation: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE>, on a: <TYPE>Int</TYPE>, and b: <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> {
+<KEYWORD>func</KEYWORD> <FUNCTION>performOperation</FUNCTION>(_ operation: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-&gt;</OPERATOR> <TYPE>Int</TYPE>, on a: <TYPE>Int</TYPE>, and b: <TYPE>Int</TYPE>) <OPERATOR>-&gt;</OPERATOR> <TYPE>Int</TYPE> {
     <KEYWORD>return</KEYWORD> <FUNCTION>operation</FUNCTION>(a, b)
 }
 
@@ -115,8 +115,8 @@
         <KEYWORD>return</KEYWORD> <KEYWORD>self</KEYWORD> <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>
     }
 
-    <KEYWORD>func</KEYWORD> <FUNCTION>times</FUNCTION>(_ action: () <OPERATOR>-></OPERATOR> <TYPE>Void</TYPE>) {
-        <KEYWORD>for</KEYWORD> _ <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR><</OPERATOR><KEYWORD>self</KEYWORD> {
+    <KEYWORD>func</KEYWORD> <FUNCTION>times</FUNCTION>(_ action: () <OPERATOR>-&gt;</OPERATOR> <TYPE>Void</TYPE>) {
+        <KEYWORD>for</KEYWORD> _ <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR>&lt;</OPERATOR><KEYWORD>self</KEYWORD> {
             <FUNCTION>action</FUNCTION>()
         }
     }
@@ -124,16 +124,16 @@
 
 <COMMENT>// Property wrapper</COMMENT>
 <ATTRIBUTE>@propertyWrapper</ATTRIBUTE>
-<KEYWORD>struct</KEYWORD> <TYPE>Clamped</TYPE><OPERATOR><</OPERATOR><TYPE>Value</TYPE>: <TYPE>Comparable</TYPE><OPERATOR>></OPERATOR> {
+<KEYWORD>struct</KEYWORD> <TYPE>Clamped</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Value</TYPE>: <TYPE>Comparable</TYPE><OPERATOR>&gt;</OPERATOR> {
     <KEYWORD>var</KEYWORD> value: <TYPE>Value</TYPE>
-    <KEYWORD>let</KEYWORD> range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR><</OPERATOR><TYPE>Value</TYPE><OPERATOR>></OPERATOR>
+    <KEYWORD>let</KEYWORD> range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>Value</TYPE><OPERATOR>&gt;</OPERATOR>
 
     <KEYWORD>var</KEYWORD> wrapped<TYPE>Value</TYPE>: <TYPE>Value</TYPE> {
         <KEYWORD>get</KEYWORD> { value }
         <KEYWORD>set</KEYWORD> { value <OPERATOR>=</OPERATOR> <FUNCTION>min</FUNCTION>(<FUNCTION>max</FUNCTION>(new<TYPE>Value</TYPE>, range.lower<TYPE>Bound</TYPE>), range.upper<TYPE>Bound</TYPE>) }
     }
 
-    <KEYWORD>init</KEYWORD>(wrapped<TYPE>Value</TYPE>: <TYPE>Value</TYPE>, range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR><</OPERATOR><TYPE>Value</TYPE><OPERATOR>></OPERATOR>) {
+    <KEYWORD>init</KEYWORD>(wrapped<TYPE>Value</TYPE>: <TYPE>Value</TYPE>, range: <FUNCTION>ClosedRange</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>Value</TYPE><OPERATOR>&gt;</OPERATOR>) {
         <KEYWORD>self</KEYWORD>.range <OPERATOR>=</OPERATOR> range
         <KEYWORD>self</KEYWORD>.value <OPERATOR>=</OPERATOR> <FUNCTION>min</FUNCTION>(<FUNCTION>max</FUNCTION>(wrapped<TYPE>Value</TYPE>, range.lower<TYPE>Bound</TYPE>), range.upper<TYPE>Bound</TYPE>)
     }
@@ -170,9 +170,9 @@
         <KEYWORD>var</KEYWORD> dict: [<TYPE>String</TYPE>: <TYPE>Int</TYPE>] <OPERATOR>=</OPERATOR> [<STRING>"one"</STRING>: <NUMBER>1</NUMBER>, <STRING>"two"</STRING>: <NUMBER>2</NUMBER>]
 
         <COMMENT>// Control flow</COMMENT>
-        <KEYWORD>if</KEYWORD> count <OPERATOR>></OPERATOR> <NUMBER>0</NUMBER> {
+        <KEYWORD>if</KEYWORD> count <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER> {
             <FUNCTION>print</FUNCTION>(<STRING>"Positive"</STRING>)
-        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> <FUNCTION>count</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>0</NUMBER> {
+        } <KEYWORD>else</KEYWORD> <KEYWORD>if</KEYWORD> <FUNCTION>count</FUNCTION> <OPERATOR>&lt;</OPERATOR> <NUMBER>0</NUMBER> {
             <FUNCTION>print</FUNCTION>(<STRING>"Negative"</STRING>)
         } <KEYWORD>else</KEYWORD> {
             <FUNCTION>print</FUNCTION>(<STRING>"Zero"</STRING>)
@@ -184,14 +184,14 @@
             <FUNCTION>print</FUNCTION>(<STRING>"Zero"</STRING>)
         <KEYWORD>case</KEYWORD> <NUMBER>1.</NUMBER>..<NUMBER>10</NUMBER>:
             <FUNCTION>print</FUNCTION>(<STRING>"Between 1 and 10"</STRING>)
-        <KEYWORD>case</KEYWORD> <KEYWORD>let</KEYWORD> x <KEYWORD>where</KEYWORD> x <OPERATOR>></OPERATOR> <NUMBER>100</NUMBER>:
+        <KEYWORD>case</KEYWORD> <KEYWORD>let</KEYWORD> x <KEYWORD>where</KEYWORD> x <OPERATOR>&gt;</OPERATOR> <NUMBER>100</NUMBER>:
             <FUNCTION>print</FUNCTION>(<STRING>"Large: \(x)"</STRING>)
         <KEYWORD>default</KEYWORD>:
             <FUNCTION>print</FUNCTION>(<STRING>"Other"</STRING>)
         }
 
         <COMMENT>// For loop</COMMENT>
-        <KEYWORD>for</KEYWORD> i <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR><</OPERATOR><NUMBER>10</NUMBER> {
+        <KEYWORD>for</KEYWORD> i <KEYWORD>in</KEYWORD> <NUMBER>0.</NUMBER>.<OPERATOR>&lt;</OPERATOR><NUMBER>10</NUMBER> {
             <KEYWORD>if</KEYWORD> i <OPERATOR>==</OPERATOR> <NUMBER>5</NUMBER> { <KEYWORD>continue</KEYWORD> }
             <KEYWORD>if</KEYWORD> i <OPERATOR>==</OPERATOR> <NUMBER>8</NUMBER> { <KEYWORD>break</KEYWORD> }
             <FUNCTION>print</FUNCTION>(i)
@@ -199,14 +199,14 @@
 
         <COMMENT>// While loop</COMMENT>
         <KEYWORD>var</KEYWORD> counter <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>
-        <KEYWORD>while</KEYWORD> <FUNCTION>counter</FUNCTION> <OPERATOR><</OPERATOR> <NUMBER>10</NUMBER> {
+        <KEYWORD>while</KEYWORD> <FUNCTION>counter</FUNCTION> <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER> {
             counter <OPERATOR>+=</OPERATOR> <NUMBER>1</NUMBER>
         }
 
         <COMMENT>// Closures</COMMENT>
-        <KEYWORD>let</KEYWORD> add: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-></OPERATOR> <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> { $<NUMBER>0</NUMBER> <OPERATOR>+</OPERATOR> $<NUMBER>1</NUMBER> }
+        <KEYWORD>let</KEYWORD> add: (<TYPE>Int</TYPE>, <TYPE>Int</TYPE>) <OPERATOR>-&gt;</OPERATOR> <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> { $<NUMBER>0</NUMBER> <OPERATOR>+</OPERATOR> $<NUMBER>1</NUMBER> }
         <KEYWORD>let</KEYWORD> doubled <OPERATOR>=</OPERATOR> numbers.map { $<NUMBER>0</NUMBER> <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
-        <KEYWORD>let</KEYWORD> filtered <OPERATOR>=</OPERATOR> numbers.filter { $<NUMBER>0</NUMBER> <OPERATOR>></OPERATOR> <NUMBER>2</NUMBER> }
+        <KEYWORD>let</KEYWORD> filtered <OPERATOR>=</OPERATOR> numbers.filter { $<NUMBER>0</NUMBER> <OPERATOR>&gt;</OPERATOR> <NUMBER>2</NUMBER> }
 
         <COMMENT>// Async/await</COMMENT>
         <KEYWORD>let</KEYWORD> async<TYPE>Counter</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>Counter</FUNCTION>()
