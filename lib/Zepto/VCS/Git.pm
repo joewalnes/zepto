@@ -166,10 +166,29 @@ sub _shell_quote {
     return "'$str'";
 }
 
-# Get mtime of .git/HEAD file
+# Get mtime of the file that tracks current HEAD commit
+# .git/HEAD may be a symbolic ref (ref: refs/heads/main) or detached (commit hash)
+# For symbolic refs, we need to check the target ref file, not HEAD itself
 sub _get_head_mtime {
     my ($self) = @_;
-    my $head_file = $self->{repo_root} . "/.git/HEAD";
+    my $git_dir = $self->{repo_root} . "/.git";
+    my $head_file = "$git_dir/HEAD";
+
+    # Read HEAD to see what it points to
+    if (open my $fh, '<', $head_file) {
+        my $content = <$fh>;
+        close $fh;
+        chomp $content if defined $content;
+
+        # Check if symbolic ref (e.g., "ref: refs/heads/main")
+        if (defined $content && $content =~ /^ref:\s*(.+)$/) {
+            my $ref_path = "$git_dir/$1";
+            # Return mtime of the actual ref file (e.g., .git/refs/heads/main)
+            return (stat($ref_path))[9] // 0;
+        }
+    }
+
+    # Detached HEAD or couldn't read - use HEAD file mtime
     return (stat($head_file))[9] // 0;
 }
 
