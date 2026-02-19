@@ -1,0 +1,228 @@
+# Expected syntax highlighting for groovy_complete.groovy
+# Generated from Groovy grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+#<OPERATOR>!</OPERATOR><REGEX>/usr/</REGEX>b<KEYWORD>in</KEYWORD><OPERATOR>/</OPERATOR>env groovy
+<COMMENT>// Groovy sample file demonstrating syntax features</COMMENT>
+<KEYWORD>package</KEYWORD> com.example.demo
+
+<KEYWORD>import</KEYWORD> groovy.transform.<OPERATOR>*</OPERATOR>
+<KEYWORD>import</KEYWORD> groovy.json.<TYPE>JsonSlurper</TYPE>
+<KEYWORD>import</KEYWORD> groovy.json.<TYPE>JsonOutput</TYPE>
+<KEYWORD>import</KEYWORD> java.util.regex.<TYPE>Pattern</TYPE>
+
+<COMMENT>/**</COMMENT>
+<COMMENT> * Groovydoc comment</COMMENT>
+<COMMENT> * @param name The name parameter</COMMENT>
+<COMMENT> */</COMMENT>
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>final</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>
+<KEYWORD>static</KEYWORD> <KEYWORD>final</KEYWORD> <CONSTANT>PI</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>
+
+<COMMENT>// Enum</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE> {
+    <CONSTANT>PENDING</CONSTANT>, <CONSTANT>ACTIVE</CONSTANT>, <CONSTANT>COMPLETED</CONSTANT>
+
+    <KEYWORD>boolean</KEYWORD> <FUNCTION>isTerminal</FUNCTION>() {
+        <KEYWORD>this</KEYWORD> <OPERATOR>==</OPERATOR> <CONSTANT>COMPLETED</CONSTANT>
+    }
+}
+
+<COMMENT>// Interface</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Repository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> {
+    <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <FUNCTION>findAll</FUNCTION>()
+    <TYPE>T</TYPE> <FUNCTION>findById</FUNCTION>(<KEYWORD>int</KEYWORD> <KEYWORD>id</KEYWORD>)
+    <KEYWORD>void</KEYWORD> <FUNCTION>save</FUNCTION>(<TYPE>T</TYPE> entity)
+}
+
+<COMMENT>// Trait</COMMENT>
+<KEYWORD>trait</KEYWORD> <TYPE>Greetable</TYPE> {
+    <TYPE>String</TYPE> greeting <OPERATOR>=</OPERATOR> "<TYPE>Hello</TYPE>"
+
+    <TYPE>String</TYPE> <FUNCTION>greet</FUNCTION>(<TYPE>String</TYPE> name) {
+        "$greeting, $name<OPERATOR>!</OPERATOR>"
+    }
+}
+
+<COMMENT>// Class with AST transformation</COMMENT>
+<ATTRIBUTE>@ToString</ATTRIBUTE>(include<TYPE>Names</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>true</KEYWORD>)
+<ATTRIBUTE>@EqualsAndHashCode</ATTRIBUTE>
+<KEYWORD>class</KEYWORD> <TYPE>Person</TYPE> <KEYWORD>implements</KEYWORD> <FUNCTION>Greetable</FUNCTION> {
+    <TYPE>String</TYPE> name
+    <KEYWORD>int</KEYWORD> age
+    <TYPE>String</TYPE> email
+
+    <COMMENT>// Constructor</COMMENT>
+    <FUNCTION>Person</FUNCTION>(<TYPE>String</TYPE> name, <KEYWORD>int</KEYWORD> age) {
+        <KEYWORD>this</KEYWORD>.name <OPERATOR>=</OPERATOR> name
+        <KEYWORD>this</KEYWORD>.age <OPERATOR>=</OPERATOR> age
+    }
+
+    <COMMENT>// Getter with custom logic</COMMENT>
+    <TYPE>String</TYPE> <FUNCTION>getDisplayName</FUNCTION>() {
+        name<OPERATOR>?.</OPERATOR><FUNCTION>toUpperCase</FUNCTION>() ?: "<TYPE>Unknown</TYPE>"
+    }
+
+    <COMMENT>// Method</COMMENT>
+    <KEYWORD>boolean</KEYWORD> <FUNCTION>isAdult</FUNCTION>() {
+        age <OPERATOR>&gt;</OPERATOR><OPERATOR>=</OPERATOR> <NUMBER>18</NUMBER>
+    }
+}
+
+<COMMENT>// Class with immutable annotation</COMMENT>
+<ATTRIBUTE>@Immutable</ATTRIBUTE>
+<KEYWORD>class</KEYWORD> <TYPE>Point</TYPE> {
+    <KEYWORD>int</KEYWORD> x
+    <KEYWORD>int</KEYWORD> y
+}
+
+<COMMENT>// Main class</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>GroovyDemo</TYPE> {
+
+    <COMMENT>// Static method</COMMENT>
+    <KEYWORD>static</KEYWORD> <KEYWORD>void</KEYWORD> <FUNCTION>main</FUNCTION>(<TYPE>String</TYPE>[] args) {
+        <COMMENT>// Variable declarations</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>message</VARIABLE> <OPERATOR>=</OPERATOR> "<TYPE>Hello</TYPE>, <TYPE>World</TYPE><OPERATOR>!</OPERATOR>"
+        <TYPE>String</TYPE> typed <OPERATOR>=</OPERATOR> "<TYPE>Typed</TYPE> string"
+        <KEYWORD>int</KEYWORD> number <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+
+        <COMMENT>// GString interpolation</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>greeting</VARIABLE> <OPERATOR>=</OPERATOR> "<TYPE>Message</TYPE>: $message, <TYPE>Number</TYPE>: ${number <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>}"
+        <KEYWORD>def</KEYWORD> <VARIABLE>multiline</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>"""</STRING>
+<STRING>            |This is a</STRING>
+<STRING>            |multiline string</STRING>
+<STRING>            |with ${number}</STRING>
+<STRING>        """</STRING>.<FUNCTION>stripMargin</FUNCTION>()
+
+        <COMMENT>// Single-quoted (no interpolation)</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>literal</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>'No $interpolation here'</STRING>
+
+        <COMMENT>// Triple single-quoted</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>rawMultiline</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>'''</STRING>
+<STRING>            Raw multiline</STRING>
+<STRING>            no interpolation</STRING>
+<STRING>        '''</STRING>
+
+        <COMMENT>// Slashy string (regex)</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>pattern</VARIABLE> <OPERATOR>=</OPERATOR> <REGEX>/\d+\.\d+/</REGEX>
+        <KEYWORD>def</KEYWORD> <VARIABLE>dollarSlashy</VARIABLE> <OPERATOR>=</OPERATOR> $<OPERATOR>/</OPERATOR>
+            <TYPE>Allows</TYPE> $ without escape
+            and <OPERATOR>/</OPERATOR> without escape
+        <OPERATOR>/</OPERATOR>$
+
+        <COMMENT>// Lists</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>numbers</VARIABLE> <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>]
+        <KEYWORD>def</KEYWORD> <VARIABLE>mixed</VARIABLE> <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, "two", <NUMBER>3.0</NUMBER>, <KEYWORD>true</KEYWORD>]
+        <KEYWORD>def</KEYWORD> <VARIABLE>empty</VARIABLE> <OPERATOR>=</OPERATOR> []
+
+        <COMMENT>// Maps</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>map</VARIABLE> <OPERATOR>=</OPERATOR> [key: "value", "foo": "bar"]
+        <KEYWORD>def</KEYWORD> <VARIABLE>emptyMap</VARIABLE> <OPERATOR>=</OPERATOR> [:]
+
+        <COMMENT>// Ranges</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>range</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>1.</NUMBER>.<NUMBER>10</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>exclusiveRange</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>1.</NUMBER>.<OPERATOR>&lt;</OPERATOR><NUMBER>10</NUMBER>
+
+        <COMMENT>// Closures</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>double</VARIABLE> <OPERATOR>=</OPERATOR> { x <OPERATOR>-</OPERATOR><OPERATOR>&gt;</OPERATOR> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
+        <KEYWORD>def</KEYWORD> <VARIABLE>add</VARIABLE> <OPERATOR>=</OPERATOR> { a, b <OPERATOR>-</OPERATOR><OPERATOR>&gt;</OPERATOR> a <OPERATOR>+</OPERATOR> b }
+        <KEYWORD>def</KEYWORD> <VARIABLE>noArgs</VARIABLE> <OPERATOR>=</OPERATOR> { <OPERATOR>-</OPERATOR><OPERATOR>&gt;</OPERATOR> println "<TYPE>No</TYPE> args" }
+        <KEYWORD>def</KEYWORD> <VARIABLE>implicit</VARIABLE> <OPERATOR>=</OPERATOR> { it <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
+
+        <COMMENT>// Collection operations</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>doubled</VARIABLE> <OPERATOR>=</OPERATOR> numbers.<FUNCTION>collect</FUNCTION> { it <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
+        <KEYWORD>def</KEYWORD> <VARIABLE>filtered</VARIABLE> <OPERATOR>=</OPERATOR> numbers.<FUNCTION>findAll</FUNCTION> { it <OPERATOR>&gt;</OPERATOR> <NUMBER>2</NUMBER> }
+        <KEYWORD>def</KEYWORD> <VARIABLE>sum</VARIABLE> <OPERATOR>=</OPERATOR> numbers.<FUNCTION>inject</FUNCTION>(<NUMBER>0</NUMBER>) { acc, n <OPERATOR>-</OPERATOR><OPERATOR>&gt;</OPERATOR> acc <OPERATOR>+</OPERATOR> n }
+        <KEYWORD>def</KEYWORD> <VARIABLE>first</VARIABLE> <OPERATOR>=</OPERATOR> numbers.<FUNCTION>find</FUNCTION> { it <OPERATOR>&gt;</OPERATOR> <NUMBER>3</NUMBER> }
+
+        <COMMENT>// Spread operator</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>args</VARIABLE> <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>]
+        <KEYWORD>def</KEYWORD> <VARIABLE>result</VARIABLE> <OPERATOR>=</OPERATOR> <FUNCTION>sum</FUNCTION>(<OPERATOR>*</OPERATOR>args)
+
+        <COMMENT>// Elvis operator</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>nullVal</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>
+        <KEYWORD>def</KEYWORD> <VARIABLE>safe</VARIABLE> <OPERATOR>=</OPERATOR> null<TYPE>Val</TYPE> ?: "<KEYWORD>default</KEYWORD>"
+
+        <COMMENT>// Safe navigation</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>person</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Person</FUNCTION>("<TYPE>Alice</TYPE>", <NUMBER>30</NUMBER>)
+        <KEYWORD>def</KEYWORD> <VARIABLE>nameLength</VARIABLE> <OPERATOR>=</OPERATOR> person<OPERATOR>?.</OPERATOR>name<OPERATOR>?.</OPERATOR><FUNCTION>length</FUNCTION>()
+
+        <COMMENT>// Spaceship operator</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>compare</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>5</NUMBER> <OPERATOR>&lt;=&gt;</OPERATOR> <NUMBER>10</NUMBER>
+
+        <COMMENT>// Pattern matching</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>text</VARIABLE> <OPERATOR>=</OPERATOR> "<TYPE>Hello</TYPE> <NUMBER>123</NUMBER> <TYPE>World</TYPE>"
+        <KEYWORD>def</KEYWORD> <VARIABLE>matcher</VARIABLE> <OPERATOR>=</OPERATOR> t<KEYWORD>ext</KEYWORD> <OPERATOR>=~</OPERATOR> <REGEX>/\d+/</REGEX>
+        <KEYWORD>def</KEYWORD> <VARIABLE>match</VARIABLE> <OPERATOR>=</OPERATOR> t<KEYWORD>ext</KEYWORD> <OPERATOR>==~</OPERATOR> <REGEX>/.*\d+.*/</REGEX>
+
+        <COMMENT>// Switch with various matches</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>value</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+        <KEYWORD>switch</KEYWORD> (value) {
+            <KEYWORD>case</KEYWORD> <NUMBER>0</NUMBER>:
+                println "<TYPE>Zero</TYPE>"
+                <KEYWORD>break</KEYWORD>
+            <KEYWORD>case</KEYWORD> <NUMBER>1.</NUMBER>.<NUMBER>10</NUMBER>:
+                println "<TYPE>Small</TYPE>"
+                <KEYWORD>break</KEYWORD>
+            <KEYWORD>case</KEYWORD> [<NUMBER>42</NUMBER>, <NUMBER>100</NUMBER>, <NUMBER>200</NUMBER>]:
+                println "<TYPE>Special</TYPE>"
+                <KEYWORD>break</KEYWORD>
+            <KEYWORD>case</KEYWORD> <OPERATOR>~</OPERATOR><REGEX>/\d+/</REGEX>:
+                println "<TYPE>Number</TYPE>"
+                <KEYWORD>break</KEYWORD>
+            <KEYWORD>case</KEYWORD> { it <OPERATOR>&gt;</OPERATOR> <NUMBER>50</NUMBER> }:
+                println "<TYPE>Large</TYPE>"
+                <KEYWORD>break</KEYWORD>
+            <KEYWORD>default</KEYWORD>:
+                println "<TYPE>Unknown</TYPE>"
+        }
+
+        <COMMENT>// Try-catch</COMMENT>
+        <KEYWORD>try</KEYWORD> {
+            <KEYWORD>def</KEYWORD> <VARIABLE>parsed</VARIABLE> <OPERATOR>=</OPERATOR> <TYPE>Integer</TYPE>.<FUNCTION>parseInt</FUNCTION>("<NUMBER>42</NUMBER>")
+        } <KEYWORD>catch</KEYWORD> (<TYPE>NumberFormatException</TYPE> e) {
+            println "<TYPE>Parse</TYPE> error: ${e.message}"
+        } <KEYWORD>finally</KEYWORD> {
+            println "<TYPE>Cleanup</TYPE>"
+        }
+
+        <COMMENT>// With statement</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>builder</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>StringBuilder</FUNCTION>()
+        builder.<KEYWORD>with</KEYWORD> {
+            <FUNCTION>append</FUNCTION>("<TYPE>Hello</TYPE>")
+            <FUNCTION>append</FUNCTION>(" ")
+            <FUNCTION>append</FUNCTION>("<TYPE>World</TYPE>")
+        }
+
+        <COMMENT>// Tap method</COMMENT>
+        <KEYWORD>new</KEYWORD> <FUNCTION>Person</FUNCTION>("<TYPE>Bob</TYPE>", <NUMBER>25</NUMBER>).<FUNCTION>tap</FUNCTION> {
+            println "<TYPE>Created</TYPE>: $name"
+        }
+
+        <COMMENT>// JSON handling</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>json</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>JsonSlurper</FUNCTION>().<FUNCTION>parseText</FUNCTION>(<STRING>'{"name": "test"}'</STRING>)
+        <KEYWORD>def</KEYWORD> <VARIABLE>jsonStr</VARIABLE> <OPERATOR>=</OPERATOR> <TYPE>JsonOutput</TYPE>.<FUNCTION>toJson</FUNCTION>([key: "value"])
+
+        <COMMENT>// Operators overloading</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>p1</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Point</FUNCTION>(<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>)
+        <KEYWORD>def</KEYWORD> <VARIABLE>p2</VARIABLE> <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <FUNCTION>Point</FUNCTION>(<NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>)
+        <KEYWORD>def</KEYWORD> <VARIABLE>nums</VARIABLE> <OPERATOR>=</OPERATOR> [<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>] <OPERATOR>+</OPERATOR> [<NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>]  <COMMENT>// Plus operator</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>str</VARIABLE> <OPERATOR>=</OPERATOR> "<TYPE>Hello</TYPE>" <OPERATOR>*</OPERATOR> <NUMBER>3</NUMBER>  <COMMENT>// Multiply</COMMENT>
+
+        <COMMENT>// Numbers</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>integer</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>bigInteger</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>42G</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>bigDecimal</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>42.0G</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>float</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>3.14f</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>double</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>3.14d</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>hex</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>
+        <KEYWORD>def</KEYWORD> <VARIABLE>binary</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>
+
+        <COMMENT>// Power operator</COMMENT>
+        <KEYWORD>def</KEYWORD> <VARIABLE>squared</VARIABLE> <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER><OPERATOR>*</OPERATOR><OPERATOR>*</OPERATOR><NUMBER>10</NUMBER>
+    }
+}
+
+<COMMENT>// Extension methods</COMMENT>
+<TYPE>String</TYPE>.meta<TYPE>Class</TYPE>.shout <OPERATOR>=</OPERATOR> { <OPERATOR>-</OPERATOR><OPERATOR>&gt;</OPERATOR> delegate.<FUNCTION>toUpperCase</FUNCTION>() <OPERATOR>+</OPERATOR> "<OPERATOR>!</OPERATOR>" }

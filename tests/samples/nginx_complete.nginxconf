@@ -1,0 +1,142 @@
+# Nginx configuration example
+# Main context
+
+user nginx;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /var/log/nginx/error.log warn;
+
+events {
+    worker_connections 1024;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logging
+    log_format main '$remote_addr - $remote_user [$time_local] '
+                    '"$request" $status $body_bytes_sent '
+                    '"$http_referer" "$http_user_agent"';
+
+    access_log /var/log/nginx/access.log main;
+
+    # Performance
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 100m;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript;
+    gzip_min_length 1000;
+    gzip_comp_level 6;
+    gzip_vary on;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Upstream backend
+    upstream backend {
+        server 127.0.0.1:8080 weight=5;
+        server 127.0.0.1:8081;
+        server 192.168.1.100:8080 backup;
+        keepalive 32;
+    }
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+    # Default server - redirect HTTP to HTTPS
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        return 301 https://$host$request_uri;
+    }
+
+    # Main HTTPS server
+    server {
+        listen 443 ssl;
+        server_name example.com www.example.com;
+
+        ssl_certificate /etc/ssl/certs/example.com.pem;
+        ssl_certificate_key /etc/ssl/private/example.com.key;
+        ssl_stapling on;
+        ssl_stapling_verify on;
+
+        root /var/www/html;
+        index index.html index.htm;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+
+        # Static files with caching
+        location /static/ {
+            alias /var/www/static/;
+            expires 30d;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # API proxy
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 30s;
+            proxy_read_timeout 60s;
+            proxy_buffering on;
+            proxy_http_version 1.1;
+        }
+
+        # WebSocket proxy
+        location /ws/ {
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+
+        # Regex location for images
+        location ~* \.(jpg|jpeg|png|gif|ico|svg|webp)$ {
+            expires 7d;
+            add_header Cache-Control "public";
+            try_files $uri =404;
+        }
+
+        # Deny access to hidden files
+        location ~ /\. {
+            deny all;
+            return 404;
+        }
+
+        # Health check endpoint
+        location = /health {
+            stub_status;
+            allow 127.0.0.1;
+            deny all;
+        }
+
+        # Default location
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        error_page 404 /404.html;
+        error_page 500 502 503 504 /50x.html;
+    }
+}

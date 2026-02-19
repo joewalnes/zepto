@@ -1,0 +1,154 @@
+= AsciiDoc Syntax Guide
+Author Name <author@example.com>
+v2.0, 2024-01-15
+:toc: left
+:icons: font
+:source-highlighter: rouge
+:imagesdir: images
+:sectnums:
+:experimental:
+
+== Introduction
+
+This document demonstrates *AsciiDoc* syntax for highlighting.
+AsciiDoc is a lightweight markup language for writing documentation.
+
+=== Basic Formatting
+
+Text can be *bold*, _italic_, `monospaced`, or [.underline]#underlined#.
+You can also use **bold within** a word and __italic within__ a word.
+
+Superscript: E=mc^2^ and subscript: H~2~O.
+
+=== Links and Cross-References
+
+Visit https://asciidoctor.org for more info.
+See link:api.html[API Documentation] for details.
+Cross-reference: <<_tables,Tables section>>
+
+== Lists
+
+=== Unordered
+
+* First item
+** Nested item
+*** Deeply nested
+* Second item
+* Third item
+
+=== Ordered
+
+. Step one
+. Step two
+.. Sub-step a
+.. Sub-step b
+. Step three
+
+=== Description List
+
+Term 1:: Definition of term 1.
+Term 2:: Definition of term 2.
+
+== Code Blocks
+
+Inline code: `System.out.println("Hello")`
+
+.A Java example
+[source,java]
+----
+public class Hello {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}
+----
+
+.Shell commands
+[source,bash]
+----
+#!/bin/bash
+echo "Installing..."
+sudo apt-get update
+sudo apt-get install -y mypackage
+----
+
+....
+This is a literal block.
+No formatting is applied.
+Special chars: * _ ` #
+....
+
+== Tables
+
+.Sample Data Table
+[cols="1,2,1",options="header"]
+|===
+| ID | Name | Score
+
+| 1
+| Alice
+| 95
+
+| 2
+| Bob
+| 82
+
+| 3
+| Carol
+| 71
+|===
+
+== Admonitions
+
+NOTE: This is a note.
+
+TIP: This is a helpful tip.
+
+IMPORTANT: Do not skip this step.
+
+WARNING: This operation is destructive.
+
+CAUTION: Proceed with care.
+
+== Images and Media
+
+image::screenshot.png[Application Screenshot,width=600]
+
+== Sidebars and Examples
+
+****
+This is a sidebar block.
+It contains auxiliary information.
+****
+
+====
+This is an example block.
+It can contain any content.
+====
+
+== Includes and Attributes
+
+The project version is {version}.
+The author is {author}.
+
+include::chapters/getting-started.adoc[]
+
+== Passthrough
+
+++++
+<div class="custom-html">
+  <p>Raw HTML content</p>
+</div>
+++++
+
+////
+This is a comment block.
+It will not appear in the output.
+Multiple lines are supported.
+////
+
+// This is a single-line comment
+
+== Conclusion
+
+For more information, see the https://docs.asciidoctor.org[Asciidoctor Documentation].

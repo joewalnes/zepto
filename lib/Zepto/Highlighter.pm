@@ -118,7 +118,7 @@ my %EXTENSION_MAP = (
     bash => 'Zepto::Syntax::Shell',
     zsh  => 'Zepto::Syntax::Shell',
     ksh  => 'Zepto::Syntax::Shell',
-    fish => 'Zepto::Syntax::Shell',
+    fish => 'Zepto::Syntax::Fish',
 
     # Markdown
     md       => 'Zepto::Syntax::Markdown',
@@ -162,8 +162,6 @@ my %EXTENSION_MAP = (
 
     # CSS
     css      => 'Zepto::Syntax::CSS',
-    scss     => 'Zepto::Syntax::CSS',
-    less     => 'Zepto::Syntax::CSS',
 
     # JSON
     json     => 'Zepto::Syntax::JSON',
@@ -175,20 +173,221 @@ my %EXTENSION_MAP = (
     # Makefile extensions
     mk       => 'Zepto::Syntax::Makefile',
     mak      => 'Zepto::Syntax::Makefile',
+
+    # SQL
+    sql      => 'Zepto::Syntax::SQL',
+    mysql    => 'Zepto::Syntax::SQL',
+    pgsql    => 'Zepto::Syntax::SQL',
+    plsql    => 'Zepto::Syntax::SQL',
+    hql      => 'Zepto::Syntax::SQL',
+
+    # Kotlin
+    kt       => 'Zepto::Syntax::Kotlin',
+    kts      => 'Zepto::Syntax::Kotlin',
+
+    # C#
+    cs       => 'Zepto::Syntax::CSharp',
+    csx      => 'Zepto::Syntax::CSharp',
+
+    # TOML
+    toml     => 'Zepto::Syntax::TOML',
+
+    # Dockerfile
+    dockerfile => 'Zepto::Syntax::Dockerfile',
+
+    # Terraform/HCL
+    tf       => 'Zepto::Syntax::Terraform',
+    tfvars   => 'Zepto::Syntax::Terraform',
+    hcl      => 'Zepto::Syntax::Terraform',
+
+    # Lua
+    lua      => 'Zepto::Syntax::Lua',
+
+    # Scala
+    scala    => 'Zepto::Syntax::Scala',
+    sc       => 'Zepto::Syntax::Scala',
+    sbt      => 'Zepto::Syntax::Scala',
+
+    # Protocol Buffers
+    proto    => 'Zepto::Syntax::Protobuf',
+
+    # Groovy
+    groovy   => 'Zepto::Syntax::Groovy',
+    gradle   => 'Zepto::Syntax::Groovy',
+    gvy      => 'Zepto::Syntax::Groovy',
+    gy       => 'Zepto::Syntax::Groovy',
+    gsh      => 'Zepto::Syntax::Groovy',
+
+    # Clojure and S-expression languages
+    clj      => 'Zepto::Syntax::Clojure',
+    cljs     => 'Zepto::Syntax::Clojure',
+    cljc     => 'Zepto::Syntax::Clojure',
+    edn      => 'Zepto::Syntax::Clojure',
+    lisp     => 'Zepto::Syntax::Clojure',
+    cl       => 'Zepto::Syntax::Clojure',
+    lsp      => 'Zepto::Syntax::Clojure',
+    scm      => 'Zepto::Syntax::Clojure',
+    ss       => 'Zepto::Syntax::Clojure',
+    rkt      => 'Zepto::Syntax::Clojure',
+    el       => 'Zepto::Syntax::Clojure',
+
+    # Objective-C
+    m        => 'Zepto::Syntax::ObjectiveC',
+    mm       => 'Zepto::Syntax::ObjectiveC',
+
+    # Bazel (reuse Python syntax)
+    bzl      => 'Zepto::Syntax::Python',
+    bazel    => 'Zepto::Syntax::Python',
+
+    # Thrift
+    thrift   => 'Zepto::Syntax::Thrift',
+
+    # INI
+    ini      => 'Zepto::Syntax::INI',
+    cfg      => 'Zepto::Syntax::INI',
+    conf     => 'Zepto::Syntax::INI',
+
+    # Properties
+    properties => 'Zepto::Syntax::Properties',
+
+    # Diff/Patch
+    diff     => 'Zepto::Syntax::Diff',
+    patch    => 'Zepto::Syntax::Diff',
+
+    # Nginx (handled mainly via FILENAME_MAP)
+    nginxconf => 'Zepto::Syntax::Nginx',
+
+    # CMake
+    cmake    => 'Zepto::Syntax::CMake',
+
+    # SCSS/Sass/Less
+    scss     => 'Zepto::Syntax::SCSS',
+    sass     => 'Zepto::Syntax::SCSS',
+    less     => 'Zepto::Syntax::SCSS',
+
+    # GraphQL
+    graphql  => 'Zepto::Syntax::GraphQL',
+    gql      => 'Zepto::Syntax::GraphQL',
+
+    # R
+    r        => 'Zepto::Syntax::R',
+    R        => 'Zepto::Syntax::R',
+    rmd      => 'Zepto::Syntax::R',
+
+    # systemd unit files
+    service  => 'Zepto::Syntax::Systemd',
+    timer    => 'Zepto::Syntax::Systemd',
+    socket   => 'Zepto::Syntax::Systemd',
+    mount    => 'Zepto::Syntax::Systemd',
+    target   => 'Zepto::Syntax::Systemd',
+    path     => 'Zepto::Syntax::Systemd',
+    slice    => 'Zepto::Syntax::Systemd',
+    scope    => 'Zepto::Syntax::Systemd',
+    automount => 'Zepto::Syntax::Systemd',
+    swap     => 'Zepto::Syntax::Systemd',
+    device   => 'Zepto::Syntax::Systemd',
+    network  => 'Zepto::Syntax::Systemd',
+    netdev   => 'Zepto::Syntax::Systemd',
+    link     => 'Zepto::Syntax::Systemd',
+
+    # Log files
+    log      => 'Zepto::Syntax::Logfile',
+
+    # SSH config
+    sshconfig => 'Zepto::Syntax::SSHConfig',
+
+    # Crontab
+    crontab  => 'Zepto::Syntax::Crontab',
+
+    # Fish shell (also mapped above in Shell section)
+
+    # Nix
+    nix      => 'Zepto::Syntax::Nix',
+
+    # LaTeX
+    tex      => 'Zepto::Syntax::LaTeX',
+    latex    => 'Zepto::Syntax::LaTeX',
+    sty      => 'Zepto::Syntax::LaTeX',
+    cls      => 'Zepto::Syntax::LaTeX',
+    bib      => 'Zepto::Syntax::LaTeX',
+
+    # reStructuredText
+    rst      => 'Zepto::Syntax::ReStructuredText',
+    rest     => 'Zepto::Syntax::ReStructuredText',
+
+    # AsciiDoc
+    adoc     => 'Zepto::Syntax::AsciiDoc',
+    asciidoc => 'Zepto::Syntax::AsciiDoc',
+    asc      => 'Zepto::Syntax::AsciiDoc',
 );
 
 # Filename to grammar mapping (for files without extensions or special names)
 my %FILENAME_MAP = (
-    'Makefile'     => 'Zepto::Syntax::Makefile',
-    'makefile'     => 'Zepto::Syntax::Makefile',
-    'GNUmakefile'  => 'Zepto::Syntax::Makefile',
-    'Rakefile'     => 'Zepto::Syntax::Ruby',
-    'Gemfile'      => 'Zepto::Syntax::Ruby',
-    'Vagrantfile'  => 'Zepto::Syntax::Ruby',
-    '.bashrc'      => 'Zepto::Syntax::Shell',
-    '.bash_profile'=> 'Zepto::Syntax::Shell',
-    '.zshrc'       => 'Zepto::Syntax::Shell',
-    '.profile'     => 'Zepto::Syntax::Shell',
+    'Makefile'       => 'Zepto::Syntax::Makefile',
+    'makefile'       => 'Zepto::Syntax::Makefile',
+    'GNUmakefile'    => 'Zepto::Syntax::Makefile',
+    'Rakefile'       => 'Zepto::Syntax::Ruby',
+    'Gemfile'        => 'Zepto::Syntax::Ruby',
+    'Vagrantfile'    => 'Zepto::Syntax::Ruby',
+    '.bashrc'        => 'Zepto::Syntax::Shell',
+    '.bash_profile'  => 'Zepto::Syntax::Shell',
+    '.zshrc'         => 'Zepto::Syntax::Shell',
+    '.profile'       => 'Zepto::Syntax::Shell',
+
+    # Dockerfile
+    'Dockerfile'     => 'Zepto::Syntax::Dockerfile',
+    'dockerfile'     => 'Zepto::Syntax::Dockerfile',
+    'Containerfile'  => 'Zepto::Syntax::Dockerfile',
+
+    # Gradle build files
+    'build.gradle'     => 'Zepto::Syntax::Groovy',
+    'settings.gradle'  => 'Zepto::Syntax::Groovy',
+    'build.gradle.kts' => 'Zepto::Syntax::Kotlin',
+    'settings.gradle.kts' => 'Zepto::Syntax::Kotlin',
+
+    # Bazel build files (use Python syntax)
+    'BUILD'          => 'Zepto::Syntax::Python',
+    'BUILD.bazel'    => 'Zepto::Syntax::Python',
+    'WORKSPACE'      => 'Zepto::Syntax::Python',
+    'WORKSPACE.bazel'=> 'Zepto::Syntax::Python',
+
+    # Config files
+    'Cargo.toml'     => 'Zepto::Syntax::TOML',
+    'pyproject.toml' => 'Zepto::Syntax::TOML',
+
+    # INI config files
+    '.gitconfig'     => 'Zepto::Syntax::INI',
+    '.gitmodules'    => 'Zepto::Syntax::INI',
+    '.editorconfig'  => 'Zepto::Syntax::INI',
+    'setup.cfg'      => 'Zepto::Syntax::INI',
+    'tox.ini'        => 'Zepto::Syntax::INI',
+    'php.ini'        => 'Zepto::Syntax::INI',
+    'my.cnf'         => 'Zepto::Syntax::INI',
+    '.npmrc'         => 'Zepto::Syntax::INI',
+    '.pylintrc'      => 'Zepto::Syntax::INI',
+
+    # Nginx config files
+    'nginx.conf'     => 'Zepto::Syntax::Nginx',
+
+    # CMake
+    'CMakeLists.txt' => 'Zepto::Syntax::CMake',
+
+    # SSH config
+    'ssh_config'     => 'Zepto::Syntax::SSHConfig',
+    'sshd_config'    => 'Zepto::Syntax::SSHConfig',
+    'config'         => 'Zepto::Syntax::SSHConfig',  # ~/.ssh/config
+
+    # Crontab
+    'crontab'        => 'Zepto::Syntax::Crontab',
+
+    # Fish config
+    'config.fish'    => 'Zepto::Syntax::Fish',
+
+    # Nix
+    'default.nix'    => 'Zepto::Syntax::Nix',
+    'shell.nix'      => 'Zepto::Syntax::Nix',
+    'flake.nix'      => 'Zepto::Syntax::Nix',
+    'configuration.nix' => 'Zepto::Syntax::Nix',
 );
 
 # Shebang to grammar mapping
@@ -208,8 +407,18 @@ my %SHEBANG_MAP = (
     zsh      => 'Zepto::Syntax::Shell',
     ksh      => 'Zepto::Syntax::Shell',
     dash     => 'Zepto::Syntax::Shell',
-    fish     => 'Zepto::Syntax::Shell',
+    fish     => 'Zepto::Syntax::Fish',
     php      => 'Zepto::Syntax::PHP',
+    lua      => 'Zepto::Syntax::Lua',
+    luajit   => 'Zepto::Syntax::Lua',
+    groovy   => 'Zepto::Syntax::Groovy',
+    scala    => 'Zepto::Syntax::Scala',
+    kotlin   => 'Zepto::Syntax::Kotlin',
+    racket   => 'Zepto::Syntax::Clojure',
+    guile    => 'Zepto::Syntax::Clojure',
+    sbcl     => 'Zepto::Syntax::Clojure',
+    clisp    => 'Zepto::Syntax::Clojure',
+    Rscript  => 'Zepto::Syntax::R',
 );
 
 sub new {

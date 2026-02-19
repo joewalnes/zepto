@@ -1,0 +1,53 @@
+# Crontab syntax highlighting example
+# System crontab format
+
+# Environment variables
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+MAILTO=admin@example.com
+HOME=/root
+
+# Special schedules
+@reboot /usr/local/bin/startup.sh
+@hourly /usr/local/bin/health-check.sh >> /var/log/health.log 2>&1
+@daily /usr/local/bin/backup.sh --full
+@weekly /usr/local/bin/cleanup.sh --old-logs
+@monthly /usr/local/bin/report.sh --monthly
+@yearly /usr/local/bin/audit.sh
+
+# Standard cron expressions
+# min hour dom month dow command
+
+# Every minute
+* * * * * /usr/local/bin/monitor.sh
+
+# Every 5 minutes
+*/5 * * * * /usr/local/bin/check-queue.sh
+
+# Every hour at minute 30
+30 * * * * /usr/local/bin/sync-data.sh
+
+# Daily at 2:30 AM
+30 2 * * * /usr/local/bin/daily-backup.sh
+
+# Every Monday at 6:00 AM
+0 6 * * MON /usr/local/bin/weekly-report.sh
+
+# First day of every month at midnight
+0 0 1 * * /usr/local/bin/monthly-cleanup.sh
+
+# Weekdays at 9 AM and 5 PM
+0 9,17 * * 1-5 /usr/local/bin/notify.sh
+
+# Every 15 minutes during business hours on weekdays
+*/15 9-17 * * MON-FRI /usr/local/bin/poll-api.sh
+
+# Quarterly (Jan, Apr, Jul, Oct) on the 1st at 3 AM
+0 3 1 1,4,7,10 * /usr/local/bin/quarterly-report.sh
+
+# Complex schedule: Every other hour, Mon-Wed
+0 */2 * * 1,2,3 /usr/local/bin/etl-job.sh --incremental
+
+# With user field (system crontab)
+0 4 * * * root /usr/sbin/logrotate /etc/logrotate.conf
+*/10 * * * * www-data /var/www/app/artisan schedule:run >> /dev/null 2>&1

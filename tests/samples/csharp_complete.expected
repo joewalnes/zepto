@@ -1,0 +1,223 @@
+# Expected syntax highlighting for csharp_complete.cs
+# Generated from CSharp grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// C# sample file demonstrating syntax features</COMMENT>
+<KEYWORD>using</KEYWORD> <TYPE>System</TYPE>;
+<KEYWORD>using</KEYWORD> <TYPE>System</TYPE>.<TYPE>Collections</TYPE>.<TYPE>Generic</TYPE>;
+<KEYWORD>using</KEYWORD> <TYPE>System</TYPE>.<TYPE>Linq</TYPE>;
+<KEYWORD>using</KEYWORD> <TYPE>System</TYPE>.<TYPE>Threading</TYPE>.<TYPE>Tasks</TYPE>;
+
+<KEYWORD>#region Namespace Declaration</KEYWORD>
+<KEYWORD>namespace</KEYWORD> <TYPE>MyApp.Models</TYPE>
+{
+<KEYWORD>#endregion</KEYWORD>
+
+<COMMENT>/// &lt;summary&gt;</COMMENT>
+<COMMENT>/// XML documentation comment</COMMENT>
+<COMMENT>/// &lt;/summary&gt;</COMMENT>
+<COMMENT>/// &lt;param name="name"&gt;The name&lt;/param&gt;</COMMENT>
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>const</KEYWORD> <KEYWORD>int</KEYWORD> <CONSTANT>MAX_VALUE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>;
+
+<COMMENT>// Enum</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>enum</KEYWORD> <TYPE>Status</TYPE>
+{
+    <TYPE>Pending</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>,
+    <TYPE>Active</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>,
+    <TYPE>Completed</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>
+}
+
+<COMMENT>// Interface</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>interface</KEYWORD> <TYPE>IRepository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <KEYWORD>where</KEYWORD> <TYPE>T</TYPE> : <KEYWORD>class</KEYWORD>
+{
+    <TYPE>Task</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>IEnumerable</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR><OPERATOR>&gt;</OPERATOR> <FUNCTION>GetAllAsync</FUNCTION>();
+    <TYPE>Task</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE>?<OPERATOR>&gt;</OPERATOR> <FUNCTION>GetByIdAsync</FUNCTION>(<KEYWORD>int</KEYWORD> id);
+    <TYPE>Task</TYPE> <FUNCTION>SaveAsync</FUNCTION>(<TYPE>T</TYPE> entity);
+}
+
+<COMMENT>// Record (C# 9+)</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>record</KEYWORD> <TYPE>Person</TYPE>(<KEYWORD>string</KEYWORD> <TYPE>Name</TYPE>, <KEYWORD>int</KEYWORD> <TYPE>Age</TYPE>, <KEYWORD>string</KEYWORD>? <TYPE>Email</TYPE> <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>);
+
+<COMMENT>// Struct</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>struct</KEYWORD> <TYPE>Point</TYPE>
+{
+    <KEYWORD>public</KEYWORD> <KEYWORD>int</KEYWORD> <TYPE>X</TYPE> { <KEYWORD>get</KEYWORD>; <KEYWORD>init</KEYWORD>; }
+    <KEYWORD>public</KEYWORD> <KEYWORD>int</KEYWORD> <TYPE>Y</TYPE> { <KEYWORD>get</KEYWORD>; <KEYWORD>init</KEYWORD>; }
+
+    <KEYWORD>public</KEYWORD> <FUNCTION>Point</FUNCTION>(<KEYWORD>int</KEYWORD> x, <KEYWORD>int</KEYWORD> y) <OPERATOR>=&gt;</OPERATOR> (<TYPE>X</TYPE>, <TYPE>Y</TYPE>) <OPERATOR>=</OPERATOR> (x, y);
+}
+
+<COMMENT>// Class with generics</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Repository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> : <FUNCTION>IRepository</FUNCTION><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <KEYWORD>where</KEYWORD> <TYPE>T</TYPE> : <KEYWORD>class</KEYWORD>, <KEYWORD>new</KEYWORD>()
+{
+    <KEYWORD>private</KEYWORD> <KEYWORD>readonly</KEYWORD> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> _items <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD>();
+
+    <KEYWORD>public</KEYWORD> <KEYWORD>async</KEYWORD> <TYPE>Task</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>IEnumerable</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR><OPERATOR>&gt;</OPERATOR> <FUNCTION>GetAllAsync</FUNCTION>()
+    {
+        <KEYWORD>await</KEYWORD> <TYPE>Task</TYPE>.<FUNCTION>Delay</FUNCTION>(<NUMBER>100</NUMBER>);
+        <KEYWORD>return</KEYWORD> _items.<FUNCTION>AsReadOnly</FUNCTION>();
+    }
+
+    <KEYWORD>public</KEYWORD> <KEYWORD>async</KEYWORD> <TYPE>Task</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE>?<OPERATOR>&gt;</OPERATOR> <FUNCTION>GetByIdAsync</FUNCTION>(<KEYWORD>int</KEYWORD> id)
+    {
+        <KEYWORD>await</KEYWORD> <TYPE>Task</TYPE>.<FUNCTION>Delay</FUNCTION>(<NUMBER>50</NUMBER>);
+        <KEYWORD>return</KEYWORD> _items.<FUNCTION>FirstOrDefault</FUNCTION>();
+    }
+
+    <KEYWORD>public</KEYWORD> <KEYWORD>async</KEYWORD> <TYPE>Task</TYPE> <FUNCTION>SaveAsync</FUNCTION>(<TYPE>T</TYPE> entity)
+    {
+        <KEYWORD>await</KEYWORD> <TYPE>Task</TYPE>.<FUNCTION>Delay</FUNCTION>(<NUMBER>50</NUMBER>);
+        _items.<FUNCTION>Add</FUNCTION>(entity);
+    }
+}
+
+<COMMENT>// Main class</COMMENT>
+<KEYWORD>public</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Program</TYPE>
+{
+    <COMMENT>// Properties</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>string</KEYWORD> <TYPE>Name</TYPE> { <KEYWORD>get</KEYWORD>; <KEYWORD>set</KEYWORD>; } <OPERATOR>=</OPERATOR> <STRING>"Default"</STRING>;
+    <KEYWORD>public</KEYWORD> <KEYWORD>int</KEYWORD> <TYPE>Age</TYPE> { <KEYWORD>get</KEYWORD>; <KEYWORD>private</KEYWORD> <KEYWORD>set</KEYWORD>; }
+
+    <COMMENT>// Auto-property with init</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>required</KEYWORD> <KEYWORD>string</KEYWORD> <TYPE>Id</TYPE> { <KEYWORD>get</KEYWORD>; <KEYWORD>init</KEYWORD>; }
+
+    <COMMENT>// Events</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>event</KEYWORD> <TYPE>EventHandler</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>string</KEYWORD><OPERATOR>&gt;</OPERATOR>? <TYPE>OnChange</TYPE>;
+
+    <COMMENT>// Constructor</COMMENT>
+    <KEYWORD>public</KEYWORD> <FUNCTION>Program</FUNCTION>(<KEYWORD>int</KEYWORD> age)
+    {
+        <TYPE>Age</TYPE> <OPERATOR>=</OPERATOR> age;
+    }
+
+    <COMMENT>// Async method</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>async</KEYWORD> <TYPE>Task</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>string</KEYWORD><OPERATOR>&gt;</OPERATOR> <FUNCTION>FetchDataAsync</FUNCTION>(<KEYWORD>string</KEYWORD> url)
+    {
+        <KEYWORD>await</KEYWORD> <TYPE>Task</TYPE>.<FUNCTION>Delay</FUNCTION>(<NUMBER>1000</NUMBER>);
+        <KEYWORD>return</KEYWORD> <STRING>$"Data from {url}"</STRING>;
+    }
+
+    <COMMENT>// Static method</COMMENT>
+    <KEYWORD>public</KEYWORD> <KEYWORD>static</KEYWORD> <KEYWORD>void</KEYWORD> <FUNCTION>Main</FUNCTION>(<KEYWORD>string</KEYWORD>[] args)
+    {
+        <COMMENT>// Variable declarations</COMMENT>
+        <KEYWORD>var</KEYWORD> message <OPERATOR>=</OPERATOR> <STRING>"Hello, World!"</STRING>;
+        <KEYWORD>string</KEYWORD>? nullable <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>;
+        <KEYWORD>int</KEYWORD> number <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+
+        <COMMENT>// String interpolation</COMMENT>
+        <KEYWORD>var</KEYWORD> greeting <OPERATOR>=</OPERATOR> <STRING>$"Message: {message}, Number: {number}"</STRING>;
+
+        <COMMENT>// Verbatim string</COMMENT>
+        <KEYWORD>var</KEYWORD> path <OPERATOR>=</OPERATOR> <STRING>@"C:\Users\test\file.txt"</STRING>;
+
+        <COMMENT>// Raw string literal (C# 11)</COMMENT>
+        <KEYWORD>var</KEYWORD> js<KEYWORD>on</KEYWORD> <OPERATOR>=</OPERATOR> <STRING>"""</STRING>
+<STRING>            {</STRING>
+<STRING>                "name": "test",</STRING>
+<STRING>                "value": 123</STRING>
+<STRING>            }</STRING>
+<STRING>            """</STRING>;
+
+        <COMMENT>// Collections</COMMENT>
+        <KEYWORD>var</KEYWORD> list <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>int</KEYWORD><OPERATOR>&gt;</OPERATOR> { <NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER> };
+        <KEYWORD>var</KEYWORD> dict <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>Dictionary</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>string</KEYWORD>, <KEYWORD>int</KEYWORD><OPERATOR>&gt;</OPERATOR>
+        {
+            [<STRING>"one"</STRING>] <OPERATOR>=</OPERATOR> <NUMBER>1</NUMBER>,
+            [<STRING>"two"</STRING>] <OPERATOR>=</OPERATOR> <NUMBER>2</NUMBER>
+        };
+
+        <COMMENT>// LINQ</COMMENT>
+        <KEYWORD>var</KEYWORD> filtered <OPERATOR>=</OPERATOR> list.<FUNCTION>Where</FUNCTION>(x <OPERATOR>=&gt;</OPERATOR> x <OPERATOR>&gt;</OPERATOR> <NUMBER>2</NUMBER>)
+                          .<FUNCTION>Select</FUNCTION>(x <OPERATOR>=&gt;</OPERATOR> x <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>)
+                          .<FUNCTION>ToList</FUNCTION>();
+
+        <KEYWORD>var</KEYWORD> query <OPERATOR>=</OPERATOR> <KEYWORD>from</KEYWORD> n <KEYWORD>in</KEYWORD> list
+                    <KEYWORD>where</KEYWORD> n <OPERATOR>&gt;</OPERATOR> <NUMBER>2</NUMBER>
+                    <KEYWORD>orderby</KEYWORD> n <KEYWORD>descending</KEYWORD>
+                    <KEYWORD>select</KEYWORD> n <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
+
+        <COMMENT>// Pattern matching</COMMENT>
+        <KEYWORD>object</KEYWORD> obj <OPERATOR>=</OPERATOR> <STRING>"test"</STRING>;
+        <KEYWORD>if</KEYWORD> (obj <KEYWORD>is</KEYWORD> <KEYWORD>string</KEYWORD> s <OPERATOR>&amp;&amp;</OPERATOR> s.<TYPE>Length</TYPE> <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>)
+        {
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(s);
+        }
+
+        <COMMENT>// Switch expression</COMMENT>
+        <KEYWORD>var</KEYWORD> result <OPERATOR>=</OPERATOR> number <KEYWORD>switch</KEYWORD>
+        {
+            <OPERATOR>&lt;</OPERATOR> <NUMBER>0</NUMBER> <OPERATOR>=&gt;</OPERATOR> <STRING>"negative"</STRING>,
+            <NUMBER>0</NUMBER> <OPERATOR>=&gt;</OPERATOR> <STRING>"zero"</STRING>,
+            <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER> <KEYWORD>and</KEYWORD> <OPERATOR>&lt;</OPERATOR> <NUMBER>100</NUMBER> <OPERATOR>=&gt;</OPERATOR> <STRING>"positive"</STRING>,
+            _ <OPERATOR>=&gt;</OPERATOR> <STRING>"large"</STRING>
+        };
+
+        <COMMENT>// Null handling</COMMENT>
+        <KEYWORD>var</KEYWORD> length <OPERATOR>=</OPERATOR> nullable<OPERATOR>?.</OPERATOR><TYPE>Length</TYPE> <OPERATOR>??</OPERATOR> <NUMBER>0</NUMBER>;
+        <KEYWORD>var</KEYWORD> forced <OPERATOR>=</OPERATOR> nullable<OPERATOR>!</OPERATOR>.<TYPE>Length</TYPE>;  <COMMENT>// Null forgiving</COMMENT>
+
+        <COMMENT>// Loops</COMMENT>
+        <KEYWORD>for</KEYWORD> (<KEYWORD>int</KEYWORD> i <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>; <FUNCTION>i</FUNCTION> <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>; i<OPERATOR>++</OPERATOR>)
+        {
+            <KEYWORD>if</KEYWORD> (i <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>) <KEYWORD>continue</KEYWORD>;
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(i);
+        }
+
+        <KEYWORD>foreach</KEYWORD> (<KEYWORD>var</KEYWORD> item <KEYWORD>in</KEYWORD> list)
+        {
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(item);
+        }
+
+        <COMMENT>// Try-catch-finally</COMMENT>
+        <KEYWORD>try</KEYWORD>
+        {
+            <KEYWORD>var</KEYWORD> parsed <OPERATOR>=</OPERATOR> <KEYWORD>int</KEYWORD>.<FUNCTION>Parse</FUNCTION>(<STRING>"42"</STRING>);
+        }
+        <KEYWORD>catch</KEYWORD> (<TYPE>FormatException</TYPE> ex) <KEYWORD>when</KEYWORD> (ex.<TYPE>Message</TYPE>.<FUNCTION>Contains</FUNCTION>(<STRING>"Input"</STRING>))
+        {
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(<STRING>$"Error: {ex.Message}"</STRING>);
+        }
+        <KEYWORD>catch</KEYWORD> (<TYPE>Exception</TYPE>)
+        {
+            <KEYWORD>throw</KEYWORD>;
+        }
+        <KEYWORD>finally</KEYWORD>
+        {
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(<STRING>"Cleanup"</STRING>);
+        }
+
+        <COMMENT>// Using statement</COMMENT>
+        <KEYWORD>using</KEYWORD> <KEYWORD>var</KEYWORD> stream <OPERATOR>=</OPERATOR> <KEYWORD>new</KEYWORD> <TYPE>System</TYPE>.<CONSTANT>IO</CONSTANT>.<FUNCTION>MemoryStream</FUNCTION>();
+
+        <COMMENT>// Lambda expressions</COMMENT>
+        <TYPE>Func</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>int</KEYWORD>, <KEYWORD>int</KEYWORD>, <KEYWORD>int</KEYWORD><OPERATOR>&gt;</OPERATOR> <KEYWORD>add</KEYWORD> <OPERATOR>=</OPERATOR> (a, b) <OPERATOR>=&gt;</OPERATOR> a <OPERATOR>+</OPERATOR> b;
+        <TYPE>Action</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>string</KEYWORD><OPERATOR>&gt;</OPERATOR> pr<KEYWORD>int</KEYWORD> <OPERATOR>=</OPERATOR> msg <OPERATOR>=&gt;</OPERATOR> <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(msg);
+
+        <COMMENT>// Async/await</COMMENT>
+        _ <OPERATOR>=</OPERATOR> <TYPE>Task</TYPE>.<FUNCTION>Run</FUNCTION>(<KEYWORD>async</KEYWORD> () <OPERATOR>=&gt;</OPERATOR>
+        {
+            <KEYWORD>await</KEYWORD> <TYPE>Task</TYPE>.<FUNCTION>Delay</FUNCTION>(<NUMBER>1000</NUMBER>);
+            <TYPE>Console</TYPE>.<FUNCTION>WriteLine</FUNCTION>(<STRING>"Done"</STRING>);
+        });
+
+        <COMMENT>// Tuple</COMMENT>
+        <KEYWORD>var</KEYWORD> (name, age) <OPERATOR>=</OPERATOR> (<STRING>"Alice"</STRING>, <NUMBER>30</NUMBER>);
+        <KEYWORD>var</KEYWORD> tuple <OPERATOR>=</OPERATOR> (<TYPE>Name</TYPE>: <STRING>"Bob"</STRING>, <TYPE>Age</TYPE>: <NUMBER>25</NUMBER>);
+
+        <COMMENT>// Numbers</COMMENT>
+        <KEYWORD>var</KEYWORD> integer <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>;
+        <KEYWORD>var</KEYWORD> floating <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>;
+        <KEYWORD>var</KEYWORD> hex <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>;
+        <KEYWORD>var</KEYWORD> binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>;
+        <KEYWORD>var</KEYWORD> underscore <OPERATOR>=</OPERATOR> <NUMBER>1_000_000</NUMBER>;
+    }
+
+    <COMMENT>// Attribute</COMMENT>
+    <ATTRIBUTE>[Obsolete("Use NewMethod instead")]</ATTRIBUTE>
+    <KEYWORD>public</KEYWORD> <KEYWORD>void</KEYWORD> <FUNCTION>OldMethod</FUNCTION>() { }
+}
+
+} <COMMENT>// end namespace</COMMENT>

@@ -1,0 +1,167 @@
+# Expected syntax highlighting for kotlin_complete.kt
+# Generated from Kotlin grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT>// Kotlin sample file demonstrating syntax features</COMMENT>
+<KEYWORD>package</KEYWORD> com.example.demo
+
+<KEYWORD>import</KEYWORD> kotl<KEYWORD>in</KEYWORD>.math.<CONSTANT>PI</CONSTANT>
+<KEYWORD>import</KEYWORD> kotl<KEYWORD>in</KEYWORD>.math.sqrt
+<KEYWORD>import</KEYWORD> kotlinx.coroutines.<OPERATOR>*</OPERATOR>
+
+<COMMENT>/**</COMMENT>
+<COMMENT> * Multi-line KDoc comment</COMMENT>
+<COMMENT> * @param name The name parameter</COMMENT>
+<COMMENT> */</COMMENT>
+
+<COMMENT>// Constants</COMMENT>
+<KEYWORD>const</KEYWORD> <KEYWORD>val</KEYWORD> <CONSTANT>MAX_SIZE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>100</NUMBER>
+<KEYWORD>val</KEYWORD> <CONSTANT>PI_VALUE</CONSTANT> <OPERATOR>=</OPERATOR> <NUMBER>3.14159</NUMBER>
+
+<COMMENT>// Data class</COMMENT>
+<KEYWORD>data</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Person</TYPE>(
+    <KEYWORD>val</KEYWORD> name: <TYPE>String</TYPE>,
+    <KEYWORD>val</KEYWORD> age: <TYPE>Int</TYPE>,
+    <KEYWORD>val</KEYWORD> email: <TYPE>String</TYPE>? <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>
+)
+
+<COMMENT>// Sealed class</COMMENT>
+<KEYWORD>sealed</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Result</TYPE><OPERATOR>&lt;</OPERATOR><KEYWORD>out</KEYWORD> <TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> {
+    <KEYWORD>data</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Success</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>(<KEYWORD>val</KEYWORD> <KEYWORD>data</KEYWORD>: <TYPE>T</TYPE>) : <TYPE>Result</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>()
+    <KEYWORD>data</KEYWORD> <KEYWORD>class</KEYWORD> <TYPE>Error</TYPE>(<KEYWORD>val</KEYWORD> message: <TYPE>String</TYPE>) : <TYPE>Result</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Nothing</TYPE><OPERATOR>&gt;</OPERATOR>()
+    <KEYWORD>object</KEYWORD> <TYPE>Loading</TYPE> : <TYPE>Result</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>Nothing</TYPE><OPERATOR>&gt;</OPERATOR>()
+}
+
+<COMMENT>// Interface</COMMENT>
+<KEYWORD>interface</KEYWORD> <TYPE>Repository</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> {
+    <KEYWORD>suspend</KEYWORD> <KEYWORD>fun</KEYWORD> <FUNCTION>getAll</FUNCTION>(): <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>
+    <KEYWORD>suspend</KEYWORD> <KEYWORD>fun</KEYWORD> <FUNCTION>getById</FUNCTION>(id: <TYPE>Int</TYPE>): <TYPE>T</TYPE>?
+    <KEYWORD>suspend</KEYWORD> <KEYWORD>fun</KEYWORD> <FUNCTION>save</FUNCTION>(item: <TYPE>T</TYPE>)
+}
+
+<COMMENT>// Enum class</COMMENT>
+<KEYWORD>enum</KEYWORD> <TYPE>class</TYPE> <FUNCTION>Status</FUNCTION>(<KEYWORD>val</KEYWORD> code: <TYPE>Int</TYPE>) {
+    <FUNCTION>PENDING</FUNCTION>(<NUMBER>0</NUMBER>),
+    <FUNCTION>ACTIVE</FUNCTION>(<NUMBER>1</NUMBER>),
+    <FUNCTION>COMPLETED</FUNCTION>(<NUMBER>2</NUMBER>);
+
+    <KEYWORD>fun</KEYWORD> <FUNCTION>isTerminal</FUNCTION>() <OPERATOR>=</OPERATOR> <KEYWORD>this</KEYWORD> <OPERATOR>==</OPERATOR> <CONSTANT>COMPLETED</CONSTANT>
+}
+
+<COMMENT>// Class with primary constructor</COMMENT>
+<KEYWORD>class</KEYWORD> <TYPE>Calculator</TYPE>(<KEYWORD>private</KEYWORD> <KEYWORD>val</KEYWORD> initial<TYPE>Value</TYPE>: <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> <NUMBER>0</NUMBER>) {
+    <KEYWORD>var</KEYWORD> value: <TYPE>Int</TYPE> <OPERATOR>=</OPERATOR> initial<TYPE>Value</TYPE>
+        <KEYWORD>private</KEYWORD> <KEYWORD>set</KEYWORD>
+
+    <KEYWORD>fun</KEYWORD> <FUNCTION>add</FUNCTION>(n: <TYPE>Int</TYPE>): <TYPE>Calculator</TYPE> {
+        value <OPERATOR>+=</OPERATOR> n
+        <KEYWORD>return</KEYWORD> <KEYWORD>this</KEYWORD>
+    }
+
+    <KEYWORD>fun</KEYWORD> <FUNCTION>multiply</FUNCTION>(n: <TYPE>Int</TYPE>) <OPERATOR>=</OPERATOR> <FUNCTION>apply</FUNCTION> { value <OPERATOR>*=</OPERATOR> n }
+
+    <KEYWORD>companion</KEYWORD> <KEYWORD>object</KEYWORD> {
+        <KEYWORD>fun</KEYWORD> <FUNCTION>create</FUNCTION>() <OPERATOR>=</OPERATOR> <FUNCTION>Calculator</FUNCTION>()
+    }
+}
+
+<COMMENT>// Extension function</COMMENT>
+<KEYWORD>fun</KEYWORD> <FUNCTION>String</FUNCTION>.<FUNCTION>addExclamation</FUNCTION>() <OPERATOR>=</OPERATOR> <STRING>"$this!"</STRING>
+
+<COMMENT>// Extension property</COMMENT>
+<KEYWORD>val</KEYWORD> <TYPE>String</TYPE>.word<TYPE>Count</TYPE>: <TYPE>Int</TYPE>
+    <KEYWORD>get</KEYWORD>() <OPERATOR>=</OPERATOR> <KEYWORD>this</KEYWORD>.<FUNCTION>split</FUNCTION>(<STRING>" "</STRING>).size
+
+<COMMENT>// Inline function with reified type</COMMENT>
+<KEYWORD>inline</KEYWORD> <KEYWORD>fun</KEYWORD> <OPERATOR>&lt;</OPERATOR><KEYWORD>reified</KEYWORD> <TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <FUNCTION>printType</FUNCTION>() {
+    <FUNCTION>println</FUNCTION>(<TYPE>T</TYPE><OPERATOR>::</OPERATOR><KEYWORD>class</KEYWORD>.java.simple<TYPE>Name</TYPE>)
+}
+
+<COMMENT>// Higher-order function</COMMENT>
+<KEYWORD>fun</KEYWORD> <OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR>.<FUNCTION>customFilter</FUNCTION>(predicate: (<TYPE>T</TYPE>) <OPERATOR>-&gt;</OPERATOR> <TYPE>Boolean</TYPE>): <TYPE>List</TYPE><OPERATOR>&lt;</OPERATOR><TYPE>T</TYPE><OPERATOR>&gt;</OPERATOR> {
+    <KEYWORD>return</KEYWORD> <FUNCTION>filter</FUNCTION>(predicate)
+}
+
+<COMMENT>// Suspend function</COMMENT>
+<KEYWORD>suspend</KEYWORD> <KEYWORD>fun</KEYWORD> <FUNCTION>fetchData</FUNCTION>(url: <TYPE>String</TYPE>): <TYPE>String</TYPE> {
+    <FUNCTION>delay</FUNCTION>(<NUMBER>1000</NUMBER>)
+    <KEYWORD>return</KEYWORD> <STRING>"Data from $url"</STRING>
+}
+
+<COMMENT>// Main function</COMMENT>
+<KEYWORD>fun</KEYWORD> <FUNCTION>main</FUNCTION>() {
+    <COMMENT>// Variable declarations</COMMENT>
+    <KEYWORD>val</KEYWORD> immutable: <TYPE>String</TYPE> <OPERATOR>=</OPERATOR> <STRING>"Hello"</STRING>
+    <KEYWORD>var</KEYWORD> mutable <OPERATOR>=</OPERATOR> <STRING>"World"</STRING>
+
+    <COMMENT>// String template</COMMENT>
+    <KEYWORD>val</KEYWORD> greeting <OPERATOR>=</OPERATOR> <STRING>"Say: $immutable ${mutable.uppercase()}!"</STRING>
+
+    <COMMENT>// Null safety</COMMENT>
+    <KEYWORD>val</KEYWORD> nullable<TYPE>String</TYPE>: <TYPE>String</TYPE>? <OPERATOR>=</OPERATOR> <KEYWORD>null</KEYWORD>
+    <KEYWORD>val</KEYWORD> length <OPERATOR>=</OPERATOR> nullable<TYPE>String</TYPE><OPERATOR>?.</OPERATOR>length ?: <NUMBER>0</NUMBER>
+    <KEYWORD>val</KEYWORD> forced <OPERATOR>=</OPERATOR> nullable<TYPE>String</TYPE><OPERATOR>!!</OPERATOR>.length  <COMMENT>// Will throw NPE</COMMENT>
+
+    <COMMENT>// Collections</COMMENT>
+    <KEYWORD>val</KEYWORD> numbers <OPERATOR>=</OPERATOR> <FUNCTION>listOf</FUNCTION>(<NUMBER>1</NUMBER>, <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER>, <NUMBER>4</NUMBER>, <NUMBER>5</NUMBER>)
+    <KEYWORD>val</KEYWORD> mutable<TYPE>List</TYPE> <OPERATOR>=</OPERATOR> <FUNCTION>mutableListOf</FUNCTION>(<STRING>"a"</STRING>, <STRING>"b"</STRING>, <STRING>"c"</STRING>)
+    <KEYWORD>val</KEYWORD> map <OPERATOR>=</OPERATOR> <FUNCTION>mapOf</FUNCTION>(<STRING>"key"</STRING> to <STRING>"value"</STRING>, <STRING>"foo"</STRING> to <STRING>"bar"</STRING>)
+
+    <COMMENT>// Lambda and functional operations</COMMENT>
+    <KEYWORD>val</KEYWORD> doubled <OPERATOR>=</OPERATOR> numbers.map { it <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER> }
+    <KEYWORD>val</KEYWORD> filtered <OPERATOR>=</OPERATOR> numbers.filter { it <OPERATOR>&gt;</OPERATOR> <NUMBER>2</NUMBER> }
+    <KEYWORD>val</KEYWORD> sum <OPERATOR>=</OPERATOR> numbers.reduce { acc, n <OPERATOR>-&gt;</OPERATOR> acc <OPERATOR>+</OPERATOR> n }
+
+    <COMMENT>// When expression</COMMENT>
+    <KEYWORD>val</KEYWORD> result <OPERATOR>=</OPERATOR> <KEYWORD>when</KEYWORD> (<KEYWORD>val</KEYWORD> x <OPERATOR>=</OPERATOR> numbers.<FUNCTION>first</FUNCTION>()) {
+        <NUMBER>1</NUMBER> <OPERATOR>-&gt;</OPERATOR> <STRING>"one"</STRING>
+        <NUMBER>2</NUMBER>, <NUMBER>3</NUMBER> <OPERATOR>-&gt;</OPERATOR> <STRING>"two or three"</STRING>
+        <KEYWORD>in</KEYWORD> <NUMBER>4.</NUMBER>.<NUMBER>10</NUMBER> <OPERATOR>-&gt;</OPERATOR> <STRING>"between 4 and 10"</STRING>
+        <KEYWORD>else</KEYWORD> <OPERATOR>-&gt;</OPERATOR> <STRING>"unknown"</STRING>
+    }
+
+    <COMMENT>// Control flow</COMMENT>
+    <KEYWORD>for</KEYWORD> (i <KEYWORD>in</KEYWORD> <NUMBER>1.</NUMBER>.<NUMBER>10</NUMBER> step <NUMBER>2</NUMBER>) {
+        <KEYWORD>if</KEYWORD> (i <OPERATOR>%</OPERATOR> <NUMBER>2</NUMBER> <OPERATOR>==</OPERATOR> <NUMBER>0</NUMBER>) <KEYWORD>continue</KEYWORD>
+        <FUNCTION>println</FUNCTION>(i)
+    }
+
+    <KEYWORD>while</KEYWORD> (mutable.<FUNCTION>length</FUNCTION> <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER>) {
+        mutable <OPERATOR>+=</OPERATOR> <STRING>"x"</STRING>
+    }
+
+    <COMMENT>// Try-catch</COMMENT>
+    <KEYWORD>try</KEYWORD> {
+        <KEYWORD>val</KEYWORD> parsed <OPERATOR>=</OPERATOR> <STRING>"42"</STRING>.<FUNCTION>toInt</FUNCTION>()
+    } <KEYWORD>catch</KEYWORD> (e: <TYPE>NumberFormatException</TYPE>) {
+        <FUNCTION>println</FUNCTION>(<STRING>"Parse error: ${e.message}"</STRING>)
+    } <KEYWORD>finally</KEYWORD> {
+        <FUNCTION>println</FUNCTION>(<STRING>"Cleanup"</STRING>)
+    }
+
+    <COMMENT>// Object expression</COMMENT>
+    <KEYWORD>val</KEYWORD> listener <OPERATOR>=</OPERATOR> <KEYWORD>object</KEYWORD> : <TYPE>Runnable</TYPE> {
+        <KEYWORD>override</KEYWORD> <KEYWORD>fun</KEYWORD> <FUNCTION>run</FUNCTION>() {
+            <FUNCTION>println</FUNCTION>(<STRING>"Running"</STRING>)
+        }
+    }
+
+    <COMMENT>// Destructuring</COMMENT>
+    <KEYWORD>val</KEYWORD> (name, age) <OPERATOR>=</OPERATOR> <FUNCTION>Person</FUNCTION>(<STRING>"Alice"</STRING>, <NUMBER>30</NUMBER>)
+
+    <COMMENT>// Coroutines</COMMENT>
+    run<TYPE>Blocking</TYPE> {
+        launch {
+            <KEYWORD>val</KEYWORD> <KEYWORD>data</KEYWORD> <OPERATOR>=</OPERATOR> async { <FUNCTION>fetchData</FUNCTION>(<STRING>"https://example.com"</STRING>) }
+            <FUNCTION>println</FUNCTION>(<KEYWORD>data</KEYWORD>.<FUNCTION>await</FUNCTION>())
+        }
+    }
+
+    <COMMENT>// Numbers</COMMENT>
+    <KEYWORD>val</KEYWORD> integer <OPERATOR>=</OPERATOR> <NUMBER>42</NUMBER>
+    <KEYWORD>val</KEYWORD> long <OPERATOR>=</OPERATOR> <NUMBER>42L</NUMBER>
+    <KEYWORD>val</KEYWORD> float <OPERATOR>=</OPERATOR> <NUMBER>3.14f</NUMBER>
+    <KEYWORD>val</KEYWORD> double <OPERATOR>=</OPERATOR> <NUMBER>3.14</NUMBER>
+    <KEYWORD>val</KEYWORD> hex <OPERATOR>=</OPERATOR> <NUMBER>0xFF</NUMBER>
+    <KEYWORD>val</KEYWORD> binary <OPERATOR>=</OPERATOR> <NUMBER>0b1010</NUMBER>
+}

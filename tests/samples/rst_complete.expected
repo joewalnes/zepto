@@ -1,0 +1,157 @@
+# Expected syntax highlighting for rst_complete.rst
+# Generated from ReStructuredText grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<HEADING>======================</HEADING>
+reStructuredText Guide
+<HEADING>======================</HEADING>
+
+Introduction
+<HEADING>============</HEADING>
+
+This document demonstrates <CONSTANT>**reStructuredText**</CONSTANT> syntax for highlighting.
+reStructuredText is used by Sphinx_ for Python documentation.
+
+Basic Formatting
+<HEADING>----------------</HEADING>
+
+Text can be <STRING>*emphasized*</STRING>, <CONSTANT>**strongly emphasized**</CONSTANT>, or use <FUNCTION>``inline code``</FUNCTION>.
+This is a <STRING>`hyperlink &lt;https://example.com&gt;`</STRING>_ and a standalone link:
+https://example.com.
+
+A footnote reference <TAG>[1]_</TAG> and a citation reference <TAG>[CIT2024]_</TAG>.
+
+Lists
+<HEADING>-----</HEADING>
+
+Bullet list:
+
+<KEYWORD>-</KEYWORD> First item
+<KEYWORD>-</KEYWORD> Second item with <STRING>*emphasis*</STRING>
+<KEYWORD>-</KEYWORD> Third item
+
+  - Nested item
+  - Another nested item
+
+Numbered list:
+
+<KEYWORD>1.</KEYWORD> First step
+<KEYWORD>2.</KEYWORD> Second step
+<KEYWORD>3.</KEYWORD> Third step
+
+<KEYWORD>#.</KEYWORD> Auto-numbered
+<KEYWORD>#.</KEYWORD> Items
+
+Definition list:
+
+Term 1
+    Definition of term 1.
+
+Term 2
+    Definition of term 2, which can span
+    multiple lines.
+
+Directives
+<HEADING>==========</HEADING>
+
+<PUNCTUATION>.. </PUNCTUATION><KEYWORD>note</KEYWORD><PUNCTUATION>::</PUNCTUATION>
+   This is a note admonition.
+
+<PUNCTUATION>.. </PUNCTUATION><KEYWORD>warning</KEYWORD><PUNCTUATION>::</PUNCTUATION>
+   Be careful with this operation!
+
+<PUNCTUATION>.. </PUNCTUATION><KEYWORD>code-block</KEYWORD><PUNCTUATION>::</PUNCTUATION><STRING> python</STRING>
+
+   def fibonacci(n):
+       """Calculate fibonacci number."""
+       if n &lt;= 1:
+           return n
+       return fibonacci(n - 1) + fibonacci(n - 2)
+
+<PUNCTUATION>.. </PUNCTUATION><KEYWORD>image</KEYWORD><PUNCTUATION>::</PUNCTUATION><STRING> images/logo.png</STRING>
+   <ATTRIBUTE>:alt:</ATTRIBUTE><STRING> Project Logo</STRING>
+   <ATTRIBUTE>:width:</ATTRIBUTE><STRING> 200px</STRING>
+   <ATTRIBUTE>:align:</ATTRIBUTE><STRING> center</STRING>
+
+<PUNCTUATION>.. </PUNCTUATION><KEYWORD>table</KEYWORD><PUNCTUATION>::</PUNCTUATION><STRING> Comparison Table</STRING>
+   <ATTRIBUTE>:widths:</ATTRIBUTE><STRING> auto</STRING>
+
+   ======  =====  ======
+   Name    Score  Grade
+   ======  =====  ======
+   Alice   95     A
+   Bob     82     B
+   Carol   71     C
+   ======  =====  ======
+
+Field Lists
+<HEADING>-----------</HEADING>
+
+<ATTRIBUTE>:Author:</ATTRIBUTE><STRING> Jane Doe</STRING>
+<ATTRIBUTE>:Version:</ATTRIBUTE><STRING> 2.0</STRING>
+<ATTRIBUTE>:Date:</ATTRIBUTE><STRING> 2024-01-15</STRING>
+<ATTRIBUTE>:Status:</ATTRIBUTE><STRING> Draft</STRING>
+<ATTRIBUTE>:License:</ATTRIBUTE><STRING> MIT</STRING>
+
+Roles and Interpreted Text
+<HEADING>--------------------------</HEADING>
+
+See <KEYWORD>:ref:</KEYWORD><STRING>`introduction`</STRING> for more details.
+The <KEYWORD>:func:</KEYWORD><STRING>`fibonacci`</STRING> function is defined in <KEYWORD>:mod:</KEYWORD><STRING>`math_utils`</STRING>.
+See <KEYWORD>:doc:</KEYWORD><STRING>`api/reference`</STRING> for the full API.
+Use <KEYWORD>:command:</KEYWORD><STRING>`make html`</STRING> to build the docs.
+
+This is <KEYWORD>:math:</KEYWORD><STRING>`E = mc^2`</STRING> inline math.
+
+Cross-references: <KEYWORD>:pep:</KEYWORD><STRING>`8`</STRING>, <KEYWORD>:rfc:</KEYWORD><STRING>`2616`</STRING>.
+
+Literal Blocks
+<HEADING>--------------</HEADING>
+
+<HEADING>A paragraph ending with double colon</HEADING><PUNCTUATION>::</PUNCTUATION>
+
+    This is a literal block.
+    It preserves formatting and whitespace.
+    No <CONSTANT>**markup**</CONSTANT> is processed here.
+
+Substitutions
+<HEADING>-------------</HEADING>
+
+<VARIABLE>|project|</VARIABLE> is version <VARIABLE>|version|</VARIABLE>.
+
+<COMMENT>.. |project| replace:: MyProject</COMMENT>
+<COMMENT>.. |version| replace:: 1.0.0</COMMENT>
+
+Tables
+<HEADING>------</HEADING>
+
++------------+----------+----------+
+<VARIABLE>| Header 1   |</VARIABLE> Header 2 <VARIABLE>| Header 3 |</VARIABLE>
++============+==========+==========+
+<VARIABLE>| Row 1      |</VARIABLE> Cell     <VARIABLE>| Cell     |</VARIABLE>
++------------+----------+----------+
+<VARIABLE>| Row 2      |</VARIABLE> Cell     <VARIABLE>| Cell     |</VARIABLE>
++------------+----------+----------+
+
+Comments
+<HEADING>--------</HEADING>
+
+<COMMENT>.. This is a comment that won't appear in output.</COMMENT>
+
+<COMMENT>..</COMMENT>
+   This is also a comment block
+   spanning multiple lines.
+
+Footnotes
+<HEADING>---------</HEADING>
+
+<COMMENT>.. [1] This is footnote 1.</COMMENT>
+<COMMENT>.. [CIT2024] Citation reference, 2024.</COMMENT>
+<COMMENT>.. _Sphinx: https://www.sphinx-doc.org/</COMMENT>
+
+Indices and Tables
+<HEADING>==================</HEADING>
+
+<KEYWORD>*</KEYWORD> <KEYWORD>:ref:</KEYWORD><STRING>`genindex`</STRING>
+<KEYWORD>*</KEYWORD> <KEYWORD>:ref:</KEYWORD><STRING>`modindex`</STRING>
+<KEYWORD>*</KEYWORD> <KEYWORD>:ref:</KEYWORD><STRING>`search`</STRING>

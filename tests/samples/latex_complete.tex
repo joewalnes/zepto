@@ -1,0 +1,151 @@
+% LaTeX syntax highlighting sample
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage[colorlinks=true,linkcolor=blue]{hyperref}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{xcolor}
+
+% Page layout
+\geometry{margin=1in}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+
+% Custom commands
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\norm}[1]{\left\| #1 \right\|}
+\renewcommand{\vec}[1]{\boldsymbol{#1}}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+% Document metadata
+\title{A Comprehensive \LaTeX{} Example}
+\author{Jane Doe \and John Smith}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Introduction}
+
+This document demonstrates various \LaTeX{} features for syntax
+highlighting purposes. We use both inline math $x^2 + y^2 = r^2$
+and display math environments.
+
+\subsection{Basic Formatting}
+
+Text can be \textbf{bold}, \textit{italic}, \texttt{monospaced},
+or \emph{emphasized}. Special characters: \& \% \$ \# \_ \{ \}
+
+\subsection*{Mathematical Expressions}
+
+The quadratic formula:
+$$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$
+
+An aligned equation system:
+\begin{align}
+    \nabla \cdot \vec{E} &= \frac{\rho}{\epsilon_0} \label{eq:gauss} \\
+    \nabla \times \vec{B} &= \mu_0 \vec{J} + \mu_0 \epsilon_0 \frac{\partial \vec{E}}{\partial t}
+\end{align}
+
+Inline math: Let $f: \R \to \R$ be a continuous function. Then for
+all $\epsilon > 0$, there exists $\delta > 0$ such that
+$|x - x_0| < \delta$ implies $|f(x) - f(x_0)| < \epsilon$.
+
+\section{Theorems and Proofs}
+
+\begin{theorem}[Fundamental Theorem of Calculus]
+    Let $f$ be continuous on $[a, b]$. Then
+    \[
+        \int_a^b f(x) \, dx = F(b) - F(a)
+    \]
+    where $F$ is any antiderivative of $f$.
+\end{theorem}
+
+\begin{proof}
+    The proof follows from the definition of the Riemann integral
+    and the Mean Value Theorem. See~\cite{rudin1976} for details.
+\end{proof}
+
+\begin{lemma}
+    For all $n \in \N$, we have $\sum_{k=1}^{n} k = \frac{n(n+1)}{2}$.
+\end{lemma}
+
+\section{Tables and Figures}
+
+\begin{table}[htbp]
+    \centering
+    \caption{Comparison of algorithms}
+    \label{tab:algorithms}
+    \begin{tabular}{lccc}
+        \toprule
+        Algorithm & Time & Space & Stable \\
+        \midrule
+        Quicksort & $O(n \log n)$ & $O(\log n)$ & No \\
+        Mergesort & $O(n \log n)$ & $O(n)$ & Yes \\
+        Heapsort  & $O(n \log n)$ & $O(1)$ & No \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+See Table~\ref{tab:algorithms} and Figure~\ref{fig:example}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figure.pdf}
+    \caption{An example figure.}
+    \label{fig:example}
+\end{figure}
+
+\section{Lists}
+
+\begin{enumerate}
+    \item First item with \textbf{bold text}
+    \item Second item with math: $e^{i\pi} + 1 = 0$
+    \item Third item
+    \begin{itemize}
+        \item Nested bullet
+        \item Another bullet
+    \end{itemize}
+\end{enumerate}
+
+\section{Code Listing}
+
+\begin{lstlisting}[language=Python, caption=Hello World]
+def hello(name):
+    print(f"Hello, {name}!")
+
+if __name__ == "__main__":
+    hello("World")
+\end{lstlisting}
+
+\begin{verbatim}
+This text is displayed verbatim.
+No \LaTeX commands are processed here.
+\end{verbatim}
+
+\section{Conclusion}
+
+For more information, see the documentation\footnote{Available at
+\url{https://www.latex-project.org}}.
+
+\bibliography{references}
+\bibliographystyle{plain}
+
+\end{document}

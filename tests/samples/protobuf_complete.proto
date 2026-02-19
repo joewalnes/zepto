@@ -1,0 +1,207 @@
+// Protocol Buffers sample file
+// Demonstrating proto3 syntax
+
+syntax = "proto3";
+
+package myapp.api.v1;
+
+option java_package = "com.example.myapp.api.v1";
+option java_outer_classname = "MyAppProtos";
+option java_multiple_files = true;
+option go_package = "github.com/example/myapp/api/v1;apiv1";
+option csharp_namespace = "MyApp.Api.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+// Enum definition
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_PENDING = 1;
+  STATUS_ACTIVE = 2;
+  STATUS_COMPLETED = 3;
+  STATUS_FAILED = 4;
+}
+
+// Another enum with options
+enum Priority {
+  option allow_alias = true;
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_NORMAL = 2;
+  PRIORITY_MEDIUM = 2;  // Alias
+  PRIORITY_HIGH = 3;
+  PRIORITY_CRITICAL = 4;
+}
+
+// Basic message
+message User {
+  // Scalar types
+  int64 id = 1;
+  string username = 2;
+  string email = 3;
+  bool is_active = 4;
+  double rating = 5;
+  float score = 6;
+
+  // Enum field
+  Status status = 7;
+
+  // Timestamp from well-known types
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+
+  // Wrapper types for nullable values
+  google.protobuf.Int32Value age = 10;
+  google.protobuf.StringValue nickname = 11;
+
+  // Nested message
+  Address address = 12;
+
+  // Repeated field (array)
+  repeated string tags = 13;
+
+  // Map field
+  map<string, string> metadata = 14;
+
+  // Reserved fields
+  reserved 100, 101, 200 to 299;
+  reserved "old_field", "deprecated_field";
+}
+
+// Nested message definition
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string country = 4;
+  string postal_code = 5;
+
+  // Nested enum
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_HOME = 1;
+    TYPE_WORK = 2;
+    TYPE_OTHER = 3;
+  }
+
+  Type type = 6;
+}
+
+// Message with oneof
+message Notification {
+  string id = 1;
+  string title = 2;
+
+  oneof content {
+    string text = 3;
+    bytes image = 4;
+    string video_url = 5;
+  }
+
+  // Any type for dynamic content
+  google.protobuf.Any extra_data = 6;
+}
+
+// Message with nested messages
+message Order {
+  string order_id = 1;
+  int64 user_id = 2;
+
+  message Item {
+    string product_id = 1;
+    int32 quantity = 2;
+    double unit_price = 3;
+
+    message Discount {
+      string code = 1;
+      double percentage = 2;
+    }
+
+    Discount discount = 4;
+  }
+
+  repeated Item items = 3;
+
+  double total = 4;
+  Status status = 5;
+
+  google.protobuf.Timestamp order_date = 6;
+}
+
+// Request/Response messages
+message GetUserRequest {
+  int64 user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message ListUsersRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+
+  // Filter options
+  string username_filter = 3;
+  Status status_filter = 4;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  google.protobuf.StringValue nickname = 3;
+}
+
+message UpdateUserRequest {
+  int64 user_id = 1;
+
+  // Using field mask pattern
+  User user = 2;
+  repeated string update_mask = 3;
+}
+
+message DeleteUserRequest {
+  int64 user_id = 1;
+}
+
+// Service definition
+service UserService {
+  // Unary RPC
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // Unary RPC returning list
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // Create
+  rpc CreateUser(CreateUserRequest) returns (User);
+
+  // Update
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+
+  // Delete (returns empty)
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+
+  // Server streaming
+  rpc WatchUsers(ListUsersRequest) returns (stream User);
+
+  // Client streaming
+  rpc BatchCreateUsers(stream CreateUserRequest) returns (ListUsersResponse);
+
+  // Bidirectional streaming
+  rpc Chat(stream Notification) returns (stream Notification);
+}
+
+// Extensions message (proto2 compatibility note)
+message ExtendableMessage {
+  string name = 1;
+  extensions 100 to 199;
+}

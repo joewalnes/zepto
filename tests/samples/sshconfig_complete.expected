@@ -1,0 +1,94 @@
+# Expected syntax highlighting for sshconfig_complete.sshconfig
+# Generated from SSHConfig grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT># SSH Client Configuration</COMMENT>
+<COMMENT># ~/.ssh/config</COMMENT>
+
+<COMMENT># Global defaults</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>*</STRING>
+    <VARIABLE>ServerAliveInterval</VARIABLE> <NUMBER>60</NUMBER>
+    <VARIABLE>ServerAliveCountMax</VARIABLE> <NUMBER>3</NUMBER>
+    <VARIABLE>AddKeysToAgent</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>IdentitiesOnly</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>Compression</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>TCPKeepAlive</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>HashKnownHosts</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>VisualHostKey</VARIABLE> <CONSTANT>no</CONSTANT>
+    <VARIABLE>StrictHostKeyChecking</VARIABLE> <CONSTANT>ask</CONSTANT>
+    <VARIABLE>ForwardAgent</VARIABLE> <CONSTANT>no</CONSTANT>
+
+<COMMENT># Development server</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>dev</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>dev.example.com</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>developer</STRING>
+    <VARIABLE>Port</VARIABLE> <NUMBER>22</NUMBER>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_ed25519_dev</STRING>
+    <VARIABLE>ForwardAgent</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>LocalForward</VARIABLE> <STRING>5432 localhost:5432</STRING>
+    <VARIABLE>LocalForward</VARIABLE> <STRING>6379 localhost:6379</STRING>
+
+<COMMENT># Production bastion host</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>bastion prod-bastion</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>10.0.1.50</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>admin</STRING>
+    <VARIABLE>Port</VARIABLE> <NUMBER>2222</NUMBER>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_rsa_prod</STRING>
+    <VARIABLE>ForwardAgent</VARIABLE> <CONSTANT>no</CONSTANT>
+    <VARIABLE>ControlMaster</VARIABLE> <CONSTANT>auto</CONSTANT>
+    <VARIABLE>ControlPath</VARIABLE> <STRING>~/.ssh/sockets/%r@%h-%p</STRING>
+    <VARIABLE>ControlPersist</VARIABLE> <NUMBER>600</NUMBER>
+
+<COMMENT># Production app servers (via bastion)</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>prod-app-*</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>deploy</STRING>
+    <VARIABLE>ProxyJump</VARIABLE> <STRING>bastion</STRING>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_ed25519_deploy</STRING>
+    <VARIABLE>StrictHostKeyChecking</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>UserKnownHostsFile</VARIABLE> <STRING>~/.ssh/known_hosts_prod</STRING>
+    <VARIABLE>RequestTTY</VARIABLE> <CONSTANT>no</CONSTANT>
+
+<KEYWORD>Host</KEYWORD> <STRING>prod-app-1</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>10.0.2.10</STRING>
+
+<KEYWORD>Host</KEYWORD> <STRING>prod-app-2</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>10.0.2.11</STRING>
+
+<COMMENT># CI/CD runner</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>ci</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>ci.internal.example.com</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>ci-runner</STRING>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_ed25519_ci</STRING>
+    <VARIABLE>BatchMode</VARIABLE> <CONSTANT>yes</CONSTANT>
+    <VARIABLE>PasswordAuthentication</VARIABLE> <CONSTANT>no</CONSTANT>
+    <VARIABLE>ChallengeResponseAuthentication</VARIABLE> <CONSTANT>no</CONSTANT>
+    <VARIABLE>LogLevel</VARIABLE> <STRING>ERROR</STRING>
+
+<COMMENT># GitHub</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>github.com</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>github.com</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>git</STRING>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_ed25519_github</STRING>
+    <VARIABLE>PreferredAuthentications</VARIABLE> <STRING>publickey</STRING>
+
+<COMMENT># GitLab</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>gitlab.example.com</STRING>
+    <VARIABLE>HostName</VARIABLE> <STRING>gitlab.example.com</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>git</STRING>
+    <VARIABLE>Port</VARIABLE> <NUMBER>2222</NUMBER>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_ed25519_gitlab</STRING>
+
+<COMMENT># Wildcard for internal hosts</COMMENT>
+<KEYWORD>Host</KEYWORD> <STRING>*.internal.example.com</STRING>
+    <VARIABLE>User</VARIABLE> <STRING>admin</STRING>
+    <VARIABLE>IdentityFile</VARIABLE> <STRING>~/.ssh/id_rsa_internal</STRING>
+    <VARIABLE>ProxyCommand</VARIABLE> <STRING>ssh -W %h:%p bastion</STRING>
+    <VARIABLE>ConnectTimeout</VARIABLE> <NUMBER>10</NUMBER>
+
+<COMMENT># Match blocks (sshd_config style)</COMMENT>
+<KEYWORD>Match</KEYWORD> <STRING>User admin</STRING>
+    <VARIABLE>PermitRootLogin</VARIABLE> <CONSTANT>no</CONSTANT>
+    <VARIABLE>MaxAuthTries</VARIABLE> <NUMBER>3</NUMBER>
+    <VARIABLE>MaxSessions</VARIABLE> <NUMBER>5</NUMBER>
+    <VARIABLE>AllowGroups</VARIABLE> <STRING>sysadmins</STRING>
+    <VARIABLE>X11Forwarding</VARIABLE> <CONSTANT>no</CONSTANT>

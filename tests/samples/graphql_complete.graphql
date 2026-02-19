@@ -1,0 +1,233 @@
+# GraphQL Schema Definition
+
+"""
+The root query type for the application.
+All read operations start here.
+"""
+type Query {
+    user(id: ID!): User
+    users(filter: UserFilter, first: Int = 10, after: String): UserConnection!
+    post(id: ID!): Post
+    posts(status: PostStatus): [Post!]!
+    search(query: String!, types: [SearchType!]): SearchResults!
+    viewer: User
+    node(id: ID!): Node
+}
+
+type Mutation {
+    createUser(input: CreateUserInput!): CreateUserPayload!
+    updateUser(id: ID!, input: UpdateUserInput!): UpdateUserPayload!
+    deleteUser(id: ID!): DeleteUserPayload!
+    createPost(input: CreatePostInput!): Post!
+    likePost(postId: ID!): Post!
+    addComment(postId: ID!, content: String!): Comment!
+}
+
+type Subscription {
+    postCreated: Post!
+    commentAdded(postId: ID!): Comment!
+    userStatusChanged(userId: ID!): User!
+}
+
+# Interfaces
+interface Node {
+    id: ID!
+}
+
+interface Timestamped {
+    createdAt: String!
+    updatedAt: String!
+}
+
+# Types
+type User implements Node & Timestamped {
+    id: ID!
+    username: String!
+    email: String! @deprecated(reason: "Use 'contact.email' instead")
+    name: String
+    avatar: String
+    bio: String
+    role: UserRole!
+    posts(first: Int = 10): [Post!]!
+    followers: UserConnection!
+    following: UserConnection!
+    contact: ContactInfo!
+    settings: UserSettings!
+    createdAt: String!
+    updatedAt: String!
+}
+
+type Post implements Node & Timestamped {
+    id: ID!
+    title: String!
+    content: String!
+    excerpt: String
+    status: PostStatus!
+    author: User!
+    tags: [Tag!]!
+    comments(first: Int = 20, after: String): CommentConnection!
+    likes: Int!
+    views: Int!
+    createdAt: String!
+    updatedAt: String!
+}
+
+type Comment implements Node & Timestamped {
+    id: ID!
+    content: String!
+    author: User!
+    post: Post!
+    parent: Comment
+    replies: [Comment!]!
+    createdAt: String!
+    updatedAt: String!
+}
+
+type Tag {
+    name: String!
+    posts: [Post!]!
+}
+
+type ContactInfo {
+    email: String!
+    phone: String
+    website: String
+}
+
+type UserSettings {
+    theme: Theme!
+    notifications: Boolean!
+    language: String!
+    privacy: PrivacyLevel!
+}
+
+# Connections (Relay-style pagination)
+type UserConnection {
+    edges: [UserEdge!]!
+    pageInfo: PageInfo!
+    totalCount: Int!
+}
+
+type UserEdge {
+    node: User!
+    cursor: String!
+}
+
+type CommentConnection {
+    edges: [CommentEdge!]!
+    pageInfo: PageInfo!
+}
+
+type CommentEdge {
+    node: Comment!
+    cursor: String!
+}
+
+type PageInfo {
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
+    endCursor: String
+}
+
+# Enums
+enum UserRole {
+    ADMIN
+    MODERATOR
+    USER
+    GUEST
+}
+
+enum PostStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+    DELETED
+}
+
+enum Theme {
+    LIGHT
+    DARK
+    SYSTEM
+}
+
+enum PrivacyLevel {
+    PUBLIC
+    FRIENDS
+    PRIVATE
+}
+
+enum SearchType {
+    USER
+    POST
+    TAG
+}
+
+# Input types
+input CreateUserInput {
+    username: String!
+    email: String!
+    name: String
+    password: String!
+}
+
+input UpdateUserInput {
+    name: String
+    bio: String
+    avatar: String
+}
+
+input CreatePostInput {
+    title: String!
+    content: String!
+    tags: [String!]
+    status: PostStatus = DRAFT
+}
+
+input UserFilter {
+    role: UserRole
+    search: String
+    isActive: Boolean
+}
+
+# Union types
+union SearchResults = User | Post | Tag
+
+# Custom scalars
+scalar DateTime
+scalar URL
+scalar JSON
+
+# Directives
+directive @cacheControl(maxAge: Int, scope: CacheScope) on FIELD_DEFINITION | OBJECT
+directive @auth(requires: UserRole!) on FIELD_DEFINITION
+
+enum CacheScope {
+    PUBLIC
+    PRIVATE
+}
+
+# Schema definition
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
+}
+
+# Example query (comment)
+# query GetUser($id: ID!) {
+#     user(id: $id) {
+#         ...UserFields
+#         posts(first: 5) {
+#             title
+#             status
+#         }
+#     }
+# }
+#
+# fragment UserFields on User {
+#     id
+#     username
+#     name
+#     role
+# }

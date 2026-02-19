@@ -1,0 +1,90 @@
+# SSH Client Configuration
+# ~/.ssh/config
+
+# Global defaults
+Host *
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    AddKeysToAgent yes
+    IdentitiesOnly yes
+    Compression yes
+    TCPKeepAlive yes
+    HashKnownHosts yes
+    VisualHostKey no
+    StrictHostKeyChecking ask
+    ForwardAgent no
+
+# Development server
+Host dev
+    HostName dev.example.com
+    User developer
+    Port 22
+    IdentityFile ~/.ssh/id_ed25519_dev
+    ForwardAgent yes
+    LocalForward 5432 localhost:5432
+    LocalForward 6379 localhost:6379
+
+# Production bastion host
+Host bastion prod-bastion
+    HostName 10.0.1.50
+    User admin
+    Port 2222
+    IdentityFile ~/.ssh/id_rsa_prod
+    ForwardAgent no
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 600
+
+# Production app servers (via bastion)
+Host prod-app-*
+    User deploy
+    ProxyJump bastion
+    IdentityFile ~/.ssh/id_ed25519_deploy
+    StrictHostKeyChecking yes
+    UserKnownHostsFile ~/.ssh/known_hosts_prod
+    RequestTTY no
+
+Host prod-app-1
+    HostName 10.0.2.10
+
+Host prod-app-2
+    HostName 10.0.2.11
+
+# CI/CD runner
+Host ci
+    HostName ci.internal.example.com
+    User ci-runner
+    IdentityFile ~/.ssh/id_ed25519_ci
+    BatchMode yes
+    PasswordAuthentication no
+    ChallengeResponseAuthentication no
+    LogLevel ERROR
+
+# GitHub
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_github
+    PreferredAuthentications publickey
+
+# GitLab
+Host gitlab.example.com
+    HostName gitlab.example.com
+    User git
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519_gitlab
+
+# Wildcard for internal hosts
+Host *.internal.example.com
+    User admin
+    IdentityFile ~/.ssh/id_rsa_internal
+    ProxyCommand ssh -W %h:%p bastion
+    ConnectTimeout 10
+
+# Match blocks (sshd_config style)
+Match User admin
+    PermitRootLogin no
+    MaxAuthTries 3
+    MaxSessions 5
+    AllowGroups sysadmins
+    X11Forwarding no

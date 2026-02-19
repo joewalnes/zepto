@@ -1,0 +1,136 @@
+# Expected syntax highlighting for cmake_complete.cmake
+# Generated from CMake grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT># CMakeLists.txt example for a C++ project</COMMENT>
+<FUNCTION>cmake_minimum_required</FUNCTION>(VERSI<CONSTANT>ON</CONSTANT> <NUMBER>3.20</NUMBER> <CONSTANT>FATAL_ERROR</CONSTANT>)
+<FUNCTION>project</FUNCTION>(MyProject VERSI<CONSTANT>ON</CONSTANT> <NUMBER>1.2</NUMBER>.<NUMBER>3</NUMBER> LANGUAGES CXX)
+
+<COMMENT># Set C++ standard</COMMENT>
+<FUNCTION>set</FUNCTION>(CMAKE_CXX_STANDARD <NUMBER>17</NUMBER>)
+<FUNCTION>set</FUNCTION>(CMAKE_CXX_STANDARD_<CONSTANT>REQUIRED</CONSTANT> <CONSTANT>ON</CONSTANT>)
+<FUNCTION>set</FUNCTION>(CMAKE_CXX_EXTENSIONS <CONSTANT>OFF</CONSTANT>)
+
+<COMMENT># Build type</COMMENT>
+<KEYWORD>if</KEYWORD>(<CONSTANT>NOT</CONSTANT> CMAKE_BUILD_TYPE)
+    <FUNCTION>set</FUNCTION>(CMAKE_BUILD_TYPE Release <CONSTANT>CACHE</CONSTANT> STRING <STRING>"Build type"</STRING> <CONSTANT>FORCE</CONSTANT>)
+<KEYWORD>endif</KEYWORD>()
+
+<COMMENT># Options</COMMENT>
+<FUNCTION>option</FUNCTION>(BUILD_TESTS <STRING>"Build test suite"</STRING> <CONSTANT>ON</CONSTANT>)
+<FUNCTION>option</FUNCTION>(BUILD_DOCS <STRING>"Build documentation"</STRING> <CONSTANT>OFF</CONSTANT>)
+<FUNCTION>option</FUNCTION>(ENABLE_COVERAGE <STRING>"Enable code coverage"</STRING> <CONSTANT>OFF</CONSTANT>)
+
+<COMMENT># Find dependencies</COMMENT>
+<FUNCTION>find_package</FUNCTION>(Boost <NUMBER>1.75</NUMBER> <CONSTANT>REQUIRED</CONSTANT> <CONSTANT>COMPONENTS</CONSTANT> filesystem system)
+<FUNCTION>find_package</FUNCTION>(Threads <CONSTANT>REQUIRED</CONSTANT>)
+<FUNCTION>find_package</FUNCTION>(OpenSSL <CONSTANT>REQUIRED</CONSTANT>)
+<FUNCTION>find_package</FUNCTION>(fmt <CONSTANT>CONFIG</CONSTANT> <CONSTANT>QUIET</CONSTANT>)
+
+<KEYWORD>if</KEYWORD>(<CONSTANT>NOT</CONSTANT> fmt_FOUND)
+    <FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"fmt not found, fetching from GitHub..."</STRING>)
+    <FUNCTION>include</FUNCTION>(FetchContent)
+    FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG <NUMBER>10.1</NUMBER>.<NUMBER>1</NUMBER>
+    )
+    FetchContent_MakeAvailable(fmt)
+<KEYWORD>endif</KEYWORD>()
+
+<COMMENT># Compile definitions</COMMENT>
+<FUNCTION>add_compile_definitions</FUNCTION>(
+    <VARIABLE>$&lt;$&lt;CONFIG:Debug&gt;</VARIABLE>:DEBUG_MODE&gt;
+    <VARIABLE>$&lt;$&lt;CONFIG:Release&gt;</VARIABLE>:N<CONSTANT>DEBUG</CONSTANT>&gt;
+    PROJECT_VERSI<CONSTANT>ON</CONSTANT>=<STRING>"${PROJECT_VERSION}"</STRING>
+)
+
+<COMMENT># Compiler warnings</COMMENT>
+<FUNCTION>add_compile_options</FUNCTION>(
+    -Wall -Wextra -Wpedantic
+    <VARIABLE>$&lt;$&lt;CONFIG:Debug&gt;</VARIABLE>:-g -O<NUMBER>0</NUMBER>&gt;
+    <VARIABLE>$&lt;$&lt;CONFIG:Release&gt;</VARIABLE>:-O<NUMBER>3</NUMBER>&gt;
+)
+
+<COMMENT># Source files</COMMENT>
+<FUNCTION>file</FUNCTION>(<CONSTANT>GLOB_RECURSE</CONSTANT> SOURCES <STRING>"src/*.cpp"</STRING>)
+<FUNCTION>file</FUNCTION>(<CONSTANT>GLOB_RECURSE</CONSTANT> HEADERS <STRING>"include/*.hpp"</STRING>)
+
+<COMMENT># Main library</COMMENT>
+<FUNCTION>add_library</FUNCTION>(mylib <CONSTANT>STATIC</CONSTANT> <VARIABLE>${SOURCES}</VARIABLE>)
+
+<FUNCTION>target_include_directories</FUNCTION>(mylib
+    <CONSTANT>PUBLIC</CONSTANT>
+        <VARIABLE>$&lt;BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include&gt;</VARIABLE>
+        <VARIABLE>$&lt;INSTALL_INTERFACE:include&gt;</VARIABLE>
+    <CONSTANT>PRIVATE</CONSTANT>
+        <VARIABLE>${CMAKE_CURRENT_SOURCE_DIR}</VARIABLE>/src
+)
+
+<FUNCTION>target_link_libraries</FUNCTION>(mylib
+    <CONSTANT>PUBLIC</CONSTANT>
+        Boost::filesystem
+        Boost::system
+        OpenSSL::SSL
+    <CONSTANT>PRIVATE</CONSTANT>
+        Threads::Threads
+        fmt::fmt
+)
+
+<COMMENT># Main executable</COMMENT>
+<FUNCTION>add_executable</FUNCTION>(myapp src/main.cpp)
+<FUNCTION>target_link_libraries</FUNCTION>(myapp <CONSTANT>PRIVATE</CONSTANT> mylib)
+
+<COMMENT># Tests</COMMENT>
+<KEYWORD>if</KEYWORD>(BUILD_TESTS)
+    <FUNCTION>enable_testing</FUNCTION>()
+    <FUNCTION>find_package</FUNCTION>(GTest <CONSTANT>REQUIRED</CONSTANT>)
+
+    <FUNCTION>add_executable</FUNCTION>(tests
+        tests/test_main.cpp
+        tests/test_core.cpp
+        tests/test_utils.cpp
+    )
+
+    <FUNCTION>target_link_libraries</FUNCTION>(tests
+        <CONSTANT>PRIVATE</CONSTANT> mylib GTest::gtest GTest::gtest_main
+    )
+
+    <FUNCTION>add_test</FUNCTION>(NAME unit_tests <CONSTANT>COMMAND</CONSTANT> tests)
+
+    <COMMENT># Coverage</COMMENT>
+    <KEYWORD>if</KEYWORD>(ENABLE_COVERAGE)
+        <FUNCTION>target_compile_options</FUNCTION>(tests <CONSTANT>PRIVATE</CONSTANT> --coverage)
+        <FUNCTION>target_link_options</FUNCTION>(tests <CONSTANT>PRIVATE</CONSTANT> --coverage)
+    <KEYWORD>endif</KEYWORD>()
+<KEYWORD>endif</KEYWORD>()
+
+<COMMENT># Installation</COMMENT>
+<FUNCTION>install</FUNCTION>(<CONSTANT>TARGETS</CONSTANT> mylib myapp
+    <CONSTANT>RUNTIME</CONSTANT> <CONSTANT>DESTINATION</CONSTANT> bin
+    <CONSTANT>LIBRARY</CONSTANT> <CONSTANT>DESTINATION</CONSTANT> lib
+    <CONSTANT>ARCHIVE</CONSTANT> <CONSTANT>DESTINATION</CONSTANT> lib
+)
+
+<FUNCTION>install</FUNCTION>(<CONSTANT>DIRECTORY</CONSTANT> include/ <CONSTANT>DESTINATION</CONSTANT> include)
+
+<COMMENT># Custom commands</COMMENT>
+<FUNCTION>add_custom_command</FUNCTION>(
+    OUTPUT <VARIABLE>${CMAKE_BINARY_DIR}</VARIABLE>/version.h
+    <CONSTANT>COMMAND</CONSTANT> <VARIABLE>${CMAKE_COMMAND}</VARIABLE> -E echo
+        <STRING>"\#define VERSION \"${PROJECT_VERSION}\""</STRING> &gt; version.h
+    WORKING_<CONSTANT>DIRECTORY</CONSTANT> <VARIABLE>${CMAKE_BINARY_DIR}</VARIABLE>
+    COMMENT <STRING>"Generating version header"</STRING>
+)
+
+<FUNCTION>add_custom_target</FUNCTION>(version_header DEPENDS <VARIABLE>${CMAKE_BINARY_DIR}</VARIABLE>/version.h)
+
+<COMMENT># Print configuration summary</COMMENT>
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>""</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"Configuration:"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"  Build type:    ${CMAKE_BUILD_TYPE}"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"  C++ standard:  ${CMAKE_CXX_STANDARD}"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"  Build tests:   ${BUILD_TESTS}"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"  Build docs:    ${BUILD_DOCS}"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>"  Coverage:      ${ENABLE_COVERAGE}"</STRING>)
+<FUNCTION>message</FUNCTION>(<CONSTANT>STATUS</CONSTANT> <STRING>""</STRING>)

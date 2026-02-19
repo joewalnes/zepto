@@ -1,0 +1,109 @@
+# TOML configuration file example
+# This is a comment
+
+# Basic key-value pairs
+title = "TOML Example"
+version = "1.0.0"
+enabled = true
+disabled = false
+
+# String types
+basic_string = "Hello, World!"
+literal_string = 'C:\Users\test'
+escaped = "Line1\nLine2\tTabbed"
+
+# Multi-line strings
+multiline_basic = """
+This is a
+multi-line string
+with "quotes" allowed
+"""
+
+multiline_literal = '''
+This is literal
+no \n escape processing
+'''
+
+# Numbers
+integer = 42
+negative = -17
+hex = 0xDEADBEEF
+octal = 0o755
+binary = 0b11010110
+float = 3.14159
+scientific = 6.022e23
+infinity = inf
+negative_infinity = -inf
+not_a_number = nan
+
+# Dates and times
+date = 2024-01-15
+time = 14:30:00
+datetime = 2024-01-15T14:30:00Z
+datetime_offset = 2024-01-15T14:30:00-08:00
+local_datetime = 2024-01-15T14:30:00
+
+# Arrays
+integers = [1, 2, 3, 4, 5]
+strings = ["one", "two", "three"]
+mixed = [1, "two", 3.0]
+nested = [[1, 2], [3, 4]]
+multiline_array = [
+    "first",
+    "second",
+    "third",
+]
+
+# Inline tables
+point = { x = 10, y = 20 }
+person = { name = "Alice", age = 30 }
+
+# Tables (sections)
+[database]
+host = "localhost"
+port = 5432
+name = "myapp"
+ssl = true
+
+[database.connection]
+timeout = 30
+max_retries = 3
+
+# Array of tables
+[[servers]]
+name = "alpha"
+ip = "10.0.0.1"
+
+[[servers]]
+name = "beta"
+ip = "10.0.0.2"
+
+# Nested tables
+[package]
+name = "my-package"
+version = "0.1.0"
+authors = ["Alice <alice@example.com>"]
+edition = "2021"
+
+[package.metadata]
+docs = "https://docs.example.com"
+
+# Dependencies with inline tables
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"], optional = true }
+
+[dev-dependencies]
+test-utils = "0.1"
+
+# Build configuration
+[build]
+target = "x86_64-unknown-linux-gnu"
+opt-level = 3
+debug = false
+
+# Feature flags
+[features]
+default = ["std"]
+std = []
+async = ["tokio"]

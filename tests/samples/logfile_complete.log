@@ -1,0 +1,24 @@
+2024-01-15T10:30:00.123Z INFO  [main] Application starting up
+2024-01-15T10:30:01.456Z DEBUG [config] Loading configuration from /etc/myapp/config.yaml
+2024-01-15T10:30:01.789Z INFO  [database] Connecting to postgresql://localhost:5432/myapp
+2024-01-15T10:30:02.100Z INFO  [database] Connection pool established: min=5 max=20
+2024-01-15T10:30:02.500Z WARN  [cache] Redis connection slow, retrying in 1s
+2024-01-15T10:30:03.500Z INFO  [cache] Redis connected to 127.0.0.1:6379
+2024-01-15T10:30:04.000Z INFO  [server] HTTP server listening on 0.0.0.0:8080
+Jan 15 10:30:05 myhost sshd[12345]: Accepted publickey for admin from 192.168.1.100 port 52431
+Jan 15 10:30:06 myhost kernel: [42.123456] TCP connection established
+192.168.1.100 - admin [15/Jan/2024:10:30:07 +0000] "GET /api/users HTTP/1.1" 200 1234 "-" "Mozilla/5.0"
+192.168.1.101 - - [15/Jan/2024:10:30:08 +0000] "POST /api/login HTTP/1.1" 401 89 "-" "curl/7.68.0"
+192.168.1.102 - user1 [15/Jan/2024:10:30:09 +0000] "GET /static/app.js HTTP/1.1" 304 0 "https://example.com/" "Chrome/120.0"
+2024-01-15 10:30:10 [ERROR] Failed to process request: connection timeout
+2024-01-15 10:30:11 [WARNING] Disk usage at 85% on /var/lib/myapp
+2024-01-15 10:30:12 [NOTICE] Rate limit applied for client_id=abc123
+2024-01-15 10:30:13 [CRITICAL] Database connection lost, attempting reconnect
+2024-01-15T10:30:14+00:00 FATAL Out of memory: pid=5678 consumed=3.2G limit=4G
+2024-01-15 10:30:15 ERROR com.example.myapp.Service - Unhandled exception in request handler
+2024-01-15 10:30:16 TRACE [sql] SELECT * FROM users WHERE id = 42 (took 3ms)
+10.0.0.1 - - [15/Jan/2024:10:30:17 +0000] "DELETE /api/sessions/old HTTP/1.1" 204 0
+10.0.0.2 - - [15/Jan/2024:10:30:18 +0000] "GET /health HTTP/1.1" 200 15
+2024-01-15 10:30:19 INFO  server.access method=GET path=/api/status status=200 duration=2ms
+2024-01-15 10:30:20 ERROR [worker-3] Task failed after 3 retries: timeout exceeded
+level=error msg="connection refused" host=db.internal.example.com port=5432 retry=3

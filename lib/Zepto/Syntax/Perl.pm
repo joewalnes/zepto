@@ -238,18 +238,25 @@ sub tokenize {
             next;
         }
 
-        # Keywords
+        # Keywords (only match at actual word boundary - not mid-word)
         if ($rest =~ /^($KEYWORDS)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_KEYWORD);
-            $pos += length($1);
-            next;
+            # Check that we're not in the middle of a word
+            my $prev_char = $pos > 0 ? substr($line, $pos - 1, 1) : '';
+            if ($prev_char !~ /\w/) {
+                push @tokens, _token($pos, $pos + length($1), TOKEN_KEYWORD);
+                $pos += length($1);
+                next;
+            }
         }
 
-        # Built-in functions
+        # Built-in functions (only match at actual word boundary)
         if ($rest =~ /^($BUILTINS)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_FUNCTION);
-            $pos += length($1);
-            next;
+            my $prev_char = $pos > 0 ? substr($line, $pos - 1, 1) : '';
+            if ($prev_char !~ /\w/) {
+                push @tokens, _token($pos, $pos + length($1), TOKEN_FUNCTION);
+                $pos += length($1);
+                next;
+            }
         }
 
         # Special variables $1, $&, $', etc.

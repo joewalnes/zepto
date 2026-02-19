@@ -1,0 +1,103 @@
+# Expected syntax highlighting for dockerfile_complete.dockerfile
+# Generated from Dockerfile grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT># syntax=docker/dockerfile:1</COMMENT>
+<COMMENT># Dockerfile example with various instructions</COMMENT>
+
+<COMMENT># Build stage</COMMENT>
+<KEYWORD>FROM</KEYWORD> <STRING>golang:1.21-alpine</STRING> <KEYWORD>AS</KEYWORD> <TYPE>builder</TYPE>
+
+<COMMENT># Labels</COMMENT>
+<KEYWORD>LABEL</KEYWORD> <VARIABLE>maintainer</VARIABLE><OPERATOR>=</OPERATOR><STRING>"developer@example.com"</STRING>
+<KEYWORD>LABEL</KEYWORD> <VARIABLE>version</VARIABLE><OPERATOR>=</OPERATOR><STRING>"1.0"</STRING>
+<KEYWORD>LABEL</KEYWORD> <VARIABLE>description</VARIABLE><OPERATOR>=</OPERATOR><STRING>"Multi-stage build example"</STRING>
+
+<COMMENT># Arguments</COMMENT>
+<KEYWORD>ARG</KEYWORD> <VARIABLE>APP_VERSION</VARIABLE><OPERATOR>=</OPERATOR><NUMBER>1</NUMBER>.<NUMBER>0</NUMBER>.<NUMBER>0</NUMBER>
+<KEYWORD>ARG</KEYWORD> BUILD_DATE
+
+<COMMENT># Environment variables</COMMENT>
+<KEYWORD>ENV</KEYWORD> <VARIABLE>GO111MODULE</VARIABLE><OPERATOR>=</OPERATOR>on <OPERATOR>\</OPERATOR>
+    <VARIABLE>CGO_ENABLED</VARIABLE><OPERATOR>=</OPERATOR><NUMBER>0</NUMBER> <OPERATOR>\</OPERATOR>
+    <VARIABLE>GOOS</VARIABLE><OPERATOR>=</OPERATOR>linux <OPERATOR>\</OPERATOR>
+    <VARIABLE>GOARCH</VARIABLE><OPERATOR>=</OPERATOR>amd<NUMBER>64</NUMBER>
+
+<COMMENT># Working directory</COMMENT>
+<KEYWORD>WORKDIR</KEYWORD> /app
+
+<COMMENT># Copy dependency files</COMMENT>
+<KEYWORD>COPY</KEYWORD> go.mod go.sum ./
+
+<COMMENT># Download dependencies</COMMENT>
+<KEYWORD>RUN</KEYWORD> go mod download
+
+<COMMENT># Copy source code</COMMENT>
+<KEYWORD>COPY</KEYWORD> . .
+
+<COMMENT># Build the application</COMMENT>
+<KEYWORD>RUN</KEYWORD> <ATTRIBUTE>--mount=</ATTRIBUTE><VARIABLE>type</VARIABLE><OPERATOR>=</OPERATOR>cache,<VARIABLE>target</VARIABLE><OPERATOR>=</OPERATOR>/root/.cache/go-build <OPERATOR>\</OPERATOR>
+    go build <VARIABLE>-ldflags</VARIABLE><OPERATOR>=</OPERATOR><STRING>"-s -w -X main.Version=${APP_VERSION}"</STRING> <OPERATOR>\</OPERATOR>
+    -o /app/server ./cmd/server
+
+<COMMENT># Production stage</COMMENT>
+<KEYWORD>FROM</KEYWORD> <STRING>alpine:3.18</STRING> <KEYWORD>AS</KEYWORD> <TYPE>production</TYPE>
+
+<COMMENT># Install runtime dependencies</COMMENT>
+<KEYWORD>RUN</KEYWORD> apk <ATTRIBUTE>--no-cache</ATTRIBUTE> add ca-certificates tzdata &amp;&amp; <OPERATOR>\</OPERATOR>
+    adduser -D -g <STRING>''</STRING> appuser
+
+<COMMENT># Copy binary from builder</COMMENT>
+<KEYWORD>COPY</KEYWORD> <ATTRIBUTE>--from=</ATTRIBUTE><STRING>builder</STRING> /app/server /usr/local/bin/server
+<KEYWORD>COPY</KEYWORD> <ATTRIBUTE>--from=</ATTRIBUTE><STRING>builder</STRING> <ATTRIBUTE>--chown=</ATTRIBUTE>appuser:appuser /app/config /etc/app/config
+
+<COMMENT># Set user</COMMENT>
+<KEYWORD>USER</KEYWORD> appuser
+
+<COMMENT># Expose port</COMMENT>
+<KEYWORD>EXPOSE</KEYWORD> <NUMBER>8080/tcp</NUMBER>
+<KEYWORD>EXPOSE</KEYWORD> <NUMBER>9090</NUMBER>
+
+<COMMENT># Health check</COMMENT>
+<KEYWORD>HEALTHCHECK</KEYWORD> <ATTRIBUTE>--interval=</ATTRIBUTE><NUMBER>30</NUMBER>s <ATTRIBUTE>--timeout=</ATTRIBUTE><NUMBER>3</NUMBER>s <ATTRIBUTE>--start-period=</ATTRIBUTE><NUMBER>5</NUMBER>s <ATTRIBUTE>--retries=</ATTRIBUTE><NUMBER>3</NUMBER> <OPERATOR>\</OPERATOR>
+    <KEYWORD>CMD</KEYWORD> wget <ATTRIBUTE>--no-verbose</ATTRIBUTE> <ATTRIBUTE>--tries=</ATTRIBUTE><NUMBER>1</NUMBER> <ATTRIBUTE>--spider</ATTRIBUTE> http://localhost:<NUMBER>8080</NUMBER>/health || exit <NUMBER>1</NUMBER>
+
+<COMMENT># Volume for data</COMMENT>
+<KEYWORD>VOLUME</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>"/data"</STRING>, <STRING>"/logs"</STRING><PUNCTUATION>]</PUNCTUATION>
+
+<COMMENT># Entry point and command</COMMENT>
+<KEYWORD>ENTRYPOINT</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>"/usr/local/bin/server"</STRING><PUNCTUATION>]</PUNCTUATION>
+<KEYWORD>CMD</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>"--config"</STRING>, <STRING>"/etc/app/config/app.yaml"</STRING><PUNCTUATION>]</PUNCTUATION>
+
+<COMMENT># Alternative shell form</COMMENT>
+<COMMENT># CMD /usr/local/bin/server --config /etc/app/config/app.yaml</COMMENT>
+
+<COMMENT># Development stage</COMMENT>
+<KEYWORD>FROM</KEYWORD> <STRING>builder</STRING> <KEYWORD>AS</KEYWORD> <TYPE>development</TYPE>
+
+<COMMENT># Install dev tools</COMMENT>
+<KEYWORD>RUN</KEYWORD> apk add <ATTRIBUTE>--no-cache</ATTRIBUTE> git vim
+
+<COMMENT># Different working directory for dev</COMMENT>
+<KEYWORD>WORKDIR</KEYWORD> /workspace
+
+<COMMENT># Mount source for live reload</COMMENT>
+<COMMENT># VOLUME /workspace</COMMENT>
+
+<COMMENT># Override entrypoint for dev</COMMENT>
+<KEYWORD>ENTRYPOINT</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>"go"</STRING>, <STRING>"run"</STRING>, <STRING>"."</STRING><PUNCTUATION>]</PUNCTUATION>
+
+<COMMENT># Testing stage</COMMENT>
+<KEYWORD>FROM</KEYWORD> <STRING>builder</STRING> <KEYWORD>AS</KEYWORD> <TYPE>testing</TYPE>
+
+<KEYWORD>RUN</KEYWORD> go test -v ./...
+
+<COMMENT># Onbuild example</COMMENT>
+<KEYWORD>ONBUILD</KEYWORD> COPY . /app
+<KEYWORD>ONBUILD</KEYWORD> RUN go build -o /app/main .
+
+<COMMENT># Stop signal</COMMENT>
+<KEYWORD>STOPSIGNAL</KEYWORD> SIGTERM
+
+<COMMENT># Shell instruction</COMMENT>
+<KEYWORD>SHELL</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>"/bin/bash"</STRING>, <STRING>"-c"</STRING><PUNCTUATION>]</PUNCTUATION>

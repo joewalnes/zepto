@@ -1,0 +1,107 @@
+# Expected syntax highlighting for properties_complete.properties
+# Generated from Properties grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT># Java Properties sample file demonstrating syntax features</COMMENT>
+<COMMENT># Application configuration</COMMENT>
+
+<COMMENT># Basic key-value pairs</COMMENT>
+<VARIABLE>app.name</VARIABLE><OPERATOR>=</OPERATOR><STRING>MyApplication</STRING>
+<VARIABLE>app.version</VARIABLE><OPERATOR>=</OPERATOR><STRING>1.0.0</STRING>
+<VARIABLE>app.description</VARIABLE><OPERATOR>=</OPERATOR><STRING>A sample application for testing</STRING>
+
+<COMMENT># Using colon as separator</COMMENT>
+<VARIABLE>app.author</VARIABLE><OPERATOR>:</OPERATOR> <STRING>John Doe</STRING>
+<VARIABLE>app.company</VARIABLE><OPERATOR>:</OPERATOR> <STRING>Example Corp</STRING>
+
+<COMMENT># Boolean values</COMMENT>
+<VARIABLE>app.debug</VARIABLE><OPERATOR>=</OPERATOR><STRING>true</STRING>
+<VARIABLE>app.production</VARIABLE><OPERATOR>=</OPERATOR><STRING>false</STRING>
+
+<COMMENT># Numeric values</COMMENT>
+<VARIABLE>server.port</VARIABLE><OPERATOR>=</OPERATOR><STRING>8080</STRING>
+<VARIABLE>server.threads</VARIABLE><OPERATOR>=</OPERATOR><STRING>10</STRING>
+<VARIABLE>server.timeout</VARIABLE><OPERATOR>=</OPERATOR><STRING>30000</STRING>
+<VARIABLE>cache.size</VARIABLE><OPERATOR>=</OPERATOR><STRING>1024</STRING>
+<VARIABLE>cache.ttl</VARIABLE><OPERATOR>=</OPERATOR><STRING>3600.5</STRING>
+
+<COMMENT># Strings with spaces</COMMENT>
+<VARIABLE>app.title</VARIABLE><OPERATOR>=</OPERATOR><STRING>My Awesome Application</STRING>
+<VARIABLE>app.welcome.message</VARIABLE><OPERATOR>=</OPERATOR><STRING>Welcome to the application!</STRING>
+
+<COMMENT># Special characters (escaped)</COMMENT>
+<VARIABLE>path.separator</VARIABLE><OPERATOR>=</OPERATOR><STRING>\</STRING><OPERATOR>\</OPERATOR>
+<STRING>message.newline=Line1\\nLine2</STRING>
+<VARIABLE>message.tab</VARIABLE><OPERATOR>=</OPERATOR><STRING>Column1\\tColumn2</STRING>
+
+<COMMENT># Unicode escapes</COMMENT>
+<VARIABLE>unicode.smiley</VARIABLE><OPERATOR>=</OPERATOR><STRING>\\u263A</STRING>
+<VARIABLE>unicode.heart</VARIABLE><OPERATOR>=</OPERATOR><STRING>\\u2665</STRING>
+
+<COMMENT># Empty value</COMMENT>
+<VARIABLE>empty.value</VARIABLE><OPERATOR>=</OPERATOR>
+
+<COMMENT># Whitespace handling</COMMENT>
+<VARIABLE>whitespace.leading</VARIABLE><OPERATOR>=</OPERATOR>   <STRING>value with leading spaces preserved after =</STRING>
+<VARIABLE>whitespace.key</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>value</STRING>
+
+<COMMENT># Line continuation with backslash</COMMENT>
+<VARIABLE>long.text</VARIABLE><OPERATOR>=</OPERATOR><STRING>This is a very long line that needs to be </STRING><OPERATOR>\</OPERATOR>
+    <STRING>continued on the next line for better </STRING><OPERATOR>\</OPERATOR>
+    <STRING>readability in the properties file.</STRING>
+
+<VARIABLE>multiline.list</VARIABLE><OPERATOR>=</OPERATOR><STRING>item1,</STRING><OPERATOR>\</OPERATOR>
+              <STRING>item2,</STRING><OPERATOR>\</OPERATOR>
+              <STRING>item3,</STRING><OPERATOR>\</OPERATOR>
+              <STRING>item4</STRING>
+
+<COMMENT># Database configuration</COMMENT>
+<VARIABLE>database.url</VARIABLE><OPERATOR>=</OPERATOR><STRING>jdbc:postgresql://localhost:5432/myapp</STRING>
+<VARIABLE>database.username</VARIABLE><OPERATOR>=</OPERATOR><STRING>dbuser</STRING>
+<VARIABLE>database.password</VARIABLE><OPERATOR>=</OPERATOR><STRING>secret123</STRING>
+<VARIABLE>database.driver</VARIABLE><OPERATOR>=</OPERATOR><STRING>org.postgresql.Driver</STRING>
+<VARIABLE>database.pool.min</VARIABLE><OPERATOR>=</OPERATOR><STRING>5</STRING>
+<VARIABLE>database.pool.max</VARIABLE><OPERATOR>=</OPERATOR><STRING>20</STRING>
+
+<COMMENT># Logging</COMMENT>
+<VARIABLE>logging.level.root</VARIABLE><OPERATOR>=</OPERATOR><STRING>INFO</STRING>
+<VARIABLE>logging.level.com.example</VARIABLE><OPERATOR>=</OPERATOR><STRING>DEBUG</STRING>
+<VARIABLE>logging.pattern</VARIABLE><OPERATOR>=</OPERATOR><STRING>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</STRING>
+<VARIABLE>logging.file</VARIABLE><OPERATOR>=</OPERATOR><STRING>/var/log/myapp/application.log</STRING>
+
+<COMMENT># Email settings</COMMENT>
+<VARIABLE>mail.smtp.host</VARIABLE><OPERATOR>=</OPERATOR><STRING>smtp.example.com</STRING>
+<VARIABLE>mail.smtp.port</VARIABLE><OPERATOR>=</OPERATOR><STRING>587</STRING>
+<VARIABLE>mail.smtp.auth</VARIABLE><OPERATOR>=</OPERATOR><STRING>true</STRING>
+<VARIABLE>mail.smtp.starttls.enable</VARIABLE><OPERATOR>=</OPERATOR><STRING>true</STRING>
+<VARIABLE>mail.from</VARIABLE><OPERATOR>=</OPERATOR><STRING>noreply@example.com</STRING>
+
+<COMMENT># Feature flags</COMMENT>
+<VARIABLE>feature.newUI.enabled</VARIABLE><OPERATOR>=</OPERATOR><STRING>false</STRING>
+<VARIABLE>feature.beta.enabled</VARIABLE><OPERATOR>=</OPERATOR><STRING>true</STRING>
+<VARIABLE>feature.experimental</VARIABLE><OPERATOR>=</OPERATOR><STRING>false</STRING>
+
+<COMMENT># Variable references (common in Spring)</COMMENT>
+<VARIABLE>service.url</VARIABLE><OPERATOR>=</OPERATOR><VARIABLE>${SERVICE_HOST:localhost}</VARIABLE><STRING>:</STRING><VARIABLE>${SERVICE_PORT:8080}</VARIABLE>
+<VARIABLE>api.key</VARIABLE><OPERATOR>=</OPERATOR><VARIABLE>${API_KEY}</VARIABLE>
+
+<COMMENT># URLs and paths</COMMENT>
+<VARIABLE>api.endpoint</VARIABLE><OPERATOR>=</OPERATOR><STRING>https://api.example.com/v1/users</STRING>
+<VARIABLE>file.upload.path</VARIABLE><OPERATOR>=</OPERATOR><STRING>/var/uploads</STRING>
+<VARIABLE>temp.directory</VARIABLE><OPERATOR>=</OPERATOR><VARIABLE>${java.io.tmpdir}</VARIABLE><STRING>/myapp</STRING>
+
+<COMMENT># Internationalization</COMMENT>
+<VARIABLE>i18n.default.locale</VARIABLE><OPERATOR>=</OPERATOR><STRING>en_US</STRING>
+<VARIABLE>i18n.supported.locales</VARIABLE><OPERATOR>=</OPERATOR><STRING>en_US,es_ES,fr_FR,de_DE</STRING>
+
+<COMMENT># Message bundles</COMMENT>
+<VARIABLE>message.greeting</VARIABLE><OPERATOR>=</OPERATOR><STRING>Hello, {0}!</STRING>
+<VARIABLE>message.farewell</VARIABLE><OPERATOR>=</OPERATOR><STRING>Goodbye, {0}. See you soon!</STRING>
+<VARIABLE>message.error.notfound</VARIABLE><OPERATOR>=</OPERATOR><STRING>Resource {0} was not found.</STRING>
+
+<COMMENT>! Alternative comment style using exclamation mark</COMMENT>
+<COMMENT>! This is also a valid comment in properties files</COMMENT>
+
+<COMMENT># Keys with dots and hyphens</COMMENT>
+<VARIABLE>my-app.config.some-setting</VARIABLE><OPERATOR>=</OPERATOR><STRING>value</STRING>
+<VARIABLE>com.example.myapp.setting</VARIABLE><OPERATOR>=</OPERATOR><STRING>another-value</STRING>

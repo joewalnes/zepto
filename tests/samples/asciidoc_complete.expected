@@ -1,0 +1,158 @@
+# Expected syntax highlighting for asciidoc_complete.adoc
+# Generated from AsciiDoc grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<PUNCTUATION>=</PUNCTUATION> <HEADING>AsciiDoc Syntax Guide</HEADING>
+Author Name &lt;author@example.com&gt;
+v2.0, 2024-01-15
+<ATTRIBUTE>:toc:</ATTRIBUTE><STRING> left</STRING>
+<ATTRIBUTE>:icons:</ATTRIBUTE><STRING> font</STRING>
+<ATTRIBUTE>:source-highlighter:</ATTRIBUTE><STRING> rouge</STRING>
+<ATTRIBUTE>:imagesdir:</ATTRIBUTE><STRING> images</STRING>
+<ATTRIBUTE>:sectnums:</ATTRIBUTE>
+<ATTRIBUTE>:experimental:</ATTRIBUTE>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Introduction</HEADING>
+
+This document demonstrates <CONSTANT>*AsciiDoc*</CONSTANT> syntax for highlighting.
+AsciiDoc is a lightweight markup language for writing documentation.
+
+<PUNCTUATION>===</PUNCTUATION> <HEADING>Basic Formatting</HEADING>
+
+Text can be <CONSTANT>*bold*</CONSTANT>, <STRING>_italic_</STRING>, <FUNCTION>`monospaced`</FUNCTION>, or [.underline]#underlined#.
+You can also use <CONSTANT>**bold within**</CONSTANT> a word and <STRING>__italic within__</STRING> a word.
+
+Superscript: E=mc^2^ and subscript: H~2~O.
+
+<PUNCTUATION>===</PUNCTUATION> <HEADING>Links and Cross-References</HEADING>
+
+Visit https://asciidoctor.org for more info.
+See <FUNCTION>link:</FUNCTION><TAG>api.html</TAG><PUNCTUATION>[</PUNCTUATION><STRING>API Documentation</STRING><PUNCTUATION>]</PUNCTUATION> for details.
+Cross-reference: <TAG>&lt;&lt;_tables,Tables section&gt;&gt;</TAG>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Lists</HEADING>
+
+<PUNCTUATION>===</PUNCTUATION> <HEADING>Unordered</HEADING>
+
+<KEYWORD>*</KEYWORD> First item
+<KEYWORD>**</KEYWORD> Nested item
+<KEYWORD>***</KEYWORD> Deeply nested
+<KEYWORD>*</KEYWORD> Second item
+<KEYWORD>*</KEYWORD> Third item
+
+<PUNCTUATION>===</PUNCTUATION> <HEADING>Ordered</HEADING>
+
+<KEYWORD>.</KEYWORD> Step one
+<KEYWORD>.</KEYWORD> Step two
+<KEYWORD>..</KEYWORD> Sub-step a
+<KEYWORD>..</KEYWORD> Sub-step b
+<KEYWORD>.</KEYWORD> Step three
+
+<PUNCTUATION>===</PUNCTUATION> <HEADING>Description List</HEADING>
+
+Term 1:: Definition of term 1.
+Term 2:: Definition of term 2.
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Code Blocks</HEADING>
+
+Inline code: <FUNCTION>`System.out.println("Hello")`</FUNCTION>
+
+<PUNCTUATION>.</PUNCTUATION><HEADING>A Java example</HEADING>
+<PUNCTUATION>[</PUNCTUATION><ATTRIBUTE>source,java</ATTRIBUTE><PUNCTUATION>]</PUNCTUATION>
+<PUNCTUATION>----</PUNCTUATION>
+<FUNCTION>public class Hello {</FUNCTION>
+<FUNCTION>    public static void main(String[] args) {</FUNCTION>
+<FUNCTION>        System.out.println("Hello, World!");</FUNCTION>
+<FUNCTION>    }</FUNCTION>
+<FUNCTION>}</FUNCTION>
+<PUNCTUATION>----</PUNCTUATION>
+
+<PUNCTUATION>.</PUNCTUATION><HEADING>Shell commands</HEADING>
+<PUNCTUATION>[</PUNCTUATION><ATTRIBUTE>source,bash</ATTRIBUTE><PUNCTUATION>]</PUNCTUATION>
+<PUNCTUATION>----</PUNCTUATION>
+<FUNCTION>#!/bin/bash</FUNCTION>
+<FUNCTION>echo "Installing..."</FUNCTION>
+<FUNCTION>sudo apt-get update</FUNCTION>
+<FUNCTION>sudo apt-get install -y mypackage</FUNCTION>
+<PUNCTUATION>----</PUNCTUATION>
+
+<PUNCTUATION>....</PUNCTUATION>
+<FUNCTION>This is a literal block.</FUNCTION>
+<FUNCTION>No formatting is applied.</FUNCTION>
+<FUNCTION>Special chars: * _ ` #</FUNCTION>
+<PUNCTUATION>....</PUNCTUATION>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Tables</HEADING>
+
+<PUNCTUATION>.</PUNCTUATION><HEADING>Sample Data Table</HEADING>
+<PUNCTUATION>[</PUNCTUATION><ATTRIBUTE>cols="1,2,1",options="header"</ATTRIBUTE><PUNCTUATION>]</PUNCTUATION>
+|===
+| ID | Name | Score
+
+| 1
+| Alice
+| 95
+
+| 2
+| Bob
+| 82
+
+| 3
+| Carol
+| 71
+|===
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Admonitions</HEADING>
+
+<KEYWORD>NOTE</KEYWORD><PUNCTUATION>:</PUNCTUATION> This is a note.
+
+<KEYWORD>TIP</KEYWORD><PUNCTUATION>:</PUNCTUATION> This is a helpful tip.
+
+<KEYWORD>IMPORTANT</KEYWORD><PUNCTUATION>:</PUNCTUATION> Do not skip this step.
+
+<KEYWORD>WARNING</KEYWORD><PUNCTUATION>:</PUNCTUATION> This operation is destructive.
+
+<KEYWORD>CAUTION</KEYWORD><PUNCTUATION>:</PUNCTUATION> Proceed with care.
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Images and Media</HEADING>
+
+<FUNCTION>image::</FUNCTION><STRING>screenshot.png</STRING><ATTRIBUTE>[Application Screenshot,width=600]</ATTRIBUTE>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Sidebars and Examples</HEADING>
+
+<PUNCTUATION>****</PUNCTUATION>
+This is a sidebar block.
+It contains auxiliary information.
+<PUNCTUATION>****</PUNCTUATION>
+
+====
+This is an example block.
+It can contain any content.
+====
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Includes and Attributes</HEADING>
+
+The project version is <VARIABLE>{version}</VARIABLE>.
+The author is <VARIABLE>{author}</VARIABLE>.
+
+<KEYWORD>include::</KEYWORD><STRING>chapters/getting-started.adoc</STRING><ATTRIBUTE>[]</ATTRIBUTE>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Passthrough</HEADING>
+
+<PUNCTUATION>++++</PUNCTUATION>
+<STRING>&lt;div class="custom-html"&gt;</STRING>
+<STRING>  &lt;p&gt;Raw HTML content&lt;/p&gt;</STRING>
+<STRING>&lt;/div&gt;</STRING>
+<PUNCTUATION>++++</PUNCTUATION>
+
+<COMMENT>////</COMMENT>
+<COMMENT>This is a comment block.</COMMENT>
+<COMMENT>It will not appear in the output.</COMMENT>
+<COMMENT>Multiple lines are supported.</COMMENT>
+<COMMENT>////</COMMENT>
+
+<COMMENT>// This is a single-line comment</COMMENT>
+
+<PUNCTUATION>==</PUNCTUATION> <HEADING>Conclusion</HEADING>
+
+For more information, see the <FUNCTION>https:</FUNCTION><TAG>//docs.asciidoctor.org</TAG><PUNCTUATION>[</PUNCTUATION><STRING>Asciidoctor Documentation</STRING><PUNCTUATION>]</PUNCTUATION>.

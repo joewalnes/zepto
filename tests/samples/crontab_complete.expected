@@ -1,0 +1,57 @@
+# Expected syntax highlighting for crontab_complete.crontab
+# Generated from Crontab grammar
+# Format: <TYPE>text</TYPE> where TYPE is the token type
+
+<COMMENT># Crontab syntax highlighting example</COMMENT>
+<COMMENT># System crontab format</COMMENT>
+
+<COMMENT># Environment variables</COMMENT>
+<VARIABLE>SHELL</VARIABLE><OPERATOR>=</OPERATOR><STRING>/bin/bash</STRING>
+<VARIABLE>PATH</VARIABLE><OPERATOR>=</OPERATOR><STRING>/usr/local/bin:/usr/bin:/bin</STRING>
+<VARIABLE>MAILTO</VARIABLE><OPERATOR>=</OPERATOR><STRING>admin@example.com</STRING>
+<VARIABLE>HOME</VARIABLE><OPERATOR>=</OPERATOR><STRING>/root</STRING>
+
+<COMMENT># Special schedules</COMMENT>
+<KEYWORD>@reboot</KEYWORD> <STRING>/usr/local/bin/startup.sh</STRING>
+<KEYWORD>@hourly</KEYWORD> <STRING>/usr/local/bin/health-check.sh &gt;&gt; /var/log/health.log 2&gt;&amp;1</STRING>
+<KEYWORD>@daily</KEYWORD> <STRING>/usr/local/bin/backup.sh --full</STRING>
+<KEYWORD>@weekly</KEYWORD> <STRING>/usr/local/bin/cleanup.sh --old-logs</STRING>
+<KEYWORD>@monthly</KEYWORD> <STRING>/usr/local/bin/report.sh --monthly</STRING>
+<KEYWORD>@yearly</KEYWORD> <STRING>/usr/local/bin/audit.sh</STRING>
+
+<COMMENT># Standard cron expressions</COMMENT>
+<COMMENT># min hour dom month dow command</COMMENT>
+
+<COMMENT># Every minute</COMMENT>
+<OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/monitor.sh</STRING>
+
+<COMMENT># Every 5 minutes</COMMENT>
+<NUMBER>*/5</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/check-queue.sh</STRING>
+
+<COMMENT># Every hour at minute 30</COMMENT>
+<NUMBER>30</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/sync-data.sh</STRING>
+
+<COMMENT># Daily at 2:30 AM</COMMENT>
+<NUMBER>30</NUMBER> <NUMBER>2</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/daily-backup.sh</STRING>
+
+<COMMENT># Every Monday at 6:00 AM</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>6</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <NUMBER>MON</NUMBER> <STRING>/usr/local/bin/weekly-report.sh</STRING>
+
+<COMMENT># First day of every month at midnight</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>0</NUMBER> <NUMBER>1</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/monthly-cleanup.sh</STRING>
+
+<COMMENT># Weekdays at 9 AM and 5 PM</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>9,17</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <NUMBER>1-5</NUMBER> <STRING>/usr/local/bin/notify.sh</STRING>
+
+<COMMENT># Every 15 minutes during business hours on weekdays</COMMENT>
+<NUMBER>*/15</NUMBER> <NUMBER>9-17</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <NUMBER>MON-FRI</NUMBER> <STRING>/usr/local/bin/poll-api.sh</STRING>
+
+<COMMENT># Quarterly (Jan, Apr, Jul, Oct) on the 1st at 3 AM</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>3</NUMBER> <NUMBER>1</NUMBER> <NUMBER>1,4,7,10</NUMBER> <OPERATOR>*</OPERATOR> <STRING>/usr/local/bin/quarterly-report.sh</STRING>
+
+<COMMENT># Complex schedule: Every other hour, Mon-Wed</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>*/2</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <NUMBER>1,2,3</NUMBER> <STRING>/usr/local/bin/etl-job.sh --incremental</STRING>
+
+<COMMENT># With user field (system crontab)</COMMENT>
+<NUMBER>0</NUMBER> <NUMBER>4</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>root /usr/sbin/logrotate /etc/logrotate.conf</STRING>
+<NUMBER>*/10</NUMBER> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <OPERATOR>*</OPERATOR> <STRING>www-data /var/www/app/artisan schedule:run &gt;&gt; /dev/null 2&gt;&amp;1</STRING>
