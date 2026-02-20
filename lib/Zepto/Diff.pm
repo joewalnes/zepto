@@ -8,9 +8,10 @@ package Zepto::Diff;
 #
 # Output format:
 #   {
-#       added    => [line_numbers],      # Lines new in current (green)
-#       modified => [line_numbers],      # Lines changed from base (yellow)
-#       deleted  => [line_numbers],      # Lines AFTER which deletions occurred (red)
+#       added               => [line_numbers],  # Lines new in current (green)
+#       modified            => [line_numbers],  # Lines changed from base (yellow)
+#       modified_whitespace => [line_numbers],  # Lines with whitespace-only changes (dim yellow)
+#       deleted             => [line_numbers],  # Lines AFTER which deletions occurred (red)
 #   }
 #
 # Line numbers are 0-indexed (matching internal buffer representation).
@@ -30,25 +31,27 @@ sub diff {
     my ($class, $base_text, $current_text) = @_;
 
     # Handle edge cases
-    return { added => [], modified => [], deleted => [] }
+    return { added => [], modified => [], modified_whitespace => [], deleted => [] }
         if !defined($base_text) && !defined($current_text);
 
     # If no base, all current lines are additions
     if (!defined($base_text) || $base_text eq '') {
         my @lines = defined($current_text) ? split(/\n/, $current_text, -1) : ();
         return {
-            added    => [0 .. $#lines],
-            modified => [],
-            deleted  => [],
+            added               => [0 .. $#lines],
+            modified            => [],
+            modified_whitespace => [],
+            deleted             => [],
         };
     }
 
     # If no current, everything was deleted
     if (!defined($current_text) || $current_text eq '') {
         return {
-            added    => [],
-            modified => [],
-            deleted  => [0],  # Deletion at start
+            added               => [],
+            modified            => [],
+            modified_whitespace => [],
+            deleted             => [0],  # Deletion at start
         };
     }
 
@@ -60,7 +63,7 @@ sub diff {
     my @edits = $class->_myers_diff(\@base_lines, \@current_lines);
 
     # Convert edit script to gutter indicators
-    return $class->_edits_to_indicators(\@edits, scalar(@current_lines));
+    return $class->_edits_to_indicators(\@edits, \@base_lines, \@current_lines);
 }
 
 # =============================================================================
@@ -251,7 +254,8 @@ sub _backtrack {
 # This ensures deletion markers never appear adjacent to added/modified lines.
 
 sub _edits_to_indicators {
-    my ($class, $edits, $current_line_count) = @_;
+    my ($class, $edits, $base_lines, $current_lines) = @_;
+    my $current_line_count = scalar(@$current_lines);
 
     # Step 1: Group edits into hunks
     # We need to track the current line number as we process edits
@@ -304,6 +308,7 @@ sub _edits_to_indicators {
     # Step 2: Convert hunks to indicators
     my @added;
     my @modified;
+    my @modified_whitespace;
     my @deleted;
 
     for my $hunk (@hunks) {
@@ -311,9 +316,30 @@ sub _edits_to_indicators {
         my $has_inserts = @{$hunk->{inserts}} > 0;
 
         if ($has_deletes && $has_inserts) {
-            # Both deletions and insertions = all inserted lines are "modified"
-            # NO deletion marker (the deletions are "absorbed" into the modification)
-            push @modified, @{$hunk->{inserts}};
+            # Both deletions and insertions = modified lines
+            # Greedily pair each inserted line with the first available
+            # whitespace-equivalent deleted line. Unpaired inserts are
+            # content-modified (deletions absorbed).
+            my @avail_deletes = @{$hunk->{deletes}};
+
+            for my $ins_line (@{$hunk->{inserts}}) {
+                my $ws_match_idx;
+                for my $j (0 .. $#avail_deletes) {
+                    if ($class->_is_whitespace_only_line_change(
+                            $base_lines->[$avail_deletes[$j]],
+                            $current_lines->[$ins_line])) {
+                        $ws_match_idx = $j;
+                        last;
+                    }
+                }
+
+                if (defined $ws_match_idx) {
+                    push @modified_whitespace, $ins_line;
+                    splice(@avail_deletes, $ws_match_idx, 1);
+                } else {
+                    push @modified, $ins_line;
+                }
+            }
         }
         elsif ($has_inserts) {
             # Only insertions = added lines
@@ -346,10 +372,22 @@ sub _edits_to_indicators {
     }
 
     return {
-        added    => \@added,
-        modified => \@modified,
-        deleted  => \@deleted,
+        added               => \@added,
+        modified            => \@modified,
+        modified_whitespace => \@modified_whitespace,
+        deleted             => \@deleted,
     };
+}
+
+# Check if a single line pair differs only in whitespace
+sub _is_whitespace_only_line_change {
+    my ($class, $base_line, $curr_line) = @_;
+
+    # Strip all whitespace and compare
+    (my $base_stripped = $base_line) =~ s/\s+//g;
+    (my $curr_stripped = $curr_line) =~ s/\s+//g;
+
+    return $base_stripped eq $curr_stripped;
 }
 
 1;

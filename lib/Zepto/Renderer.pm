@@ -774,6 +774,9 @@ sub _render_text_area {
                 } elsif ($chg_status eq 'modified') {
                     $vcs_char = Zepto::Chars->get('vcs_modified');
                     $vcs_color = $theme->color('vcs_modified');
+                } elsif ($chg_status eq 'modified_whitespace') {
+                    $vcs_char = Zepto::Chars->get('vcs_modified');
+                    $vcs_color = $theme->color('vcs_modified_whitespace');
                 }
             } elsif ($del_status) {
                 # Deletion marker spans two lines to show the gap where content was removed

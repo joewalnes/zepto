@@ -269,4 +269,75 @@ subtest 'Performance on larger input' => sub {
     ok(@{$result->{added}} >= 1, 'Found additions');
 };
 
+# =============================================================================
+# Whitespace-only modifications
+# =============================================================================
+
+subtest 'Whitespace-only modification: indentation change' => sub {
+    my $base = "line1\n  indented\nline3";
+    my $current = "line1\n    indented\nline3";  # Changed indentation
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is_deeply($result->{added}, [], 'No additions');
+    is_deeply($result->{modified}, [], 'Not in regular modified');
+    is_deeply($result->{modified_whitespace}, [1], 'Line 1 is whitespace-only modified');
+    is_deeply($result->{deleted}, [], 'No deletions');
+};
+
+subtest 'Whitespace-only modification: trailing whitespace' => sub {
+    my $base = "line1\nhello\nline3";
+    my $current = "line1\nhello   \nline3";  # Added trailing spaces
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is_deeply($result->{modified}, [], 'Not in regular modified');
+    is_deeply($result->{modified_whitespace}, [1], 'Line 1 is whitespace-only modified');
+};
+
+subtest 'Whitespace-only modification: tabs to spaces' => sub {
+    my $base = "line1\n\tindented\nline3";
+    my $current = "line1\n    indented\nline3";  # Tab to spaces
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is_deeply($result->{modified}, [], 'Not in regular modified');
+    is_deeply($result->{modified_whitespace}, [1], 'Line 1 is whitespace-only modified');
+};
+
+subtest 'Content modification is NOT whitespace-only' => sub {
+    my $base = "line1\nhello world\nline3";
+    my $current = "line1\nhello earth\nline3";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is_deeply($result->{modified}, [1], 'Line 1 is content-modified');
+    is_deeply($result->{modified_whitespace}, [], 'Not whitespace-only');
+};
+
+subtest 'Mixed content and whitespace modifications' => sub {
+    my $base = "line1\nhello\n  world\nline4";
+    my $current = "line1\ngoodbye\n    world\nline4";  # line2: content, line3: whitespace
+    my $result = Zepto::Diff->diff($base, $current);
+
+    ok(grep({ $_ == 1 } @{$result->{modified}}), 'Line 1 is content-modified');
+    ok(grep({ $_ == 2 } @{$result->{modified_whitespace}}), 'Line 2 is whitespace-only modified');
+};
+
+subtest 'Multiple whitespace-only modifications' => sub {
+    my $base = "  a\nb\n  c\nd";
+    my $current = "    a\nb\n    c\nd";  # Reindented lines 0 and 2
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is_deeply($result->{modified}, [], 'No content modifications');
+    is_deeply($result->{modified_whitespace}, [0, 2], 'Lines 0 and 2 are whitespace-only');
+};
+
+subtest 'Hunk with different line counts is not whitespace-only' => sub {
+    # Even if whitespace is the only non-structural change, adding/removing lines
+    # means it is not a simple whitespace modification
+    my $base = "line1\nhello world\nline3";
+    my $current = "line1\nhello\nworld\nline3";  # Split into two lines
+    my $result = Zepto::Diff->diff($base, $current);
+
+    # This should NOT be whitespace-only since line count changed
+    is_deeply($result->{modified_whitespace}, [], 'Line split is not whitespace-only');
+};
+
 done_testing();

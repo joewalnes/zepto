@@ -482,6 +482,13 @@ sub vcs_change_status {
         return 'modified' if $l == $line;
     }
 
+    # Check if line is whitespace-only modified
+    if ($diff->{modified_whitespace}) {
+        for my $l (@{$diff->{modified_whitespace}}) {
+            return 'modified_whitespace' if $l == $line;
+        }
+    }
+
     return undef;
 }
 
