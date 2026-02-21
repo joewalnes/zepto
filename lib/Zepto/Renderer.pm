@@ -762,13 +762,11 @@ sub _render_text_area {
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
 
-    # Calculate the visual cursor column ONCE from the cursor line's content
-    # This ensures the crosshair is a straight vertical line regardless of tabs on other lines
+    # Calculate the visual cursor column from the cursor line's content
     my $cursor_line_content = $cursor_line < $doc->line_count()
         ? $doc->get_line_content($cursor_line)
         : '';
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
-    my $visible_cursor_col = $visual_cursor_col - $scroll_col;
 
     # Cache for per-hunk character-level diff highlights
     my %hunk_char_diffs;  # hunk_idx => { old => {base_line => [start, end]}, new => {doc_line => [start, end]} }
@@ -964,9 +962,6 @@ sub _render_text_area {
                 }
             }
 
-            # Note: visual_cursor_col and visible_cursor_col are calculated once before the loop
-            # to ensure a straight vertical crosshair regardless of tab content on different lines
-
             # Apply horizontal scroll (now in visual columns)
             if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
                 $expanded_content = substr($expanded_content, $scroll_col);
@@ -1015,39 +1010,17 @@ sub _render_text_area {
                 $is_hunk_line ? 'new' : undef, $new_char_hl
             );
 
-            # Fill remaining space with appropriate backgrounds (crosshair column highlight)
+            # Fill remaining space with appropriate background
             my $fill_start = length($expanded_content);
-            my $col_bg = $theme->color('cursor_col_bg');
-
-            for (my $i = $fill_start; $i < $width; $i++) {
-                if ($is_cursor_line) {
-                    $output .= $line_bg . ' ';
-                }
-                elsif ($is_hunk_line) {
-                    $output .= $line_bg . ' ';
-                }
-                elsif ($i == $visible_cursor_col) {
-                    $output .= $col_bg . ' ';
-                }
-                else {
-                    $output .= $theme->color('bg') . ' ';
-                }
-            }
+            my $fill_bg = $is_cursor_line ? $line_bg
+                        : $is_hunk_line   ? $line_bg
+                        :                   $theme->color('bg');
+            $output .= $fill_bg . (' ' x ($width - $fill_start)) if $fill_start < $width;
         }
         else {
-            # Empty line (beyond document) - highlight cursor column for crosshair
-            # Uses pre-calculated visible_cursor_col for consistent vertical alignment
+            # Empty line (beyond document)
             my $empty_bg = $theme->color('empty_line_bg');
-            my $col_bg = $theme->color('cursor_col_bg');
-
-            for (my $i = 0; $i < $width; $i++) {
-                if ($i == $visible_cursor_col) {
-                    $output .= $col_bg . ' ';
-                }
-                else {
-                    $output .= $empty_bg . ' ';
-                }
-            }
+            $output .= $empty_bg . (' ' x $width);
         }
 
         $output .= RESET;
@@ -1297,7 +1270,6 @@ sub _render_line_with_highlights {
         $vis_hl_end = $char_highlight->[1] - $scroll_col;
     }
     my $line_bg = $theme->color('cursor_line_bg');
-    my $col_bg = $theme->color('cursor_col_bg');
     my $fg = $theme->color('fg');
     my $match_bg = $theme->color('match_bg');
     my $match_fg = $theme->color('match_fg');
@@ -1354,9 +1326,6 @@ sub _render_line_with_highlights {
             }
         }
     }
-
-    # Cursor column position relative to viewport
-    my $visible_cursor_col = $cursor_col - $scroll_col;
 
     # Get selection info
     my $has_selection = $view->has_selection();
@@ -1417,11 +1386,6 @@ sub _render_line_with_highlights {
             $char_bg = $line_bg;
             $char_fg = $syntax_fg[$i] // $fg;
             $style_key = "line:" . ($syntax_fg[$i] // 'def');
-        }
-        elsif ($i == $visible_cursor_col) {
-            $char_bg = $col_bg;
-            $char_fg = $syntax_fg[$i] // $fg;
-            $style_key = "col:" . ($syntax_fg[$i] // 'def');
         }
         # Check char-level diff highlight (stronger green for changed chars)
         elsif ($diff_hl_bg && $i >= $vis_hl_start && $i < $vis_hl_end) {
