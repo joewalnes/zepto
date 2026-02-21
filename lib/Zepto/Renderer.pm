@@ -666,6 +666,28 @@ sub _render_text_area {
     my $visible_start = $scroll_line;
     my $visible_end = $scroll_line + $height;
 
+    # Get LineMap for inline diff expansion
+    my $line_map = $view->line_map();
+    my $has_expanded = $line_map && $line_map->has_expanded_hunks();
+
+    # Build visible entries from LineMap or simple doc-line mapping
+    my @entries;
+    if ($has_expanded) {
+        my $raw = $line_map->visible_entries($scroll_line, $height);
+        @entries = @$raw;
+        # Pad with undef if fewer entries than height (end of file)
+        while (@entries < $height) {
+            push @entries, undef;
+        }
+    } else {
+        for my $i (0 .. $height - 1) {
+            push @entries, { type => 'doc', line => $scroll_line + $i };
+        }
+    }
+
+    # Lazily-created base highlighter for old-line syntax highlighting
+    my $base_highlighter;
+
     # Precompute match ranges by line if in find mode (only visible lines)
     # Use viewport_matches for O(viewport) instead of O(all_matches)
     my %line_matches;  # line_num => [{start, end, is_current}, ...]
@@ -748,12 +770,43 @@ sub _render_text_area {
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
     my $visible_cursor_col = $visual_cursor_col - $scroll_col;
 
+    # Cache for per-hunk character-level diff highlights
+    my %hunk_char_diffs;  # hunk_idx => { old => {base_line => [start, end]}, new => {doc_line => [start, end]} }
+
     for my $screen_row (0 .. $height - 1) {
-        my $doc_line = $scroll_line + $screen_row;
-        my $is_cursor_line = ($doc_line == $cursor_line);
+        my $entry = $entries[$screen_row];
 
         # Position cursor at start of this row (row 3 is first text row, after menu and ruler)
         $output .= _move_to($screen_row + 3, 1);
+
+        # Handle old-line entries (expanded hunk base content)
+        if ($entry && $entry->{type} eq 'old') {
+            # Ensure char-level highlights are computed for this hunk
+            my $hunk_idx = $entry->{hunk_idx};
+            if (!exists $hunk_char_diffs{$hunk_idx}) {
+                my $hunks = $doc->vcs_hunks();
+                if ($hunks && $hunk_idx < @$hunks) {
+                    my ($old_hl, $new_hl) = $class->_compute_hunk_highlights(
+                        $hunks->[$hunk_idx], $doc, $doc->vcs_base_lines()
+                    );
+                    $hunk_char_diffs{$hunk_idx} = { old => $old_hl, new => $new_hl };
+                } else {
+                    $hunk_char_diffs{$hunk_idx} = { old => {}, new => {} };
+                }
+            }
+            my $char_hl = $hunk_char_diffs{$hunk_idx}{old}{$entry->{base_line}};
+            $output .= $class->_render_old_line_row(
+                $doc, $view, $theme, $width, $gutter_width,
+                $entry, $highlighter, \$base_highlighter, $char_hl
+            );
+            $output .= RESET;
+            $output .= CLEAR_LINE;
+            next;
+        }
+
+        my $doc_line = $entry ? $entry->{line} : ($scroll_line + $screen_row);
+        my $is_cursor_line = ($doc_line == $cursor_line);
+        my $is_hunk_line = $entry && defined $entry->{hunk_idx};
 
         # Line number gutter with VCS indicator (single column)
         if ($doc_line < $doc->line_count()) {
@@ -792,13 +845,23 @@ sub _render_text_area {
             $vcs_char //= ' ';
             $vcs_color //= $theme->color('gutter_fg');
 
+            # Gutter background: use diff_new_gutter_bg for hunk lines
+            my $gutter_bg = $is_hunk_line
+                ? $theme->color('diff_new_gutter_bg')
+                : $theme->color('gutter_bg');
+
+            # Override gutter bar color to green when inside an expanded hunk
+            if ($is_hunk_line) {
+                $vcs_color = $theme->color('vcs_added');
+            }
+
             if ($is_cursor_line) {
                 # Cursor line: [vcs][pad][rl][space][digits][ar]
                 my $rl = Zepto::Chars->get('round_left');
                 my $ar = Zepto::Chars->get('arrow_right');
 
                 # VCS indicator first (on gutter background)
-                $output .= $theme->color('gutter_bg') . $vcs_color . $vcs_char;
+                $output .= $gutter_bg . $vcs_color . $vcs_char;
 
                 # Right-align: match the sprintf padding used in normal lines
                 # Normal line uses sprintf("%*d", gutter_width - 3, num) which right-aligns
@@ -806,16 +869,19 @@ sub _render_text_area {
                 my $padded_num = sprintf("%*d", $num_width, $doc_line + 1);
 
                 # Badge: rl + padded_num + ar
-                $output .= $theme->color('gutter_bg') . $theme->color('ruler_cursor_edge') . $rl;
+                $output .= $gutter_bg . $theme->color('ruler_cursor_edge') . $rl;
                 $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
                 # Arrow right: badge color as fg, next area color as bg
-                $output .= $theme->color('cursor_line_bg') . $theme->color('ruler_cursor_edge') . $ar;
+                my $next_bg = $is_hunk_line
+                    ? $theme->color('diff_new_bg')
+                    : $theme->color('cursor_line_bg');
+                $output .= $next_bg . $theme->color('ruler_cursor_edge') . $ar;
             } else {
                 # Normal line: [vcs][space][right-aligned digits][space]
                 # VCS indicator first
-                $output .= $theme->color('gutter_bg') . $vcs_color . $vcs_char;
+                $output .= $gutter_bg . $vcs_color . $vcs_char;
                 # Rest of gutter
-                $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
+                $output .= $gutter_bg . $theme->color('gutter_fg');
                 # Use (gutter_width - 3) for digits: total = 1(vcs) + 1(space) + digits + 1(space) = gutter_width
                 my $line_num = sprintf("%*d", $gutter_width - 3, $doc_line + 1);
                 $output .= ' ' . $line_num . ' ';
@@ -826,8 +892,15 @@ sub _render_text_area {
             $output .= ' ' x $gutter_width;
         }
 
-        # Background (highlight if cursor line)
-        my $line_bg = $is_cursor_line ? $theme->color('cursor_line_bg') : $theme->color('bg');
+        # Background: cursor line > hunk line > normal
+        my $line_bg;
+        if ($is_cursor_line) {
+            $line_bg = $theme->color('cursor_line_bg');
+        } elsif ($is_hunk_line) {
+            $line_bg = $theme->color('diff_new_bg');
+        } else {
+            $line_bg = $theme->color('bg');
+        }
         $output .= $line_bg . $theme->color('fg');
 
         # Text content
@@ -907,11 +980,39 @@ sub _render_text_area {
                 $expanded_content = substr($expanded_content, 0, $width);
             }
 
+            # Compute char-level highlight range for green (new) lines in expanded hunks
+            my $new_char_hl;
+            if ($is_hunk_line) {
+                my $hunk_idx = $entry->{hunk_idx};
+                if (!exists $hunk_char_diffs{$hunk_idx}) {
+                    my $hunks = $doc->vcs_hunks();
+                    if ($hunks && $hunk_idx < @$hunks) {
+                        my ($old_hl, $new_hl) = $class->_compute_hunk_highlights(
+                            $hunks->[$hunk_idx], $doc, $doc->vcs_base_lines()
+                        );
+                        $hunk_char_diffs{$hunk_idx} = { old => $old_hl, new => $new_hl };
+                    } else {
+                        $hunk_char_diffs{$hunk_idx} = { old => {}, new => {} };
+                    }
+                }
+                my $char_range = $hunk_char_diffs{$hunk_idx}{new}{$doc_line};
+                if ($char_range) {
+                    # Convert char positions to visual (tab-expanded) positions
+                    my ($hl_start, $hl_end) = @$char_range;
+                    my $vis_start = ($hl_start < @$char_to_visual)
+                        ? $char_to_visual->[$hl_start] : length($expanded_content);
+                    my $vis_end = ($hl_end < @$char_to_visual)
+                        ? $char_to_visual->[$hl_end] : length($expanded_content);
+                    $new_char_hl = [$vis_start, $vis_end];
+                }
+            }
+
             # Render with selection, syntax, match, and cursor highlighting
             $output .= $class->_render_line_with_highlights(
                 $expanded_content, $doc_line, $scroll_col, $width,
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
-                $full_line_content, \@visual_matches
+                $full_line_content, \@visual_matches,
+                $is_hunk_line ? 'new' : undef, $new_char_hl
             );
 
             # Fill remaining space with appropriate backgrounds (crosshair column highlight)
@@ -920,6 +1021,9 @@ sub _render_text_area {
 
             for (my $i = $fill_start; $i < $width; $i++) {
                 if ($is_cursor_line) {
+                    $output .= $line_bg . ' ';
+                }
+                elsif ($is_hunk_line) {
                     $output .= $line_bg . ' ';
                 }
                 elsif ($i == $visible_cursor_col) {
@@ -953,19 +1057,245 @@ sub _render_text_area {
     return $output;
 }
 
+# =============================================================================
+# Character-level diff for inline hunk highlighting
+# =============================================================================
+
+# Compute changed character ranges between two lines via common prefix/suffix.
+# Returns { old_range => [start, end], new_range => [start, end] }
+# where [start, end) marks the changed region in each string.
+sub _char_diff_ranges {
+    my ($old, $new) = @_;
+
+    my $old_len = length($old);
+    my $new_len = length($new);
+    my $min_len = $old_len < $new_len ? $old_len : $new_len;
+
+    # Common prefix
+    my $prefix = 0;
+    while ($prefix < $min_len && substr($old, $prefix, 1) eq substr($new, $prefix, 1)) {
+        $prefix++;
+    }
+
+    # Common suffix (not overlapping prefix)
+    my $suffix = 0;
+    while ($suffix < ($min_len - $prefix) &&
+           substr($old, $old_len - 1 - $suffix, 1) eq substr($new, $new_len - 1 - $suffix, 1)) {
+        $suffix++;
+    }
+
+    return {
+        old_range => [$prefix, $old_len - $suffix],
+        new_range => [$prefix, $new_len - $suffix],
+    };
+}
+
+# Compute char-level diff highlights for all line pairs in a hunk.
+# Returns { old => { base_line_idx => [start, end] }, new => { doc_line => [start, end] } }
+sub _compute_hunk_highlights {
+    my ($class, $hunk, $doc, $base_lines) = @_;
+
+    my %old_hl;
+    my %new_hl;
+
+    return (\%old_hl, \%new_hl) unless $hunk->{type} eq 'modified';
+
+    my $bl = $hunk->{base_lines};
+    my $cl = $hunk->{current_lines};
+    my $pairs = @$bl < @$cl ? scalar @$bl : scalar @$cl;
+
+    for my $i (0 .. $pairs - 1) {
+        my $old_text = ($base_lines && $bl->[$i] < @$base_lines)
+            ? $base_lines->[$bl->[$i]] : '';
+        my $new_text = $cl->[$i] < $doc->line_count()
+            ? $doc->get_line_content($cl->[$i]) : '';
+
+        my $diff = _char_diff_ranges($old_text, $new_text);
+
+        # Only store if there's an actual change region (not identical lines)
+        if ($diff->{old_range}[0] < $diff->{old_range}[1] ||
+            $diff->{new_range}[0] < $diff->{new_range}[1]) {
+            $old_hl{$bl->[$i]} = $diff->{old_range};
+            $new_hl{$cl->[$i]} = $diff->{new_range};
+        }
+    }
+
+    # Unpaired extra lines: highlight entire line
+    for my $i ($pairs .. $#$bl) {
+        $old_hl{$bl->[$i]} = [0, length($base_lines->[$bl->[$i]] // '')];
+    }
+    for my $i ($pairs .. $#$cl) {
+        my $content = $cl->[$i] < $doc->line_count() ? $doc->get_line_content($cl->[$i]) : '';
+        $new_hl{$cl->[$i]} = [0, length($content)];
+    }
+
+    return (\%old_hl, \%new_hl);
+}
+
+# Render an "old" (base) line from an expanded diff hunk
+# These lines show deleted/modified-from content with red background, no line number
+sub _render_old_line_row {
+    my ($class, $doc, $view, $theme, $width, $gutter_width, $entry, $highlighter, $base_hl_ref, $char_highlights) = @_;
+
+    my $output = '';
+    my $base_line_idx = $entry->{base_line};
+
+    # Gutter: red background, red bar char, blank line number
+    my $gutter_bg = $theme->color('diff_old_gutter_bg');
+    my $vcs_color = $theme->color('vcs_deleted');
+    my $vcs_char = Zepto::Chars->get('vcs_modified');
+    $output .= $gutter_bg . $vcs_color . $vcs_char;
+    # Blank padding for the rest of the gutter
+    $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+
+    # Line content from base
+    my $line_bg = $theme->color('diff_old_bg');
+    my $fg = $theme->color('fg');
+    $output .= $line_bg . $fg;
+
+    my $base_lines = $doc->vcs_base_lines();
+    my $line_content = '';
+    if ($base_lines && $base_line_idx < scalar @$base_lines) {
+        $line_content = $base_lines->[$base_line_idx];
+    }
+
+    # Syntax highlight using a base highlighter (lazily created)
+    my $tokens = [];
+    if ($highlighter && $line_content ne '') {
+        if (!$$base_hl_ref) {
+            # Create a base highlighter with the same grammar (use ref to avoid require)
+            $$base_hl_ref = ref($highlighter)->new();
+            my $filename = $doc->filename() // '';
+            $$base_hl_ref->set_file($filename) if $filename;
+
+            # Pre-tokenize all base lines up to the one we need so state is correct
+            if ($$base_hl_ref && $base_lines) {
+                for my $i (0 .. $base_line_idx) {
+                    my $bl = $base_lines->[$i] // '';
+                    $$base_hl_ref->tokenize_line($bl, $i);
+                }
+            }
+        } else {
+            # Ensure all preceding lines have been tokenized for correct state
+            # The highlighter caches states, so already-tokenized lines are fast
+            if ($base_lines) {
+                for my $i (0 .. $base_line_idx) {
+                    my $bl = $base_lines->[$i] // '';
+                    $$base_hl_ref->tokenize_line($bl, $i);
+                }
+            }
+        }
+        ($tokens) = $$base_hl_ref->tokenize_line($line_content, $base_line_idx);
+    }
+
+    # Expand tabs
+    my ($expanded_content, $char_to_visual) = _expand_tabs($line_content);
+
+    # Convert token positions to visual positions
+    my @visual_tokens;
+    for my $tok (@$tokens) {
+        my $vis_start = $char_to_visual->[$tok->{start}] // 0;
+        my $vis_end = $tok->{end} < @$char_to_visual
+            ? $char_to_visual->[$tok->{end}]
+            : length($expanded_content);
+        push @visual_tokens, {
+            start => $vis_start,
+            end => $vis_end,
+            type => $tok->{type},
+        };
+    }
+
+    # Apply horizontal scroll
+    my $scroll_col = $view->scroll_col();
+    if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
+        $expanded_content = substr($expanded_content, $scroll_col);
+    } elsif ($scroll_col >= length($expanded_content)) {
+        $expanded_content = '';
+    }
+
+    # Truncate to width
+    if (length($expanded_content) > $width) {
+        $expanded_content = substr($expanded_content, 0, $width);
+    }
+
+    # Render character by character with syntax highlighting on red background
+    my $len = length($expanded_content);
+
+    # Build syntax color lookup (adjusted for scroll)
+    my @syntax_fg;
+    for my $tok (@visual_tokens) {
+        my $color = $theme->color("syntax_$tok->{type}");
+        next unless $color;
+        my $start = $tok->{start} - $scroll_col;
+        my $end = $tok->{end} - $scroll_col;
+        $start = 0 if $start < 0;
+        next if $start >= $len;
+        $end = $len if $end > $len;
+        next if $end <= 0;
+        for my $c ($start .. $end - 1) {
+            $syntax_fg[$c] = $color if $c >= 0 && $c < $len;
+        }
+    }
+
+    # Convert char highlight range to visual positions for stronger-red background
+    my $hl_bg = $theme->color('diff_old_highlight_bg');
+    my ($vis_hl_start, $vis_hl_end) = (-1, -1);
+    if ($char_highlights && $char_to_visual) {
+        my ($hl_start, $hl_end) = @$char_highlights;
+        $vis_hl_start = ($hl_start < @$char_to_visual)
+            ? $char_to_visual->[$hl_start] : length($expanded_content);
+        $vis_hl_end = ($hl_end < @$char_to_visual)
+            ? $char_to_visual->[$hl_end] : length($expanded_content);
+        # Adjust for horizontal scroll
+        $vis_hl_start -= $scroll_col;
+        $vis_hl_end -= $scroll_col;
+    }
+
+    my $last_bg = '';
+    for my $i (0 .. $len - 1) {
+        my $char = substr($expanded_content, $i, 1);
+        my $char_fg = $syntax_fg[$i] // $fg;
+        my $bg = ($i >= $vis_hl_start && $i < $vis_hl_end) ? $hl_bg : $line_bg;
+        if ($bg ne $last_bg) {
+            $output .= $bg . $char_fg . $char;
+            $last_bg = $bg;
+        } else {
+            $output .= $char_fg . $char;
+        }
+    }
+
+    # Fill rest with red background
+    for (my $i = $len; $i < $width; $i++) {
+        $output .= $line_bg . ' ';
+    }
+
+    return $output;
+}
+
 # Render a line with selection, syntax, match, and crosshair highlighting
 # $content: tab-expanded content for this line
 # $orig_content: original content (with tabs) for position conversion
 # $cursor_col: visual cursor column (already converted)
 # $matches: array of {start, end, is_current} for find matches on this line
 sub _render_line_with_highlights {
-    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches) = @_;
+    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight) = @_;
 
     my $output = '';
     my $len = length($content);
 
-    # Background colors
-    my $bg = $theme->color('bg');
+    # Background colors — use diff background when in expanded hunk
+    my $bg = ($diff_mode && $diff_mode eq 'new')
+        ? $theme->color('diff_new_bg')
+        : $theme->color('bg');
+
+    # Char-level highlight range for stronger green background on changed chars
+    my $diff_hl_bg;
+    my ($vis_hl_start, $vis_hl_end) = (-1, -1);
+    if ($char_highlight && $diff_mode && $diff_mode eq 'new') {
+        $diff_hl_bg = $theme->color('diff_new_highlight_bg');
+        $vis_hl_start = $char_highlight->[0] - $scroll_col;
+        $vis_hl_end = $char_highlight->[1] - $scroll_col;
+    }
     my $line_bg = $theme->color('cursor_line_bg');
     my $col_bg = $theme->color('cursor_col_bg');
     my $fg = $theme->color('fg');
@@ -1092,6 +1422,12 @@ sub _render_line_with_highlights {
             $char_bg = $col_bg;
             $char_fg = $syntax_fg[$i] // $fg;
             $style_key = "col:" . ($syntax_fg[$i] // 'def');
+        }
+        # Check char-level diff highlight (stronger green for changed chars)
+        elsif ($diff_hl_bg && $i >= $vis_hl_start && $i < $vis_hl_end) {
+            $char_bg = $diff_hl_bg;
+            $char_fg = $syntax_fg[$i] // $fg;
+            $style_key = "diffhl:" . ($syntax_fg[$i] // 'def');
         }
         else {
             $char_bg = $bg;
@@ -1385,8 +1721,17 @@ sub _cursor_screen_pos {
         : '';
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
 
-    # +2 for menu bar and ruler bar
-    my $screen_row = $cursor_line - $scroll_line + $menu_height + 2;
+    # Account for expanded hunk rows via LineMap
+    my $lm = $view->line_map();
+    my $screen_row;
+    if ($lm && $lm->has_expanded_hunks()) {
+        my $cursor_display = $lm->doc_line_to_display($cursor_line);
+        my $scroll_display = $lm->scroll_display_start($scroll_line);
+        $screen_row = $cursor_display - $scroll_display + $menu_height + 2;
+    } else {
+        # +2 for menu bar and ruler bar
+        $screen_row = $cursor_line - $scroll_line + $menu_height + 2;
+    }
     my $screen_col = $visual_cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);

@@ -340,4 +340,105 @@ subtest 'Hunk with different line counts is not whitespace-only' => sub {
     is_deeply($result->{modified_whitespace}, [], 'Line split is not whitespace-only');
 };
 
+# =============================================================================
+# Rich hunk data
+# =============================================================================
+
+subtest 'Hunks: single modification' => sub {
+    my $base = "line1\nline2\nline3";
+    my $current = "line1\nmodified\nline3";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    ok(exists $result->{hunks}, 'Result contains hunks array');
+    is(scalar @{$result->{hunks}}, 1, 'One hunk');
+
+    my $h = $result->{hunks}[0];
+    is($h->{type}, 'modified', 'Hunk type is modified');
+    is_deeply($h->{base_lines}, [1], 'Base line 1 was deleted');
+    is_deeply($h->{current_lines}, [1], 'Current line 1 was inserted');
+    is($h->{prev_curr_line}, 0, 'Previous current line is 0');
+    is($h->{next_curr_line}, 2, 'Next current line is 2');
+};
+
+subtest 'Hunks: single addition' => sub {
+    my $base = "line1\nline3";
+    my $current = "line1\nline2\nline3";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is(scalar @{$result->{hunks}}, 1, 'One hunk');
+
+    my $h = $result->{hunks}[0];
+    is($h->{type}, 'added', 'Hunk type is added');
+    is_deeply($h->{base_lines}, [], 'No base lines');
+    is_deeply($h->{current_lines}, [1], 'Current line 1 was inserted');
+};
+
+subtest 'Hunks: single deletion' => sub {
+    my $base = "line1\nline2\nline3";
+    my $current = "line1\nline3";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is(scalar @{$result->{hunks}}, 1, 'One hunk');
+
+    my $h = $result->{hunks}[0];
+    is($h->{type}, 'deleted', 'Hunk type is deleted');
+    is_deeply($h->{base_lines}, [1], 'Base line 1 was deleted');
+    is_deeply($h->{current_lines}, [], 'No current lines');
+    is($h->{prev_curr_line}, 0, 'Previous current line is 0');
+    is($h->{next_curr_line}, 1, 'Next current line is 1');
+};
+
+subtest 'Hunks: multiple hunks' => sub {
+    my $base = "aaa\nbbb\nccc\nddd\neee";
+    my $current = "aaa\nBBB\nccc\nEEE\nfff";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    ok(@{$result->{hunks}} >= 2, 'At least 2 hunks');
+
+    # First hunk: bbb -> BBB (modified)
+    my $h0 = $result->{hunks}[0];
+    is($h0->{type}, 'modified', 'First hunk is modified');
+    is_deeply($h0->{current_lines}, [1], 'Current line 1');
+
+    # Second hunk: ddd,eee -> EEE,fff (modified)
+    my $h1 = $result->{hunks}[1];
+    is($h1->{type}, 'modified', 'Second hunk is modified');
+    is_deeply($h1->{current_lines}, [3, 4], 'Current lines 3,4');
+};
+
+subtest 'Hunks: deletion at start of file' => sub {
+    my $base = "removed\nline1\nline2";
+    my $current = "line1\nline2";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is(scalar @{$result->{hunks}}, 1, 'One hunk');
+    my $h = $result->{hunks}[0];
+    is($h->{type}, 'deleted', 'Hunk type is deleted');
+    is($h->{prev_curr_line}, -1, 'prev_curr_line is -1 for start-of-file deletion');
+    is($h->{next_curr_line}, 0, 'next_curr_line is 0');
+};
+
+subtest 'Hunks: deletion at end of file' => sub {
+    my $base = "line1\nline2\nremoved";
+    my $current = "line1\nline2";
+    my $result = Zepto::Diff->diff($base, $current);
+
+    is(scalar @{$result->{hunks}}, 1, 'One hunk');
+    my $h = $result->{hunks}[0];
+    is($h->{type}, 'deleted', 'Hunk type is deleted');
+    is($h->{prev_curr_line}, 1, 'prev_curr_line is last line');
+    ok(!defined $h->{next_curr_line}, 'next_curr_line is undef for end-of-file deletion');
+};
+
+subtest 'Hunks: no changes produces empty hunks' => sub {
+    my $text = "line1\nline2\nline3";
+    my $result = Zepto::Diff->diff($text, $text);
+    is_deeply($result->{hunks}, [], 'No hunks for identical content');
+};
+
+subtest 'Hunks: edge case, all content new' => sub {
+    my $result = Zepto::Diff->diff(undef, "line1\nline2");
+    is_deeply($result->{hunks}, [], 'Edge case returns empty hunks');
+};
+
 done_testing();

@@ -761,4 +761,270 @@ subtest 'Gutter width is stable across document' => sub {
     }
 };
 
+# =============================================================================
+# Inline diff expansion rendering
+# =============================================================================
+
+use Zepto::LineMap;
+
+subtest 'Expanded modified hunk renders old and new lines' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\nLine D\nLine E\n");
+    my $theme = Zepto::Theme->dark_theme();
+
+    # Create a modified hunk: base lines [0,1] replaced current lines [1,2]
+    my @hunks = ({
+        type           => 'modified',
+        base_lines     => [0, 1],
+        current_lines  => [1, 2],
+        prev_curr_line => 0,
+        next_curr_line => 3,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 15,
+        cols     => 80,
+    );
+
+    ok(defined $output, 'Output produced with expanded hunk');
+    ok(length($output) > 0, 'Output has content');
+
+    # The output should contain the diff_old_bg color (rgb 60,30,30 for dark theme)
+    my $old_bg = "\x1b[48;2;60;30;30m";
+    like($output, qr/\Q$old_bg\E/, 'Output contains diff_old_bg color for old lines');
+
+    # Should also contain diff_new_bg color (rgb 30,55,30)
+    my $new_bg = "\x1b[48;2;30;55;30m";
+    like($output, qr/\Q$new_bg\E/, 'Output contains diff_new_bg color for new lines');
+
+    # Old lines should have red bar char in gutter (▐ = \x{2590})
+    my $stripped = strip_escapes($output);
+    like($stripped, qr/\x{2590}/, 'Old lines display bar char in gutter');
+};
+
+subtest 'Expanded deleted hunk shows only old lines' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\n");
+    my $theme = Zepto::Theme->dark_theme();
+
+    my @hunks = ({
+        type           => 'deleted',
+        base_lines     => [0, 1],
+        current_lines  => [],
+        prev_curr_line => 0,
+        next_curr_line => 1,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 12,
+        cols     => 80,
+    );
+
+    # Should have old-line bg but no new-line bg (no current_lines in hunk)
+    my $old_bg = "\x1b[48;2;60;30;30m";
+    like($output, qr/\Q$old_bg\E/, 'Deleted hunk shows old lines with red bg');
+
+    # Total display rows = 3 doc + 2 old = 5
+    is($lm->total_display_rows(), 5, 'LineMap shows 5 display rows');
+};
+
+subtest 'Expanded added hunk shows green bg, no old lines' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\nLine D\n");
+    my $theme = Zepto::Theme->dark_theme();
+
+    my @hunks = ({
+        type           => 'added',
+        base_lines     => [],
+        current_lines  => [1, 2],
+        prev_curr_line => 0,
+        next_curr_line => 3,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 12,
+        cols     => 80,
+    );
+
+    # Should have green bg for added lines
+    my $new_bg = "\x1b[48;2;30;55;30m";
+    like($output, qr/\Q$new_bg\E/, 'Added hunk shows green bg');
+
+    # No red bg (no old lines)
+    my $old_bg = "\x1b[48;2;60;30;30m";
+    unlike($output, qr/\Q$old_bg\E/, 'No red bg for added-only hunk');
+
+    # Total display rows unchanged (no old lines to insert)
+    is($lm->total_display_rows(), 4, 'LineMap shows 4 display rows (no old lines)');
+};
+
+subtest 'Collapse hunk restores normal rendering' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\n");
+    my $theme = Zepto::Theme->dark_theme();
+
+    my @hunks = ({
+        type           => 'modified',
+        base_lines     => [0],
+        current_lines  => [0],
+        prev_curr_line => -1,
+        next_curr_line => 1,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $view->set_line_map($lm);
+
+    # Render without expansion — no diff colors
+    my $output_normal = Zepto::Renderer->render(
+        document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
+    );
+
+    # Expand, then collapse
+    $lm->toggle_hunk(0);
+    $lm->toggle_hunk(0);
+
+    my $output_collapsed = Zepto::Renderer->render(
+        document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
+    );
+
+    my $old_bg = "\x1b[48;2;60;30;30m";
+    unlike($output_collapsed, qr/\Q$old_bg\E/, 'No red bg after collapse');
+
+    is($lm->total_display_rows(), 3, 'Display rows back to normal after collapse');
+};
+
+subtest 'screen_to_doc returns undef for old-line rows' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\nLine D\nLine E\n");
+
+    my @hunks = ({
+        type           => 'modified',
+        base_lines     => [0, 1],
+        current_lines  => [1, 2],
+        prev_curr_line => 0,
+        next_curr_line => 3,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+    $view->set_viewport_size(10, 60);
+
+    # Display: row 0=doc0, row 1=old0, row 2=old1, row 3=doc1(green), row 4=doc2(green), row 5=doc3, row 6=doc4
+
+    # Row 0 -> doc line 0
+    my ($line0, $col0) = $view->screen_to_doc(0, 0);
+    is($line0, 0, 'Screen row 0 maps to doc line 0');
+
+    # Row 1 -> old line (should return undef)
+    my ($line1, $col1) = $view->screen_to_doc(1, 0);
+    is($line1, undef, 'Screen row 1 (old line) returns undef');
+
+    # Row 2 -> old line (should return undef)
+    my ($line2, $col2) = $view->screen_to_doc(2, 0);
+    is($line2, undef, 'Screen row 2 (old line) returns undef');
+
+    # Row 3 -> doc line 1
+    my ($line3, $col3) = $view->screen_to_doc(3, 0);
+    is($line3, 1, 'Screen row 3 maps to doc line 1');
+
+    # Row 5 -> doc line 3
+    my ($line5, $col5) = $view->screen_to_doc(5, 0);
+    is($line5, 3, 'Screen row 5 maps to doc line 3');
+};
+
+subtest 'doc_to_screen accounts for expanded hunks' => sub {
+    my ($doc, $view) = create_test_state("A\nB\nC\nD\nE\n");
+
+    my @hunks = ({
+        type           => 'modified',
+        base_lines     => [0, 1],
+        current_lines  => [1, 2],
+        prev_curr_line => 0,
+        next_curr_line => 3,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+    $view->set_viewport_size(10, 60);
+
+    # Doc line 0 at display row 0 -> screen row 0
+    my ($row0, $col0) = $view->doc_to_screen(0, 0);
+    is($row0, 0, 'Doc line 0 at screen row 0');
+
+    # Doc line 1 at display row 3 (after 2 old lines) -> screen row 3
+    my ($row1, $col1) = $view->doc_to_screen(1, 0);
+    is($row1, 3, 'Doc line 1 at screen row 3 (after 2 old lines)');
+
+    # Doc line 4 at display row 6
+    my ($row4, $col4) = $view->doc_to_screen(4, 0);
+    is($row4, 6, 'Doc line 4 at screen row 6');
+};
+
+subtest 'Light theme diff colors in expanded hunk' => sub {
+    my ($doc, $view) = create_test_state("Line A\nLine B\nLine C\n");
+    my $theme = Zepto::Theme->light_theme();
+
+    my @hunks = ({
+        type           => 'modified',
+        base_lines     => [0],
+        current_lines  => [0],
+        prev_curr_line => -1,
+        next_curr_line => 1,
+    });
+
+    my $lm = Zepto::LineMap->new(
+        doc_line_count => $doc->line_count(),
+        hunks          => \@hunks,
+    );
+    $lm->toggle_hunk(0);
+    $view->set_line_map($lm);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
+    );
+
+    # Light theme uses different RGB values
+    my $old_bg_light = "\x1b[48;2;255;220;220m";
+    my $new_bg_light = "\x1b[48;2;220;255;220m";
+
+    like($output, qr/\Q$old_bg_light\E/, 'Light theme has pink bg for old lines');
+    like($output, qr/\Q$new_bg_light\E/, 'Light theme has green bg for new lines');
+};
+
 done_testing();

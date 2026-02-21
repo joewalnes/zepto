@@ -43,10 +43,16 @@ sub new {
 
         # Preferred column for vertical movement (to handle short lines)
         _preferred_col => 0,
+
+        # LineMap for inline diff expansion (undef when no hunks expanded)
+        line_map => undef,
     }, $class;
 
     return $self;
 }
+
+sub line_map     { $_[0]->{line_map} }
+sub set_line_map { $_[0]->{line_map} = $_[1] }
 
 # ============================================================================
 # Document access
@@ -499,12 +505,29 @@ sub set_viewport_size {
 sub viewport_rows { $_[0]->{viewport_rows} }
 sub viewport_cols { $_[0]->{viewport_cols} }
 
-# Get range of visible lines
+# Get range of visible lines (document lines)
+# When hunks are expanded, may return fewer doc lines than viewport_rows
+# since old-line rows consume display space
 sub visible_line_range {
     my ($self) = @_;
     my $start = $self->{scroll_line};
-    my $end = $start + $self->{viewport_rows};
     my $max = $self->{document}->line_count();
+
+    my $lm = $self->{line_map};
+    if ($lm && $lm->has_expanded_hunks()) {
+        # Walk visible entries to find the last doc line shown
+        my $entries = $lm->visible_entries($start, $self->{viewport_rows});
+        my $end_line = $start;
+        for my $entry (@$entries) {
+            if ($entry->{type} eq 'doc' && $entry->{line} >= $end_line) {
+                $end_line = $entry->{line} + 1;
+            }
+        }
+        $end_line = $max if $end_line > $max;
+        return ($start, $end_line);
+    }
+
+    my $end = $start + $self->{viewport_rows};
     $end = $max if $end > $max;
     return ($start, $end);
 }
@@ -514,11 +537,36 @@ sub ensure_cursor_visible {
     my ($self) = @_;
 
     # Vertical scrolling (no margins - scroll exactly when needed)
-    if ($self->{cursor_line} < $self->{scroll_line}) {
-        $self->{scroll_line} = $self->{cursor_line};
-    }
-    elsif ($self->{cursor_line} >= $self->{scroll_line} + $self->{viewport_rows}) {
-        $self->{scroll_line} = $self->{cursor_line} - $self->{viewport_rows} + 1;
+    my $lm = $self->{line_map};
+    if ($lm && $lm->has_expanded_hunks()) {
+        # With expanded hunks, we need to account for old-line rows
+        # consuming viewport space between scroll_line and cursor_line
+        if ($self->{cursor_line} < $self->{scroll_line}) {
+            $self->{scroll_line} = $self->{cursor_line};
+        } else {
+            my $cursor_display = $lm->doc_line_to_display($self->{cursor_line});
+            my $scroll_display = $lm->doc_line_to_display($self->{scroll_line});
+            my $display_span = $cursor_display - $scroll_display + 1;
+            if ($display_span > $self->{viewport_rows}) {
+                # Need to scroll down — find a scroll_line where cursor fits
+                # Walk backwards from cursor to find a doc line that puts cursor in viewport
+                my $target_display = $cursor_display - $self->{viewport_rows} + 1;
+                # Find the doc line at or after target_display
+                my $new_scroll = $self->{cursor_line};
+                while ($new_scroll > 0 &&
+                       $lm->doc_line_to_display($new_scroll - 1) >= $target_display) {
+                    $new_scroll--;
+                }
+                $self->{scroll_line} = $new_scroll;
+            }
+        }
+    } else {
+        if ($self->{cursor_line} < $self->{scroll_line}) {
+            $self->{scroll_line} = $self->{cursor_line};
+        }
+        elsif ($self->{cursor_line} >= $self->{scroll_line} + $self->{viewport_rows}) {
+            $self->{scroll_line} = $self->{cursor_line} - $self->{viewport_rows} + 1;
+        }
     }
 
     # Horizontal scrolling - keep cursor in a comfortable zone with context ahead
@@ -582,7 +630,15 @@ sub scroll_down {
 sub doc_to_screen {
     my ($self, $line, $col) = @_;
 
-    my $row = $line - $self->{scroll_line};
+    my $lm = $self->{line_map};
+    my $row;
+    if ($lm && $lm->has_expanded_hunks()) {
+        my $line_display = $lm->doc_line_to_display($line);
+        my $scroll_display = $lm->scroll_display_start($self->{scroll_line});
+        $row = $line_display - $scroll_display;
+    } else {
+        $row = $line - $self->{scroll_line};
+    }
     my $scol = $col - $self->{scroll_col};
 
     return (undef, undef) if $row < 0 || $row >= $self->{viewport_rows};
@@ -592,10 +648,24 @@ sub doc_to_screen {
 }
 
 # Convert screen position to document line/col
+# Returns ($line, $col) or (undef, undef) if the screen row is an old-line row
 sub screen_to_doc {
     my ($self, $row, $col) = @_;
 
-    my $line = $self->{scroll_line} + $row;
+    my $lm = $self->{line_map};
+    my $line;
+    if ($lm && $lm->has_expanded_hunks()) {
+        my $scroll_display = $lm->scroll_display_start($self->{scroll_line});
+        my $display_row = $scroll_display + $row;
+        my $entry = $lm->display_entry($display_row);
+        return (undef, undef) unless $entry;
+        # Old-line rows have no document line
+        return (undef, undef) if $entry->{type} eq 'old';
+        $line = $entry->{line};
+    } else {
+        $line = $self->{scroll_line} + $row;
+    }
+
     my $dcol = $self->{scroll_col} + $col;
 
     # Clamp to document bounds

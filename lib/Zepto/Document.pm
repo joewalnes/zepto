@@ -426,6 +426,7 @@ sub update_vcs_diff {
     if ($self->{_vcs_provider}->head_changed()) {
         $self->{_vcs_provider}->invalidate_cache($self->{path});
         $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+        $self->{_vcs_base_lines} = undef;
         $self->{_vcs_dirty} = 1;  # Force recompute
     }
 
@@ -512,7 +513,53 @@ sub invalidate_vcs_cache {
 
     $self->{_vcs_provider}->invalidate_cache($self->{path});
     $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+    $self->{_vcs_base_lines} = undef;
     $self->_compute_vcs_diff();
+}
+
+# Get base (HEAD) text split into lines (cached)
+sub vcs_base_lines {
+    my ($self) = @_;
+    return [] unless defined $self->{_vcs_base};
+    $self->{_vcs_base_lines} //= [split(/\n/, $self->{_vcs_base}, -1)];
+    return $self->{_vcs_base_lines};
+}
+
+# Get enriched hunk data from the diff result
+sub vcs_hunks {
+    my ($self) = @_;
+    return $self->{_vcs_diff} ? ($self->{_vcs_diff}{hunks} // []) : [];
+}
+
+# Find the hunk index for a given document line (0-indexed)
+# Returns the hunk index if the line has a VCS marker, undef otherwise
+sub vcs_hunk_at_line {
+    my ($self, $doc_line) = @_;
+    my $hunks = $self->vcs_hunks();
+
+    for my $i (0 .. $#$hunks) {
+        my $h = $hunks->[$i];
+
+        # Check if doc_line is in this hunk's current_lines
+        for my $cl (@{$h->{current_lines}}) {
+            return $i if $cl == $doc_line;
+        }
+
+        # For deletion hunks, check the marker position
+        if ($h->{type} eq 'deleted') {
+            my $marker;
+            if ($h->{prev_curr_line} == -1) {
+                $marker = 0;
+            } elsif (!defined $h->{next_curr_line}) {
+                $marker = $self->line_count() > 0 ? $self->line_count() - 1 : 0;
+            } else {
+                $marker = $h->{prev_curr_line};
+            }
+            return $i if $marker == $doc_line || ($marker + 1) == $doc_line;
+        }
+    }
+
+    return undef;
 }
 
 1;

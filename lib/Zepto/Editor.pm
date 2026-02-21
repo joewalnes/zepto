@@ -35,6 +35,7 @@ use Zepto::Theme;
 use Zepto::FilePicker;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
+use Zepto::LineMap;
 
 # Editor states
 use constant {
@@ -586,8 +587,56 @@ sub handle_mouse_event {
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
         my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
+        # Resolve display row to entry via LineMap
+        my $line_map = $view->line_map();
+        my $entry;
+        if ($line_map && $line_map->has_expanded_hunks()) {
+            my $scroll_display = $line_map->scroll_display_start($view->scroll_line());
+            my $display_row = $scroll_display + $text_row;
+            $entry = $line_map->display_entry($display_row);
+        }
+
+        # Gutter click: toggle hunk expansion
+        if ($visual_col < 0 && $self->{document}) {
+            my $doc_line;
+            if ($entry) {
+                if ($entry->{type} eq 'old') {
+                    # Click on old-line gutter — collapse this hunk
+                    if ($line_map && defined $entry->{hunk_idx}) {
+                        $line_map->toggle_hunk($entry->{hunk_idx});
+                    }
+                    return;
+                }
+                $doc_line = $entry->{line};
+            } else {
+                $doc_line = $view->scroll_line() + $text_row;
+            }
+
+            # Check if this doc line has a VCS marker that can be expanded
+            if (defined $doc_line && $doc_line >= 0 && $doc_line < $self->{document}->line_count()) {
+                my $hunk_idx = $self->{document}->vcs_hunk_at_line($doc_line);
+                if (defined $hunk_idx) {
+                    $self->_ensure_line_map();
+                    $line_map = $view->line_map();
+                    $line_map->toggle_hunk($hunk_idx);
+                    return;
+                }
+            }
+            return;
+        }
+
         if ($visual_col >= 0) {
-            my $doc_line = $view->scroll_line() + $text_row;
+            # Block clicks on old-line rows (read-only)
+            if ($entry && $entry->{type} eq 'old') {
+                return;
+            }
+
+            my $doc_line;
+            if ($entry) {
+                $doc_line = $entry->{line};
+            } else {
+                $doc_line = $view->scroll_line() + $text_row;
+            }
 
             # Clamp line to document bounds
             $doc_line = 0 if $doc_line < 0;
@@ -626,12 +675,23 @@ sub handle_mouse_event {
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
         my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
+        # Resolve display row via LineMap
+        my $line_map = $view->line_map();
+        my $doc_line;
+        if ($line_map && $line_map->has_expanded_hunks()) {
+            my $scroll_display = $line_map->scroll_display_start($view->scroll_line());
+            my $display_row = $scroll_display + $text_row;
+            my $drag_entry = $line_map->display_entry($display_row);
+            return if !$drag_entry || $drag_entry->{type} eq 'old';
+            $doc_line = $drag_entry->{line};
+        } else {
+            $doc_line = $view->scroll_line() + $text_row;
+        }
+
         if ($visual_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
             $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
         }
-
-        my $doc_line = $view->scroll_line() + $text_row;
 
         # Clamp line to document bounds
         $doc_line = 0 if $doc_line < 0;
@@ -1969,6 +2029,45 @@ sub delete_selection {
 }
 
 # =============================================================================
+# LineMap for inline diff expansion
+# =============================================================================
+
+# Ensure a LineMap exists on the view (creates one from current document hunks)
+sub _ensure_line_map {
+    my ($self) = @_;
+    my $view = $self->{view};
+    my $doc = $self->{document};
+    return unless $view && $doc;
+
+    my $lm = $view->line_map();
+    if (!$lm) {
+        $lm = Zepto::LineMap->new(
+            doc_line_count => $doc->line_count(),
+            hunks          => $doc->vcs_hunks(),
+        );
+        $view->set_line_map($lm);
+    }
+    return $lm;
+}
+
+# Sync LineMap with current document state (call after diff recomputation)
+sub _sync_line_map {
+    my ($self) = @_;
+    my $view = $self->{view};
+    my $doc = $self->{document};
+    return unless $view && $doc;
+
+    my $lm = $view->line_map();
+    return unless $lm;
+
+    # Update hunks and doc line count — collapses all expanded hunks
+    $lm->update(
+        doc_line_count => $doc->line_count(),
+        hunks          => $doc->vcs_hunks(),
+    );
+}
+
+# =============================================================================
 # Rendering
 # =============================================================================
 
@@ -1977,6 +2076,17 @@ sub render {
 
     # Update VCS diff if needed (debounced)
     $self->{document}->update_vcs_diff();
+
+    # If we have a LineMap, keep it in sync with current hunks/doc count
+    if ($self->{view}->line_map()) {
+        my $lm = $self->{view}->line_map();
+        my $current_hunks = $self->{document}->vcs_hunks();
+        my $current_count = $self->{document}->line_count();
+        # Sync if hunks array ref changed (diff recomputed) or doc lines changed
+        if ($current_hunks ne $lm->{hunks} || $current_count != $lm->{doc_line_count}) {
+            $self->_sync_line_map();
+        }
+    }
 
     my $term = $self->{terminal};
     my ($rows, $cols) = $term->get_size();

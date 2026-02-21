@@ -31,7 +31,7 @@ sub diff {
     my ($class, $base_text, $current_text) = @_;
 
     # Handle edge cases
-    return { added => [], modified => [], modified_whitespace => [], deleted => [] }
+    return { added => [], modified => [], modified_whitespace => [], deleted => [], hunks => [] }
         if !defined($base_text) && !defined($current_text);
 
     # If no base, all current lines are additions
@@ -42,6 +42,7 @@ sub diff {
             modified            => [],
             modified_whitespace => [],
             deleted             => [],
+            hunks               => [],
         };
     }
 
@@ -52,6 +53,7 @@ sub diff {
             modified            => [],
             modified_whitespace => [],
             deleted             => [0],  # Deletion at start
+            hunks               => [],
         };
     }
 
@@ -305,11 +307,12 @@ sub _edits_to_indicators {
         push @hunks, $current_hunk;
     }
 
-    # Step 2: Convert hunks to indicators
+    # Step 2: Classify hunks and convert to indicators
     my @added;
     my @modified;
     my @modified_whitespace;
     my @deleted;
+    my @classified_hunks;
 
     for my $hunk (@hunks) {
         my $has_deletes = @{$hunk->{deletes}} > 0;
@@ -340,34 +343,49 @@ sub _edits_to_indicators {
                     push @modified, $ins_line;
                 }
             }
+
+            push @classified_hunks, {
+                type           => 'modified',
+                base_lines     => $hunk->{deletes},
+                current_lines  => $hunk->{inserts},
+                prev_curr_line => $hunk->{prev_curr_line},
+                next_curr_line => $hunk->{next_curr_line},
+            };
         }
         elsif ($has_inserts) {
             # Only insertions = added lines
             push @added, @{$hunk->{inserts}};
+
+            push @classified_hunks, {
+                type           => 'added',
+                base_lines     => [],
+                current_lines  => $hunk->{inserts},
+                prev_curr_line => $hunk->{prev_curr_line},
+                next_curr_line => $hunk->{next_curr_line},
+            };
         }
         elsif ($has_deletes) {
             # Only deletions = deletion marker
-            # Marker is placed on the line AFTER which content was deleted
-            # - If deletion at start (prev_curr_line == -1), marker goes on line 0
-            # - If deletion at end (next_curr_line is undef), marker on last line
-            # - Otherwise, marker on prev_curr_line (the line before the deletion point)
-
             my $marker_line;
             if ($hunk->{prev_curr_line} == -1) {
-                # Deletion at start of file - mark line 0
                 $marker_line = 0;
             } elsif (!defined $hunk->{next_curr_line}) {
-                # Deletion at end of file - mark last line
                 $marker_line = $current_line_count > 0 ? $current_line_count - 1 : 0;
             } else {
-                # Deletion in middle - mark line before deletion point
                 $marker_line = $hunk->{prev_curr_line};
             }
 
-            # Avoid duplicate markers at same position
             if (!@deleted || $deleted[-1] != $marker_line) {
                 push @deleted, $marker_line;
             }
+
+            push @classified_hunks, {
+                type           => 'deleted',
+                base_lines     => $hunk->{deletes},
+                current_lines  => [],
+                prev_curr_line => $hunk->{prev_curr_line},
+                next_curr_line => $hunk->{next_curr_line},
+            };
         }
     }
 
@@ -376,6 +394,7 @@ sub _edits_to_indicators {
         modified            => \@modified,
         modified_whitespace => \@modified_whitespace,
         deleted             => \@deleted,
+        hunks               => \@classified_hunks,
     };
 }
 
