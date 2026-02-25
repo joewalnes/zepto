@@ -476,6 +476,9 @@ sub handle_editing_event {
             elsif ($view->has_selection()) {
                 $view->clear_selection();
             }
+            elsif ($view->line_map() && $view->line_map()->has_expanded_hunks()) {
+                $view->line_map()->collapse_all();
+            }
             else {
                 # Nothing to cancel - open menu bar
                 $self->open_menu('f');
@@ -547,7 +550,13 @@ sub handle_alt_char {
     # Word movement (Option+Arrow on macOS sends ESC b/f)
     if    ($char eq 'b') { $view->move_word_left(); }
     elsif ($char eq 'f') { $view->move_word_right(); }
-    # Menus accessed via Escape key, not Alt+letter
+
+    # Inline diff expansion
+    elsif ($char eq 'd') { $self->cmd_toggle_diff(); }
+
+    # Change navigation
+    elsif ($char eq 'n') { $self->cmd_next_change(); }
+    elsif ($char eq 'p') { $self->cmd_prev_change(); }
 }
 
 sub handle_mouse_event {
@@ -2065,6 +2074,148 @@ sub _sync_line_map {
         doc_line_count => $doc->line_count(),
         hunks          => $doc->vcs_hunks(),
     );
+}
+
+# Build sorted list of hunk anchor lines (first line of each hunk)
+sub _hunk_anchors {
+    my ($self) = @_;
+    my $doc = $self->{document};
+    my $hunks = $doc->vcs_hunks();
+    return [] unless $hunks && @$hunks;
+
+    my @anchors;
+    for my $i (0 .. $#$hunks) {
+        my $h = $hunks->[$i];
+        my $anchor;
+        if ($h->{type} eq 'deleted') {
+            $anchor = $h->{prev_curr_line} == -1 ? 0 : $h->{prev_curr_line};
+        } else {
+            $anchor = $h->{current_lines}[0];
+        }
+        push @anchors, { line => $anchor, hunk_idx => $i };
+    }
+    return [ sort { $a->{line} <=> $b->{line} } @anchors ];
+}
+
+# Navigate to the next VCS hunk (wraps around)
+sub cmd_next_change {
+    my ($self) = @_;
+    my $doc = $self->{document};
+    my $view = $self->{view};
+    return unless $doc && $view;
+
+    my $anchors = $self->_hunk_anchors();
+    return $self->show_message("No changes") unless @$anchors;
+
+    my $cursor = $view->cursor_line();
+    my $current_hunk = $doc->vcs_hunk_at_line($cursor);
+
+    # Find the next hunk after the current one
+    for my $a (@$anchors) {
+        next if defined $current_hunk && $a->{hunk_idx} == $current_hunk;
+        if ($a->{line} > $cursor) {
+            $self->_navigate_to_hunk($a);
+            return;
+        }
+    }
+    # Wrap to first hunk
+    my $first = $anchors->[0];
+    if (defined $current_hunk && $first->{hunk_idx} == $current_hunk && @$anchors > 1) {
+        $first = $anchors->[1];
+    }
+    $self->_navigate_to_hunk($first);
+}
+
+# Navigate to the previous VCS hunk (wraps around)
+sub cmd_prev_change {
+    my ($self) = @_;
+    my $doc = $self->{document};
+    my $view = $self->{view};
+    return unless $doc && $view;
+
+    my $anchors = $self->_hunk_anchors();
+    return $self->show_message("No changes") unless @$anchors;
+
+    my $cursor = $view->cursor_line();
+    my $current_hunk = $doc->vcs_hunk_at_line($cursor);
+
+    # Find the previous hunk before the current one
+    for my $a (reverse @$anchors) {
+        next if defined $current_hunk && $a->{hunk_idx} == $current_hunk;
+        if ($a->{line} < $cursor) {
+            $self->_navigate_to_hunk($a);
+            return;
+        }
+    }
+    # Wrap to last hunk
+    my $last = $anchors->[-1];
+    if (defined $current_hunk && $last->{hunk_idx} == $current_hunk && @$anchors > 1) {
+        $last = $anchors->[-2];
+    }
+    $self->_navigate_to_hunk($last);
+}
+
+# Navigate to a hunk: expand it, position cursor, center viewport with old lines visible
+sub _navigate_to_hunk {
+    my ($self, $anchor) = @_;
+    my $doc = $self->{document};
+    my $view = $self->{view};
+    my $hunk_idx = $anchor->{hunk_idx};
+
+    # Auto-expand the hunk
+    $self->_ensure_line_map();
+    my $lm = $view->line_map();
+    if (!$lm->is_expanded($hunk_idx)) {
+        $lm->toggle_hunk($hunk_idx);
+    }
+
+    # Move cursor to first line of the hunk
+    $view->set_cursor($anchor->{line}, 0);
+
+    # Center viewport, accounting for old lines above the anchor
+    my $hunks = $doc->vcs_hunks();
+    my $h = $hunks->[$hunk_idx];
+    my $old_line_count = ($h->{type} eq 'modified' || $h->{type} eq 'deleted')
+        ? scalar @{$h->{base_lines}} : 0;
+
+    my $viewport = $view->viewport_rows();
+    my $scroll = $view->scroll_line();
+
+    # The visual block starts $old_line_count display rows before the anchor line.
+    # Center the whole block (old + new lines) in the viewport.
+    my $block_start = $anchor->{line} - $old_line_count;  # approximate doc line of visual top
+    $block_start = 0 if $block_start < 0;
+
+    # If already well-positioned, don't jump
+    my $margin = int($viewport / 4);
+    if ($block_start >= $scroll + $margin &&
+        $anchor->{line} < $scroll + $viewport - $margin) {
+        return;
+    }
+
+    # Center the block in viewport
+    my $new_scroll = $block_start - int($viewport / 4);
+    $new_scroll = 0 if $new_scroll < 0;
+    my $max_scroll = $doc->line_count() - $viewport;
+    $new_scroll = $max_scroll if $max_scroll > 0 && $new_scroll > $max_scroll;
+    $view->{scroll_line} = $new_scroll;
+}
+
+# Toggle inline diff expansion at cursor position
+sub cmd_toggle_diff {
+    my ($self) = @_;
+    my $doc = $self->{document};
+    my $view = $self->{view};
+    return unless $doc && $view;
+
+    my $hunk_idx = $doc->vcs_hunk_at_line($view->cursor_line());
+    if (defined $hunk_idx) {
+        $self->_ensure_line_map();
+        my $lm = $view->line_map();
+        $lm->toggle_hunk($hunk_idx);
+    } else {
+        $self->show_message("No change at cursor");
+    }
 }
 
 # =============================================================================

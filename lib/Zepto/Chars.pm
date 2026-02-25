@@ -59,6 +59,8 @@ use constant {
     VCS_ADDED           => "\x{2590}",  # ▐ Right half block (added line)
     VCS_MODIFIED        => "\x{2590}",  # ▐ Right half block (modified line)
     VCS_DELETED         => "\x{2590}",  # ▐ Right half block (deletion marker - red color)
+    # Full block for expanded hunk indicator
+    VCS_EXPANDED        => "\x{2588}",  # █ Full block (hunk is expanded)
     # Legacy: these were used for two-column display
     VCS_DEL_UPPER       => "\x{259d}",  # ▝ Upper right quadrant (deletion indicator, upper half)
     VCS_DEL_LOWER       => "\x{2597}",  # ▗ Lower right quadrant (deletion indicator, lower half)
@@ -135,6 +137,7 @@ my %CHARS = (
     vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐
     vcs_modified        => [ VCS_MODIFIED,        VCS_MODIFIED  ],  # ▐
     vcs_deleted         => [ VCS_DELETED,         VCS_DELETED   ],  # ▐ (red)
+    vcs_expanded        => [ VCS_EXPANDED,        VCS_EXPANDED  ],  # █ (expanded hunk)
     vcs_del_upper       => [ VCS_DEL_UPPER,       VCS_DEL_UPPER ],  # ▝ (legacy)
     vcs_del_lower       => [ VCS_DEL_LOWER,       VCS_DEL_LOWER ],  # ▗ (legacy)
 

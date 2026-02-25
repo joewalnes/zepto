@@ -110,6 +110,11 @@ our %MENU_ITEMS = (
     v => [
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
         { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
+        { separator => 1 },
+        { label => 'Toggle Diff',    shortcut => 'Alt+D',   action => 'toggle_diff' },
+        { separator => 1 },
+        { label => "Next Change",    shortcut => "Alt+N",   action => 'next_change' },
+        { label => "Prev Change",    shortcut => "Alt+P",   action => 'prev_change' },
     ],
 );
 
@@ -350,8 +355,27 @@ sub render {
             $theme, $ui->{footer_input}, $cols
         );
     } else {
+        # Compute contextual hint for status bar
+        my ($status_hint, $hint_color);
+        if ($doc && $view && !$message) {
+            my $cl = $view->cursor_line();
+            my $hunk_idx = $doc->vcs_hunk_at_line($cl);
+            if (defined $hunk_idx) {
+                my $hunks = $doc->vcs_hunks();
+                my $h = $hunks->[$hunk_idx];
+                my $type = $h->{type} // 'modified';
+                if ($type eq 'added') {
+                    $hint_color = $theme->color('vcs_added');
+                } elsif ($type eq 'deleted') {
+                    $hint_color = $theme->color('vcs_deleted');
+                } else {
+                    $hint_color = $theme->color('vcs_modified');
+                }
+                $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
+            }
+        }
         $output .= $class->_render_status_bar(
-            $doc, $view, $theme, $cols, $message
+            $doc, $view, $theme, $cols, $message, $status_hint, $hint_color
         );
     }
 
@@ -848,9 +872,17 @@ sub _render_text_area {
                 ? $theme->color('diff_new_gutter_bg')
                 : $theme->color('gutter_bg');
 
-            # Override gutter bar color to green when inside an expanded hunk
+            # Override gutter for expanded hunk lines:
+            # - Fat block (█) instead of thin (▐) to show expanded state
+            # - Added hunks: green gutter; modified hunks: keep yellow
             if ($is_hunk_line) {
-                $vcs_color = $theme->color('vcs_added');
+                $vcs_char = Zepto::Chars->get('vcs_expanded');
+                my $hunks = $doc->vcs_hunks();
+                my $h = $hunks->[$entry->{hunk_idx}];
+                if ($h && $h->{type} eq 'added') {
+                    $vcs_color = $theme->color('vcs_added');
+                }
+                # Modified hunks keep vcs_modified (yellow) which is already set
             }
 
             if ($is_cursor_line) {
@@ -871,7 +903,7 @@ sub _render_text_area {
                 $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
                 # Arrow right: badge color as fg, next area color as bg
                 my $next_bg = $is_hunk_line
-                    ? $theme->color('diff_new_bg')
+                    ? $theme->color('diff_new_cursor_bg')
                     : $theme->color('cursor_line_bg');
                 $output .= $next_bg . $theme->color('ruler_cursor_edge') . $ar;
             } else {
@@ -890,9 +922,11 @@ sub _render_text_area {
             $output .= ' ' x $gutter_width;
         }
 
-        # Background: cursor line > hunk line > normal
+        # Background: cursor+hunk > cursor > hunk > normal
         my $line_bg;
-        if ($is_cursor_line) {
+        if ($is_cursor_line && $is_hunk_line) {
+            $line_bg = $theme->color('diff_new_cursor_bg');
+        } elsif ($is_cursor_line) {
             $line_bg = $theme->color('cursor_line_bg');
         } elsif ($is_hunk_line) {
             $line_bg = $theme->color('diff_new_bg');
@@ -1113,10 +1147,14 @@ sub _render_old_line_row {
     my $output = '';
     my $base_line_idx = $entry->{base_line};
 
-    # Gutter: red background, red bar char, blank line number
+    # Gutter: use yellow (vcs_modified) for modified hunks, red for deleted hunks
     my $gutter_bg = $theme->color('diff_old_gutter_bg');
-    my $vcs_color = $theme->color('vcs_deleted');
-    my $vcs_char = Zepto::Chars->get('vcs_modified');
+    my $hunks = $doc->vcs_hunks();
+    my $h = $hunks->[$entry->{hunk_idx}];
+    my $vcs_color = ($h && $h->{type} eq 'modified')
+        ? $theme->color('vcs_modified')
+        : $theme->color('vcs_deleted');
+    my $vcs_char = Zepto::Chars->get('vcs_expanded');  # Fat block for expanded lines
     $output .= $gutter_bg . $vcs_color . $vcs_char;
     # Blank padding for the rest of the gutter
     $output .= $gutter_bg . ' ' x ($gutter_width - 1);
@@ -1269,7 +1307,9 @@ sub _render_line_with_highlights {
         $vis_hl_start = $char_highlight->[0] - $scroll_col;
         $vis_hl_end = $char_highlight->[1] - $scroll_col;
     }
-    my $line_bg = $theme->color('cursor_line_bg');
+    my $line_bg = ($diff_mode && $diff_mode eq 'new')
+        ? $theme->color('diff_new_cursor_bg')
+        : $theme->color('cursor_line_bg');
     my $fg = $theme->color('fg');
     my $match_bg = $theme->color('match_bg');
     my $match_fg = $theme->color('match_fg');
@@ -1413,7 +1453,7 @@ sub _render_line_with_highlights {
 
 # Render the status bar with Powerline segments
 sub _render_status_bar {
-    my ($class, $doc, $view, $theme, $cols, $message) = @_;
+    my ($class, $doc, $view, $theme, $cols, $message, $status_hint, $hint_color) = @_;
 
     my $output = '';
     my $ar = Zepto::Chars->get('arrow_right');
@@ -1438,12 +1478,20 @@ sub _render_status_bar {
     my $file_width = length($filename) + 2;
     $file_width += 2 if $is_dirty;  # For modified icon + space
 
+    # Build right segment: contextual hint (dimmed)
+    my $hint_text = '';
+    my $hint_width = 0;
+    if ($status_hint) {
+        $hint_text = "$status_hint ";
+        $hint_width = length($hint_text);
+    }
+
     # Calculate middle fill (arrow char only in powerline mode)
     my $segment_overhead = Zepto::Chars->enabled() ? 1 : 0;
-    my $middle = $cols - $file_width - $segment_overhead;
+    my $middle = $cols - $file_width - $segment_overhead - $hint_width;
     $middle = 0 if $middle < 0;
 
-    # Render: [file segment][arrow][middle fill]
+    # Render: [file segment][arrow][middle fill][hint]
     # File segment
     $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
     $output .= " $filename";
@@ -1463,6 +1511,13 @@ sub _render_status_bar {
     # Middle fill
     $output .= $theme->color('status_bg') . $theme->color('status_fg');
     $output .= ' ' x $middle if $middle > 0;
+
+    # Hint (right-aligned, colored by hunk type)
+    if ($hint_width > 0) {
+        $output .= $theme->color('status_bg');
+        $output .= $hint_color // $theme->color('gutter_fg');
+        $output .= $hint_text;
+    }
 
     $output .= RESET;
     $output .= CLEAR_LINE;

@@ -224,29 +224,36 @@ subtest 'Multiple expanded hunks' => sub {
         },
     );
     my $lm = make_linemap(7, \@hunks);
-    $lm->toggle_hunk(0);
-    $lm->toggle_hunk(1);
 
-    # Expected:
+    # Only one hunk can be expanded at a time.
+    # Expanding hunk 1 should auto-collapse hunk 0.
+    $lm->toggle_hunk(0);
+    ok($lm->is_expanded(0), 'Hunk 0 expanded after toggle');
+    ok(!$lm->is_expanded(1), 'Hunk 1 still collapsed');
+
+    $lm->toggle_hunk(1);
+    ok(!$lm->is_expanded(0), 'Hunk 0 auto-collapsed when hunk 1 expanded');
+    ok($lm->is_expanded(1), 'Hunk 1 now expanded');
+
+    # Expected with only hunk 1 expanded:
     # 0: doc 0
-    # 1: old base 1      (hunk 0)
-    # 2: doc 1 (green)    (hunk 0)
-    # 3: doc 2
-    # 4: doc 3
-    # 5: doc 4
-    # 6: old base 4      (hunk 1)
-    # 7: old base 5      (hunk 1)
-    # 8: doc 5
-    # 9: doc 6
-    is($lm->total_display_rows(), 10, 'Total rows = 7 doc + 1 old (hunk0) + 2 old (hunk1)');
+    # 1: doc 1
+    # 2: doc 2
+    # 3: doc 3
+    # 4: doc 4
+    # 5: old base 4      (hunk 1)
+    # 6: old base 5      (hunk 1)
+    # 7: doc 5
+    # 8: doc 6
+    is($lm->total_display_rows(), 9, 'Total rows = 7 doc + 2 old (hunk1 only)');
 
     is($lm->doc_line_to_display(0), 0, 'Doc 0 at display 0');
-    is($lm->doc_line_to_display(1), 2, 'Doc 1 at display 2');
-    is($lm->doc_line_to_display(5), 8, 'Doc 5 at display 8');
-    is($lm->doc_line_to_display(6), 9, 'Doc 6 at display 9');
+    is($lm->doc_line_to_display(1), 1, 'Doc 1 at display 1');
+    is($lm->doc_line_to_display(5), 7, 'Doc 5 at display 7');
+    is($lm->doc_line_to_display(6), 8, 'Doc 6 at display 8');
 
-    is($lm->extra_rows_before(1), 1, '1 extra row before doc 1');
-    is($lm->extra_rows_before(5), 3, '3 extra rows before doc 5');
+    is($lm->extra_rows_before(1), 0, '0 extra rows before doc 1');
+    is($lm->extra_rows_before(5), 2, '2 extra rows before doc 5');
 };
 
 # =============================================================================
@@ -313,21 +320,19 @@ subtest 'Deletion at start of file' => sub {
 # collapse_all
 # =============================================================================
 
-subtest 'collapse_all resets all expansions' => sub {
+subtest 'collapse_all resets expansion' => sub {
     my @hunks = (
         { type => 'modified', base_lines => [0], current_lines => [0], prev_curr_line => -1, next_curr_line => 1 },
         { type => 'added', base_lines => [], current_lines => [2], prev_curr_line => 1, next_curr_line => 3 },
     );
     my $lm = make_linemap(4, \@hunks);
     $lm->toggle_hunk(0);
-    $lm->toggle_hunk(1);
-
     ok($lm->is_expanded(0), 'Hunk 0 expanded');
-    ok($lm->is_expanded(1), 'Hunk 1 expanded');
+    ok($lm->has_expanded_hunks(), 'Has expanded hunks');
 
     $lm->collapse_all();
-    ok(!$lm->is_expanded(0), 'Hunk 0 collapsed');
-    ok(!$lm->is_expanded(1), 'Hunk 1 collapsed');
+    ok(!$lm->is_expanded(0), 'Hunk 0 collapsed after collapse_all');
+    ok(!$lm->has_expanded_hunks(), 'No expanded hunks');
     is($lm->total_display_rows(), 4, 'Back to identity mapping');
 };
 

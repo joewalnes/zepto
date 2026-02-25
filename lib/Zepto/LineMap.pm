@@ -39,6 +39,8 @@ sub toggle_hunk {
     if ($self->{_expanded}{$hunk_idx}) {
         delete $self->{_expanded}{$hunk_idx};
     } else {
+        # Only one hunk can be expanded at a time
+        %{$self->{_expanded}} = ();
         $self->{_expanded}{$hunk_idx} = 1;
     }
     $self->{_dirty} = 1;

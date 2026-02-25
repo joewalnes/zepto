@@ -173,9 +173,11 @@ sub dark_theme {
 
         # Inline diff backgrounds (expanded hunk view)
         diff_old_bg         => bg_rgb(60, 30, 30),     # Muted red background
+        diff_old_cursor_bg  => bg_rgb(80, 35, 35),     # Brighter red for cursor line
         diff_old_gutter_bg  => bg_rgb(50, 25, 25),     # Darker red for gutter
         diff_old_highlight_bg => bg_rgb(110, 40, 40),  # Stronger red for changed chars
         diff_new_bg         => bg_rgb(30, 55, 30),     # Muted green background
+        diff_new_cursor_bg  => bg_rgb(38, 70, 38),     # Brighter green for cursor line
         diff_new_gutter_bg  => bg_rgb(25, 45, 25),     # Darker green for gutter
         diff_new_highlight_bg => bg_rgb(40, 100, 40),  # Stronger green for changed chars
 
@@ -299,9 +301,11 @@ sub light_theme {
 
         # Inline diff backgrounds (expanded hunk view)
         diff_old_bg         => bg_rgb(255, 220, 220),  # Pink-red background
+        diff_old_cursor_bg  => bg_rgb(255, 200, 200),  # Deeper pink for cursor line
         diff_old_gutter_bg  => bg_rgb(245, 210, 210),  # Slightly darker for gutter
         diff_old_highlight_bg => bg_rgb(255, 160, 160),# Stronger pink for changed chars
         diff_new_bg         => bg_rgb(220, 255, 220),  # Pale green background
+        diff_new_cursor_bg  => bg_rgb(200, 245, 200),  # Deeper green for cursor line
         diff_new_gutter_bg  => bg_rgb(210, 245, 210),  # Slightly darker for gutter
         diff_new_highlight_bg => bg_rgb(160, 240, 160),# Stronger green for changed chars
 

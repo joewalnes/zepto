@@ -806,9 +806,9 @@ subtest 'Expanded modified hunk renders old and new lines' => sub {
     my $new_bg = "\x1b[48;2;30;55;30m";
     like($output, qr/\Q$new_bg\E/, 'Output contains diff_new_bg color for new lines');
 
-    # Old lines should have red bar char in gutter (▐ = \x{2590})
+    # Expanded hunk lines should have full block char in gutter (█ = \x{2588})
     my $stripped = strip_escapes($output);
-    like($stripped, qr/\x{2590}/, 'Old lines display bar char in gutter');
+    like($stripped, qr/\x{2588}/, 'Expanded lines display full block in gutter');
 };
 
 subtest 'Expanded deleted hunk shows only old lines' => sub {
@@ -1021,10 +1021,11 @@ subtest 'Light theme diff colors in expanded hunk' => sub {
 
     # Light theme uses different RGB values
     my $old_bg_light = "\x1b[48;2;255;220;220m";
-    my $new_bg_light = "\x1b[48;2;220;255;220m";
+    # Cursor is on line 0 (the hunk line), so it gets diff_new_cursor_bg
+    my $new_cursor_bg_light = "\x1b[48;2;200;245;200m";
 
     like($output, qr/\Q$old_bg_light\E/, 'Light theme has pink bg for old lines');
-    like($output, qr/\Q$new_bg_light\E/, 'Light theme has green bg for new lines');
+    like($output, qr/\Q$new_cursor_bg_light\E/, 'Light theme has green cursor bg for hunk line');
 };
 
 done_testing();
