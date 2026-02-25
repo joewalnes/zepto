@@ -181,6 +181,13 @@ sub dark_theme {
         diff_new_gutter_bg  => bg_rgb(25, 45, 25),     # Darker green for gutter
         diff_new_highlight_bg => bg_rgb(40, 100, 40),  # Stronger green for changed chars
 
+        # Minimap / scrollbar
+        minimap_bg          => bg_rgb(22, 23, 34),     # Slightly darker than editor bg
+        minimap_viewport_bg => bg_rgb(45, 50, 72),     # Highlighted viewport region
+        minimap_text_fg     => fg_rgb(70, 78, 110),    # Dim text density
+        minimap_separator   => fg_rgb(45, 50, 70),     # Subtle separator line
+        minimap_cursor_fg   => fg_rgb(122, 162, 247),  # Cursor line indicator
+
         # Syntax highlighting (Tokyo Night inspired)
         # Comments are prominent - they're documentation, not noise!
         syntax_keyword     => fg_rgb(187, 154, 247),  # Purple - control flow
@@ -308,6 +315,13 @@ sub light_theme {
         diff_new_cursor_bg  => bg_rgb(200, 245, 200),  # Deeper green for cursor line
         diff_new_gutter_bg  => bg_rgb(210, 245, 210),  # Slightly darker for gutter
         diff_new_highlight_bg => bg_rgb(160, 240, 160),# Stronger green for changed chars
+
+        # Minimap / scrollbar
+        minimap_bg          => bg_rgb(240, 242, 248),  # Slightly different from main bg
+        minimap_viewport_bg => bg_rgb(210, 215, 228),  # Highlighted viewport region
+        minimap_text_fg     => fg_rgb(170, 175, 190),  # Dim text density
+        minimap_separator   => fg_rgb(200, 204, 215),  # Subtle separator line
+        minimap_cursor_fg   => fg_rgb(114, 135, 253),  # Cursor line indicator
 
         # Syntax highlighting - high contrast for light backgrounds
         # Comments are prominent - they're documentation, not noise!

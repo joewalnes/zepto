@@ -248,6 +248,7 @@ sub execute_menu_item {
     elsif ($action eq 'goto')       { $self->cmd_goto_line(); }
     elsif ($action eq 'toggle_theme') { $self->cmd_toggle_theme(); }
     elsif ($action eq 'toggle_powerline') { $self->cmd_toggle_powerline(); }
+    elsif ($action eq 'toggle_minimap')   { $self->cmd_toggle_minimap(); }
     elsif ($action eq 'toggle_diff')    { $self->cmd_toggle_diff(); }
     elsif ($action eq 'next_change')    { $self->cmd_next_change(); }
     elsif ($action eq 'prev_change')    { $self->cmd_prev_change(); }

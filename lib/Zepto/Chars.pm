@@ -150,6 +150,12 @@ my %CHARS = (
     # Box drawing - lines (same in both modes)
     box_h               => [ BOX_HORIZONTAL,      BOX_HORIZONTAL ],
     box_v               => [ BOX_VERTICAL,        BOX_VERTICAL ],
+
+    # Minimap separator (thin vertical line between text and minimap)
+    minimap_sep         => [ BOX_VERTICAL,        '|' ],
+
+    # Minimap VCS indicator (thinnest bar — compact to match minimap scale)
+    minimap_vcs         => [ "\x{258f}",          '|' ],  # ▏ Left one eighth block
 );
 
 # Module state

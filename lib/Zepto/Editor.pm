@@ -554,6 +554,9 @@ sub handle_alt_char {
     # Inline diff expansion
     elsif ($char eq 'd') { $self->cmd_toggle_diff(); }
 
+    # Minimap toggle
+    elsif ($char eq 'm') { $self->cmd_toggle_minimap(); }
+
     # Change navigation
     elsif ($char eq 'n') { $self->cmd_next_change(); }
     elsif ($char eq 'p') { $self->cmd_prev_change(); }
@@ -594,6 +597,20 @@ sub handle_mouse_event {
         my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
         my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
+
+        # Check if click is in minimap region (right side)
+        my ($rows_size, $cols_size) = $term->get_size();
+        my $text_height = $rows_size - 3;  # menu + ruler + status
+        $text_height = 1 if $text_height < 1;
+        my $minimap_width = Zepto::Renderer->get_minimap_width(
+            $line_count, $text_height, $cols_size, $gutter_width, $self->{prefs}
+        );
+        if ($minimap_width > 0 && $x > $cols_size - $minimap_width) {
+            $self->{minimap_dragging} = 1;
+            $self->_handle_minimap_click($text_row, $text_height);
+            return;
+        }
+
         my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
         # Resolve display row to entry via LineMap
@@ -664,6 +681,7 @@ sub handle_mouse_event {
     elsif ($action eq 'release') {
         # Track mouse button state
         $self->{mouse_button_down} = 0;
+        $self->{minimap_dragging} = 0;
     }
     elsif ($action eq 'scroll') {
         if ($event->{button} eq 'up') {
@@ -677,6 +695,16 @@ sub handle_mouse_event {
         # Only handle drag if mouse button is actually down
         # (some terminals send spurious motion events)
         return unless $self->{mouse_button_down};
+
+        # Handle minimap drag (scrollbar behavior)
+        if ($self->{minimap_dragging}) {
+            my $text_row = $y - 3;
+            my ($rows_size, $cols_size) = $term->get_size();
+            my $text_height = $rows_size - 3;
+            $text_height = 1 if $text_height < 1;
+            $self->_handle_minimap_click($text_row, $text_height);
+            return;
+        }
 
         # Handle drag for selection
         my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
@@ -715,6 +743,44 @@ sub handle_mouse_event {
         # Extend selection
         $view->set_cursor($doc_line, $doc_col, 1) if $visual_col >= 0;
     }
+}
+
+# =============================================================================
+# Minimap click handling
+# =============================================================================
+
+# Handle a click or drag in the minimap region.
+# Jumps cursor to the corresponding document line and centers the viewport.
+sub _handle_minimap_click {
+    my ($self, $text_row, $text_height) = @_;
+
+    return unless $self->{document};
+
+    # Clamp text_row to valid range
+    $text_row = 0 if $text_row < 0;
+    $text_row = $text_height - 1 if $text_row >= $text_height;
+
+    my $total_lines = $self->{document}->line_count();
+    my $view = $self->{view};
+    my $viewport_rows = $view->viewport_rows();
+
+    # Map minimap row to document line proportionally
+    my $ratio = $text_height > 1 ? $text_row / ($text_height - 1) : 0;
+    my $target_line = int($ratio * ($total_lines - 1) + 0.5);
+    $target_line = 0 if $target_line < 0;
+    $target_line = $total_lines - 1 if $target_line >= $total_lines;
+
+    # Move cursor to the target line (column 0)
+    $view->set_cursor($target_line, 0);
+
+    # Center the viewport on the target line
+    my $new_scroll = $target_line - int($viewport_rows / 2);
+    my $max_scroll = $total_lines - $viewport_rows;
+    $max_scroll = 0 if $max_scroll < 0;
+    $new_scroll = 0 if $new_scroll < 0;
+    $new_scroll = $max_scroll if $new_scroll > $max_scroll;
+
+    $view->{scroll_line} = $new_scroll;
 }
 
 # =============================================================================

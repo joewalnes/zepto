@@ -9,7 +9,5 @@
 - Expand selection: double click select word, triple line, quad paragraph, 5 all. And shortcut key
 - Detect if file changed and prompt for reload
 - Git change status
-- Scroll bar
-- Minimap
 - Large files
 - State: find/replace, theme

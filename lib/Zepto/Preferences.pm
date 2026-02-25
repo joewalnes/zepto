@@ -23,6 +23,7 @@ my %DEFAULTS = (
     show_status_bar  => 1,
     show_menu_bar    => 1,
     powerline        => 1,            # Use Powerline/Nerd Font glyphs
+    show_minimap     => 1,            # Show minimap/scrollbar
 
     # Editing
     tab_width        => 4,
@@ -182,6 +183,9 @@ sub set_search_wrap { $_[0]->set('search_wrap', $_[1]) }
 
 sub powerline { $_[0]->get('powerline') }
 sub set_powerline { $_[0]->set('powerline', $_[1]) }
+
+sub show_minimap { $_[0]->get('show_minimap') }
+sub set_show_minimap { $_[0]->set('show_minimap', $_[1]) }
 
 # =============================================================================
 # Tab/space conversion helpers

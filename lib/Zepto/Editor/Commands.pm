@@ -510,4 +510,10 @@ sub cmd_toggle_powerline {
     Zepto::Chars->set_enabled($new_state);
 }
 
+sub cmd_toggle_minimap {
+    my ($self) = @_;
+    my $current = $self->{prefs}->show_minimap();
+    $self->{prefs}->set_show_minimap($current ? 0 : 1);
+}
+
 1;

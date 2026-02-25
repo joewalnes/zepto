@@ -20,6 +20,7 @@ use strict;
 use warnings;
 use utf8;
 use Zepto::Chars;
+use Zepto::Minimap;
 
 # Escape sequences
 use constant {
@@ -67,6 +68,7 @@ use constant {
     MENU_DROPDOWN_WIDTH => 24,
     DIALOG_WIDTH       => 50,
     DIALOG_HEIGHT      => 5,
+    MINIMAP_WIDTH      => 8,  # Must match Zepto::Minimap::MINIMAP_TOTAL_WIDTH
 };
 
 # Menu definitions (single source of truth for menu names, order, and items)
@@ -110,6 +112,7 @@ our %MENU_ITEMS = (
     v => [
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
         { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
+        { label => 'Minimap',      shortcut => 'Alt+M',  action => 'toggle_minimap', toggle => 'show_minimap' },
         { separator => 1 },
         { label => 'Toggle Diff',    shortcut => 'Alt+D',   action => 'toggle_diff' },
         { separator => 1 },
@@ -275,6 +278,16 @@ sub get_gutter_width {
     return $gutter_width;
 }
 
+# Calculate the minimap width for given parameters.
+# Returns 0 if minimap should be hidden.
+sub get_minimap_width {
+    my ($class, $line_count, $text_height, $cols, $gutter_width, $prefs) = @_;
+    return 0 unless $prefs && $prefs->show_minimap();
+    return 0 unless $line_count > $text_height;
+    my $tentative_text = $cols - $gutter_width - MINIMAP_WIDTH;
+    return $tentative_text >= MIN_TEXT_WIDTH ? MINIMAP_WIDTH : 0;
+}
+
 # Render the complete editor screen
 # Returns a string of escape sequences
 sub render {
@@ -314,7 +327,18 @@ sub render {
     my $line_count = $doc ? $doc->line_count() : 1;
     my $gutter_width = $class->get_gutter_width($line_count);
 
-    my $text_width = $cols - $gutter_width;
+    # Determine minimap width
+    my $show_minimap = $prefs && $prefs->show_minimap();
+    my $minimap_width = 0;
+    if ($show_minimap && $doc && $line_count > $text_height) {
+        # Show minimap when document is taller than viewport
+        my $tentative_text = $cols - $gutter_width - MINIMAP_WIDTH;
+        if ($tentative_text >= MIN_TEXT_WIDTH) {
+            $minimap_width = MINIMAP_WIDTH;
+        }
+    }
+
+    my $text_width = $cols - $gutter_width - $minimap_width;
     $text_width = MIN_TEXT_WIDTH if $text_width < MIN_TEXT_WIDTH;
 
     # Render menu bar (row 1)
@@ -336,7 +360,7 @@ sub render {
         $output .= $class->_render_text_area(
             $doc, $view, $theme,
             $text_height, $text_width, $gutter_width, $highlighter,
-            $ui->{find_mode}
+            $ui->{find_mode}, $minimap_width
         );
     }
 
@@ -680,7 +704,8 @@ sub _render_ruler_bar {
 
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width) = @_;
+    $minimap_width //= 0;
 
     my $output = '';
 
@@ -792,6 +817,16 @@ sub _render_text_area {
         : '';
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
 
+    # Precompute minimap data (once, before row loop)
+    my $minimap_data;
+    if ($minimap_width > 0) {
+        $minimap_data = Zepto::Minimap->compute(
+            document => $doc,
+            view     => $view,
+            height   => $height,
+        );
+    }
+
     # Cache for per-hunk character-level diff highlights
     my %hunk_char_diffs;  # hunk_idx => { old => {base_line => [start, end]}, new => {doc_line => [start, end]} }
 
@@ -821,6 +856,8 @@ sub _render_text_area {
                 $doc, $view, $theme, $width, $gutter_width,
                 $entry, $highlighter, \$base_highlighter, $char_hl
             );
+            $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+                if $minimap_width > 0;
             $output .= RESET;
             $output .= CLEAR_LINE;
             next;
@@ -1057,8 +1094,64 @@ sub _render_text_area {
             $output .= $empty_bg . (' ' x $width);
         }
 
+        # Render minimap column for this row
+        $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+            if $minimap_width > 0;
+
         $output .= RESET;
         $output .= CLEAR_LINE;
+    }
+
+    return $output;
+}
+
+# =============================================================================
+# Minimap / scrollbar column rendering
+# =============================================================================
+
+# Render one row of the minimap column.
+# Returns ANSI string for: separator │ + VCS indicator + braille text density
+sub _render_minimap_column {
+    my ($class, $minimap_data, $screen_row, $theme) = @_;
+
+    my $output = '';
+    my $minimap_bg = $theme->color('minimap_bg');
+
+    # Separator column (thin vertical line)
+    $output .= $minimap_bg . $theme->color('minimap_separator') . Zepto::Chars->get('minimap_sep');
+
+    # Check if this row has minimap data
+    my $row_data;
+    if ($minimap_data && $screen_row < $minimap_data->{total_rows}) {
+        $row_data = $minimap_data->{rows}[$screen_row];
+    }
+
+    # VCS indicator column — use a small dot to match the minimap's compact scale
+    if ($row_data && $row_data->{vcs}) {
+        my $vcs_status = $row_data->{vcs};
+        my $vcs_color = $theme->color("vcs_$vcs_status") // '';
+        $output .= $minimap_bg . $vcs_color . Zepto::Chars->get('minimap_vcs');
+    } else {
+        $output .= $minimap_bg . ' ';
+    }
+
+    # Determine background: viewport highlight or normal minimap bg
+    my $in_viewport = $minimap_data
+        && $screen_row >= $minimap_data->{viewport_start}
+        && $screen_row <= $minimap_data->{viewport_end};
+    my $text_bg = $in_viewport
+        ? $theme->color('minimap_viewport_bg')
+        : $minimap_bg;
+
+    my $text_fg = $theme->color('minimap_text_fg');
+
+    # Braille text density
+    my $text_cols = MINIMAP_WIDTH - 2;  # Subtract separator + VCS column
+    if ($row_data && $row_data->{braille}) {
+        $output .= $text_bg . $text_fg . $row_data->{braille};
+    } else {
+        # Empty row (beyond document content)
+        $output .= $text_bg . (' ' x $text_cols);
     }
 
     return $output;

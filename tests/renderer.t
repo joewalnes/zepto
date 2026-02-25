@@ -10,6 +10,8 @@ use Zepto::Theme;
 use Zepto::Document;
 use Zepto::View;
 use Zepto::Chars;
+use Zepto::Minimap;
+use Zepto::Preferences;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -1026,6 +1028,124 @@ subtest 'Light theme diff colors in expanded hunk' => sub {
 
     like($output, qr/\Q$old_bg_light\E/, 'Light theme has pink bg for old lines');
     like($output, qr/\Q$new_cursor_bg_light\E/, 'Light theme has green cursor bg for hunk line');
+};
+
+# ============================================================================
+# Minimap
+# ============================================================================
+
+subtest 'Minimap not shown when disabled' => sub {
+    # Create a long document (longer than viewport)
+    my $content = join('', map { "Line $_\n" } (1..50));
+    my ($doc, $view) = create_test_state($content);
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 0);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        prefs    => $prefs,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # Braille chars (U+2800-U+28FF) should NOT appear
+    unlike($output, qr/[\x{2800}-\x{28FF}]/, 'No braille chars when minimap disabled');
+};
+
+subtest 'Minimap not shown for short documents' => sub {
+    my ($doc, $view) = create_test_state("Line 1\nLine 2\nLine 3\n");
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        prefs    => $prefs,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # 3 lines < 20 text rows, so minimap should auto-hide
+    unlike($output, qr/[\x{2800}-\x{28FF}]/, 'No braille chars for short document');
+};
+
+subtest 'Minimap shown for long documents' => sub {
+    my $content = join('', map { "Line number $_ with some content here\n" } (1..50));
+    my ($doc, $view) = create_test_state($content);
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        prefs    => $prefs,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # Braille chars should appear for text density
+    like($output, qr/[\x{2800}-\x{28FF}]/, 'Braille chars present for long document');
+
+    # Minimap separator (│) should appear
+    my $sep = Zepto::Chars->get('minimap_sep');
+    like($output, qr/\Q$sep\E/, 'Minimap separator present');
+
+    # Minimap background color should appear
+    like($output, qr/\x1b\[48;2;22;23;34m/, 'Minimap bg color present');
+};
+
+subtest 'Minimap viewport highlight' => sub {
+    my $content = join('', map { "Line number $_ with some content here\n" } (1..100));
+    my ($doc, $view) = create_test_state($content);
+    $view->{viewport_rows} = 20;
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    my $output = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        prefs    => $prefs,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # Viewport highlight bg should appear
+    like($output, qr/\x1b\[48;2;45;50;72m/, 'Minimap viewport highlight bg present');
+};
+
+subtest 'Minimap width constant matches module' => sub {
+    is(Zepto::Renderer::MINIMAP_WIDTH, Zepto::Minimap::MINIMAP_TOTAL_WIDTH,
+       'Renderer MINIMAP_WIDTH matches Minimap module');
+};
+
+subtest 'get_minimap_width returns 0 when disabled' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 0);
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 80, 5, $prefs);
+    is($width, 0, 'Minimap width is 0 when disabled');
+};
+
+subtest 'get_minimap_width returns 0 for short documents' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+    my $width = Zepto::Renderer->get_minimap_width(10, 20, 80, 5, $prefs);
+    is($width, 0, 'Minimap width is 0 when doc shorter than viewport');
+};
+
+subtest 'get_minimap_width returns MINIMAP_WIDTH for long documents' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 80, 5, $prefs);
+    is($width, Zepto::Renderer::MINIMAP_WIDTH, 'Minimap width is MINIMAP_WIDTH for long doc');
+};
+
+subtest 'get_minimap_width returns 0 for narrow terminal' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+    # cols=20, gutter=5, minimap=8 => text=7 < MIN_TEXT_WIDTH=10
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 20, 5, $prefs);
+    is($width, 0, 'Minimap hidden for narrow terminal');
 };
 
 done_testing();

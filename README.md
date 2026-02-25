@@ -136,6 +136,8 @@ make test     # Run tests
 - Modal dialogs for search, replace, go-to-line
 - Footer prompts for simple inputs (Save As, confirmations)
 - Escape closes menus and dialogs
+- Minimap / vertical scrollbar with braille text density (Alt+M to toggle)
+- Minimap shows viewport position and git change indicators
 
 ### Mouse Support
 
@@ -144,6 +146,7 @@ make test     # Run tests
 - Click on menus to open
 - Click on menu items to activate
 - Scroll wheel for vertical scrolling
+- Click or drag minimap to scroll document
 
 ### Themes
 
