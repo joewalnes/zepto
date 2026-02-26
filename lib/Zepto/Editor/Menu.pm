@@ -232,7 +232,7 @@ sub execute_menu_item {
     if    ($action eq 'new')        { $self->cmd_new_file(); }
     elsif ($action eq 'open')       { $self->cmd_open_file(); }
     elsif ($action eq 'save')       { $self->cmd_save(); }
-    elsif ($action eq 'save_quit')  { $self->cmd_save_and_quit(); }
+    elsif ($action eq 'close_tab')  { $self->cmd_close_tab(); }
     elsif ($action eq 'quit')       { $self->cmd_quit(); }
     elsif ($action eq 'undo')       { $self->cmd_undo(); }
     elsif ($action eq 'redo')       { $self->cmd_redo(); }
@@ -250,6 +250,8 @@ sub execute_menu_item {
     elsif ($action eq 'toggle_powerline') { $self->cmd_toggle_powerline(); }
     elsif ($action eq 'toggle_minimap')   { $self->cmd_toggle_minimap(); }
     elsif ($action eq 'toggle_diff')    { $self->cmd_toggle_diff(); }
+    elsif ($action eq 'next_tab')       { $self->cmd_next_tab(); }
+    elsif ($action eq 'prev_tab')       { $self->cmd_prev_tab(); }
     elsif ($action eq 'next_change')    { $self->cmd_next_change(); }
     elsif ($action eq 'prev_change')    { $self->cmd_prev_change(); }
 }

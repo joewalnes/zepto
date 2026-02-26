@@ -261,7 +261,7 @@ subtest 'Ruler bar shows cursor column' => sub {
 
     # Ruler bar shows cursor column badge (1-indexed column number)
     # Cursor is at col 2 (0-indexed), displayed as 3 (1-indexed)
-    # The badge appears in the ruler bar (row 2)
+    # The badge appears in the ruler bar (row 3)
     my $stripped = strip_escapes($output);
     like($stripped, qr/ 3/, 'Ruler shows cursor column badge');
 };
@@ -598,7 +598,7 @@ subtest 'Text area uses cursor positioning' => sub {
     );
 
     # Text area rows should use explicit cursor positioning (CSI row;1H)
-    # Row 2 is the first text row (after menu bar on row 1)
+    # Row 2 is the tab bar, Row 3 is the ruler bar
     my $row2_pos_count = () = $output =~ /\x1b\[2;1H/g;
     my $row3_pos_count = () = $output =~ /\x1b\[3;1H/g;
 

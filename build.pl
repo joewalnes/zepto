@@ -137,14 +137,14 @@ print <<'MAIN';
 package main;
 
 # Parse command line options
-my $file;
+my @files;
 my $no_powerline = 0;
 
 for my $arg (@ARGV) {
     if ($arg eq '--no-powerline' || $arg eq '-P') {
         $no_powerline = 1;
     } elsif ($arg eq '--help' || $arg eq '-h') {
-        print "Usage: zepto [options] [file]\n";
+        print "Usage: zepto [options] [file ...]\n";
         print "Options:\n";
         print "  --no-powerline, -P  Disable Powerline/Nerd Font glyphs\n";
         print "  --help, -h          Show this help\n";
@@ -152,7 +152,7 @@ for my $arg (@ARGV) {
         print "  ZEPTO_POWERLINE=0   Disable Powerline glyphs by default\n";
         exit 0;
     } elsif ($arg !~ /^-/) {
-        $file = $arg;
+        push @files, $arg;
     }
 }
 
@@ -166,6 +166,6 @@ if ($no_powerline || (defined $ENV{ZEPTO_POWERLINE} && $ENV{ZEPTO_POWERLINE} eq 
 my $prefs = Zepto::Preferences->new(powerline => $powerline);
 Zepto::Chars->set_enabled($powerline);
 
-my $editor = Zepto::Editor->new(file => $file, prefs => $prefs);
+my $editor = Zepto::Editor->new(files => \@files, prefs => $prefs);
 $editor->run();
 MAIN

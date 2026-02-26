@@ -11,6 +11,8 @@ use Zepto::Terminal;
 use Zepto::Document;
 use Zepto::View;
 use Zepto::Preferences;
+use Zepto::FindEngine;
+use Zepto::Highlighter;
 
 # Create a mock terminal for testing
 sub mock_terminal {
@@ -27,6 +29,23 @@ sub create_temp_file {
     close $fh;
     return $filename;
 }
+# Helper to set up document + view in editor's tab manager (replaces direct field assignment)
+sub setup_editor_doc {
+    my ($editor, $filename) = @_;
+    my $doc = Zepto::Document->load($filename);
+    my $view = Zepto::View->new(document => $doc);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document    => $doc,
+        view        => $view,
+        find_engine => $find_engine,
+        highlighter => $highlighter,
+        file_path   => $filename,
+    );
+    return ($doc, $view);
+}
+
 
 # ============================================================================
 # Construction
@@ -44,7 +63,7 @@ subtest 'Construction with file' => sub {
         terminal => $term,
         file => $filename,
     );
-    is($editor->{file_path}, $filename, 'File path set');
+    is($editor->{initial_file}, $filename, 'File path set');
 };
 
 subtest 'Construction with preferences' => sub {
@@ -115,8 +134,7 @@ subtest 'Click on menu item' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("test content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Open the Edit menu
     $editor->open_menu('e');
@@ -126,7 +144,7 @@ subtest 'Click on menu item' => sub {
     my $positions = Zepto::Renderer::get_menu_positions();
     my $menu_x = $positions->{e}{x};
 
-    # Simulate clicking on the first item (Undo) - row 2, within menu x bounds
+    # Simulate clicking outside dropdown area - y=2 is tab bar, not in dropdown
     my $event = {
         type => 'mouse',
         action => 'press',
@@ -143,8 +161,7 @@ subtest 'Click outside menu closes it' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("test content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Open the File menu
     $editor->open_menu('f');
@@ -274,7 +291,7 @@ subtest 'Init with existing file' => sub {
     );
 
     # Can't call init() without real terminal, but test file path
-    is($editor->{file_path}, $filename, 'File path stored');
+    is($editor->{initial_file}, $filename, 'File path stored');
 };
 
 # ============================================================================
@@ -289,8 +306,7 @@ subtest 'Ctrl char mapping' => sub {
     );
 
     # Initialize document and view manually for testing
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Test undo when nothing to undo
     $editor->cmd_undo();
@@ -312,18 +328,17 @@ subtest 'Delete selection' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Create selection
-    $editor->{view}->move_right() for (1..5);  # Move to space after Hello
-    $editor->{view}->move_right(1) for (1..6); # Select " World"
+    $editor->active_view()->move_right() for (1..5);  # Move to space after Hello
+    $editor->active_view()->move_right(1) for (1..6); # Select " World"
 
-    ok($editor->{view}->has_selection(), 'Selection active');
+    ok($editor->active_view()->has_selection(), 'Selection active');
 
     $editor->delete_selection();
-    ok(!$editor->{view}->has_selection(), 'Selection cleared');
-    is($editor->{document}->text(), 'Hello', 'Selection deleted');
+    ok(!$editor->active_view()->has_selection(), 'Selection cleared');
+    is($editor->active_doc()->text(), 'Hello', 'Selection deleted');
 };
 
 # ============================================================================
@@ -337,11 +352,10 @@ subtest 'Indent' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->do_indent();
-    like($editor->{document}->text(), qr/^    line/, 'Line indented with spaces');
+    like($editor->active_doc()->text(), qr/^    line/, 'Line indented with spaces');
 };
 
 subtest 'Hard tab indent' => sub {
@@ -354,11 +368,10 @@ subtest 'Hard tab indent' => sub {
         prefs => $prefs,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->do_indent();
-    like($editor->{document}->text(), qr/^\tline/, 'Line indented with tab');
+    like($editor->active_doc()->text(), qr/^\tline/, 'Line indented with tab');
 };
 
 subtest 'Indent preserves selection' => sub {
@@ -369,19 +382,18 @@ subtest 'Indent preserves selection' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Select lines 1-2 (0-indexed: lines 0-1)
-    $editor->{view}->set_cursor(0, 0, 0);
-    $editor->{view}->set_cursor(1, 5, 1);  # Select to end of "line2"
+    $editor->active_view()->set_cursor(0, 0, 0);
+    $editor->active_view()->set_cursor(1, 5, 1);  # Select to end of "line2"
 
-    ok($editor->{view}->has_selection(), 'Selection active before indent');
+    ok($editor->active_view()->has_selection(), 'Selection active before indent');
 
     $editor->do_indent();
 
-    ok($editor->{view}->has_selection(), 'Selection preserved after indent');
-    like($editor->{document}->text(), qr/^    line1\n    line2\n/, 'Lines indented');
+    ok($editor->active_view()->has_selection(), 'Selection preserved after indent');
+    like($editor->active_doc()->text(), qr/^    line1\n    line2\n/, 'Lines indented');
 };
 
 subtest 'Unindent preserves selection' => sub {
@@ -392,19 +404,18 @@ subtest 'Unindent preserves selection' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Select lines 1-2 (0-indexed: lines 0-1)
-    $editor->{view}->set_cursor(0, 4, 0);  # Start at "l" in "line1"
-    $editor->{view}->set_cursor(1, 9, 1);  # Select to end of "    line2"
+    $editor->active_view()->set_cursor(0, 4, 0);  # Start at "l" in "line1"
+    $editor->active_view()->set_cursor(1, 9, 1);  # Select to end of "    line2"
 
-    ok($editor->{view}->has_selection(), 'Selection active before unindent');
+    ok($editor->active_view()->has_selection(), 'Selection active before unindent');
 
     $editor->do_unindent();
 
-    ok($editor->{view}->has_selection(), 'Selection preserved after unindent');
-    like($editor->{document}->text(), qr/^line1\nline2\n/, 'Lines unindented');
+    ok($editor->active_view()->has_selection(), 'Selection preserved after unindent');
+    like($editor->active_doc()->text(), qr/^line1\nline2\n/, 'Lines unindented');
 };
 
 # ============================================================================
@@ -418,16 +429,15 @@ subtest 'Move line down' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Cursor on first line
-    is($editor->{view}->cursor_line(), 0, 'Start on line 0');
+    is($editor->active_view()->cursor_line(), 0, 'Start on line 0');
 
     $editor->do_move_line_down();
 
-    is($editor->{document}->text(), "bbb\naaa\nccc", 'Line moved down');
-    is($editor->{view}->cursor_line(), 1, 'Cursor follows moved line');
+    is($editor->active_doc()->text(), "bbb\naaa\nccc", 'Line moved down');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor follows moved line');
 };
 
 subtest 'Move line up' => sub {
@@ -438,17 +448,16 @@ subtest 'Move line up' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Move cursor to second line
-    $editor->{view}->move_down();
-    is($editor->{view}->cursor_line(), 1, 'Start on line 1');
+    $editor->active_view()->move_down();
+    is($editor->active_view()->cursor_line(), 1, 'Start on line 1');
 
     $editor->do_move_line_up();
 
-    is($editor->{document}->text(), "bbb\naaa\nccc", 'Line moved up');
-    is($editor->{view}->cursor_line(), 0, 'Cursor follows moved line');
+    is($editor->active_doc()->text(), "bbb\naaa\nccc", 'Line moved up');
+    is($editor->active_view()->cursor_line(), 0, 'Cursor follows moved line');
 };
 
 subtest 'Move line at boundary is no-op' => sub {
@@ -459,17 +468,16 @@ subtest 'Move line at boundary is no-op' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Try to move first line up - should be no-op
     $editor->do_move_line_up();
-    is($editor->{document}->text(), "aaa\nbbb", 'First line stays put');
+    is($editor->active_doc()->text(), "aaa\nbbb", 'First line stays put');
 
     # Move to last line, try to move down - should be no-op
-    $editor->{view}->move_down();
+    $editor->active_view()->move_down();
     $editor->do_move_line_down();
-    is($editor->{document}->text(), "aaa\nbbb", 'Last line stays put');
+    is($editor->active_doc()->text(), "aaa\nbbb", 'Last line stays put');
 };
 
 subtest 'Move multiple selected lines' => sub {
@@ -480,18 +488,17 @@ subtest 'Move multiple selected lines' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Select lines 1-2 (bbb, ccc)
-    $editor->{view}->move_down();  # Line 1
-    $editor->{view}->set_cursor(1, 0, 0);
-    $editor->{view}->set_cursor(2, 3, 1);  # Partial selection of line 2
+    $editor->active_view()->move_down();  # Line 1
+    $editor->active_view()->set_cursor(1, 0, 0);
+    $editor->active_view()->set_cursor(2, 3, 1);  # Partial selection of line 2
 
     $editor->do_move_line_down();
 
-    is($editor->{document}->text(), "aaa\nddd\nbbb\nccc", 'Selected lines moved down');
-    ok($editor->{view}->has_selection(), 'Selection preserved');
+    is($editor->active_doc()->text(), "aaa\nddd\nbbb\nccc", 'Selected lines moved down');
+    ok($editor->active_view()->has_selection(), 'Selection preserved');
 };
 
 subtest 'Duplicate line down' => sub {
@@ -502,13 +509,12 @@ subtest 'Duplicate line down' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->do_duplicate_line_down();
 
-    is($editor->{document}->text(), "aaa\naaa\nbbb", 'Line duplicated below');
-    is($editor->{view}->cursor_line(), 1, 'Cursor on new duplicate');
+    is($editor->active_doc()->text(), "aaa\naaa\nbbb", 'Line duplicated below');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
 };
 
 subtest 'Duplicate line up' => sub {
@@ -519,15 +525,14 @@ subtest 'Duplicate line up' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    $editor->{view}->move_down();  # Line 1
+    $editor->active_view()->move_down();  # Line 1
 
     $editor->do_duplicate_line_up();
 
-    is($editor->{document}->text(), "aaa\nbbb\nbbb", 'Line duplicated above');
-    is($editor->{view}->cursor_line(), 1, 'Cursor on new duplicate');
+    is($editor->active_doc()->text(), "aaa\nbbb\nbbb", 'Line duplicated above');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
 };
 
 # ============================================================================
@@ -541,21 +546,20 @@ subtest 'Copy and paste' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Select "Hello"
-    $editor->{view}->move_right(1) for (1..5);
+    $editor->active_view()->move_right(1) for (1..5);
 
     $editor->cmd_copy();
     is($editor->{clipboard}, 'Hello', 'Text copied');
 
     # Move to end
-    $editor->{view}->move_to_document_end();
-    $editor->{view}->move_to_line_end();
+    $editor->active_view()->move_to_document_end();
+    $editor->active_view()->move_to_line_end();
 
     $editor->cmd_paste();
-    is($editor->{document}->text(), 'Hello WorldHello', 'Text pasted');
+    is($editor->active_doc()->text(), 'Hello WorldHello', 'Text pasted');
 };
 
 subtest 'Copy without selection copies current line' => sub {
@@ -566,20 +570,19 @@ subtest 'Copy without selection copies current line' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Position cursor on line two, no selection
-    $editor->{view}->move_down();
-    ok(!$editor->{view}->has_selection(), 'No selection initially');
+    $editor->active_view()->move_down();
+    ok(!$editor->active_view()->has_selection(), 'No selection initially');
 
     $editor->cmd_copy();
 
     # Should have selected and copied the entire line including newline
-    ok($editor->{view}->has_selection(), 'Line is now selected');
+    ok($editor->active_view()->has_selection(), 'Line is now selected');
     is($editor->{clipboard}, "line two\n", 'Entire line copied including newline');
-    is($editor->{view}->cursor_line(), 1, 'Cursor stays on same line');
-    is($editor->{view}->cursor_col(), 8, 'Cursor at end of line');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor stays on same line');
+    is($editor->active_view()->cursor_col(), 8, 'Cursor at end of line');
 };
 
 subtest 'Cut without selection cuts current line' => sub {
@@ -590,18 +593,17 @@ subtest 'Cut without selection cuts current line' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Position cursor on line two, no selection
-    $editor->{view}->move_down();
-    ok(!$editor->{view}->has_selection(), 'No selection initially');
+    $editor->active_view()->move_down();
+    ok(!$editor->active_view()->has_selection(), 'No selection initially');
 
     $editor->cmd_cut();
 
     # Line should be cut
     is($editor->{clipboard}, "line two\n", 'Entire line cut including newline');
-    is($editor->{document}->text(), "line one\nline three", 'Line removed from document');
+    is($editor->active_doc()->text(), "line one\nline three", 'Line removed from document');
 };
 
 # ============================================================================
@@ -615,14 +617,13 @@ subtest 'Find next' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
     $editor->{search_term} = 'foo';
 
     $editor->do_find_next();
 
     # Cursor should be at end of first "foo" (with selection)
-    ok($editor->{view}->has_selection(), 'Match selected');
+    ok($editor->active_view()->has_selection(), 'Match selected');
     like($editor->{message}, qr/Found/, 'Found message');
 };
 
@@ -634,8 +635,7 @@ subtest 'Find not found' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
     $editor->{search_term} = 'xyz';
 
     $editor->do_find_next();
@@ -652,8 +652,7 @@ subtest 'Find prev with selection finds previous match' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
     $editor->{search_term} = 'foo';
 
     # Start at 0,0 - find_next searches from cursor+1
@@ -665,24 +664,24 @@ subtest 'Find prev with selection finds previous match' => sub {
     $editor->do_find_next();  # Wraps around, finds foo at col 0
 
     # Now we have "foo" at position 0 selected (wrapped around)
-    ok($editor->{view}->has_selection(), 'Foo is selected');
-    my ($sl, $sc, $el, $ec) = $editor->{view}->selection();
+    ok($editor->active_view()->has_selection(), 'Foo is selected');
+    my ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
     is($sc, 0, 'Selection at column 0 after wrap');
 
     # Find prev should find the "foo" at position 16 (searching backwards from -1, wraps)
     $editor->do_find_prev();
-    ok($editor->{view}->has_selection(), 'Previous foo is selected');
-    ($sl, $sc, $el, $ec) = $editor->{view}->selection();
+    ok($editor->active_view()->has_selection(), 'Previous foo is selected');
+    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
     is($sc, 16, 'Find prev wrapped to foo at column 16');
 
     # Find prev again should find the "foo" at position 8
     $editor->do_find_prev();
-    ($sl, $sc, $el, $ec) = $editor->{view}->selection();
+    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
     is($sc, 8, 'Find prev found foo at column 8');
 
     # Find prev again should find the "foo" at position 0
     $editor->do_find_prev();
-    ($sl, $sc, $el, $ec) = $editor->{view}->selection();
+    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
     is($sc, 0, 'Find prev found foo at column 0');
 };
 
@@ -696,31 +695,30 @@ subtest 'Mouse drag selection' => sub {
     # Content: "Hello World Test" - "World" is at columns 6-10
     my $filename = create_temp_file("Hello World Test\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
 
     # Simulate press at column 6 (start of "World")
-    # Row 3 is the first text line (after menu bar on 1 and ruler bar on 2)
+    # Row 4 is the first text line (after menu bar on 1, tab bar on 2, ruler bar on 3)
     # Terminal coordinates are 1-indexed, so x = gutter_width + col + 1
     my $x_start = $gutter_width + 6 + 1;  # gutter + col 6 + 1 for 1-indexed
-    my $press = { type => 'mouse', action => 'press', x => $x_start, y => 3, modifiers => [] };
+    my $press = { type => 'mouse', action => 'press', x => $x_start, y => 4, modifiers => [] };
     $editor->handle_mouse_event($press);
 
-    ok(!$editor->{view}->has_selection(), 'No selection after press');
-    is($editor->{view}->cursor_col(), 6, 'Cursor at column 6 after press');
+    ok(!$editor->active_view()->has_selection(), 'No selection after press');
+    is($editor->active_view()->cursor_col(), 6, 'Cursor at column 6 after press');
 
     # Simulate drag to column 11 (end of "World")
     my $x_end = $gutter_width + 11 + 1;  # gutter + col 11 + 1 for 1-indexed
-    my $drag = { type => 'mouse', action => 'drag', x => $x_end, y => 3, modifiers => [] };
+    my $drag = { type => 'mouse', action => 'drag', x => $x_end, y => 4, modifiers => [] };
     $editor->handle_mouse_event($drag);
 
-    ok($editor->{view}->has_selection(), 'Selection exists after drag');
-    my ($sl, $sc, $el, $ec) = $editor->{view}->selection();
+    ok($editor->active_view()->has_selection(), 'Selection exists after drag');
+    my ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
     is($sc, 6, 'Selection starts at column 6');
     is($ec, 11, 'Selection ends at column 11');
-    is($editor->{view}->selected_text(), 'World', 'Selected text is "World"');
+    is($editor->active_view()->selected_text(), 'World', 'Selected text is "World"');
 };
 
 # ============================================================================
@@ -734,12 +732,11 @@ subtest 'Goto line logic' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Simulate goto line 2
-    $editor->{view}->set_cursor(1, 0);  # Line 2 (0-indexed)
-    is($editor->{view}->cursor_line(), 1, 'Cursor on line 2');
+    $editor->active_view()->set_cursor(1, 0);  # Line 2 (0-indexed)
+    is($editor->active_view()->cursor_line(), 1, 'Cursor on line 2');
 };
 
 subtest 'Goto line uses footer input' => sub {
@@ -750,8 +747,7 @@ subtest 'Goto line uses footer input' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_goto_line();
 
@@ -770,15 +766,14 @@ subtest 'Goto line parses line number' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_goto_line();
     $editor->handle_input('3');
     $editor->handle_input("\r");  # Enter
 
-    is($editor->{view}->cursor_line(), 2, 'Line 3 is 0-indexed line 2');
-    is($editor->{view}->cursor_col(), 0, 'Column is 0');
+    is($editor->active_view()->cursor_line(), 2, 'Line 3 is 0-indexed line 2');
+    is($editor->active_view()->cursor_col(), 0, 'Column is 0');
 };
 
 subtest 'Goto line 0 goes to line 1' => sub {
@@ -789,18 +784,17 @@ subtest 'Goto line 0 goes to line 1' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Start on line 2
-    $editor->{view}->set_cursor(1, 3);
+    $editor->active_view()->set_cursor(1, 3);
 
     $editor->cmd_goto_line();
     $editor->handle_input('0');
     $editor->handle_input("\r");
 
-    is($editor->{view}->cursor_line(), 0, 'Line 0 input goes to first line');
-    is($editor->{view}->cursor_col(), 0, 'Column is 0');
+    is($editor->active_view()->cursor_line(), 0, 'Line 0 input goes to first line');
+    is($editor->active_view()->cursor_col(), 0, 'Column is 0');
 };
 
 subtest 'Goto line:col parses column' => sub {
@@ -811,15 +805,14 @@ subtest 'Goto line:col parses column' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_goto_line();
     $editor->handle_input('2:10');
     $editor->handle_input("\r");
 
-    is($editor->{view}->cursor_line(), 1, 'Line 2 is 0-indexed line 1');
-    is($editor->{view}->cursor_col(), 9, 'Column 10 is 0-indexed column 9');
+    is($editor->active_view()->cursor_line(), 1, 'Line 2 is 0-indexed line 1');
+    is($editor->active_view()->cursor_col(), 9, 'Column 10 is 0-indexed column 9');
 };
 
 subtest 'Goto :col jumps to column on current line' => sub {
@@ -830,18 +823,17 @@ subtest 'Goto :col jumps to column on current line' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Start on line 2 (0-indexed: 1), column 0
-    $editor->{view}->set_cursor(1, 0);
+    $editor->active_view()->set_cursor(1, 0);
 
     $editor->cmd_goto_line();
     $editor->handle_input(':15');
     $editor->handle_input("\r");
 
-    is($editor->{view}->cursor_line(), 1, 'Stays on current line');
-    is($editor->{view}->cursor_col(), 14, 'Column 15 is 0-indexed column 14');
+    is($editor->active_view()->cursor_line(), 1, 'Stays on current line');
+    is($editor->active_view()->cursor_col(), 14, 'Column 15 is 0-indexed column 14');
 };
 
 subtest 'Goto line clamps to valid range' => sub {
@@ -852,16 +844,15 @@ subtest 'Goto line clamps to valid range' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Go to line way beyond end
     $editor->cmd_goto_line();
     $editor->handle_input('999');
     $editor->handle_input("\r");
 
-    my $max_line = $editor->{document}->line_count() - 1;
-    is($editor->{view}->cursor_line(), $max_line, 'Line clamped to max');
+    my $max_line = $editor->active_doc()->line_count() - 1;
+    is($editor->active_view()->cursor_line(), $max_line, 'Line clamped to max');
 };
 
 subtest 'Goto line:col clamps column to line length' => sub {
@@ -872,15 +863,14 @@ subtest 'Goto line:col clamps column to line length' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_goto_line();
     $editor->handle_input('1:999');
     $editor->handle_input("\r");
 
-    is($editor->{view}->cursor_line(), 0, 'On line 1');
-    is($editor->{view}->cursor_col(), 5, 'Column clamped to line length (5 chars in "Short")');
+    is($editor->active_view()->cursor_line(), 0, 'On line 1');
+    is($editor->active_view()->cursor_col(), 5, 'Column clamped to line length (5 chars in "Short")');
 };
 
 # ============================================================================
@@ -894,8 +884,7 @@ subtest 'Editor does not quit on empty input' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Simulate handling empty input (what happens on timeout)
     $editor->handle_input('');
@@ -918,8 +907,7 @@ subtest 'Editor does not quit on escape sequences' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Arrow keys
     $editor->handle_input("\x1b[A");  # Up
@@ -934,6 +922,7 @@ subtest 'Editor does not quit on escape sequences' => sub {
 
     # Lone escape opens menu (new behavior)
     $editor->handle_input("\x1b");
+    $editor->flush_pending_input();
     is($editor->{state}, 'menu', 'Lone escape opens menu');
 };
 
@@ -949,8 +938,7 @@ subtest 'Only quit commands trigger quit' => sub {
             terminal => $term,
             file => $filename,
         );
-        $editor->{document} = Zepto::Document->load($filename);
-        $editor->{view} = Zepto::View->new(document => $editor->{document});
+        setup_editor_doc($editor, $filename);
 
         my $char = chr($ctrl);
         $editor->handle_input($char);
@@ -962,8 +950,7 @@ subtest 'Only quit commands trigger quit' => sub {
         terminal => $term,
         file => $filename,
     );
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->handle_input("\x11");  # Ctrl+Q
     is($editor->{state}, 'quit', 'Ctrl+Q triggers quit');
@@ -973,8 +960,7 @@ subtest 'Only quit commands trigger quit' => sub {
         terminal => $term,
         file => $filename,
     );
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->handle_input("\x17");  # Ctrl+W
     is($editor->{state}, 'quit', 'Ctrl+W triggers save and quit');
@@ -988,22 +974,21 @@ subtest 'Quit requires confirmation on dirty document' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Make document dirty
-    $editor->{document}->insert(0, 'x');
-    ok($editor->{document}->is_dirty(), 'Document is dirty');
+    $editor->active_doc()->insert(0, 'x');
+    ok($editor->active_doc()->is_dirty(), 'Document is dirty');
 
-    # First Ctrl+Q should NOT quit (just show warning)
+    # Ctrl+Q on dirty doc should show save prompt
     $editor->handle_input("\x11");
-    is($editor->{state}, 'editing', 'First Ctrl+Q on dirty doc stays editing');
-    is($editor->{quit_pending}, 1, 'Quit is pending');
-    like($editor->{message}, qr/unsaved/i, 'Warning message shown');
+    is($editor->{state}, 'prompt', 'Ctrl+Q on dirty doc shows prompt');
+    ok($editor->{prompt}, 'Prompt is set');
+    like($editor->{prompt}{text}, qr/save changes/i, 'Prompt asks about saving');
 
-    # Second Ctrl+Q should quit
-    $editor->handle_input("\x11");
-    is($editor->{state}, 'quit', 'Second Ctrl+Q quits');
+    # Pressing 'n' (No) should quit without saving
+    $editor->handle_input("n");
+    is($editor->{state}, 'quit', 'Pressing No quits');
 };
 
 # ============================================================================
@@ -1017,18 +1002,16 @@ subtest 'New file on clean document' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Document is clean, should create new immediately
     $editor->cmd_new_file();
 
-    is($editor->{document}->text(), '', 'Document is now empty');
-    is($editor->{file_path}, undef, 'File path cleared');
-    like($editor->{message}, qr/new file/i, 'New file message shown');
+    is($editor->active_doc()->text(), '', 'Document is now empty');
+    is($editor->active_file_path(), undef, 'File path cleared');
 };
 
-subtest 'New file on dirty document shows prompt' => sub {
+subtest 'New file on dirty document creates new tab' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Original\n");
     my $editor = Zepto::Editor->new(
@@ -1036,18 +1019,18 @@ subtest 'New file on dirty document shows prompt' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Make dirty
-    $editor->{document}->insert(0, 'x');
-    ok($editor->{document}->is_dirty(), 'Document is dirty');
+    $editor->active_doc()->insert(0, 'x');
+    ok($editor->active_doc()->is_dirty(), 'Document is dirty');
 
     $editor->cmd_new_file();
 
-    is($editor->{state}, 'prompt', 'Prompt state activated');
-    ok($editor->{prompt}, 'Prompt is set');
-    like($editor->{prompt}{text}, qr/unsaved/i, 'Prompt shows unsaved message');
+    # With tabs, new file creates a new tab without prompting
+    is($editor->{state}, 'editing', 'Still in editing state');
+    is($editor->active_doc()->text(), '', 'New tab document is empty');
+    is($editor->{tab_manager}->tab_count(), 2, 'Two tabs open');
 };
 
 # ============================================================================
@@ -1061,8 +1044,7 @@ subtest 'Open file on clean document shows picker' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
 
@@ -1070,7 +1052,7 @@ subtest 'Open file on clean document shows picker' => sub {
     ok($editor->{file_picker}, 'File picker is set');
 };
 
-subtest 'Open file on dirty document shows prompt first' => sub {
+subtest 'Open file on dirty document opens picker directly' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Original\n");
     my $editor = Zepto::Editor->new(
@@ -1078,16 +1060,16 @@ subtest 'Open file on dirty document shows prompt first' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Make dirty
-    $editor->{document}->insert(0, 'x');
+    $editor->active_doc()->insert(0, 'x');
 
     $editor->cmd_open_file();
 
-    is($editor->{state}, 'prompt', 'Prompt state activated first');
-    ok(!$editor->{file_picker}, 'File picker not yet opened');
+    # With tabs, open file goes straight to picker (dirty doc stays in its tab)
+    is($editor->{state}, 'file_picker', 'File picker opens directly');
+    ok($editor->{file_picker}, 'File picker is set');
 };
 
 # ============================================================================
@@ -1101,8 +1083,7 @@ subtest 'Prompt responds to key press' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Open prompt with test callback
     my $choice_made;
@@ -1132,8 +1113,7 @@ subtest 'Prompt escape cancels' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     my $choice_made = 'not_called';
     $editor->open_prompt(
@@ -1144,6 +1124,7 @@ subtest 'Prompt escape cancels' => sub {
 
     # Press escape
     $editor->handle_input("\e");
+    $editor->flush_pending_input();
 
     is($choice_made, 'not_called', 'Callback not called on escape');
     is($editor->{state}, 'editing', 'Back to editing state');
@@ -1160,8 +1141,7 @@ subtest 'File picker navigation' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
     ok($editor->{file_picker}, 'File picker opened');
@@ -1185,8 +1165,7 @@ subtest 'File picker typing filters' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
     my $initial_count = $editor->{file_picker}->filtered_count();
@@ -1207,13 +1186,13 @@ subtest 'File picker escape closes' => sub {
         file => $filename,
     );
 
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
     is($editor->{state}, 'file_picker', 'File picker open');
 
     $editor->handle_input("\e");  # Escape
+    $editor->flush_pending_input();
     is($editor->{state}, 'editing', 'Back to editing after escape');
     ok(!$editor->{file_picker}, 'File picker cleared');
 };
@@ -1245,8 +1224,7 @@ subtest 'Footer input handles typing' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     $editor->open_footer_input(prompt => 'Name:');
     is($editor->{footer_input}{value}, '', 'Value initially empty');
@@ -1267,8 +1245,7 @@ subtest 'Footer input submit calls callback' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     my $submitted;
     $editor->open_footer_input(
@@ -1287,8 +1264,7 @@ subtest 'Footer input escape cancels' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     my $cancelled = 0;
     $editor->open_footer_input(
@@ -1298,6 +1274,7 @@ subtest 'Footer input escape cancels' => sub {
 
     $editor->handle_input('partial');
     $editor->handle_input("\e");  # Escape
+    $editor->flush_pending_input();
 
     is($cancelled, 1, 'Cancel callback called');
     is($editor->{state}, 'editing', 'Back to editing after cancel');
@@ -1312,8 +1289,7 @@ subtest 'Click Open button in menu bar' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     # Render once to set up button positions
     # We need to manually trigger the rendering to populate button positions
@@ -1341,8 +1317,7 @@ subtest 'Mouse button state tracking' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Hello World\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
     is($editor->{mouse_button_down}, 0, 'Mouse button initially up');
 
@@ -1363,21 +1338,20 @@ subtest 'Drag without press is ignored' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Hello World\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
 
     # Ensure mouse button is up
     is($editor->{mouse_button_down}, 0, 'Mouse button initially up');
-    ok(!$editor->{view}->has_selection(), 'No selection initially');
+    ok(!$editor->active_view()->has_selection(), 'No selection initially');
 
     # Send drag event without press first (spurious motion)
     my $drag = { type => 'mouse', action => 'drag', x => $gutter_width + 5, y => 2, modifiers => [] };
     $editor->handle_mouse_event($drag);
 
     # Should NOT create selection
-    ok(!$editor->{view}->has_selection(), 'No selection after spurious drag');
+    ok(!$editor->active_view()->has_selection(), 'No selection after spurious drag');
 };
 
 subtest 'Drag after press creates selection' => sub {
@@ -1386,10 +1360,9 @@ subtest 'Drag after press creates selection' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Hello World\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
 
     # Press first
     my $press = { type => 'mouse', action => 'press', x => $gutter_width + 0, y => 2, modifiers => [] };
@@ -1401,7 +1374,7 @@ subtest 'Drag after press creates selection' => sub {
     $editor->handle_mouse_event($drag);
 
     # Should create selection
-    ok($editor->{view}->has_selection(), 'Selection created after proper press+drag');
+    ok($editor->active_view()->has_selection(), 'Selection created after proper press+drag');
 };
 
 # ============================================================================
@@ -1415,21 +1388,20 @@ subtest 'Mouse click accounts for tab display width' => sub {
     # With tab width 4: 'a' displays at col 0, tab expands to cols 1-3, 'b' at col 4
     my $filename = create_temp_file("a\tb\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
 
     # Click at display column 4 (where 'b' visually appears)
     # Terminal coordinates are 1-indexed, so x = gutter_width + display_col + 1
-    # Row 3 is the first text line (after menu bar on 1 and ruler bar on 2)
+    # Row 4 is the first text line (after menu bar on 1, tab bar on 2, ruler bar on 3)
     my $display_col = 4;  # Where 'b' appears visually
     my $x = $gutter_width + $display_col + 1;
-    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 4, modifiers => [] };
     $editor->handle_mouse_event($press);
 
     # Cursor should be at document column 2 (after 'a' and tab), not display column 4
-    is($editor->{view}->cursor_col(), 2, 'Cursor at doc column 2 (after a and tab), not display column 4');
+    is($editor->active_view()->cursor_col(), 2, 'Cursor at doc column 2 (after a and tab), not display column 4');
 };
 
 subtest 'Mouse click in middle of tab jumps to tab position' => sub {
@@ -1439,19 +1411,18 @@ subtest 'Mouse click in middle of tab jumps to tab position' => sub {
     # Content: "a\tb" - clicking in the middle of the tab's visual space
     my $filename = create_temp_file("a\tb\n");
     my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    $editor->{document} = Zepto::Document->load($filename);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
+    setup_editor_doc($editor, $filename);
 
-    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->{document}->line_count());
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
 
     # Click at display column 2 (in the middle of the tab's visual space, columns 1-3)
     my $display_col = 2;
     my $x = $gutter_width + $display_col + 1;
-    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 4, modifiers => [] };
     $editor->handle_mouse_event($press);
 
     # Cursor should be at document column 1 (the tab character position)
-    is($editor->{view}->cursor_col(), 1, 'Clicking in tab space positions cursor at tab character');
+    is($editor->active_view()->cursor_col(), 1, 'Clicking in tab space positions cursor at tab character');
 };
 
 done_testing();

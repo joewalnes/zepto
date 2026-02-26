@@ -86,7 +86,7 @@ our %MENU_ITEMS = (
         { label => 'Open',        shortcut => 'Ctrl+O', action => 'open' },
         { separator => 1 },
         { label => 'Save',        shortcut => 'Ctrl+S', action => 'save' },
-        { label => 'Save & Quit', shortcut => 'Ctrl+W', action => 'save_quit' },
+        { label => 'Close Tab', shortcut => 'Ctrl+W', action => 'close_tab' },
         { separator => 1 },
         { label => 'Quit',        shortcut => 'Ctrl+Q', action => 'quit' },
     ],
@@ -113,6 +113,9 @@ our %MENU_ITEMS = (
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
         { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
         { label => 'Minimap',      shortcut => 'Alt+M',  action => 'toggle_minimap', toggle => 'show_minimap' },
+        { separator => 1 },
+        { label => 'Next Tab',       shortcut => 'Alt+.',     action => 'next_tab' },
+        { label => 'Prev Tab',       shortcut => 'Alt+,',     action => 'prev_tab' },
         { separator => 1 },
         { label => 'Toggle Diff',    shortcut => 'Alt+D',   action => 'toggle_diff' },
         { separator => 1 },
@@ -258,6 +261,14 @@ sub get_menu_positions {
     sub get_menu_bar_buttons { return @{$_menu_bar_buttons}; }
 }
 
+# Store and retrieve tab bar button positions for click handling
+# Each entry: { start => $x, end => $x, index => $tab_idx, type => 'tab'|'close' }
+{
+    my $_tab_bar_buttons = [];
+    sub _set_tab_bar_buttons { shift; $_tab_bar_buttons = shift; }
+    sub get_tab_bar_buttons { return @{$_tab_bar_buttons}; }
+}
+
 # Move cursor to row, col (1-indexed)
 sub _move_to {
     my ($row, $col) = @_;
@@ -318,9 +329,10 @@ sub render {
 
     # Calculate layout
     my $menu_height = 1;
+    my $tab_height = 1;
     my $ruler_height = 1;
     my $status_height = 1;
-    my $text_height = $rows - $menu_height - $ruler_height - $status_height;
+    my $text_height = $rows - $menu_height - $tab_height - $ruler_height - $status_height;
     $text_height = 1 if $text_height < 1;
 
     # Calculate gutter width based on line count
@@ -345,8 +357,12 @@ sub render {
     $output .= _move_to(1, 1);
     $output .= $class->_render_menu_bar($theme, $cols, $ui);
 
-    # Render ruler bar (row 2)
+    # Render tab bar (row 2)
     $output .= _move_to(2, 1);
+    $output .= $class->_render_tab_bar($theme, $cols, $ui);
+
+    # Render ruler bar (row 3)
+    $output .= _move_to(3, 1);
     $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc);
 
     # Render text area or file picker
@@ -356,7 +372,7 @@ sub render {
             $theme, $ui->{file_picker}, $text_height, $cols
         );
     } else {
-        # Normal text area with line numbers (rows 2 to 2+text_height-1)
+        # Normal text area with line numbers (rows 4 to 4+text_height-1)
         $output .= $class->_render_text_area(
             $doc, $view, $theme,
             $text_height, $text_width, $gutter_width, $highlighter,
@@ -425,7 +441,7 @@ sub render {
         # Position cursor in file picker search input
         my $picker = $ui->{file_picker};
         my $query_len = length($picker->query() // '');
-        $output .= _move_to(3, 4 + $query_len);  # Row 3, after "> "
+        $output .= _move_to(4, 4 + $query_len);  # Row 4, after "> "
         $output .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
@@ -631,6 +647,356 @@ sub _render_menu_bar {
     $output .= CLEAR_LINE;
 
     return $output;
+}
+
+# Render the tab bar showing open file tabs
+sub _render_tab_bar {
+    my ($class, $theme, $cols, $ui) = @_;
+
+    my $output = '';
+    my $tabs = $ui->{tabs} // [];
+    my $active_idx = $ui->{active_tab_index} // 0;
+    my $tab_manager = $ui->{tab_manager};
+
+    # Geometric triangle edges for tab shape:
+    # ◢ (U+25E2) lower-right triangle: fg fills lower-right → left edge of tab
+    # ◣ (U+25E3) lower-left triangle: fg fills lower-left → right edge of tab
+    my $TAB_LEFT  = "\x{25e2}";  # ◢
+    my $TAB_RIGHT = "\x{25e3}";  # ◣
+    my $close_char = "\x{00d7}";  # × (multiplication sign, reliable single-width)
+    my $modified_char = "\x{25cf}";  # ● (filled circle)
+
+    my $LEADING_SPACE = 1;
+
+    # --- Pre-calculate per-tab widths with full names ---
+    my @tab_info;
+    my $total_width = $LEADING_SPACE;
+    for my $i (0 .. $#$tabs) {
+        my $tab = $tabs->[$i];
+        my $name = $tab->{display_name} // '[untitled]';
+        my $is_dirty = $tab->{is_dirty} // 0;
+        my $has_vcs_changes = $tab->{has_vcs_changes} // 0;
+        my $width = _calc_tab_pill_width($name, $is_dirty, $i);
+        $total_width += $width;
+        push @tab_info, {
+            tab             => $tab,
+            orig_name       => $name,
+            name            => $name,
+            is_dirty        => $is_dirty,
+            has_vcs_changes => $has_vcs_changes,
+            width           => $width,
+            index           => $i,
+        };
+    }
+
+    # --- Handle overflow ---
+    my $first_visible = 0;
+    my $last_visible = $#tab_info;
+    my $show_left_arrow = 0;
+    my $show_right_arrow = 0;
+
+    if ($total_width > $cols && @tab_info > 1) {
+        # Phase 1: Try progressive name truncation
+        _truncate_tab_names(\@tab_info, $cols - $LEADING_SPACE);
+
+        $total_width = $LEADING_SPACE;
+        $total_width += $_->{width} for @tab_info;
+    }
+
+    if ($total_width > $cols && @tab_info > 1) {
+        # Phase 2: Scroll-based subset rendering
+        my $left_arrow_width = 2;
+        my $right_arrow_width = 2;
+
+        ($first_visible, $last_visible) = _calc_visible_tab_range(
+            \@tab_info, $active_idx, $cols - $LEADING_SPACE,
+            $left_arrow_width, $right_arrow_width,
+        );
+
+        $show_left_arrow = ($first_visible > 0);
+        $show_right_arrow = ($last_visible < $#tab_info);
+
+        if ($tab_manager) {
+            $tab_manager->set_tab_scroll_offset($first_visible);
+        }
+    }
+
+    # --- Render tab bar ---
+    my $bar_bg = $theme->color('tab_bar_bg');
+
+    # Baseline underline runs across entire row, except under active tab body.
+    # SGR 58 sets underline color independently of fg.
+    my $ul_color = $theme->color('tab_baseline_ul');
+    my $UL_ON  = "\e[4m" . $ul_color;
+    my $UL_OFF = "\e[24m";
+
+    # Start row with underline enabled
+    $output .= $bar_bg . $UL_ON;
+
+    my $x = 0;
+    my @buttons;
+
+    # Leading space (underlined)
+    $output .= ' ';
+    $x++;
+
+    # Left scroll indicator (clickable, underlined)
+    if ($show_left_arrow) {
+        my $arrow = Zepto::Chars->enabled() ? "\x{25c2}" : '<';  # ◂ or <
+        my $arrow_start_x = $x;
+        $output .= $theme->color('tab_inactive_fg') . $arrow . ' ';
+        $x += 2;
+        push @buttons, {
+            start => $arrow_start_x,
+            end   => $x - 1,
+            index => 0,
+            type  => 'scroll_left',
+        };
+    }
+
+    for my $vi ($first_visible .. $last_visible) {
+        my $info = $tab_info[$vi];
+        my $i = $info->{index};
+        my $is_active = ($i == $active_idx);
+
+        my $name = $info->{name};
+        my $is_dirty = $info->{is_dirty};
+        my $has_vcs_changes = $info->{has_vcs_changes};
+
+        my $tab_start_x = $x;
+
+        my $tab_bg = $is_active
+            ? $theme->color('tab_active_bg')
+            : $theme->color('tab_inactive_bg');
+        my $edge_fg = $is_active
+            ? $theme->color('tab_active_edge')
+            : $theme->color('tab_inactive_edge');
+
+        # Left triangle edge ◢ — underlined (part of bar territory)
+        $output .= $bar_bg . $edge_fg . $TAB_LEFT;
+        $x++;
+
+        # Tab interior
+        my $name_color;
+        if ($is_active) {
+            $name_color = $theme->color('tab_active_fg');
+        } else {
+            $name_color = $has_vcs_changes
+                ? $theme->color('tab_vcs_fg')
+                : $theme->color('tab_inactive_fg');
+        }
+
+        # Active tab body: no underline (opens into ruler below)
+        # Inactive tab body: underline continues (baseline runs through)
+        if ($is_active) {
+            $output .= $UL_OFF . $tab_bg . $name_color;
+        } else {
+            $output .= $tab_bg . $name_color;
+        }
+
+        # Space + name
+        $output .= " $name";
+        $x += 1 + length($name);
+
+        # Dirty indicator
+        if ($is_dirty) {
+            $output .= ' ';
+            $output .= $theme->color('tab_modified_fg');
+            $output .= $modified_char;
+            $output .= $name_color;
+            $x += 2;
+        }
+
+        # Shortcut hint for tabs 1-9 (⌥N = Alt+N to switch)
+        if ($i < 9) {
+            $output .= ' ';
+            $output .= $theme->color('tab_shortcut_fg');
+            my $hint = "\x{2325}" . ($i + 1);  # ⌥N
+            $output .= $hint;
+            $output .= $name_color;
+            $x += 1 + length($hint);
+        }
+
+        # Close button
+        $output .= ' ';
+        my $close_start_x = $x;
+        $output .= $theme->color('tab_close_fg');
+        $output .= $close_char;
+        $x += 2;
+
+        push @buttons, {
+            start => $close_start_x,
+            end   => $x - 1,
+            index => $i,
+            type  => 'close',
+        };
+
+        # Right triangle edge ◣ — re-enable underline (back to bar territory)
+        if ($is_active) {
+            $output .= $UL_ON;
+        }
+        $output .= $bar_bg . $edge_fg . $TAB_RIGHT;
+        $x++;
+
+        push @buttons, {
+            start => $tab_start_x,
+            end   => $x - 1,
+            index => $i,
+            type  => 'tab',
+        };
+
+        # Gap between tabs (underlined)
+        if ($vi < $last_visible) {
+            $output .= $bar_bg . ' ';
+            $x++;
+        }
+    }
+
+    # Right scroll indicator (clickable, underlined)
+    if ($show_right_arrow) {
+        my $arrow = Zepto::Chars->enabled() ? "\x{25b8}" : '>';  # ▸ or >
+        my $arrow_start_x = $x;
+        $output .= $bar_bg . ' ' . $theme->color('tab_inactive_fg') . $arrow;
+        $x += 2;
+        push @buttons, {
+            start => $arrow_start_x,
+            end   => $x - 1,
+            index => 0,
+            type  => 'scroll_right',
+        };
+    }
+
+    # Fill remaining space with bar bg (underlined)
+    my $remaining = $cols - $x;
+    if ($remaining > 0) {
+        $output .= $bar_bg;
+        $output .= ' ' x $remaining;
+    }
+    $output .= $UL_OFF . RESET;
+
+    $class->_set_tab_bar_buttons(\@buttons);
+
+    return $output;
+}
+
+# Calculate the display width of a tab pill (not counting inter-tab gap)
+# Width = left_tri(1) + " name" + [" ●"(2)] + [" ⌥N"(3)] + " ×"(2) + right_tri(1) + gap(1)
+sub _calc_tab_pill_width {
+    my ($name, $is_dirty, $tab_index) = @_;
+    my $w = 1 + 1 + length($name) + 2 + 1 + 1;  # left_tri + space + name + " ×" + right_tri + gap
+    $w += 2 if $is_dirty;            # space + ●
+    $w += 3 if $tab_index < 9;       # space + ⌥N (2 chars)
+    return $w;
+}
+
+# Truncate tab names to fit within available width.
+# Preserves file extension, truncates stem with "…".
+sub _truncate_tab_names {
+    my ($tab_info, $avail) = @_;
+
+    my $ELLIPSIS = "\x{2026}";  # …
+    my $MIN_STEM = 4;           # Minimum stem chars before ellipsis
+
+    # Calculate current total
+    my $total = 0;
+    $total += $_->{width} for @$tab_info;
+    return if $total <= $avail;
+
+    # Sort indices by name length descending (truncate longest first)
+    my @by_len = sort { length($b->{name}) <=> length($a->{name}) } @$tab_info;
+
+    for my $pass (1 .. 20) {  # Safety limit
+        last if $total <= $avail;
+
+        # Find the current longest name length
+        my $max_len = length($by_len[0]->{name});
+        last if $max_len <= $MIN_STEM + 1;  # Can't truncate further
+
+        # Target: truncate to one less than current max, or to fit
+        my $excess = $total - $avail;
+        my $target_len = $max_len - 1;
+
+        for my $info (@by_len) {
+            last if $total <= $avail;
+            my $cur_len = length($info->{name});
+            next if $cur_len <= $target_len;
+
+            my $orig = $info->{orig_name};
+            my ($stem, $ext) = $orig =~ /^(.+?)(\.[^.]+)$/ ? ($1, $2) : ($orig, '');
+
+            my $max_name_len = $target_len;
+            $max_name_len = $MIN_STEM + length($ELLIPSIS) + length($ext)
+                if $max_name_len < $MIN_STEM + length($ELLIPSIS) + length($ext);
+
+            my $new_name;
+            if (length($orig) <= $max_name_len) {
+                $new_name = $orig;
+            } else {
+                my $stem_budget = $max_name_len - length($ELLIPSIS) - length($ext);
+                $stem_budget = $MIN_STEM if $stem_budget < $MIN_STEM;
+                $new_name = substr($stem, 0, $stem_budget) . $ELLIPSIS . $ext;
+            }
+
+            my $old_width = $info->{width};
+            $info->{name} = $new_name;
+            $info->{width} = _calc_tab_pill_width($new_name, $info->{is_dirty}, $info->{index});
+            $total -= ($old_width - $info->{width});
+        }
+
+        # Re-sort by name length
+        @by_len = sort { length($b->{name}) <=> length($a->{name}) } @$tab_info;
+    }
+}
+
+# Determine visible tab range when scrolling is needed.
+# Returns ($first_visible, $last_visible) indices.
+sub _calc_visible_tab_range {
+    my ($tab_info, $active_idx, $avail, $left_arrow_w, $right_arrow_w) = @_;
+
+    my $count = scalar @$tab_info;
+    return (0, $count - 1) if $count <= 1;
+
+    # Start by trying to center the active tab
+    # Expand outward from active tab, fitting as many tabs as possible
+    my $first = $active_idx;
+    my $last = $active_idx;
+    my $used = $tab_info->[$active_idx]{width};
+
+    # Reserve space for arrows
+    my $left_reserve = ($first > 0) ? $left_arrow_w : 0;
+    my $right_reserve = ($last < $count - 1) ? $right_arrow_w : 0;
+
+    # Expand alternating left and right
+    my $expanded = 1;
+    while ($expanded) {
+        $expanded = 0;
+
+        # Try expanding right
+        if ($last < $count - 1) {
+            my $new_right_reserve = ($last + 1 < $count - 1) ? $right_arrow_w : 0;
+            my $needed = $used + $tab_info->[$last + 1]{width} + $left_reserve + $new_right_reserve;
+            if ($needed <= $avail) {
+                $last++;
+                $used += $tab_info->[$last]{width};
+                $right_reserve = $new_right_reserve;
+                $expanded = 1;
+            }
+        }
+
+        # Try expanding left
+        if ($first > 0) {
+            my $new_left_reserve = ($first - 1 > 0) ? $left_arrow_w : 0;
+            my $needed = $used + $tab_info->[$first - 1]{width} + $new_left_reserve + $right_reserve;
+            if ($needed <= $avail) {
+                $first--;
+                $used += $tab_info->[$first]{width};
+                $left_reserve = $new_left_reserve;
+                $expanded = 1;
+            }
+        }
+    }
+
+    return ($first, $last);
 }
 
 # Render the ruler bar showing column positions
@@ -878,8 +1244,8 @@ sub _render_text_area {
     for my $screen_row (0 .. $height - 1) {
         my $entry = $entries[$screen_row];
 
-        # Position cursor at start of this row (row 3 is first text row, after menu and ruler)
-        $output .= _move_to($screen_row + 3, 1);
+        # Position cursor at start of this row (row 4 is first text row, after menu, tabs, and ruler)
+        $output .= _move_to($screen_row + 4, 1);
 
         # Handle old-line entries (expanded hunk base content)
         if ($entry && $entry->{type} eq 'old') {
@@ -1677,14 +2043,14 @@ sub _render_status_bar {
         return $output;
     }
 
-    # Get file info
-    my $filename = $doc ? $doc->filename() : '[No file]';
+    # Get file info — show relative path (tab bar shows filename, status bar shows path)
+    my $display_path = $doc ? ($doc->path() // $doc->filename()) : '[No file]';
     my $is_dirty = $doc && $doc->is_dirty();
     my $modified_icon = $is_dirty ? ' ' . Zepto::Chars->get('modified') : '';
 
-    # Build left segment: filename with optional modified indicator
-    my $file_text = " $filename$modified_icon ";
-    my $file_width = length($filename) + 2;
+    # Build left segment: path with optional modified indicator
+    my $file_text = " $display_path$modified_icon ";
+    my $file_width = length($display_path) + 2;
     $file_width += 2 if $is_dirty;  # For modified icon + space
 
     # Build right segment: contextual hint (dimmed)
@@ -1703,7 +2069,7 @@ sub _render_status_bar {
     # Render: [file segment][arrow][middle fill][hint]
     # File segment
     $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
-    $output .= " $filename";
+    $output .= " $display_path";
     if ($is_dirty) {
         $output .= $theme->color('status_modified_fg');
         $output .= " " . Zepto::Chars->get('modified');
@@ -1770,7 +2136,7 @@ sub _render_dropdown {
     my $box_v = Zepto::Chars->get('box_v');
     my $arrow_r = Zepto::Chars->get('arrow_right');
 
-    # Top border (row 2, overlays ruler bar)
+    # Top border (row 2, overlays tab bar — directly below menu bar)
     $output .= _move_to(2, $menu_x);
     $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
     $output .= $box_tl . ($box_h x ($menu_width - 2)) . $box_tr;
@@ -1955,10 +2321,10 @@ sub _cursor_screen_pos {
     if ($lm && $lm->has_expanded_hunks()) {
         my $cursor_display = $lm->doc_line_to_display($cursor_line);
         my $scroll_display = $lm->scroll_display_start($scroll_line);
-        $screen_row = $cursor_display - $scroll_display + $menu_height + 2;
+        $screen_row = $cursor_display - $scroll_display + $menu_height + 3;
     } else {
-        # +2 for menu bar and ruler bar
-        $screen_row = $cursor_line - $scroll_line + $menu_height + 2;
+        # +3 for menu bar, tab bar, and ruler bar
+        $screen_row = $cursor_line - $scroll_line + $menu_height + 3;
     }
     my $screen_col = $visual_cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
 
@@ -2518,8 +2884,8 @@ sub _render_file_picker {
     my $total = $picker->total_files();
     my $filtered_count = $picker->filtered_count();
 
-    # Row 3: Search input (after menu and ruler)
-    $output .= _move_to(3, 1);
+    # Row 4: Search input (after menu, tabs, and ruler)
+    $output .= _move_to(4, 1);
     $output .= $theme->color('dialog_bg');
     $output .= $theme->color('dialog_fg');
     $output .= ' > ';
@@ -2533,17 +2899,17 @@ sub _render_file_picker {
     $output .= CLEAR_LINE;
 
     # Separator line
-    $output .= _move_to(4, 1);
+    $output .= _move_to(5, 1);
     $output .= $theme->color('dialog_border');
     $output .= Zepto::Chars->get('box_h') x $cols;
     $output .= RESET;
 
-    # File list (rows 5+ to text_height)
+    # File list (rows 6+ to text_height)
     my $list_height = $text_height - 2;  # -2 for search row and separator
     $list_height = 1 if $list_height < 1;
 
     for my $i (0 .. $list_height - 1) {
-        my $row = 5 + $i;
+        my $row = 6 + $i;
         my $file_idx = $scroll + $i;
 
         $output .= _move_to($row, 1);

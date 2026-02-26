@@ -11,6 +11,7 @@ use Zepto::Terminal;
 use Zepto::Document;
 use Zepto::View;
 use Zepto::FindEngine;
+use Zepto::Highlighter;
 
 # Create a mock terminal for testing
 sub mock_terminal {
@@ -24,12 +25,17 @@ sub create_editor_with_content {
     my ($content) = @_;
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
-    $editor->{document} = Zepto::Document->new();
-    $editor->{document}->insert(0, $content);
-    $editor->{view} = Zepto::View->new(document => $editor->{document});
-    # Create find engine for async search
-    $editor->{find_engine} = Zepto::FindEngine->new(
-        document => $editor->{document},
+    my $doc = Zepto::Document->new();
+    $doc->insert(0, $content);
+    my $view = Zepto::View->new(document => $doc);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document    => $doc,
+        view        => $view,
+        find_engine => $find_engine,
+        highlighter => $highlighter,
+        file_path   => undef,
     );
     return $editor;
 }
@@ -245,7 +251,7 @@ subtest 'Navigate with no matches' => sub {
 # ============================================================================
 subtest 'Find nearest match to cursor' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
-    $editor->{view}->set_cursor(0, 10);  # Position near second "foo"
+    $editor->active_view()->set_cursor(0, 10);  # Position near second "foo"
     $editor->enter_find_mode();
     $editor->{find_input} = 'foo';
     $editor->_update_find_matches();
@@ -304,7 +310,7 @@ subtest 'Replace current match' => sub {
 
     $editor->_replace_current();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     like($text, qr/^XXX bar/, 'First foo replaced with XXX');
     is(scalar @{$editor->{find_matches}}, 2, 'Now two matches');
 };
@@ -320,7 +326,7 @@ subtest 'Replace all matches' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "YYY bar YYY baz YYY\n", 'All foo replaced with YYY');
     is(scalar @{$editor->{find_matches}}, 0, 'No matches after replace all');
 };
@@ -334,7 +340,7 @@ subtest 'Replace with empty string' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, " bar \n", 'All foo deleted (replaced with empty)');
 };
 
@@ -347,7 +353,7 @@ subtest 'Replace preserves case with regex' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "The cog sog on the mog.\n", 'All "at" replaced with "og"');
 };
 
@@ -419,7 +425,7 @@ subtest 'Find searches new document after loading different file' => sub {
 # ============================================================================
 subtest 'Count capture groups in regex patterns' => sub {
     my $editor = create_editor_with_content("test\n");
-    my $engine = $editor->{find_engine};
+    my $engine = $editor->active_find_engine();
     $engine->{use_regex} = 1;
 
     is($engine->_count_capture_groups('foo'), 0, 'No groups');
@@ -441,7 +447,7 @@ subtest 'Count capture groups in regex patterns' => sub {
 
 subtest 'capture_group_count respects regex mode' => sub {
     my $editor = create_editor_with_content("test\n");
-    my $engine = $editor->{find_engine};
+    my $engine = $editor->active_find_engine();
 
     # Non-regex mode always returns 0
     $engine->{use_regex} = 0;
@@ -465,7 +471,7 @@ subtest 'capture_group_count respects regex mode' => sub {
 # ============================================================================
 subtest 'Expand replacement with capture references' => sub {
     my $editor = create_editor_with_content("test\n");
-    my $engine = $editor->{find_engine};
+    my $engine = $editor->active_find_engine();
 
     # $0 = full match
     is($engine->_expand_replacement('[$0]', 'hello', []),
@@ -528,7 +534,7 @@ subtest 'Replace current with capture groups' => sub {
 
     $editor->_replace_current();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     like($text, qr/Smith, John/, 'First match replaced with swapped captures');
     like($text, qr/Jane Doe/, 'Second match not yet replaced');
 };
@@ -543,7 +549,7 @@ subtest 'Replace all with capture groups' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "Smith, John\nDoe, Jane\n", 'All matches replaced with swapped captures');
 };
 
@@ -557,7 +563,7 @@ subtest 'Replace with $0 (full match reference)' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "[foo] [bar] [baz]\n", 'Each word wrapped in brackets via \$0');
 };
 
@@ -571,7 +577,7 @@ subtest 'Literal mode ignores capture references' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "\$1 bar \$1\n", 'Literal mode leaves $1 as literal text');
 };
 
@@ -585,13 +591,13 @@ subtest 'Dollar sign escape in replacement' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     is($text, "\$100\n", '\$\$ produces literal \$ in output');
 };
 
 subtest 'Preview line with capture expansion' => sub {
     my $editor = create_editor_with_content("John Smith\n");
-    my $engine = $editor->{find_engine};
+    my $engine = $editor->active_find_engine();
 
     $engine->search('(\w+) (\w+)', 0, 1,
         use_regex => 1,
@@ -618,14 +624,14 @@ subtest 'Replace all with captures on many matches' => sub {
 
     $editor->_replace_all();
 
-    my $text = $editor->{document}->text();
+    my $text = $editor->active_doc()->text();
     my $expected = join("\n", map { "thing[$_]" } 1..5) . "\n";
     is($text, $expected, 'All items renumbered with capture groups');
 };
 
 subtest 'Extract capture positions for highlighting' => sub {
     my $editor = create_editor_with_content("John Smith\n");
-    my $engine = $editor->{find_engine};
+    my $engine = $editor->active_find_engine();
 
     $engine->search('(\w+) (\w+)', 0, 1,
         use_regex => 1,

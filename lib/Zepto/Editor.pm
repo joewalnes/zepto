@@ -36,6 +36,7 @@ use Zepto::FilePicker;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
 use Zepto::LineMap;
+use Zepto::Editor::TabManager;
 
 # Editor states
 use constant {
@@ -57,7 +58,7 @@ use Zepto::Editor::Menu;
 use constant {
     INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
     MESSAGE_DISPLAY_SEC => 3,     # Seconds to show status messages
-    RESERVED_ROWS       => 3,     # Rows for menu bar + ruler bar + status bar
+    RESERVED_ROWS       => 4,     # Rows for menu bar + tab bar + ruler bar + status bar
 };
 
 sub new {
@@ -65,13 +66,11 @@ sub new {
 
     my $self = bless {
         # Core components
-        document    => undef,
-        view        => undef,
+        tab_manager => Zepto::Editor::TabManager->new(),
         terminal    => $opts{terminal} // Zepto::Terminal->new(),
         parser      => Zepto::InputParser->new(),
         prefs       => $opts{prefs} // Zepto::Preferences->new(),
         theme       => undef,
-        highlighter => Zepto::Highlighter->new(),
 
         # UI state
         state        => STATE_EDITING,
@@ -87,7 +86,6 @@ sub new {
         last_search_pos => 0,
 
         # Incremental find state
-        find_engine       => undef,   # FindEngine for async search
         find_input        => '',      # Current search input
         find_input_cursor => 0,       # Cursor position in input
         find_current      => 0,       # Index of current match (0-based)
@@ -110,8 +108,9 @@ sub new {
         # Mouse button state for reliable drag detection
         mouse_button_down => 0,
 
-        # File path from command line
-        file_path    => $opts{file},
+        # Initial file paths from command line (supports both 'file' and 'files')
+        initial_file  => $opts{file},  # backward compat for tests
+        initial_files => $opts{files} // ($opts{file} ? [$opts{file}] : []),
 
         # Prompt state (for status bar prompts)
         prompt       => undef,
@@ -129,6 +128,55 @@ sub new {
     return $self;
 }
 
+# --- Tab accessor convenience methods ---
+sub active_doc        { $_[0]->{tab_manager}->active_doc() }
+sub active_view       { $_[0]->{tab_manager}->active_view() }
+sub active_find_engine { $_[0]->{tab_manager}->active_find_engine() }
+sub active_highlighter { $_[0]->{tab_manager}->active_highlighter() }
+sub active_file_path  { $_[0]->{tab_manager}->active_file_path() }
+sub active_tab        { $_[0]->{tab_manager}->active_tab() }
+
+sub _create_document_state {
+    my ($self, $file_path) = @_;
+
+    my $doc;
+    if ($file_path && -f $file_path) {
+        $doc = Zepto::Document->load($file_path);
+    } else {
+        $doc = Zepto::Document->new(
+            path => $file_path,
+        );
+    }
+
+    my $highlighter = Zepto::Highlighter->new();
+    $highlighter->set_file($file_path);
+
+    # Shebang detection
+    if (!$highlighter->has_grammar && $doc->line_count() > 0) {
+        my $first_line = $doc->get_line_content(0);
+        $highlighter->detect_from_shebang($first_line);
+    }
+
+    my ($rows, $cols) = $self->{terminal}->get_size();
+    my $line_count = $doc->line_count();
+    my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
+    my $text_width = $cols - $gutter_width;
+    $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
+
+    my $view = Zepto::View->new(
+        document => $doc,
+        viewport_rows => $rows - RESERVED_ROWS,
+        viewport_cols => $text_width,
+    );
+
+    my $find_engine = Zepto::FindEngine->new(
+        document => $doc,
+    );
+
+    return ($doc, $view, $find_engine, $highlighter);
+}
+
+
 # =============================================================================
 # Initialization
 # =============================================================================
@@ -141,12 +189,12 @@ sub init {
     # Set process name (shows in ps/top)
     $0 = 'zepto';
 
-    # Set cursor color and shape BEFORE raw mode (raw mode may interfere)
+    # Set cursor color and shape BEFORE raw mode
     my $cursor_color = $self->{theme}->color('cursor_color');
     if ($cursor_color) {
-        print STDOUT "\x1b]12;${cursor_color}\x1b\\";  # OSC 12 - cursor color
+        print STDOUT "\x1b]12;${cursor_color}\x1b\\";
     }
-    print STDOUT "\x1b[5 q";  # DECSCUSR 5 - blinking bar cursor
+    print STDOUT "\x1b[5 q";
     STDOUT->flush();
 
     # Setup terminal
@@ -161,52 +209,38 @@ sub init {
         $self->render();
     };
 
-    # Load or create document
-    if ($self->{file_path} && -f $self->{file_path}) {
-        $self->{document} = Zepto::Document->load($self->{file_path});
-        $self->show_message("Loaded: " . $self->{file_path});
-    }
-    else {
-        $self->{document} = Zepto::Document->new(
-            path => $self->{file_path},
-        );
-        if ($self->{file_path}) {
-            $self->show_message("New file: " . $self->{file_path});
+    # Create tabs from initial files (or one empty tab if none specified)
+    my @files = @{$self->{initial_files}};
+    if (@files) {
+        for my $file_path (@files) {
+            my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state($file_path);
+            $self->{tab_manager}->add_tab(
+                document    => $doc,
+                view        => $view,
+                find_engine => $find_engine,
+                highlighter => $highlighter,
+                file_path   => $file_path,
+            );
         }
-    }
-
-    # Initialize syntax highlighting for the file
-    $self->{highlighter}->set_file($self->{file_path});
-
-    # If no grammar detected from extension, try shebang detection
-    if (!$self->{highlighter}->has_grammar && $self->{document}->line_count() > 0) {
-        my $first_line = $self->{document}->get_line_content(0);
-        $self->{highlighter}->detect_from_shebang($first_line);
+        # Activate the first tab
+        $self->{tab_manager}->set_active(0);
+    } else {
+        # No files specified — open one empty tab
+        my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state(undef);
+        $self->{tab_manager}->add_tab(
+            document    => $doc,
+            view        => $view,
+            find_engine => $find_engine,
+            highlighter => $highlighter,
+        );
     }
 
     # Set terminal title
     $self->update_title();
 
-    # Create view - account for gutter width in text area
-    my ($rows, $cols) = $term->get_size();
-    my $line_count = $self->{document}->line_count();
-    my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
-    my $text_width = $cols - $gutter_width;
-    $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
-
-    $self->{view} = Zepto::View->new(
-        document => $self->{document},
-        viewport_rows => $rows - RESERVED_ROWS,
-        viewport_cols => $text_width,
-    );
-
-    # Create find engine for async search
-    $self->{find_engine} = Zepto::FindEngine->new(
-        document => $self->{document},
-    );
-
     return $self;
 }
+
 
 # =============================================================================
 # Main Loop
@@ -225,7 +259,7 @@ sub run {
 
         while ($self->{state} ne STATE_QUIT) {
             # Use shorter timeout when background search is active
-            my $searching = $self->{find_engine} && $self->{find_engine}->is_searching;
+            my $searching = $self->active_find_engine() && $self->active_find_engine()->is_searching;
             my $timeout = $searching ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
 
             # Read input with timeout
@@ -244,11 +278,18 @@ sub run {
                 $needs_render = 1;
                 $last_search_render = 0;  # Reset throttle on user input
             }
+            else {
+                # Timeout with no input — flush pending escape sequences
+                # (ESC alone becomes Escape key; ESC+char within timeout is Alt+char)
+                if ($self->flush_pending_input()) {
+                    $needs_render = 1;
+                }
+            }
 
             # Continue background search if active
             if ($searching) {
                 my $term = $self->{terminal};
-                my $engine = $self->{find_engine};
+                my $engine = $self->active_find_engine();
 
                 # Run ticks aggressively until input available or time limit
                 my $batch_start = time();
@@ -306,18 +347,18 @@ sub _print_crash_report {
     }
 
     # Gather context
-    my $file = $self->{file_path} // '[no file]';
+    my $file = $self->active_file_path() // '[no file]';
     my $state = $self->{state} // 'unknown';
     my $cursor_info = '';
-    if ($self->{view}) {
-        my $line = $self->{view}->cursor_line() + 1;
-        my $col = $self->{view}->cursor_col() + 1;
+    if ($self->active_view()) {
+        my $line = $self->active_view()->cursor_line() + 1;
+        my $col = $self->active_view()->cursor_col() + 1;
         $cursor_info = "Cursor: line $line, col $col";
     }
     my $doc_info = '';
-    if ($self->{document}) {
-        my $lines = $self->{document}->line_count();
-        my $dirty = $self->{document}->is_dirty() ? ' (modified)' : '';
+    if ($self->active_doc()) {
+        my $lines = $self->active_doc()->line_count();
+        my $dirty = $self->active_doc()->is_dirty() ? ' (modified)' : '';
         $doc_info = "Document: $lines lines$dirty";
     }
 
@@ -352,11 +393,11 @@ sub update_title {
     my ($self) = @_;
 
     my $title = 'zepto';
-    if ($self->{document} && $self->{document}->path()) {
-        $title .= ' - ' . $self->{document}->filename();
+    if ($self->active_doc() && $self->active_doc()->path()) {
+        $title .= ' - ' . $self->active_doc()->filename();
     }
-    elsif ($self->{file_path}) {
-        my ($name) = $self->{file_path} =~ m{([^/]+)$};
+    elsif ($self->active_file_path()) {
+        my ($name) = $self->active_file_path() =~ m{([^/]+)$};
         $title .= ' - ' . $name if $name;
     }
 
@@ -372,15 +413,20 @@ sub handle_input {
 
     my @events = $self->{parser}->parse($input);
 
-    # Check for pending escape (e.g., standalone ESC key)
-    if (!@events) {
-        my $pending = $self->{parser}->flush_pending();
-        push @events, $pending if $pending;
-    }
-
     for my $event (@events) {
         $self->handle_event($event);
     }
+}
+
+# Flush any pending escape sequence (call after read timeout, not immediately)
+sub flush_pending_input {
+    my ($self) = @_;
+    my $pending = $self->{parser}->flush_pending();
+    if ($pending) {
+        $self->handle_event($pending);
+        return 1;
+    }
+    return 0;
 }
 
 sub handle_event {
@@ -420,8 +466,8 @@ sub handle_editing_event {
     my ($self, $event) = @_;
 
     my $type = $event->{type};
-    my $view = $self->{view};
-    my $doc = $self->{document};
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
 
     if ($type eq 'key') {
         my $key = $event->{key};
@@ -456,8 +502,16 @@ sub handle_editing_event {
             if ($ctrl) { $view->move_to_document_end($shift); }
             else { $view->move_to_line_end($shift); }
         }
-        elsif ($key eq 'pageup')   { $view->move_page_up($shift); }
-        elsif ($key eq 'pagedown') { $view->move_page_down($shift); }
+        elsif ($key eq 'pageup') {
+            if ($ctrl && $shift) { $self->cmd_move_tab_left(); }
+            elsif ($ctrl) { $self->cmd_prev_tab(); }
+            else { $view->move_page_up($shift); }
+        }
+        elsif ($key eq 'pagedown') {
+            if ($ctrl && $shift) { $self->cmd_move_tab_right(); }
+            elsif ($ctrl) { $self->cmd_next_tab(); }
+            else { $view->move_page_down($shift); }
+        }
 
         # Editing keys
         elsif ($key eq 'backspace') { $self->do_backspace(); }
@@ -517,7 +571,7 @@ sub handle_ctrl_char {
     if    ($char eq 'n') { $self->cmd_new_file(); }
     elsif ($char eq 'o') { $self->cmd_open_file(); }
     elsif ($char eq 's') { $self->cmd_save(); }
-    elsif ($char eq 'w') { $self->cmd_save_and_quit(); }
+    elsif ($char eq 'w') { $self->cmd_close_tab(); }
     elsif ($char eq 'q') { $self->cmd_quit(); }
 
     # Edit operations
@@ -545,7 +599,7 @@ sub handle_ctrl_char {
 sub handle_alt_char {
     my ($self, $char) = @_;
 
-    my $view = $self->{view};
+    my $view = $self->active_view();
 
     # Word movement (Option+Arrow on macOS sends ESC b/f)
     if    ($char eq 'b') { $view->move_word_left(); }
@@ -560,6 +614,15 @@ sub handle_alt_char {
     # Change navigation
     elsif ($char eq 'n') { $self->cmd_next_change(); }
     elsif ($char eq 'p') { $self->cmd_prev_change(); }
+
+    # Tab navigation (Alt+, prev, Alt+. next)
+    elsif ($char eq ',') { $self->cmd_prev_tab(); }
+    elsif ($char eq '.') { $self->cmd_next_tab(); }
+
+    # Tab switching (Alt+1 through Alt+9)
+    elsif ($char ge '1' && $char le '9') {
+        $self->cmd_switch_to_tab(ord($char) - ord('1'));  # 0-indexed
+    }
 }
 
 sub handle_mouse_event {
@@ -571,7 +634,7 @@ sub handle_mouse_event {
     my $shift = Zepto::InputParser::has_modifier($event, 'shift');
 
     my $term = $self->{terminal};
-    my $view = $self->{view};
+    my $view = $self->active_view();
 
     if ($action eq 'press') {
         # Track mouse button state
@@ -583,8 +646,14 @@ sub handle_mouse_event {
             return;
         }
 
-        # Ignore clicks on ruler bar (row 2)
-        return if $y == 2;
+        # Check if click is in tab bar (row 2)
+        if ($y == 2) {
+            $self->handle_tab_bar_click($x);
+            return;
+        }
+
+        # Ignore clicks on ruler bar (row 3)
+        return if $y == 3;
 
         # Check if click is on status bar (last row) in find mode
         my ($rows, $cols) = $term->get_size();
@@ -594,13 +663,13 @@ sub handle_mouse_event {
         }
 
         # Click in text area
-        my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
-        my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
+        my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
+        my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
 
         # Check if click is in minimap region (right side)
         my ($rows_size, $cols_size) = $term->get_size();
-        my $text_height = $rows_size - 3;  # menu + ruler + status
+        my $text_height = $rows_size - 4;  # menu + tabs + ruler + status
         $text_height = 1 if $text_height < 1;
         my $minimap_width = Zepto::Renderer->get_minimap_width(
             $line_count, $text_height, $cols_size, $gutter_width, $self->{prefs}
@@ -623,7 +692,7 @@ sub handle_mouse_event {
         }
 
         # Gutter click: toggle hunk expansion
-        if ($visual_col < 0 && $self->{document}) {
+        if ($visual_col < 0 && $self->active_doc()) {
             my $doc_line;
             if ($entry) {
                 if ($entry->{type} eq 'old') {
@@ -639,8 +708,8 @@ sub handle_mouse_event {
             }
 
             # Check if this doc line has a VCS marker that can be expanded
-            if (defined $doc_line && $doc_line >= 0 && $doc_line < $self->{document}->line_count()) {
-                my $hunk_idx = $self->{document}->vcs_hunk_at_line($doc_line);
+            if (defined $doc_line && $doc_line >= 0 && $doc_line < $self->active_doc()->line_count()) {
+                my $hunk_idx = $self->active_doc()->vcs_hunk_at_line($doc_line);
                 if (defined $hunk_idx) {
                     $self->_ensure_line_map();
                     $line_map = $view->line_map();
@@ -666,13 +735,13 @@ sub handle_mouse_event {
 
             # Clamp line to document bounds
             $doc_line = 0 if $doc_line < 0;
-            $doc_line = $self->{document}->line_count() - 1
-                if $doc_line >= $self->{document}->line_count();
+            $doc_line = $self->active_doc()->line_count() - 1
+                if $doc_line >= $self->active_doc()->line_count();
 
             # Convert visual column to document column, accounting for tabs
             # Need to add scroll_col to visual position first
             my $absolute_visual_col = $view->scroll_col() + $visual_col;
-            my $line_content = $self->{document}->get_line($doc_line) // '';
+            my $line_content = $self->active_doc()->get_line($doc_line) // '';
             my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
             $view->set_cursor($doc_line, $doc_col, $shift);
@@ -698,17 +767,17 @@ sub handle_mouse_event {
 
         # Handle minimap drag (scrollbar behavior)
         if ($self->{minimap_dragging}) {
-            my $text_row = $y - 3;
+            my $text_row = $y - 4;
             my ($rows_size, $cols_size) = $term->get_size();
-            my $text_height = $rows_size - 3;
+            my $text_height = $rows_size - 4;
             $text_height = 1 if $text_height < 1;
             $self->_handle_minimap_click($text_row, $text_height);
             return;
         }
 
         # Handle drag for selection
-        my $text_row = $y - 3;  # Adjust for menu bar (row 1) and ruler bar (row 2)
-        my $line_count = $self->{document} ? $self->{document}->line_count() : 1;
+        my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
+        my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
         my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
@@ -732,16 +801,59 @@ sub handle_mouse_event {
 
         # Clamp line to document bounds
         $doc_line = 0 if $doc_line < 0;
-        $doc_line = $self->{document}->line_count() - 1
-            if $doc_line >= $self->{document}->line_count();
+        $doc_line = $self->active_doc()->line_count() - 1
+            if $doc_line >= $self->active_doc()->line_count();
 
         # Convert visual column to document column, accounting for tabs
         my $absolute_visual_col = $view->scroll_col() + $visual_col;
-        my $line_content = $self->{document}->get_line($doc_line) // '';
+        my $line_content = $self->active_doc()->get_line($doc_line) // '';
         my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
         # Extend selection
         $view->set_cursor($doc_line, $doc_col, 1) if $visual_col >= 0;
+    }
+}
+
+# =============================================================================
+# Tab bar click handling
+# =============================================================================
+
+sub handle_tab_bar_click {
+    my ($self, $x) = @_;
+
+    my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+
+    # Check scroll arrows first
+    for my $btn (@buttons) {
+        next unless $btn->{type} eq 'scroll_left' || $btn->{type} eq 'scroll_right';
+        if ($x >= $btn->{start} + 1 && $x <= $btn->{end} + 1) {
+            if ($btn->{type} eq 'scroll_left') {
+                $self->cmd_prev_tab();
+            } else {
+                $self->cmd_next_tab();
+            }
+            return;
+        }
+    }
+
+    # Check close buttons (they overlap tab regions)
+    for my $btn (@buttons) {
+        next unless $btn->{type} eq 'close';
+        if ($x >= $btn->{start} + 1 && $x <= $btn->{end} + 1) {  # +1 for 1-indexed terminal x
+            # Switch to this tab first, then close it
+            $self->_switch_to_tab($btn->{index});
+            $self->cmd_close_tab();
+            return;
+        }
+    }
+
+    # Then check tab regions
+    for my $btn (@buttons) {
+        next unless $btn->{type} eq 'tab';
+        if ($x >= $btn->{start} + 1 && $x <= $btn->{end} + 1) {  # +1 for 1-indexed terminal x
+            $self->_switch_to_tab($btn->{index});
+            return;
+        }
     }
 }
 
@@ -754,14 +866,14 @@ sub handle_mouse_event {
 sub _handle_minimap_click {
     my ($self, $text_row, $text_height) = @_;
 
-    return unless $self->{document};
+    return unless $self->active_doc();
 
     # Clamp text_row to valid range
     $text_row = 0 if $text_row < 0;
     $text_row = $text_height - 1 if $text_row >= $text_height;
 
-    my $total_lines = $self->{document}->line_count();
-    my $view = $self->{view};
+    my $total_lines = $self->active_doc()->line_count();
+    my $view = $self->active_view();
     my $viewport_rows = $view->viewport_rows();
 
     # Map minimap row to document line proportionally
@@ -1026,7 +1138,7 @@ sub enter_find_mode {
 sub exit_find_mode {
     my ($self, $keep_changes) = @_;
 
-    my $engine = $self->{find_engine};
+    my $engine = $self->active_find_engine();
 
     # If keeping changes and we have matches to replace, apply them now
     if ($keep_changes && $self->{find_replace_active} && $self->{find_replace_all}) {
@@ -1216,7 +1328,7 @@ sub handle_find_bar_click {
     my ($rows, $cols) = $self->{terminal}->get_size();
 
     # Calculate match text width
-    my $match_count = $self->{find_engine} ? $self->{find_engine}->match_count() : 0;
+    my $match_count = $self->active_find_engine() ? $self->active_find_engine()->match_count() : 0;
     my $current = $self->{find_current} // 0;
     my $match_text = $match_count == 0
         ? (length($self->{find_input}) ? 'No matches' : '')
@@ -1296,10 +1408,10 @@ sub _reset_replace_preview {
 
 sub _update_find_matches {
     my ($self, $skip_jump) = @_;
-    my $doc = $self->{document};
+    my $doc = $self->active_doc();
     my $term = $self->{find_input};
-    my $view = $self->{view};
-    my $engine = $self->{find_engine};
+    my $view = $self->active_view();
+    my $engine = $self->active_find_engine();
 
     # Empty search = no matches
     if (!length($term)) {
@@ -1337,7 +1449,7 @@ sub _find_nearest_match {
     return unless @$matches;
 
     # Get current cursor position (line/col)
-    my $view = $self->{view};
+    my $view = $self->active_view();
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
 
@@ -1386,7 +1498,7 @@ sub _find_navigate {
     my ($self, $direction) = @_;
 
     # Get latest matches from engine (includes completed background results)
-    my $engine = $self->{find_engine};
+    my $engine = $self->active_find_engine();
     if ($engine) {
         $self->{find_matches} = $engine->matches();
     }
@@ -1414,7 +1526,7 @@ sub _jump_to_match {
     return unless $idx >= 0 && $idx < @$matches;
 
     my $match = $matches->[$idx];
-    my $view = $self->{view};
+    my $view = $self->active_view();
 
     # Use line/col directly from FindEngine match
     my $line = $match->{line};
@@ -1439,11 +1551,11 @@ sub _replace_current {
     return unless $idx >= 0 && $idx < @$matches;
 
     my $match = $matches->[$idx];
-    my $doc = $self->{document};
+    my $doc = $self->active_doc();
     my $replacement = $self->{find_replace_input};
 
     # Expand capture references ($0, $1, ...) if in regex mode
-    my $engine = $self->{find_engine};
+    my $engine = $self->active_find_engine();
     my $expanded = $engine->expand_replacement_for_match($match, $replacement);
 
     # Convert line/col to byte offset for document operations
@@ -1469,7 +1581,7 @@ sub _replace_all {
     my $matches = $self->{find_matches};
     return unless @$matches;
 
-    my $doc = $self->{document};
+    my $doc = $self->active_doc();
     my $replacement = $self->{find_replace_input};
     my $total = scalar @$matches;
 
@@ -1509,7 +1621,7 @@ sub _replace_all {
 
     # Build new string by concatenating: non-match regions + replacements
     # This is O(n) vs O(n*k) for in-place substr modifications
-    my $engine = $self->{find_engine};
+    my $engine = $self->active_find_engine();
     my $re = $engine->_build_regex($self->{find_input});
     my $has_captures = $self->{find_regex} && $replacement =~ /\$/;
 
@@ -1552,7 +1664,7 @@ sub _replace_all_sync {
     my $matches = $self->{find_matches};
     return unless @$matches;
 
-    my $doc = $self->{document};
+    my $doc = $self->active_doc();
     my $replacement = $self->{find_replace_input};
 
     # Sort by line/col descending to preserve offsets
@@ -1561,7 +1673,7 @@ sub _replace_all_sync {
         $b->{col} <=> $a->{col}
     } @$matches;
 
-    my $engine = $self->{find_engine};
+    my $engine = $self->active_find_engine();
     for my $match (@sorted) {
         my $expanded = $engine->expand_replacement_for_match($match, $replacement);
         my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
@@ -1579,8 +1691,8 @@ sub _replace_all_sync {
 sub _apply_replace_preview {
     my ($self) = @_;
 
-    my $view = $self->{view};
-    my $engine = $self->{find_engine};
+    my $view = $self->active_view();
+    my $engine = $self->active_find_engine();
     my $replacement = $self->{find_replace_input};
 
     # Get viewport bounds
@@ -1691,8 +1803,8 @@ sub _handle_file_picker_mouse {
     my $y = $event->{y};
 
     # Calculate which row was clicked
-    # Row 1 = menu bar, Row 2 = search input, Row 3 = separator, Row 4+ = file list
-    my $list_start_row = 4;
+    # Row 1 = menu bar, Row 2 = tab bar, Row 3 = ruler, Row 4 = search input, Row 5 = separator, Row 6+ = file list
+    my $list_start_row = 5;
     my ($rows, $cols) = $self->{terminal}->get_size();
     my $list_end_row = $rows - 1;  # -1 for status bar
 
@@ -1722,8 +1834,8 @@ sub _handle_file_picker_mouse {
 sub do_insert_char {
     my ($self, $char) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     # Delete selection first if any
     if ($view->has_selection()) {
@@ -1742,8 +1854,8 @@ sub do_insert_char {
 sub do_backspace {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     if ($view->has_selection()) {
         $self->delete_selection();
@@ -1768,8 +1880,8 @@ sub do_backspace {
 sub do_delete {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     if ($view->has_selection()) {
         $self->delete_selection();
@@ -1789,8 +1901,8 @@ sub do_delete {
 sub do_enter {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     # Delete selection first
     if ($view->has_selection()) {
@@ -1822,8 +1934,8 @@ sub do_enter {
 sub do_indent {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     if ($view->has_selection()) {
         # Indent selected lines
@@ -1856,8 +1968,8 @@ sub do_indent {
 sub do_unindent {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
     my $tab_width = $self->{prefs}->tab_width();
 
     my ($start_line, $end_line, $had_selection);
@@ -1934,8 +2046,8 @@ sub do_move_line_down {
 sub _move_lines {
     my ($self, $direction) = @_;  # -1 = up, 1 = down
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     # Determine line range (expand selection to full lines)
     my ($start_line, $end_line, $orig_sc, $orig_ec);
@@ -2042,8 +2154,8 @@ sub do_duplicate_line_down {
 sub _duplicate_lines {
     my ($self, $direction) = @_;  # -1 = up, 1 = down
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     # Determine line range (expand selection to full lines)
     my ($start_line, $end_line);
@@ -2105,8 +2217,8 @@ sub _duplicate_lines {
 sub delete_selection {
     my ($self) = @_;
 
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
 
     return unless $view->has_selection();
 
@@ -2125,8 +2237,8 @@ sub delete_selection {
 # Ensure a LineMap exists on the view (creates one from current document hunks)
 sub _ensure_line_map {
     my ($self) = @_;
-    my $view = $self->{view};
-    my $doc = $self->{document};
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
     return unless $view && $doc;
 
     my $lm = $view->line_map();
@@ -2143,8 +2255,8 @@ sub _ensure_line_map {
 # Sync LineMap with current document state (call after diff recomputation)
 sub _sync_line_map {
     my ($self) = @_;
-    my $view = $self->{view};
-    my $doc = $self->{document};
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
     return unless $view && $doc;
 
     my $lm = $view->line_map();
@@ -2160,7 +2272,7 @@ sub _sync_line_map {
 # Build sorted list of hunk anchor lines (first line of each hunk)
 sub _hunk_anchors {
     my ($self) = @_;
-    my $doc = $self->{document};
+    my $doc = $self->active_doc();
     my $hunks = $doc->vcs_hunks();
     return [] unless $hunks && @$hunks;
 
@@ -2181,8 +2293,8 @@ sub _hunk_anchors {
 # Navigate to the next VCS hunk (wraps around)
 sub cmd_next_change {
     my ($self) = @_;
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
     return unless $doc && $view;
 
     my $anchors = $self->_hunk_anchors();
@@ -2210,8 +2322,8 @@ sub cmd_next_change {
 # Navigate to the previous VCS hunk (wraps around)
 sub cmd_prev_change {
     my ($self) = @_;
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
     return unless $doc && $view;
 
     my $anchors = $self->_hunk_anchors();
@@ -2239,8 +2351,8 @@ sub cmd_prev_change {
 # Navigate to a hunk: expand it, position cursor, center viewport with old lines visible
 sub _navigate_to_hunk {
     my ($self, $anchor) = @_;
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
     my $hunk_idx = $anchor->{hunk_idx};
 
     # Auto-expand the hunk
@@ -2285,8 +2397,8 @@ sub _navigate_to_hunk {
 # Toggle inline diff expansion at cursor position
 sub cmd_toggle_diff {
     my ($self) = @_;
-    my $doc = $self->{document};
-    my $view = $self->{view};
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
     return unless $doc && $view;
 
     my $hunk_idx = $doc->vcs_hunk_at_line($view->cursor_line());
@@ -2307,13 +2419,13 @@ sub render {
     my ($self) = @_;
 
     # Update VCS diff if needed (debounced)
-    $self->{document}->update_vcs_diff();
+    $self->active_doc()->update_vcs_diff();
 
     # If we have a LineMap, keep it in sync with current hunks/doc count
-    if ($self->{view}->line_map()) {
-        my $lm = $self->{view}->line_map();
-        my $current_hunks = $self->{document}->vcs_hunks();
-        my $current_count = $self->{document}->line_count();
+    if ($self->active_view()->line_map()) {
+        my $lm = $self->active_view()->line_map();
+        my $current_hunks = $self->active_doc()->vcs_hunks();
+        my $current_count = $self->active_doc()->line_count();
         # Sync if hunks array ref changed (diff recomputed) or doc lines changed
         if ($current_hunks ne $lm->{hunks} || $current_count != $lm->{doc_line_count}) {
             $self->_sync_line_map();
@@ -2324,23 +2436,23 @@ sub render {
     my ($rows, $cols) = $term->get_size();
 
     # Update view size - account for gutter width
-    my $line_count = $self->{document}->line_count();
+    my $line_count = $self->active_doc()->line_count();
     my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
     my $text_width = $cols - $gutter_width;
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
-    $self->{view}->set_viewport_size($rows - RESERVED_ROWS, $text_width);
-    $self->{view}->ensure_cursor_visible();
+    $self->active_view()->set_viewport_size($rows - RESERVED_ROWS, $text_width);
+    $self->active_view()->ensure_cursor_visible();
 
     my $output = Zepto::Renderer->render(
-        document    => $self->{document},
-        view        => $self->{view},
+        document    => $self->active_doc(),
+        view        => $self->active_view(),
         theme       => $self->{theme},
         prefs       => $self->{prefs},
         rows        => $rows,
         cols        => $cols,
         message     => $self->{message},
-        highlighter => $self->{highlighter},
+        highlighter => $self->active_highlighter(),
         ui          => {
             menu_open => $self->{menu_open},
             menu_selected => $self->{menu_selected},
@@ -2348,6 +2460,9 @@ sub render {
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
             file_picker => $self->{file_picker},
+            tabs => $self->{tab_manager}->tabs_for_render(),
+            active_tab_index => $self->{tab_manager}->active_index(),
+            tab_manager => $self->{tab_manager},
             find_mode => ($self->{state} eq STATE_FIND) ? {
                 value          => $self->{find_input},
                 cursor         => $self->{find_input_cursor},
@@ -2362,12 +2477,12 @@ sub render {
                 replace_active => $self->{find_replace_active},
                 replace_all    => $self->{find_replace_all},
                 focus          => $self->{find_focus},
-                match_count    => $self->{find_engine} ? $self->{find_engine}->match_count() : 0,
-                capture_count  => ($self->{find_regex} && $self->{find_engine})
-                    ? $self->{find_engine}->capture_group_count() : 0,
-                capture_regex  => ($self->{find_regex} && $self->{find_engine})
-                    ? $self->{find_engine}->capture_regex() : undef,
-                is_searching   => $self->{find_engine} ? $self->{find_engine}->is_searching() : 0,
+                match_count    => $self->active_find_engine() ? $self->active_find_engine()->match_count() : 0,
+                capture_count  => ($self->{find_regex} && $self->active_find_engine())
+                    ? $self->active_find_engine()->capture_group_count() : 0,
+                capture_regex  => ($self->{find_regex} && $self->active_find_engine())
+                    ? $self->active_find_engine()->capture_regex() : undef,
+                is_searching   => $self->active_find_engine() ? $self->active_find_engine()->is_searching() : 0,
                 is_replacing   => $self->{_replace_active} // 0,
                 replace_progress => $self->{_replace_progress} // 0,
                 replace_total  => $self->{_replace_total} // 0,

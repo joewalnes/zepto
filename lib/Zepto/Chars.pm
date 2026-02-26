@@ -48,6 +48,27 @@ use constant {
     NF_MODIFIED         => "\x{f111}",  #  (circle)
 };
 
+# Nerd Font devicons (file type icons)
+use constant {
+    NF_PERL             => "\x{e769}",  #  Perl
+    NF_PYTHON           => "\x{e73c}",  #  Python
+    NF_JAVASCRIPT       => "\x{e74e}",  #  JavaScript
+    NF_TYPESCRIPT       => "\x{e628}",  #  TypeScript
+    NF_RUBY             => "\x{e739}",  #  Ruby
+    NF_RUST             => "\x{e7a8}",  #  Rust
+    NF_GO               => "\x{e627}",  #  Go
+    NF_MARKDOWN         => "\x{e73e}",  #  Markdown
+    NF_HTML             => "\x{e736}",  #  HTML
+    NF_CSS              => "\x{e749}",  #  CSS
+    NF_SHELL            => "\x{e795}",  #  Shell/Bash
+    NF_C                => "\x{e61e}",  #  C
+    NF_CPP              => "\x{e61d}",  #  C++
+    NF_JAVA             => "\x{e738}",  #  Java
+    NF_JSON             => "\x{e60b}",  #  JSON
+    NF_YAML             => "\x{e6a8}",  #  YAML
+    NF_CLOSE            => "\x{f00d}",  #  (same as NF_TIMES)
+};
+
 # Simple toggle indicators (single-width, more compatible)
 use constant {
     TOGGLE_ON           => "\x{25cf}",  # ● (filled circle)
@@ -265,6 +286,56 @@ sub segment_right {
 sub segment_left {
     my ($class, $content) = @_;
     return $class->get('arrow_left') . $content;
+}
+
+# File extension to icon mapping
+my %FILE_ICONS = (
+    pl   => [ NF_PERL,       "\x{2022}" ],
+    pm   => [ NF_PERL,       "\x{2022}" ],
+    py   => [ NF_PYTHON,     "\x{2022}" ],
+    js   => [ NF_JAVASCRIPT, "\x{2022}" ],
+    mjs  => [ NF_JAVASCRIPT, "\x{2022}" ],
+    ts   => [ NF_TYPESCRIPT, "\x{2022}" ],
+    tsx  => [ NF_TYPESCRIPT, "\x{2022}" ],
+    jsx  => [ NF_JAVASCRIPT, "\x{2022}" ],
+    rb   => [ NF_RUBY,       "\x{2022}" ],
+    rs   => [ NF_RUST,       "\x{2022}" ],
+    go   => [ NF_GO,         "\x{2022}" ],
+    md   => [ NF_MARKDOWN,   "\x{2022}" ],
+    html => [ NF_HTML,       "\x{2022}" ],
+    htm  => [ NF_HTML,       "\x{2022}" ],
+    css  => [ NF_CSS,        "\x{2022}" ],
+    sh   => [ NF_SHELL,      "\x{2022}" ],
+    bash => [ NF_SHELL,      "\x{2022}" ],
+    zsh  => [ NF_SHELL,      "\x{2022}" ],
+    c    => [ NF_C,          "\x{2022}" ],
+    h    => [ NF_C,          "\x{2022}" ],
+    cpp  => [ NF_CPP,        "\x{2022}" ],
+    hpp  => [ NF_CPP,        "\x{2022}" ],
+    java => [ NF_JAVA,       "\x{2022}" ],
+    json => [ NF_JSON,       "\x{2022}" ],
+    yml  => [ NF_YAML,       "\x{2022}" ],
+    yaml => [ NF_YAML,       "\x{2022}" ],
+    t    => [ NF_PERL,       "\x{2022}" ],  # Perl test files
+);
+
+# Get file type icon for a filename
+# Returns the appropriate nerd font icon or ASCII fallback
+sub file_icon {
+    my ($class, $filename) = @_;
+    return $_powerline_enabled ? NF_FILE : "\x{2022}" unless defined $filename;
+
+    # Extract extension
+    my ($ext) = $filename =~ /\.([^.]+)$/;
+    $ext = lc($ext // '');
+
+    my $entry = $FILE_ICONS{$ext};
+    if ($entry) {
+        return $_powerline_enabled ? $entry->[0] : $entry->[1];
+    }
+
+    # Default file icon
+    return $_powerline_enabled ? NF_FILE : "\x{2022}";
 }
 
 # Create a horizontal line of specified width

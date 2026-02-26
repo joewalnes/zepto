@@ -181,6 +181,21 @@ sub dark_theme {
         diff_new_gutter_bg  => bg_rgb(25, 45, 25),     # Darker green for gutter
         diff_new_highlight_bg => bg_rgb(40, 100, 40),  # Stronger green for changed chars
 
+        # Tab bar
+        tab_bar_bg          => bg_rgb(30, 32, 44),     # Matches ruler_bg — seamless
+        tab_bar_bg_fg       => fg_rgb(30, 32, 44),     # Bar bg as foreground (for powerline edges)
+        tab_active_fg       => fg_rgb(255, 255, 255),  # Bright white text
+        tab_active_bg       => bg_rgb(52, 79, 138),    # Blue accent — clearly active
+        tab_active_edge     => fg_rgb(52, 79, 138),    # Matches active bg for smooth transition
+        tab_inactive_fg     => fg_rgb(140, 148, 190),  # Readable muted text
+        tab_inactive_bg     => bg_rgb(40, 44, 62),     # Subtle, between bar and menu
+        tab_inactive_edge   => fg_rgb(40, 44, 62),     # Matches inactive bg
+        tab_modified_fg     => fg_rgb(224, 175, 104),  # Yellow dot for unsaved
+        tab_close_fg        => fg_rgb(100, 106, 134),  # Dim close button
+        tab_shortcut_fg     => fg_rgb(120, 130, 170),  # Readable hint
+        tab_vcs_fg          => fg_rgb(224, 175, 104),   # VCS-changed file tint (warm amber)
+        tab_baseline_ul     => "\x1b[58;2;55;60;85m",   # Underline color (SGR 58) for baseline
+
         # Minimap / scrollbar
         minimap_bg          => bg_rgb(22, 23, 34),     # Slightly darker than editor bg
         minimap_viewport_bg => bg_rgb(45, 50, 72),     # Highlighted viewport region
@@ -332,6 +347,21 @@ sub light_theme {
         diff_new_cursor_bg  => bg_rgb(200, 245, 200),  # Deeper green for cursor line
         diff_new_gutter_bg  => bg_rgb(210, 245, 210),  # Slightly darker for gutter
         diff_new_highlight_bg => bg_rgb(160, 240, 160),# Stronger green for changed chars
+
+        # Tab bar
+        tab_bar_bg          => bg_rgb(230, 233, 239),  # Matches ruler_bg — seamless
+        tab_bar_bg_fg       => fg_rgb(230, 233, 239),  # Bar bg as foreground (for powerline edges)
+        tab_active_fg       => fg_rgb(255, 255, 255),  # White text on accent bg
+        tab_active_bg       => bg_rgb(114, 135, 253),  # Lavender accent — clearly active
+        tab_active_edge     => fg_rgb(114, 135, 253),  # Matches active bg
+        tab_inactive_fg     => fg_rgb(100, 104, 120),  # Muted text
+        tab_inactive_bg     => bg_rgb(210, 214, 226),  # Subtle, slightly darker than bar
+        tab_inactive_edge   => fg_rgb(210, 214, 226),  # Matches inactive bg
+        tab_modified_fg     => fg_rgb(223, 142, 29),   # Yellow dot for unsaved
+        tab_close_fg        => fg_rgb(156, 160, 176),  # Dim close button
+        tab_shortcut_fg     => fg_rgb(130, 136, 156),  # Readable hint
+        tab_vcs_fg          => fg_rgb(140, 90, 20),     # VCS-changed file tint
+        tab_baseline_ul     => "\x1b[58;2;190;194;208m", # Underline color (SGR 58) for baseline
 
         # Minimap / scrollbar
         minimap_bg          => bg_rgb(240, 242, 248),  # Slightly different from main bg
