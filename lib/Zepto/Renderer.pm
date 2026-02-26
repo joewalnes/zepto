@@ -444,10 +444,31 @@ sub render {
         # Calculate input_width using same formula as _render_find_bar
         my $match_count = $find->{match_count} // 0;
         my $current = $find->{current} // 0;
-        my $match_text = $match_count == 0
-            ? (length($value) ? 'No matches' : '')
-            : (($current + 1) . ' of ' . $match_count);
-        my $right_side_width = 45 + length($match_text);
+        my $is_searching = $find->{is_searching} // 0;
+        my $is_replacing = $find->{is_replacing} // 0;
+        my $replace_progress = $find->{replace_progress} // 0;
+        my $replace_total = $find->{replace_total} // 0;
+        my $match_text;
+        if ($is_replacing) {
+            $match_text = "Replacing $replace_progress/$replace_total...";
+        } elsif ($match_count == 0) {
+            $match_text = length($value) ? 'No matches' : '';
+        } else {
+            $match_text = ($current + 1) . ' of ' . $match_count;
+            $match_text .= '...' if $is_searching;
+        }
+        # Account for capture hint width (must match _render_find_bar)
+        my $capture_count = $find->{capture_count} // 0;
+        my $regex_on = $find->{regex} // 0;
+        my $capture_hint = '';
+        if ($regex_on) {
+            $capture_hint = '$0';
+            for my $i (1 .. $capture_count) {
+                $capture_hint .= " \$$i";
+            }
+        }
+        my $capture_hint_width = length($capture_hint) ? length($capture_hint) + 1 : 0;
+        my $right_side_width = 45 + length($match_text) + $capture_hint_width;
         my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
         my $input_width = int($available / 2);
         $input_width = 8 if $input_width < 8;
@@ -740,6 +761,7 @@ sub _render_text_area {
     # Precompute match ranges by line if in find mode (only visible lines)
     # Use viewport_matches for O(viewport) instead of O(all_matches)
     my %line_matches;  # line_num => [{start, end, is_current}, ...]
+    my %line_capture_regions;  # line_num => [{start, end, group, is_current}, ...]
     if ($find_mode && $find_mode->{matches} && @{$find_mode->{matches}}) {
         my $matches = $find_mode->{matches};
         my $current = $find_mode->{current} // 0;
@@ -747,6 +769,10 @@ sub _render_text_area {
         # Find current match line for highlighting
         my $current_line = $matches->[$current]{line} if $current < @$matches;
         my $current_col = $matches->[$current]{col} if $current < @$matches;
+
+        # Compiled regex for extracting capture positions from any match
+        my $capture_regex = $find_mode->{capture_regex};
+        my $capture_count = $find_mode->{capture_count} // 0;
 
         # Only iterate visible matches - use binary search to find range
         # Since matches are sorted by (line, col), find first visible
@@ -782,6 +808,25 @@ sub _render_text_area {
                 end => $end_col,
                 is_current => $is_current,
             };
+
+            # Extract capture sub-regions for ALL visible matches
+            if ($capture_regex && $capture_count > 0 && $match->{length} > 0) {
+                my $line_content = $doc->get_line_content($line);
+                my $matched_text = substr($line_content, $col, $match->{length});
+                if ($matched_text =~ /$capture_regex/) {
+                    $line_capture_regions{$line} //= [];
+                    for my $gi (1 .. $#+) {
+                        if (defined $-[$gi]) {
+                            push @{$line_capture_regions{$line}}, {
+                                start      => $col + $-[$gi],
+                                end        => $col + $+[$gi],
+                                group      => $gi,
+                                is_current => $is_current,
+                            };
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1033,6 +1078,38 @@ sub _render_text_area {
                 }
             }
 
+            # Convert capture sub-regions to visual positions
+            my @visual_capture_regions;
+            if ($preview_data && $preview_data->{capture_regions} && @{$preview_data->{capture_regions}}) {
+                # Preview mode: use capture regions mapped to replacement text
+                for my $cr (@{$preview_data->{capture_regions}}) {
+                    my $vis_start = $char_to_visual->[$cr->{start}] // 0;
+                    my $vis_end = $cr->{end} < @$char_to_visual
+                        ? $char_to_visual->[$cr->{end}]
+                        : length($expanded_content);
+                    push @visual_capture_regions, {
+                        start      => $vis_start,
+                        end        => $vis_end,
+                        group      => $cr->{group},
+                        is_current => 1,  # All preview replacements shown prominently
+                    };
+                }
+            } elsif (!$preview_data && $line_capture_regions{$doc_line}) {
+                # Normal mode: use capture regions from original match positions
+                for my $cr (@{$line_capture_regions{$doc_line}}) {
+                    my $vis_start = $char_to_visual->[$cr->{start}] // 0;
+                    my $vis_end = $cr->{end} < @$char_to_visual
+                        ? $char_to_visual->[$cr->{end}]
+                        : length($expanded_content);
+                    push @visual_capture_regions, {
+                        start      => $vis_start,
+                        end        => $vis_end,
+                        group      => $cr->{group},
+                        is_current => $cr->{is_current},
+                    };
+                }
+            }
+
             # Apply horizontal scroll (now in visual columns)
             if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
                 $expanded_content = substr($expanded_content, $scroll_col);
@@ -1078,7 +1155,8 @@ sub _render_text_area {
                 $expanded_content, $doc_line, $scroll_col, $width,
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
                 $full_line_content, \@visual_matches,
-                $is_hunk_line ? 'new' : undef, $new_char_hl
+                $is_hunk_line ? 'new' : undef, $new_char_hl,
+                \@visual_capture_regions
             );
 
             # Fill remaining space with appropriate background
@@ -1382,7 +1460,7 @@ sub _render_old_line_row {
 # $cursor_col: visual cursor column (already converted)
 # $matches: array of {start, end, is_current} for find matches on this line
 sub _render_line_with_highlights {
-    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight) = @_;
+    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight, $capture_regions) = @_;
 
     my $output = '';
     my $len = length($content);
@@ -1408,6 +1486,26 @@ sub _render_line_with_highlights {
     my $match_fg = $theme->color('match_fg');
     my $current_match_bg = $theme->color('current_match_bg');
     my $current_match_fg = $theme->color('current_match_fg');
+
+    # Build capture region lookup (maps visible column → {group, is_current})
+    my @capture_group;       # column → group number
+    my @capture_is_current;  # column → is this the current match?
+    if ($capture_regions && @$capture_regions) {
+        for my $cr (@$capture_regions) {
+            my $start = $cr->{start} - $scroll_col;
+            my $end = $cr->{end} - $scroll_col;
+            $start = 0 if $start < 0;
+            next if $start >= $len;
+            $end = $len if $end > $len;
+            next if $end <= 0;
+            for my $c ($start .. $end - 1) {
+                if ($c >= 0 && $c < $len) {
+                    $capture_group[$c] = $cr->{group};
+                    $capture_is_current[$c] = $cr->{is_current};
+                }
+            }
+        }
+    }
 
     # Build match highlight lookup (adjusted for scroll)
     # Maps visible column → 'current' or 'other' or undef
@@ -1499,13 +1597,31 @@ sub _render_line_with_highlights {
         # Check if in a find match (highest priority for visibility)
         if ($match_type[$i]) {
             if ($match_type[$i] eq 'current') {
-                $char_bg = $current_match_bg;
-                $char_fg = $current_match_fg;  # Use prominent foreground for current match
-                $style_key = "curmatch";
+                # Check for capture group sub-region
+                if ($capture_group[$i]) {
+                    my $grp = $capture_group[$i];
+                    my $color_idx = (($grp - 1) % 4) + 1;
+                    $char_bg = $theme->color("capture_group_${color_idx}_bg");
+                    $char_fg = $current_match_fg;
+                    $style_key = "curmatch_g$grp";
+                } else {
+                    $char_bg = $current_match_bg;
+                    $char_fg = $current_match_fg;
+                    $style_key = "curmatch";
+                }
             } else {
-                $char_bg = $match_bg;
-                $char_fg = $match_fg;  # Muted foreground for other matches
-                $style_key = "match";
+                # Non-current match: check for capture group sub-region (dim tint)
+                if ($capture_group[$i]) {
+                    my $grp = $capture_group[$i];
+                    my $color_idx = (($grp - 1) % 4) + 1;
+                    $char_bg = $theme->color("capture_group_${color_idx}_dim_bg");
+                    $char_fg = $match_fg;
+                    $style_key = "match_g$grp";
+                } else {
+                    $char_bg = $match_bg;
+                    $char_fg = $match_fg;
+                    $style_key = "match";
+                }
             }
         }
         # Check if in selection
@@ -1919,6 +2035,159 @@ sub _render_footer_input {
 # Find Bar Rendering (incremental search in status bar)
 # =============================================================================
 
+# Colorize regex find input: highlight () capture groups with distinct colors
+# Group numbers are assigned left-to-right by opening paren (matching Perl semantics)
+sub _colorize_find_input {
+    my ($class, $theme, $text, $default_fg) = @_;
+
+    my $output = '';
+    my $len = length($text);
+    my $group_num = 0;       # Next group number to assign
+    my @group_stack;         # Stack of active group numbers (for nesting)
+    my $i = 0;
+
+    while ($i < $len) {
+        my $ch = substr($text, $i, 1);
+
+        # Skip escaped characters
+        if ($ch eq '\\' && $i + 1 < $len) {
+            $output .= substr($text, $i, 2);
+            $i += 2;
+            next;
+        }
+
+        # Skip character classes
+        if ($ch eq '[') {
+            my $start = $i;
+            $i++;
+            $i++ if $i < $len && substr($text, $i, 1) eq '^';
+            $i++ if $i < $len && substr($text, $i, 1) eq ']';
+            while ($i < $len && substr($text, $i, 1) ne ']') {
+                $i++ if substr($text, $i, 1) eq '\\';
+                $i++;
+            }
+            $i++ if $i < $len;  # Skip closing ]
+            $output .= substr($text, $start, $i - $start);
+            next;
+        }
+
+        if ($ch eq '(') {
+            # Determine if this is a capturing group
+            my $is_capturing = 1;
+            if ($i + 1 < $len && substr($text, $i + 1, 1) eq '?') {
+                $is_capturing = 0;
+                # Named capture (?<name>...) IS capturing
+                if ($i + 2 < $len && substr($text, $i + 2, 1) eq '<'
+                    && $i + 3 < $len && substr($text, $i + 3, 1) =~ /[A-Za-z_]/) {
+                    $is_capturing = 1;
+                }
+                # (?P<name>...) IS capturing
+                elsif ($i + 2 < $len && substr($text, $i + 2, 1) eq 'P'
+                    && $i + 3 < $len && substr($text, $i + 3, 1) eq '<') {
+                    $is_capturing = 1;
+                }
+            }
+
+            if ($is_capturing) {
+                $group_num++;
+                my $color_idx = (($group_num - 1) % 4) + 1;
+                my $color = $theme->color("capture_group_$color_idx");
+                push @group_stack, { num => $group_num, color => $color };
+                $output .= $color . $ch;
+            } else {
+                # Non-capturing group: push placeholder
+                push @group_stack, { num => 0, color => undef };
+                $output .= $ch;
+            }
+            $i++;
+            next;
+        }
+
+        if ($ch eq ')' && @group_stack) {
+            my $entry = pop @group_stack;
+            if ($entry->{color}) {
+                $output .= $entry->{color} . $ch;
+            } else {
+                $output .= $ch;
+            }
+            # Restore parent group color or default
+            if (@group_stack && $group_stack[-1]{color}) {
+                $output .= $group_stack[-1]{color};
+            } else {
+                $output .= $default_fg;
+            }
+            $i++;
+            next;
+        }
+
+        # Regular character: use current group's color
+        if (@group_stack && $group_stack[-1]{color}) {
+            # Already in a colored group, color is set
+        }
+        $output .= $ch;
+        $i++;
+    }
+
+    # Restore default color
+    $output .= $default_fg;
+    return $output;
+}
+
+# Colorize replace input: highlight $N tokens with capture group colors
+sub _colorize_replace_input {
+    my ($class, $theme, $text, $default_fg, $capture_count) = @_;
+
+    my $output = '';
+    my $len = length($text);
+    my $i = 0;
+
+    while ($i < $len) {
+        my $ch = substr($text, $i, 1);
+
+        if ($ch eq '$' && $i + 1 < $len) {
+            my $next = substr($text, $i + 1, 1);
+
+            if ($next eq '$') {
+                # $$ escape
+                $output .= '$$';
+                $i += 2;
+                next;
+            }
+
+            if ($next =~ /[0-9]/) {
+                # Collect consecutive digits
+                my $num_str = '';
+                my $j = $i + 1;
+                while ($j < $len && substr($text, $j, 1) =~ /[0-9]/) {
+                    $num_str .= substr($text, $j, 1);
+                    $j++;
+                }
+                my $num = int($num_str);
+                my $token = '$' . $num_str;
+
+                if ($num == 0) {
+                    # $0 = full match, use dim color
+                    $output .= $theme->color('status_dim') . $token . $default_fg;
+                } elsif ($num <= $capture_count) {
+                    # $N within range: use group color
+                    my $color_idx = (($num - 1) % 4) + 1;
+                    $output .= $theme->color("capture_group_$color_idx") . $token . $default_fg;
+                } else {
+                    # Beyond capture count: no special color
+                    $output .= $token;
+                }
+                $i = $j;
+                next;
+            }
+        }
+
+        $output .= $ch;
+        $i++;
+    }
+
+    return $output;
+}
+
 sub _render_find_bar {
     my ($class, $theme, $find, $cols) = @_;
 
@@ -1935,6 +2204,7 @@ sub _render_find_bar {
     my $replace_progress = $find->{replace_progress} // 0;
     my $replace_total = $find->{replace_total} // 0;
     my $current = $find->{current} // 0;
+    my $capture_count = $find->{capture_count} // 0;
 
     # Match count text
     my $match_count = $find->{match_count} // 0;
@@ -1953,9 +2223,19 @@ sub _render_find_bar {
     my $rl = Zepto::Chars->get('powerline_round_left');
     my $rr = Zepto::Chars->get('powerline_round_right');
 
+    # Build capture hint string (e.g. "$0 $1 $2") for status bar
+    my $capture_hint = '';
+    if ($regex_on) {
+        $capture_hint = '$0';
+        for my $i (1 .. $capture_count) {
+            $capture_hint .= " \$$i";
+        }
+    }
+    my $capture_hint_width = length($capture_hint) ? length($capture_hint) + 1 : 0;  # +1 for space
+
     # Fixed widths for buttons/toggles on right side
     # ".* ^R" (9+1) + "Aa ^C" (9+1) + "X Esc" (9+1) + "✓ Enter" (11) + spaces
-    my $right_side_width = 45 + length($match_text);
+    my $right_side_width = 45 + length($match_text) + $capture_hint_width;
 
     # Calculate input field widths
     my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
@@ -1976,16 +2256,23 @@ sub _render_find_bar {
 
     # Find input field (clickable)
     my $find_field_start = $x;
-    if ($focus eq 'find') {
-        $content .= $theme->color('dialog_input_bg') . $theme->color('dialog_input_fg');
-    } else {
-        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
-    }
+    my $find_bg_color = ($focus eq 'find')
+        ? $theme->color('dialog_input_bg') : $theme->color('menu_pill_bg');
+    my $find_fg_color = ($focus eq 'find')
+        ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
+    $content .= $find_bg_color . $find_fg_color;
     my $display_value = $value;
     if (length($display_value) > $input_width) {
         $display_value = substr($display_value, length($display_value) - $input_width);
     }
-    $content .= $display_value;
+    if ($regex_on && $capture_count > 0) {
+        # Color capture groups in the find input
+        $content .= $class->_colorize_find_input(
+            $theme, $display_value, $find_fg_color);
+    } else {
+        $content .= $display_value;
+    }
+    $content .= $find_bg_color . $find_fg_color;
     $content .= ' ' x ($input_width - length($display_value));
     $x += $input_width;
     
@@ -1999,16 +2286,23 @@ sub _render_find_bar {
 
     # Replace input field (clickable)
     my $replace_field_start = $x;
-    if ($focus eq 'replace') {
-        $content .= $theme->color('dialog_input_bg') . $theme->color('dialog_input_fg');
-    } else {
-        $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
-    }
+    my $replace_bg_color = ($focus eq 'replace')
+        ? $theme->color('dialog_input_bg') : $theme->color('menu_pill_bg');
+    my $replace_fg_color = ($focus eq 'replace')
+        ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
+    $content .= $replace_bg_color . $replace_fg_color;
     my $replace_display = $replace_value;
     if (length($replace_display) > $input_width) {
         $replace_display = substr($replace_display, length($replace_display) - $input_width);
     }
-    $content .= $replace_display;
+    if ($regex_on && $capture_count > 0) {
+        # Color $N tokens in the replace input
+        $content .= $class->_colorize_replace_input(
+            $theme, $replace_display, $replace_fg_color, $capture_count);
+    } else {
+        $content .= $replace_display;
+    }
+    $content .= $replace_bg_color . $replace_fg_color;
     $content .= ' ' x ($input_width - length($replace_display));
     $x += $input_width;
     
@@ -2109,10 +2403,25 @@ sub _render_find_bar {
     $visible =~ s/\x1b\[[0-9;]*m//g;
     my $visible_width = length($visible);
 
-    # Add padding and match text
-    my $padding_needed = $cols - $visible_width - length($match_text) - 1;
+    # Add padding, capture hint, and match text
+    my $padding_needed = $cols - $visible_width - length($match_text) - $capture_hint_width - 1;
     $padding_needed = 1 if $padding_needed < 1;
     $content .= ' ' x $padding_needed;
+
+    # Render capture hint with colored $N tokens
+    if ($capture_hint_width > 0) {
+        # $0 in dim (no specific group color)
+        $content .= $theme->color('status_dim') . '$0';
+        # $1, $2, ... in their group colors
+        for my $i (1 .. $capture_count) {
+            $content .= ' ';
+            my $color_idx = (($i - 1) % 4) + 1;
+            $content .= $theme->color("capture_group_$color_idx");
+            $content .= "\$$i";
+        }
+        $content .= $theme->color('status_fg') . ' ';
+    }
+
     $content .= $match_text;
     $content .= ' ';
 

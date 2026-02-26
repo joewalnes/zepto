@@ -188,6 +188,23 @@ sub dark_theme {
         minimap_separator   => fg_rgb(45, 50, 70),     # Subtle separator line
         minimap_cursor_fg   => fg_rgb(122, 162, 247),  # Cursor line indicator
 
+        # Capture group colors (for regex find/replace)
+        # Foreground: used in find input, replace input, status bar hints
+        capture_group_1    => fg_rgb(130, 190, 220),  # Soft blue-cyan
+        capture_group_2    => fg_rgb(140, 190, 130),  # Soft sage
+        capture_group_3    => fg_rgb(210, 175, 120),  # Soft amber
+        capture_group_4    => fg_rgb(175, 155, 210),  # Soft lavender
+        # Background: current match capture sub-regions (bright enough for dark text)
+        capture_group_1_bg => bg_rgb(100, 180, 210),  # Cyan tint
+        capture_group_2_bg => bg_rgb(110, 185, 110),  # Green tint
+        capture_group_3_bg => bg_rgb(210, 175, 95),   # Gold tint
+        capture_group_4_bg => bg_rgb(165, 140, 205),  # Purple tint
+        # Dim background: non-current match capture sub-regions (subtle tints)
+        capture_group_1_dim_bg => bg_rgb(50, 80, 95),   # Dark cyan
+        capture_group_2_dim_bg => bg_rgb(50, 82, 50),   # Dark green
+        capture_group_3_dim_bg => bg_rgb(90, 78, 42),   # Dark gold
+        capture_group_4_dim_bg => bg_rgb(72, 60, 88),   # Dark purple
+
         # Syntax highlighting (Tokyo Night inspired)
         # Comments are prominent - they're documentation, not noise!
         syntax_keyword     => fg_rgb(187, 154, 247),  # Purple - control flow
@@ -322,6 +339,23 @@ sub light_theme {
         minimap_text_fg     => fg_rgb(170, 175, 190),  # Dim text density
         minimap_separator   => fg_rgb(200, 204, 215),  # Subtle separator line
         minimap_cursor_fg   => fg_rgb(114, 135, 253),  # Cursor line indicator
+
+        # Capture group colors (for regex find/replace)
+        # Foreground: used in find input, replace input, status bar hints
+        capture_group_1    => fg_rgb(30, 90, 160),    # Medium blue
+        capture_group_2    => fg_rgb(30, 110, 60),    # Medium green
+        capture_group_3    => fg_rgb(160, 90, 15),    # Medium amber
+        capture_group_4    => fg_rgb(115, 40, 130),   # Medium purple
+        # Background: current match capture sub-regions
+        capture_group_1_bg => bg_rgb(155, 205, 235),  # Light blue
+        capture_group_2_bg => bg_rgb(160, 220, 170),  # Light green
+        capture_group_3_bg => bg_rgb(240, 205, 140),  # Light gold
+        capture_group_4_bg => bg_rgb(205, 180, 235),  # Light purple
+        # Dim background: non-current match capture sub-regions (very pale tints)
+        capture_group_1_dim_bg => bg_rgb(220, 235, 250),  # Pale blue
+        capture_group_2_dim_bg => bg_rgb(220, 242, 225),  # Pale green
+        capture_group_3_dim_bg => bg_rgb(252, 235, 200),  # Pale gold
+        capture_group_4_dim_bg => bg_rgb(235, 225, 248),  # Pale purple
 
         # Syntax highlighting - high contrast for light backgrounds
         # Comments are prominent - they're documentation, not noise!

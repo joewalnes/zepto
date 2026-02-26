@@ -261,14 +261,13 @@ subtest 'Toggle cycles through options' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
 
-    # Initial state
-    is($editor->{find_regex}, 0, 'Regex off initially');
+    # Initial state (regex on by default)
+    is($editor->{find_regex}, 1, 'Regex on initially');
     is($editor->{find_case}, 0, 'Case off initially');
 
-    # Simulate tab key to toggle (from handle_find_event logic)
-    # First toggle: regex on
-    $editor->{find_regex} = 1;
-    is($editor->{find_regex}, 1, 'Regex toggled on');
+    # Toggle: regex off
+    $editor->{find_regex} = 0;
+    is($editor->{find_regex}, 0, 'Regex toggled off');
 
     # Second toggle: regex off, case on
     $editor->{find_regex} = 0;
@@ -413,6 +412,238 @@ subtest 'Find searches new document after loading different file' => sub {
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 0, 'No "apple" in new file (old content gone)');
+};
+
+# ============================================================================
+# Capture Group Counting
+# ============================================================================
+subtest 'Count capture groups in regex patterns' => sub {
+    my $editor = create_editor_with_content("test\n");
+    my $engine = $editor->{find_engine};
+    $engine->{use_regex} = 1;
+
+    is($engine->_count_capture_groups('foo'), 0, 'No groups');
+    is($engine->_count_capture_groups('(foo)'), 1, 'One group');
+    is($engine->_count_capture_groups('(foo)(bar)'), 2, 'Two groups');
+    is($engine->_count_capture_groups('(foo(bar))'), 2, 'Nested groups');
+    is($engine->_count_capture_groups('(?:foo)'), 0, 'Non-capturing (?:)');
+    is($engine->_count_capture_groups('(?=foo)'), 0, 'Lookahead (?=)');
+    is($engine->_count_capture_groups('(?!foo)'), 0, 'Negative lookahead (?!)');
+    is($engine->_count_capture_groups('(?<=foo)'), 0, 'Lookbehind (?<=)');
+    is($engine->_count_capture_groups('(?<!foo)'), 0, 'Negative lookbehind (?<!)');
+    is($engine->_count_capture_groups('\\(foo\\)'), 0, 'Escaped parens');
+    is($engine->_count_capture_groups('[(]foo[)]'), 0, 'Parens inside char class');
+    is($engine->_count_capture_groups('(?<name>foo)'), 1, 'Named capture (?<name>)');
+    is($engine->_count_capture_groups('(a)(?:b)(c)'), 2, 'Mixed capturing and non-capturing');
+    is($engine->_count_capture_groups(''), 0, 'Empty pattern');
+    is($engine->_count_capture_groups('(a)(b)(c)(d)'), 4, 'Four groups');
+};
+
+subtest 'capture_group_count respects regex mode' => sub {
+    my $editor = create_editor_with_content("test\n");
+    my $engine = $editor->{find_engine};
+
+    # Non-regex mode always returns 0
+    $engine->{use_regex} = 0;
+    $engine->{search_term} = '(foo)';
+    is($engine->capture_group_count(), 0, 'Non-regex mode returns 0');
+
+    # Regex mode counts groups
+    $engine->{use_regex} = 1;
+    $engine->{search_term} = '(\w+) (\w+)';
+    is($engine->capture_group_count(), 2, 'Two capture groups');
+
+    $engine->{search_term} = '(?:\w+) (\w+)';
+    is($engine->capture_group_count(), 1, 'One capturing, one non-capturing');
+
+    $engine->{search_term} = 'no groups here';
+    is($engine->capture_group_count(), 0, 'No groups');
+};
+
+# ============================================================================
+# Replacement Expansion
+# ============================================================================
+subtest 'Expand replacement with capture references' => sub {
+    my $editor = create_editor_with_content("test\n");
+    my $engine = $editor->{find_engine};
+
+    # $0 = full match
+    is($engine->_expand_replacement('[$0]', 'hello', []),
+       '[hello]', '$0 expands to full match');
+
+    # $1, $2 from captures
+    is($engine->_expand_replacement('$2-$1', 'foobar', ['foo', 'bar']),
+       'bar-foo', '$1 and $2 expand to captures');
+
+    # $N beyond capture count -> literal
+    is($engine->_expand_replacement('$3', 'test', ['a', 'b']),
+       '$3', '$N beyond count stays literal');
+
+    # $$ -> literal $
+    is($engine->_expand_replacement('$$1', 'test', ['a']),
+       '$1', '$$ becomes literal $');
+
+    # No $ in replacement -> unchanged
+    is($engine->_expand_replacement('xyz', 'test', ['a']),
+       'xyz', 'No $ means no expansion');
+
+    # $ at end of string
+    is($engine->_expand_replacement('end$', 'test', []),
+       'end$', '$ at end stays literal');
+
+    # $ followed by non-digit
+    is($engine->_expand_replacement('$x', 'test', []),
+       '$x', '$ followed by non-digit stays literal');
+
+    # Empty replacement
+    is($engine->_expand_replacement('', 'test', ['a']),
+       '', 'Empty replacement stays empty');
+
+    # $0 with no captures
+    is($engine->_expand_replacement('($0)', 'word', []),
+       '(word)', '$0 works even with no capture groups');
+
+    # Multiple references to same capture
+    is($engine->_expand_replacement('$1-$1', 'test', ['x']),
+       'x-x', 'Same capture referenced twice');
+
+    # Multi-digit capture number
+    is($engine->_expand_replacement('$10', 'test',
+       ['a','b','c','d','e','f','g','h','i','j']),
+       'j', '$10 works for 10th capture');
+};
+
+# ============================================================================
+# Integration: Replace with Capture Groups
+# ============================================================================
+subtest 'Replace current with capture groups' => sub {
+    my $editor = create_editor_with_content("John Smith\nJane Doe\n");
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = '(\w+) (\w+)';
+    $editor->{find_regex} = 1;
+    $editor->{find_replace_input} = '$2, $1';
+    $editor->_update_find_matches();
+
+    is(scalar @{$editor->{find_matches}}, 2, 'Found two matches');
+
+    $editor->_replace_current();
+
+    my $text = $editor->{document}->text();
+    like($text, qr/Smith, John/, 'First match replaced with swapped captures');
+    like($text, qr/Jane Doe/, 'Second match not yet replaced');
+};
+
+subtest 'Replace all with capture groups' => sub {
+    my $editor = create_editor_with_content("John Smith\nJane Doe\n");
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = '(\w+) (\w+)';
+    $editor->{find_regex} = 1;
+    $editor->{find_replace_input} = '$2, $1';
+    $editor->_update_find_matches();
+
+    $editor->_replace_all();
+
+    my $text = $editor->{document}->text();
+    is($text, "Smith, John\nDoe, Jane\n", 'All matches replaced with swapped captures');
+};
+
+subtest 'Replace with $0 (full match reference)' => sub {
+    my $editor = create_editor_with_content("foo bar baz\n");
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = '\w+';
+    $editor->{find_regex} = 1;
+    $editor->{find_replace_input} = '[$0]';
+    $editor->_update_find_matches();
+
+    $editor->_replace_all();
+
+    my $text = $editor->{document}->text();
+    is($text, "[foo] [bar] [baz]\n", 'Each word wrapped in brackets via \$0');
+};
+
+subtest 'Literal mode ignores capture references' => sub {
+    my $editor = create_editor_with_content("foo bar foo\n");
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = 'foo';
+    $editor->{find_regex} = 0;  # Literal mode
+    $editor->{find_replace_input} = '$1';
+    $editor->_update_find_matches();
+
+    $editor->_replace_all();
+
+    my $text = $editor->{document}->text();
+    is($text, "\$1 bar \$1\n", 'Literal mode leaves $1 as literal text');
+};
+
+subtest 'Dollar sign escape in replacement' => sub {
+    my $editor = create_editor_with_content("foo\n");
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = 'foo';
+    $editor->{find_regex} = 1;
+    $editor->{find_replace_input} = '$$100';
+    $editor->_update_find_matches();
+
+    $editor->_replace_all();
+
+    my $text = $editor->{document}->text();
+    is($text, "\$100\n", '\$\$ produces literal \$ in output');
+};
+
+subtest 'Preview line with capture expansion' => sub {
+    my $editor = create_editor_with_content("John Smith\n");
+    my $engine = $editor->{find_engine};
+
+    $engine->search('(\w+) (\w+)', 0, 1,
+        use_regex => 1,
+        case_sensitive => 0,
+    );
+    # Complete background search
+    while ($engine->is_searching()) { $engine->tick(100); }
+
+    my $preview = $engine->preview_line(0, '$2, $1');
+
+    is($preview->{text}, 'Smith, John', 'Preview shows expanded captures');
+    is(scalar @{$preview->{highlights}}, 1, 'One highlight in preview');
+};
+
+subtest 'Replace all with captures on many matches' => sub {
+    # Test the _replace_all fast path (string concatenation) for >3 matches
+    my $content = join("\n", map { "item_$_" } 1..5) . "\n";
+    my $editor = create_editor_with_content($content);
+    $editor->enter_find_mode(1);
+    $editor->{find_input} = 'item_(\d+)';
+    $editor->{find_regex} = 1;
+    $editor->{find_replace_input} = 'thing[$1]';
+    $editor->_update_find_matches();
+
+    $editor->_replace_all();
+
+    my $text = $editor->{document}->text();
+    my $expected = join("\n", map { "thing[$_]" } 1..5) . "\n";
+    is($text, $expected, 'All items renumbered with capture groups');
+};
+
+subtest 'Extract capture positions for highlighting' => sub {
+    my $editor = create_editor_with_content("John Smith\n");
+    my $engine = $editor->{find_engine};
+
+    $engine->search('(\w+) (\w+)', 0, 1,
+        use_regex => 1,
+        case_sensitive => 0,
+    );
+    while ($engine->is_searching()) { $engine->tick(100); }
+
+    my $matches = $engine->matches();
+    ok(@$matches >= 1, 'Found at least one match');
+
+    my $positions = $engine->extract_capture_positions($matches->[0]);
+    is(scalar @$positions, 2, 'Two capture positions');
+    is($positions->[0]{start}, 0, 'First capture starts at 0');
+    is($positions->[0]{length}, 4, 'First capture is 4 chars (John)');
+    is($positions->[0]{group}, 1, 'First capture is group 1');
+    is($positions->[1]{start}, 5, 'Second capture starts at 5');
+    is($positions->[1]{length}, 5, 'Second capture is 5 chars (Smith)');
+    is($positions->[1]{group}, 2, 'Second capture is group 2');
 };
 
 done_testing();

@@ -91,7 +91,7 @@ sub new {
         find_input        => '',      # Current search input
         find_input_cursor => 0,       # Cursor position in input
         find_current      => 0,       # Index of current match (0-based)
-        find_regex        => 0,       # Regex mode enabled
+        find_regex        => 1,       # Regex mode enabled (on by default)
         find_case         => 0,       # Case-sensitive enabled
 
         # Replace state (extension of find)
@@ -1442,11 +1442,15 @@ sub _replace_current {
     my $doc = $self->{document};
     my $replacement = $self->{find_replace_input};
 
+    # Expand capture references ($0, $1, ...) if in regex mode
+    my $engine = $self->{find_engine};
+    my $expanded = $engine->expand_replacement_for_match($match, $replacement);
+
     # Convert line/col to byte offset for document operations
     my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
 
     # Replace the match in the document
-    $doc->replace($offset, $offset + $match->{length}, $replacement);
+    $doc->replace($offset, $offset + $match->{length}, $expanded);
 
     # Update matches after replacement
     $self->_update_find_matches();
@@ -1505,13 +1509,22 @@ sub _replace_all {
 
     # Build new string by concatenating: non-match regions + replacements
     # This is O(n) vs O(n*k) for in-place substr modifications
+    my $engine = $self->{find_engine};
+    my $re = $engine->_build_regex($self->{find_input});
+    my $has_captures = $self->{find_regex} && $replacement =~ /\$/;
+
     my $result = '';
     my $last_end = 0;
     for my $m (@offsets) {
         # Add text between last match and this one
         $result .= substr($text, $last_end, $m->{offset} - $last_end);
-        # Add replacement
-        $result .= $replacement;
+        # Add replacement, expanding capture refs if needed
+        if ($has_captures && $re) {
+            my $matched_text = substr($text, $m->{offset}, $m->{length});
+            $result .= $engine->expand_replacement_for_text($matched_text, $replacement, $re);
+        } else {
+            $result .= $replacement;
+        }
         $last_end = $m->{offset} + $m->{length};
     }
     # Add remaining text after last match
@@ -1548,9 +1561,11 @@ sub _replace_all_sync {
         $b->{col} <=> $a->{col}
     } @$matches;
 
+    my $engine = $self->{find_engine};
     for my $match (@sorted) {
+        my $expanded = $engine->expand_replacement_for_match($match, $replacement);
         my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
-        $doc->replace($offset, $offset + $match->{length}, $replacement);
+        $doc->replace($offset, $offset + $match->{length}, $expanded);
     }
 
     # Update matches
@@ -2348,6 +2363,10 @@ sub render {
                 replace_all    => $self->{find_replace_all},
                 focus          => $self->{find_focus},
                 match_count    => $self->{find_engine} ? $self->{find_engine}->match_count() : 0,
+                capture_count  => ($self->{find_regex} && $self->{find_engine})
+                    ? $self->{find_engine}->capture_group_count() : 0,
+                capture_regex  => ($self->{find_regex} && $self->{find_engine})
+                    ? $self->{find_engine}->capture_regex() : undef,
                 is_searching   => $self->{find_engine} ? $self->{find_engine}->is_searching() : 0,
                 is_replacing   => $self->{_replace_active} // 0,
                 replace_progress => $self->{_replace_progress} // 0,

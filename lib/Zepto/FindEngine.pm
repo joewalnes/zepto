@@ -216,6 +216,135 @@ sub match_count {
     return scalar(@{$self->{all_matches}});
 }
 
+# Get number of capture groups in current regex pattern
+sub capture_group_count {
+    my ($self) = @_;
+    return 0 unless $self->{use_regex};
+    return $self->_count_capture_groups($self->{search_term});
+}
+
+# Return compiled regex for capture group extraction (used by Renderer)
+sub capture_regex {
+    my ($self) = @_;
+    return undef unless $self->{use_regex};
+    return $self->_build_regex($self->{search_term});
+}
+
+# =============================================================================
+# Capture Group Replacement
+# =============================================================================
+
+# Expand capture references ($0, $1, ...) in replacement for a specific match
+# Returns the expanded replacement string
+sub expand_replacement_for_match {
+    my ($self, $match, $replacement) = @_;
+
+    # No expansion in literal mode
+    return $replacement unless $self->{use_regex};
+
+    # Quick check: does replacement contain any $ references?
+    return $replacement unless $replacement =~ /\$/;
+
+    # Get the matched text from the document
+    my $doc = $self->{document};
+    my $line_content = $doc->get_line_content($match->{line});
+    my $matched_text = substr($line_content, $match->{col}, $match->{length});
+
+    # Build regex (without the ($re) wrapper used in search loop)
+    my $re = $self->_build_regex($self->{search_term});
+    return $replacement unless $re;
+
+    # Extract captures and expand
+    my $captures = $self->_extract_captures($matched_text, $re);
+    return $self->_expand_replacement($replacement, $matched_text, $captures);
+}
+
+# Expand captures using raw text and pre-built regex (for _replace_all fast path)
+sub expand_replacement_for_text {
+    my ($self, $matched_text, $replacement, $re) = @_;
+
+    my $captures = $self->_extract_captures($matched_text, $re);
+    return $self->_expand_replacement($replacement, $matched_text, $captures);
+}
+
+# Map capture group positions within expanded replacement text
+# Returns arrayref of { start, end, group } with positions relative to base_offset
+sub _map_replacement_capture_positions {
+    my ($self, $replacement, $matched_text, $captures, $base_offset) = @_;
+
+    my @regions;
+    my $pos = 0;  # position in expanded output
+    my $i = 0;
+    my $len = length($replacement);
+
+    while ($i < $len) {
+        my $ch = substr($replacement, $i, 1);
+
+        if ($ch eq '$') {
+            if ($i + 1 < $len) {
+                my $next = substr($replacement, $i + 1, 1);
+                if ($next eq '$') {
+                    $pos++;
+                    $i += 2;
+                    next;
+                }
+                if ($next =~ /[0-9]/) {
+                    my $num_str = '';
+                    my $j = $i + 1;
+                    while ($j < $len && substr($replacement, $j, 1) =~ /[0-9]/) {
+                        $num_str .= substr($replacement, $j, 1);
+                        $j++;
+                    }
+                    my $num = int($num_str);
+                    my $text;
+                    if ($num == 0) {
+                        $text = $matched_text;
+                        # $0 = full match, no group color
+                    } elsif ($num <= scalar @$captures && defined $captures->[$num - 1]) {
+                        $text = $captures->[$num - 1];
+                        if (length($text) > 0) {
+                            push @regions, {
+                                start => $base_offset + $pos,
+                                end   => $base_offset + $pos + length($text),
+                                group => $num,
+                            };
+                        }
+                    } else {
+                        $text = '$' . $num_str;
+                    }
+                    $pos += length($text // '');
+                    $i = $j;
+                    next;
+                }
+            }
+            $pos++;
+            $i++;
+        } else {
+            $pos++;
+            $i++;
+        }
+    }
+
+    return \@regions;
+}
+
+# Extract capture group positions within matched text (for highlighting)
+# Returns arrayref of { start, length, group } relative to match start
+sub extract_capture_positions {
+    my ($self, $match) = @_;
+
+    return [] unless $self->{use_regex};
+
+    my $doc = $self->{document};
+    my $line_content = $doc->get_line_content($match->{line});
+    my $matched_text = substr($line_content, $match->{col}, $match->{length});
+
+    my $re = $self->_build_regex($self->{search_term});
+    return [] unless $re;
+
+    return $self->_extract_capture_positions($matched_text, $re);
+}
+
 # =============================================================================
 # Replace Preview (Virtual - doesn't modify document)
 # =============================================================================
@@ -227,7 +356,8 @@ sub matches_for_line {
 }
 
 # Compute what a line would look like with replacements applied
-# Returns: { text => "replaced text", highlights => [{start, end}, ...] }
+# Returns: { text => "replaced text", highlights => [{start, end}, ...],
+#            capture_regions => [{start, end, group}, ...] }
 sub preview_line {
     my ($self, $line_num, $replacement) = @_;
 
@@ -235,7 +365,7 @@ sub preview_line {
     my $original = $doc->get_line_content($line_num);
     my $matches = $self->matches_for_line($line_num);
 
-    return { text => $original, highlights => [] } unless @$matches;
+    return { text => $original, highlights => [], capture_regions => [] } unless @$matches;
 
     # Sort matches by column (should already be sorted, but ensure)
     my @sorted = sort { $a->{col} <=> $b->{col} } @$matches;
@@ -243,19 +373,38 @@ sub preview_line {
     # Build replaced text and track highlight positions
     my $result = '';
     my @highlights;
+    my @capture_regions;
     my $last_end = 0;
-    my $rep_len = length($replacement);
+
+    # Check if we need to compute capture regions
+    my $capture_regex = $self->capture_regex();
+    my $has_captures = $capture_regex && $self->capture_group_count() > 0
+                       && $replacement =~ /\$/;
 
     for my $m (@sorted) {
         # Add text before this match
         $result .= substr($original, $last_end, $m->{col} - $last_end);
 
+        # Expand capture references if in regex mode
+        my $expanded = $self->expand_replacement_for_match($m, $replacement);
+
         # Track highlight position in result
         my $highlight_start = length($result);
-        $result .= $replacement;
+
+        # Compute capture group positions within the replacement text
+        if ($has_captures) {
+            my $matched_text = substr($original, $m->{col}, $m->{length});
+            my $captures = $self->_extract_captures($matched_text, $capture_regex);
+            my $regions = $self->_map_replacement_capture_positions(
+                $replacement, $matched_text, $captures, $highlight_start
+            );
+            push @capture_regions, @$regions;
+        }
+
+        $result .= $expanded;
         push @highlights, {
             start => $highlight_start,
-            end   => $highlight_start + $rep_len,
+            end   => $highlight_start + length($expanded),
         };
 
         $last_end = $m->{col} + $m->{length};
@@ -264,7 +413,7 @@ sub preview_line {
     # Add remaining text
     $result .= substr($original, $last_end);
 
-    return { text => $result, highlights => \@highlights };
+    return { text => $result, highlights => \@highlights, capture_regions => \@capture_regions };
 }
 
 # Get preview info for visible lines (for renderer)
@@ -300,6 +449,162 @@ sub _build_regex {
 
     my $re = eval { qr/(?$flags)$pattern/ };
     return $re;
+}
+
+# Count capturing groups in a regex pattern string
+sub _count_capture_groups {
+    my ($self, $pattern) = @_;
+
+    my $count = 0;
+    my $i = 0;
+    my $len = length($pattern);
+
+    while ($i < $len) {
+        my $ch = substr($pattern, $i, 1);
+
+        # Skip escaped characters
+        if ($ch eq '\\') {
+            $i += 2;
+            next;
+        }
+
+        # Skip character classes entirely (parens inside don't count)
+        if ($ch eq '[') {
+            $i++;
+            # Handle negation
+            $i++ if $i < $len && substr($pattern, $i, 1) eq '^';
+            # Handle ] as first char in class (literal)
+            $i++ if $i < $len && substr($pattern, $i, 1) eq ']';
+            while ($i < $len && substr($pattern, $i, 1) ne ']') {
+                $i++ if substr($pattern, $i, 1) eq '\\';
+                $i++;
+            }
+            $i++;  # Skip closing ]
+            next;
+        }
+
+        if ($ch eq '(') {
+            if ($i + 1 < $len && substr($pattern, $i + 1, 1) eq '?') {
+                # Check for named capture (?<name>...) which IS capturing
+                if ($i + 2 < $len && substr($pattern, $i + 2, 1) eq '<') {
+                    # (?<= and (?<! are lookbehind, not capturing
+                    # (?<name> where name starts with letter/underscore IS capturing
+                    if ($i + 3 < $len && substr($pattern, $i + 3, 1) =~ /[A-Za-z_]/) {
+                        $count++;
+                    }
+                }
+                elsif ($i + 2 < $len && substr($pattern, $i + 2, 1) eq 'P'
+                    && $i + 3 < $len && substr($pattern, $i + 3, 1) eq '<') {
+                    # (?P<name>...) - Python-style named capture, also works in Perl
+                    $count++;
+                }
+                # All other (?...) forms are non-capturing
+            } else {
+                # Plain ( = capturing group
+                $count++;
+            }
+        }
+
+        $i++;
+    }
+
+    return $count;
+}
+
+# Extract capture group values from matched text
+# Returns arrayref of capture strings
+sub _extract_captures {
+    my ($self, $matched_text, $re) = @_;
+
+    my @captures;
+    if ($matched_text =~ /$re/) {
+        no strict 'refs';
+        for my $i (1 .. 20) {
+            last unless defined ${ $i };
+            push @captures, ${ $i };
+        }
+    }
+
+    return \@captures;
+}
+
+# Extract capture group positions within matched text
+# Returns arrayref of { start, length, group } relative to match start
+sub _extract_capture_positions {
+    my ($self, $matched_text, $re) = @_;
+
+    my @positions;
+    if ($matched_text =~ /$re/) {
+        for my $i (1 .. $#+) {
+            if (defined $-[$i]) {
+                push @positions, {
+                    start  => $-[$i],
+                    length => $+[$i] - $-[$i],
+                    group  => $i,
+                };
+            }
+        }
+    }
+
+    return \@positions;
+}
+
+# Expand capture references in a replacement template
+# $0 = full match, $1 = first capture, etc.
+# $$ = literal $
+sub _expand_replacement {
+    my ($self, $replacement, $matched_text, $captures) = @_;
+
+    my $result = '';
+    my $i = 0;
+    my $len = length($replacement);
+
+    while ($i < $len) {
+        my $ch = substr($replacement, $i, 1);
+
+        if ($ch eq '$') {
+            if ($i + 1 < $len) {
+                my $next = substr($replacement, $i + 1, 1);
+
+                if ($next eq '$') {
+                    # $$ -> literal $
+                    $result .= '$';
+                    $i += 2;
+                    next;
+                }
+
+                if ($next =~ /[0-9]/) {
+                    # Collect all consecutive digits
+                    my $num_str = '';
+                    my $j = $i + 1;
+                    while ($j < $len && substr($replacement, $j, 1) =~ /[0-9]/) {
+                        $num_str .= substr($replacement, $j, 1);
+                        $j++;
+                    }
+                    my $num = int($num_str);
+
+                    if ($num == 0) {
+                        $result .= $matched_text;
+                    } elsif ($num <= scalar @$captures) {
+                        $result .= $captures->[$num - 1];
+                    } else {
+                        # Beyond capture count: leave as literal
+                        $result .= '$' . $num_str;
+                    }
+                    $i = $j;
+                    next;
+                }
+            }
+            # $ at end or $ followed by non-digit/non-$ -> literal $
+            $result .= '$';
+            $i++;
+        } else {
+            $result .= $ch;
+            $i++;
+        }
+    }
+
+    return $result;
 }
 
 # Search a range of lines using cached text (fast)
