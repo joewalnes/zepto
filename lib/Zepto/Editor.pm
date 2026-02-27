@@ -146,14 +146,15 @@ sub active_file_path  { $_[0]->{tab_manager}->active_file_path() }
 sub active_tab        { $_[0]->{tab_manager}->active_tab() }
 
 sub _create_document_state {
-    my ($self, $file_path) = @_;
+    my ($self, $file_path, %opts) = @_;
 
     my $doc;
     if ($file_path && -f $file_path) {
-        $doc = Zepto::Document->load($file_path);
+        $doc = Zepto::Document->load($file_path, skip_vcs => $opts{skip_vcs});
     } else {
         $doc = Zepto::Document->new(
             path => $file_path,
+            ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
         );
     }
 
@@ -685,6 +686,16 @@ sub handle_mouse_event {
         # Check if click is in tab bar (row 2)
         if ($y == 2) {
             $self->handle_tab_bar_click($x);
+            # Start tab drag if we clicked on a tab (not close/scroll buttons)
+            my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+            for my $btn (@buttons) {
+                next unless $btn->{type} eq 'tab';
+                if ($x >= $btn->{start} + 1 && $x <= $btn->{end} + 1) {
+                    $self->{tab_dragging} = $btn->{index};
+                    $self->{tab_drag_start_x} = $x;
+                    last;
+                }
+            }
             return;
         }
 
@@ -859,8 +870,19 @@ sub handle_mouse_event {
         $self->{minimap_dragging} = 0;
         $self->{tree_border_dragging} = 0;
         $self->{tree_scrollbar_dragging} = 0;
+        $self->{tab_dragging} = undef;
     }
     elsif ($action eq 'scroll') {
+        # Scroll on tab bar — cycle through tabs
+        if ($y == 2) {
+            if ($event->{button} eq 'up') {
+                $self->cmd_prev_tab();
+            } else {
+                $self->cmd_next_tab();
+            }
+            return;
+        }
+
         # Scroll in tree panel
         my $tw = 0;
         if ($self->{file_tree} && $self->{prefs}->show_tree()) {
@@ -886,6 +908,12 @@ sub handle_mouse_event {
         # Only handle drag if mouse button is actually down
         # (some terminals send spurious motion events)
         return unless $self->{mouse_button_down};
+
+        # Handle tab drag reorder
+        if (defined $self->{tab_dragging}) {
+            $self->_handle_tab_drag($x, $y);
+            return;
+        }
 
         # Handle tree border drag (resize)
         if ($self->{tree_border_dragging} && $self->{file_tree}) {
@@ -998,6 +1026,38 @@ sub handle_tab_bar_click {
             $self->_switch_to_tab($btn->{index});
             return;
         }
+    }
+}
+
+# Handle tab drag reorder: find which tab position the cursor is over
+# and move the dragged tab there.
+sub _handle_tab_drag {
+    my ($self, $x, $y) = @_;
+
+    # Only reorder while dragging on the tab bar row
+    return unless $y == 2;
+
+    my $from = $self->{tab_dragging};
+    my $tm = $self->{tab_manager};
+    return unless defined $from && $from >= 0 && $from < $tm->tab_count();
+
+    # Hit-test against tab button midpoints to find the drop target
+    my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+    my $to;
+    for my $btn (@buttons) {
+        next unless $btn->{type} eq 'tab';
+        my $mid = ($btn->{start} + $btn->{end}) / 2 + 1;  # +1 for 1-indexed
+        if ($x <= $mid) {
+            $to = $btn->{index};
+            last;
+        }
+        $to = $btn->{index};  # past this tab's midpoint, candidate is here
+    }
+
+    return unless defined $to;
+    if ($to != $from) {
+        $tm->move_tab($from, $to);
+        $self->{tab_dragging} = $to;  # Follow the moved tab
     }
 }
 
@@ -2670,9 +2730,9 @@ sub _tree_preview_current {
         return;
     }
 
-    # Open file in a new transient tab
+    # Open file in a new transient tab (skip VCS to keep preview instant)
     eval {
-        my ($doc, $view, $fe, $hl) = $self->_create_document_state($path);
+        my ($doc, $view, $fe, $hl) = $self->_create_document_state($path, skip_vcs => 1);
         $self->{tab_manager}->add_tab(
             document => $doc, view => $view,
             find_engine => $fe, highlighter => $hl,
@@ -2738,8 +2798,10 @@ sub _tree_open_selected {
         return;
     }
 
-    # If previewing this file, confirm it (keep the tab)
+    # If previewing this file, confirm it (keep the tab, init VCS now)
     if ($tree->{preview_active}) {
+        # Preview was loaded without VCS — initialize it now for gutter indicators
+        $self->active_doc()->init_vcs();
         $tree->{preview_active} = 0;
         $tree->{preview_path} = undef;
         $tree->{pre_preview_tab_index} = undef;
@@ -2803,8 +2865,11 @@ sub render {
         # Tree spans rows 2..N-1 (2 more rows than text area which starts at row 4)
         $self->{file_tree}->set_viewport_height($rows - RESERVED_ROWS + 2);
         # Update VCS statuses (debounced internally)
-        my $vcs = $self->active_doc()->{_vcs_provider};
-        $self->{file_tree}->update_vcs_statuses($vcs) if $vcs;
+        # Skip while tree is focused — git status blocks too long on large repos
+        if (!$self->{file_tree}->focused()) {
+            my $vcs = $self->active_doc()->{_vcs_provider};
+            $self->{file_tree}->update_vcs_statuses($vcs) if $vcs;
+        }
     }
 
     # Update view size - account for gutter width

@@ -39,8 +39,8 @@ sub new {
         _vcs_last_diff  => 0,      # Timestamp of last diff computation
     }, $class;
 
-    # Detect VCS if path is provided
-    if (defined $opts{path}) {
+    # Detect VCS if path is provided (skip_vcs defers this for preview tabs)
+    if (defined $opts{path} && !$opts{skip_vcs}) {
         $self->_init_vcs();
     }
 
@@ -48,8 +48,9 @@ sub new {
 }
 
 # Load document from file
+# Options: skip_vcs => 1 to defer VCS initialization (for preview tabs)
 sub load {
-    my ($class, $path) = @_;
+    my ($class, $path, %opts) = @_;
 
     open my $fh, '<:encoding(UTF-8)', $path
         or die "Cannot open $path: $!";
@@ -77,7 +78,15 @@ sub load {
         path        => $path,
         line_ending => $line_ending,
         permissions => $permissions,
+        ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
     );
+}
+
+# Initialize VCS for a document that was loaded with skip_vcs
+sub init_vcs {
+    my ($self) = @_;
+    return if $self->{_vcs_provider};  # already initialized
+    $self->_init_vcs() if defined $self->{path};
 }
 
 # Save document to file

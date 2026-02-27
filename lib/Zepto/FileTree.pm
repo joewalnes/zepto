@@ -27,7 +27,7 @@ use constant {
     INDENT_PER_LEVEL   => 2,
     MAX_INDENT         => 16,   # clamp at 8 levels deep
     RESIZE_STEP        => 2,
-    VCS_DEBOUNCE_SEC   => 1.0,
+    VCS_DEBOUNCE_SEC   => 5.0,
 };
 
 # =============================================================================
