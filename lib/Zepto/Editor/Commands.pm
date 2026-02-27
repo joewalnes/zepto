@@ -39,7 +39,6 @@ sub cmd_save {
                         $self->show_message("Error: $@");
                     }
                     else {
-                        $self->update_title();
                         $self->show_message("Saved: $filename");
                     }
                 }
@@ -115,7 +114,6 @@ sub _do_close_tab {
 
     # Restore find state from the new active tab
     $self->_restore_find_state_from_tab();
-    $self->update_title();
 }
 
 sub cmd_quit {
@@ -200,8 +198,6 @@ sub cmd_new_file {
         file_path     => undef,
         untitled_name => $untitled_name,
     );
-
-    $self->update_title();
 }
 
 sub cmd_open_file {
@@ -243,8 +239,6 @@ sub _load_file {
             highlighter => $highlighter,
             file_path   => $path,
         );
-
-        $self->update_title();
     };
     if ($@) {
         $self->show_message("Error opening file: $@");
@@ -624,7 +618,12 @@ sub _switch_to_tab {
     # Restore find state from new tab
     $self->_restore_find_state_from_tab();
 
-    $self->update_title();
+    # Auto-reveal active file in tree (skip when tree is focused to avoid
+    # destabilizing cursor/scroll during preview navigation)
+    if ($self->{file_tree} && $self->active_file_path() && !$self->{file_tree}->focused()) {
+        $self->{file_tree}->set_current_file($self->active_file_path());
+        $self->{file_tree}->expand_to_path($self->active_file_path());
+    }
 }
 
 sub _save_find_state_to_tab {

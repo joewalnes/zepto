@@ -18,6 +18,7 @@ use strict;
 use warnings;
 use utf8;
 use Carp;
+use Time::HiRes qw(time);
 
 use Exporter 'import';
 our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FILE_PICKER STATE_FIND STATE_QUIT);
@@ -37,6 +38,7 @@ use Zepto::Highlighter;
 use Zepto::FindEngine;
 use Zepto::LineMap;
 use Zepto::Editor::TabManager;
+use Zepto::FileTree;
 
 # Editor states
 use constant {
@@ -120,6 +122,13 @@ sub new {
 
         # File picker state
         file_picker  => undef,
+
+        # File tree state
+        file_tree            => undef,
+        tree_border_dragging => 0,
+
+        # Title cache — avoids redundant terminal writes
+        _last_title => '',
     }, $class;
 
     # Initialize theme
@@ -235,8 +244,14 @@ sub init {
         );
     }
 
-    # Set terminal title
-    $self->update_title();
+    # Initialize file tree
+    if ($self->{prefs}->show_tree()) {
+        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+        if ($self->active_file_path()) {
+            $self->{file_tree}->set_current_file($self->active_file_path());
+            $self->{file_tree}->expand_to_path($self->active_file_path());
+        }
+    }
 
     return $self;
 }
@@ -401,6 +416,9 @@ sub update_title {
         $title .= ' - ' . $name if $name;
     }
 
+    # Skip redundant terminal writes
+    return if $self->{_last_title} eq $title;
+    $self->{_last_title} = $title;
     $self->{terminal}->set_title($title);
 }
 
@@ -464,6 +482,23 @@ sub handle_event {
 
 sub handle_editing_event {
     my ($self, $event) = @_;
+
+    # If file tree is focused, check for global shortcuts first, then route to tree
+    if ($self->{file_tree} && $self->{file_tree}->focused()) {
+        # Ctrl+letter arrives as 'char' type with ctrl modifier, not 'key' type
+        if ($event->{type} eq 'char' && Zepto::InputParser::has_modifier($event, 'ctrl')) {
+            my $ch = lc($event->{char});
+            # Global shortcuts that work regardless of focus
+            if ($ch eq 'q' || $ch eq 's' || $ch eq 'n' ||
+                $ch eq 'o' || $ch eq 'w' || $ch eq 'f' ||
+                $ch eq 't' || $ch eq 'p' || $ch eq 'b') {
+                $self->handle_ctrl_char($ch);
+                return;
+            }
+        }
+        $self->handle_tree_event($event);
+        return;
+    }
 
     my $type = $event->{type};
     my $view = $self->active_view();
@@ -591,6 +626,7 @@ sub handle_ctrl_char {
     # View
     elsif ($char eq 't') { $self->cmd_toggle_theme(); }
     elsif ($char eq 'p') { $self->cmd_toggle_powerline(); }
+    elsif ($char eq 'b') { $self->cmd_toggle_tree(); }
 
     # Reset quit pending for any other command
     $self->{quit_pending} = 0 unless $char eq 'q';
@@ -662,6 +698,76 @@ sub handle_mouse_event {
             return;
         }
 
+        # Check tree panel region (columns 1..tree_width, rows 2+)
+        my $tree_width = 0;
+        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+            $tree_width = $self->{file_tree}->panel_width() + 1;
+        }
+        if ($tree_width > 0 && $x <= $tree_width && $y >= 2 && $y < $rows) {
+            if ($x == $tree_width) {
+                # Border column — start resize drag
+                $self->{tree_border_dragging} = 1;
+                return;
+            }
+
+            my $tree = $self->{file_tree};
+            my $tree_row = $y - 2;
+            my $stickies = $tree->sticky_headers();
+            my $sticky_count = scalar @$stickies;
+            my $filter_rows = $tree->filter_active() ? 1 : 0;
+
+            # Check if click is on scrollbar column (rightmost col of panel)
+            my $sb = $tree->scrollbar_data();
+            my $has_scrollbar = ($sb->{total} > $sb->{visible});
+            if ($has_scrollbar && $x == $tree_width - 1) {
+                # Start scrollbar drag
+                $self->{tree_scrollbar_dragging} = 1;
+                $self->_handle_tree_scrollbar_drag($tree_row - $sticky_count - $filter_rows, $sb);
+                return;
+            }
+
+            my $content_row = $tree_row - $sticky_count - $filter_rows;
+            if ($content_row >= 0) {
+                my $flat_idx = $tree->scroll() + $content_row;
+                if ($flat_idx < $tree->visible_count()) {
+                    $tree->set_cursor($flat_idx);
+                    $tree->set_focused(1);
+                    my $node = $tree->cursor_node();
+                    if ($node) {
+                        # Detect double-click (same item within 400ms)
+                        my $now = time();
+                        my $is_double = (
+                            defined $self->{_tree_last_click_idx} &&
+                            $self->{_tree_last_click_idx} == $flat_idx &&
+                            ($now - ($self->{_tree_last_click_time} // 0)) < 0.4
+                        );
+                        $self->{_tree_last_click_time} = $now;
+                        $self->{_tree_last_click_idx} = $flat_idx;
+
+                        if ($node->{is_dir}) {
+                            # Click on dir → toggle expand/collapse
+                            $tree->toggle_current();
+                        } elsif ($is_double) {
+                            # Double-click on file → open and focus document
+                            if ($tree->{preview_active}) {
+                                $tree->{preview_active} = 0;
+                                $tree->{preview_path} = undef;
+                                $tree->{pre_preview_tab_index} = undef;
+                            } else {
+                                $self->_load_file($node->{path});
+                            }
+                            $tree->set_current_file($node->{path});
+                            $tree->set_focused(0);
+                        } else {
+                            # Single-click on file → preview (like arrow navigation)
+                            $self->_tree_preview_current();
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
         # Click in text area
         my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
         my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
@@ -680,7 +786,7 @@ sub handle_mouse_event {
             return;
         }
 
-        my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
+        my $visual_col = $x - $tree_width - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
         # Resolve display row to entry via LineMap
         my $line_map = $view->line_map();
@@ -751,8 +857,24 @@ sub handle_mouse_event {
         # Track mouse button state
         $self->{mouse_button_down} = 0;
         $self->{minimap_dragging} = 0;
+        $self->{tree_border_dragging} = 0;
+        $self->{tree_scrollbar_dragging} = 0;
     }
     elsif ($action eq 'scroll') {
+        # Scroll in tree panel
+        my $tw = 0;
+        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+            $tw = $self->{file_tree}->panel_width() + 1;
+        }
+        if ($tw > 0 && $x <= $tw && $y >= 4) {
+            if ($event->{button} eq 'up') {
+                $self->{file_tree}->move_up();
+            } else {
+                $self->{file_tree}->move_down();
+            }
+            return;
+        }
+
         if ($event->{button} eq 'up') {
             $view->move_up() for (1..3);
         }
@@ -764,6 +886,24 @@ sub handle_mouse_event {
         # Only handle drag if mouse button is actually down
         # (some terminals send spurious motion events)
         return unless $self->{mouse_button_down};
+
+        # Handle tree border drag (resize)
+        if ($self->{tree_border_dragging} && $self->{file_tree}) {
+            $self->{file_tree}->set_width($x - 1);
+            return;
+        }
+
+        # Handle tree scrollbar drag
+        if ($self->{tree_scrollbar_dragging} && $self->{file_tree}) {
+            my $tree = $self->{file_tree};
+            my $tree_row = $y - 2;
+            my $stickies = $tree->sticky_headers();
+            my $sticky_count = scalar @$stickies;
+            my $filter_rows = $tree->filter_active() ? 1 : 0;
+            my $sb = $tree->scrollbar_data();
+            $self->_handle_tree_scrollbar_drag($tree_row - $sticky_count - $filter_rows, $sb);
+            return;
+        }
 
         # Handle minimap drag (scrollbar behavior)
         if ($self->{minimap_dragging}) {
@@ -779,7 +919,11 @@ sub handle_mouse_event {
         my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
         my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
-        my $visual_col = $x - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
+        my $drag_tree_w = 0;
+        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+            $drag_tree_w = $self->{file_tree}->panel_width() + 1;
+        }
+        my $visual_col = $x - $drag_tree_w - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
         # Resolve display row via LineMap
         my $line_map = $view->line_map();
@@ -2412,11 +2556,230 @@ sub cmd_toggle_diff {
 }
 
 # =============================================================================
+# File Tree
+# =============================================================================
+
+sub handle_tree_event {
+    my ($self, $event) = @_;
+    my $tree = $self->{file_tree};
+
+    if ($event->{type} eq 'key') {
+        my $key = $event->{key};
+        my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
+
+        if    ($key eq 'up')       { $tree->move_up(); $self->_tree_preview_current(); }
+        elsif ($key eq 'down')     { $tree->move_down(); $self->_tree_preview_current(); }
+        elsif ($key eq 'left')     { $tree->collapse_current(); }
+        elsif ($key eq 'right')    { $tree->expand_current(); }
+        elsif ($key eq 'enter')    { $self->_tree_open_selected(); }
+        elsif ($key eq 'escape') {
+            if ($tree->filter_active()) { $tree->clear_filter(); }
+            else { $self->_tree_unfocus(); }
+        }
+        elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); }
+        elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); }
+        elsif ($key eq 'home')     { $tree->home(); }
+        elsif ($key eq 'end')      { $tree->end(); }
+        elsif ($key eq 'backspace' && $tree->filter_active()) { $tree->filter_backspace(); }
+    }
+    elsif ($event->{type} eq 'char') {
+        my $char = $event->{char};
+        if    ($char eq '{') { $tree->shrink(2); }
+        elsif ($char eq '}') { $tree->grow(2); }
+        elsif ($char eq ' ') { $tree->toggle_current(); }
+        elsif ($char eq '/') { $tree->start_filter(); }
+        elsif ($tree->filter_active()) { $tree->filter_append_char($char); }
+    }
+    elsif ($event->{type} eq 'mouse') {
+        $self->handle_mouse_event($event);
+    }
+}
+
+sub cmd_toggle_tree {
+    my ($self) = @_;
+
+    if ($self->{file_tree}) {
+        if ($self->{file_tree}->focused()) {
+            $self->_tree_unfocus();
+        } else {
+            $self->{file_tree}->set_focused(1);
+            $self->_tree_reveal_current();
+        }
+    } else {
+        # Create tree if it doesn't exist
+        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+        $self->{file_tree}->set_focused(1);
+        $self->_tree_reveal_current();
+    }
+}
+
+sub _tree_reveal_current {
+    my ($self) = @_;
+    my $tree = $self->{file_tree};
+    return unless $tree;
+
+    if ($self->active_file_path()) {
+        $tree->set_current_file($self->active_file_path());
+        $tree->expand_to_path($self->active_file_path());
+    }
+}
+
+use constant PREVIEW_MAX_FILE_SIZE => 100_000;  # 100KB — skip preview for large files
+
+sub _tree_preview_current {
+    my ($self) = @_;
+    my $tree = $self->{file_tree};
+    my $node = $tree->cursor_node();
+    return unless $node && !$node->{is_dir};
+
+    my $path = $node->{path};
+    return if $tree->{preview_path} && $tree->{preview_path} eq $path;
+
+    # Skip preview for large files to avoid UI freeze
+    my $file_size = -s $path;
+    if (defined $file_size && $file_size > PREVIEW_MAX_FILE_SIZE) {
+        # Cancel any active preview and show nothing
+        if ($tree->{preview_active}) {
+            $self->_close_preview_tab();
+            if (defined $tree->{pre_preview_tab_index}) {
+                my $idx = $tree->{pre_preview_tab_index};
+                $idx = 0 if $idx >= $self->{tab_manager}->tab_count();
+                $self->_switch_to_tab($idx);
+            }
+            $tree->{preview_active} = 0;
+            $tree->{preview_path} = undef;
+        }
+        return;
+    }
+
+    # If already previewing a different file, close that preview tab first
+    if ($tree->{preview_active}) {
+        $self->_close_preview_tab();
+    } else {
+        # Remember which tab to return to
+        $tree->{pre_preview_tab_index} = $self->{tab_manager}->active_index();
+    }
+
+    # Check if file already open in a tab — just switch to it
+    my $existing = $self->{tab_manager}->find_tab_by_path($path);
+    if (defined $existing) {
+        $self->_switch_to_tab($existing);
+        $tree->{preview_active} = 1;
+        $tree->{preview_path} = $path;
+        $tree->{_preview_is_existing_tab} = 1;
+        return;
+    }
+
+    # Open file in a new transient tab
+    eval {
+        my ($doc, $view, $fe, $hl) = $self->_create_document_state($path);
+        $self->{tab_manager}->add_tab(
+            document => $doc, view => $view,
+            find_engine => $fe, highlighter => $hl,
+            file_path => $path,
+        );
+        $tree->{preview_active} = 1;
+        $tree->{preview_path} = $path;
+        $tree->{_preview_is_existing_tab} = 0;
+    };
+}
+
+sub _close_preview_tab {
+    my ($self) = @_;
+    my $tree = $self->{file_tree};
+
+    # Only close if it's a transient tab we created
+    return unless $tree->{preview_active} && !$tree->{_preview_is_existing_tab};
+
+    my $preview_path = $tree->{preview_path};
+    return unless defined $preview_path;
+
+    # Find and remove the preview tab
+    my $idx = $self->{tab_manager}->find_tab_by_path($preview_path);
+    if (defined $idx) {
+        $self->{tab_manager}->remove_tab($idx);
+    }
+}
+
+sub _tree_unfocus {
+    my ($self) = @_;
+    my $tree = $self->{file_tree};
+
+    # Cancel preview: close transient tab, return to original
+    if ($tree->{preview_active} && !$tree->{_preview_is_existing_tab}) {
+        $self->_close_preview_tab();
+    }
+    # Restore original tab
+    if (defined $tree->{pre_preview_tab_index}) {
+        my $idx = $tree->{pre_preview_tab_index};
+        $idx = 0 if $idx >= $self->{tab_manager}->tab_count();
+        $self->_switch_to_tab($idx);
+    }
+    $tree->{preview_active} = 0;
+    $tree->{preview_path} = undef;
+    $tree->{pre_preview_tab_index} = undef;
+    $tree->set_focused(0);
+
+    # Now that tree is unfocused, update highlight to match active tab
+    if ($self->active_file_path()) {
+        $tree->set_current_file($self->active_file_path());
+        $tree->expand_to_path($self->active_file_path());
+    }
+}
+
+sub _tree_open_selected {
+    my ($self) = @_;
+    my $tree = $self->{file_tree};
+    my $node = $tree->cursor_node();
+    return unless $node;
+
+    if ($node->{is_dir}) {
+        $tree->toggle_current();
+        return;
+    }
+
+    # If previewing this file, confirm it (keep the tab)
+    if ($tree->{preview_active}) {
+        $tree->{preview_active} = 0;
+        $tree->{preview_path} = undef;
+        $tree->{pre_preview_tab_index} = undef;
+    } else {
+        # Open file via existing _load_file (handles duplicate detection)
+        $self->_load_file($node->{path});
+    }
+
+    $tree->set_current_file($node->{path});
+    $tree->set_focused(0);
+}
+
+# Map a scrollbar drag y-position to a scroll offset in the tree
+sub _handle_tree_scrollbar_drag {
+    my ($self, $row_in_content, $sb) = @_;
+    my $tree = $self->{file_tree};
+    return unless $sb->{visible} > 0 && $sb->{total} > $sb->{visible};
+
+    # Clamp row to content area
+    $row_in_content = 0 if $row_in_content < 0;
+    $row_in_content = $sb->{visible} - 1 if $row_in_content >= $sb->{visible};
+
+    # Map row position to scroll offset proportionally
+    my $scroll_range = $sb->{total} - $sb->{visible};
+    my $new_scroll = int(($row_in_content * $scroll_range) / ($sb->{visible} - 1 || 1));
+    $new_scroll = 0 if $new_scroll < 0;
+    $new_scroll = $scroll_range if $new_scroll > $scroll_range;
+
+    $tree->set_scroll($new_scroll);
+}
+
+# =============================================================================
 # Rendering
 # =============================================================================
 
 sub render {
     my ($self) = @_;
+
+    # Keep terminal title in sync — cached, so no-op when unchanged
+    $self->update_title();
 
     # Update VCS diff if needed (debounced)
     $self->active_doc()->update_vcs_diff();
@@ -2434,6 +2797,15 @@ sub render {
 
     my $term = $self->{terminal};
     my ($rows, $cols) = $term->get_size();
+
+    # Sync file tree viewport height and VCS statuses
+    if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+        # Tree spans rows 2..N-1 (2 more rows than text area which starts at row 4)
+        $self->{file_tree}->set_viewport_height($rows - RESERVED_ROWS + 2);
+        # Update VCS statuses (debounced internally)
+        my $vcs = $self->active_doc()->{_vcs_provider};
+        $self->{file_tree}->update_vcs_statuses($vcs) if $vcs;
+    }
 
     # Update view size - account for gutter width
     my $line_count = $self->active_doc()->line_count();
@@ -2463,6 +2835,7 @@ sub render {
             tabs => $self->{tab_manager}->tabs_for_render(),
             active_tab_index => $self->{tab_manager}->active_index(),
             tab_manager => $self->{tab_manager},
+            file_tree => ($self->{prefs}->show_tree() && $self->{file_tree}) ? $self->{file_tree} : undef,
             find_mode => ($self->{state} eq STATE_FIND) ? {
                 value          => $self->{find_input},
                 cursor         => $self->{find_input_cursor},

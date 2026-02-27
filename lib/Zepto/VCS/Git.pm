@@ -192,6 +192,32 @@ sub _get_head_mtime {
     return (stat($head_file))[9] // 0;
 }
 
+# Get worktree status for all tracked/untracked files
+# Returns hashref: { relative_path => status_string }
+sub get_worktree_status {
+    my ($self) = @_;
+    my $repo_root = $self->{repo_root};
+    my $cmd = "cd " . _shell_quote($repo_root) . " && git status --porcelain 2>/dev/null";
+    my $output = `$cmd`;
+    return {} if $? != 0;
+
+    my %status;
+    for my $line (split /\n/, $output) {
+        my ($xy, $file) = ($line =~ /^(..) (.+)$/);
+        next unless defined $file;
+        # Strip quotes from filenames with special chars
+        $file =~ s/^"(.+)"$/$1/;
+        my $idx = substr($xy, 0, 1);
+        my $wt  = substr($xy, 1, 1);
+
+        if    ($wt eq '?' || $idx eq '?')        { $status{$file} = 'untracked'; }
+        elsif ($wt eq 'M' || $wt eq 'D')         { $status{$file} = 'modified'; }
+        elsif ($idx eq 'A')                       { $status{$file} = 'added'; }
+        elsif ($idx eq 'M' || $idx eq 'R')        { $status{$file} = 'staged'; }
+    }
+    return \%status;
+}
+
 # Check if HEAD has changed since last check
 # Returns true if changed, and updates stored mtime
 sub head_changed {

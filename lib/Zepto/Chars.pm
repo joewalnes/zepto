@@ -46,6 +46,8 @@ use constant {
     NF_CHECK            => "\x{f00c}",  #
     NF_TIMES            => "\x{f00d}",  #
     NF_MODIFIED         => "\x{f111}",  #  (circle)
+    NF_CARET_RIGHT      => "\x{f0da}",  #  (solid right triangle)
+    NF_CARET_DOWN       => "\x{f0d7}",  #  (solid down triangle)
 };
 
 # Nerd Font devicons (file type icons)
@@ -177,6 +179,16 @@ my %CHARS = (
 
     # Minimap VCS indicator (thinnest bar — compact to match minimap scale)
     minimap_vcs         => [ "\x{258f}",          '|' ],  # ▏ Left one eighth block
+
+    # Tree structure (powerline → ascii)
+    tree_branch         => [ "\x{251c}",          '|' ],  # ├
+    tree_last           => [ BOX_ROUND_BL,        '`' ],  # ╰
+    tree_vertical       => [ BOX_VERTICAL,        '|' ],  # │
+    tree_dash           => [ BOX_HORIZONTAL,      '-' ],  # ─
+
+    # Directory expand/collapse arrows (Nerd Font carets)
+    tree_arrow_right    => [ NF_CARET_RIGHT,      '>' ],  #  (collapsed)
+    tree_arrow_down     => [ NF_CARET_DOWN,        'v' ],  #  (expanded)
 );
 
 # Module state

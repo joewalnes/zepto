@@ -137,4 +137,11 @@ sub _find_repo_root {
     return undef;
 }
 
+# Get worktree status for all files (override in subclass)
+# Returns hashref: { relative_path => status_string }
+# Status strings: 'modified', 'added', 'untracked', 'staged'
+sub get_worktree_status {
+    return {};
+}
+
 1;

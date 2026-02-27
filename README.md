@@ -138,6 +138,15 @@ make test     # Run tests
 - Escape closes menus and dialogs
 - Minimap / vertical scrollbar with braille text density (Alt+M to toggle)
 - Minimap shows viewport position and git change indicators
+- File explorer tree panel (Ctrl+B to toggle)
+  - Directory tree with expand/collapse, single-child dir collapsing
+  - Fuzzy filter (/ to start, type to filter, Esc to clear)
+  - Git status colors (modified, added, untracked, staged)
+  - Sticky headers for scrolled-past ancestor directories
+  - Scrollbar for large trees
+  - Resizable panel ({ and } keys, or drag border with mouse)
+  - File preview on cursor navigation (transient tabs)
+  - Auto-reveals active file on tab switch
 
 ### Mouse Support
 
@@ -147,6 +156,7 @@ make test     # Run tests
 - Click on menu items to activate
 - Scroll wheel for vertical scrolling
 - Click or drag minimap to scroll document
+- Click files in tree panel to open, drag border to resize
 
 ### Themes
 

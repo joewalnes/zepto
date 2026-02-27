@@ -220,6 +220,31 @@ sub dark_theme {
         capture_group_3_dim_bg => bg_rgb(90, 78, 42),   # Dark gold
         capture_group_4_dim_bg => bg_rgb(72, 60, 88),   # Dark purple
 
+        # File tree panel
+        tree_bg               => bg_rgb(22, 23, 34),
+        tree_focused_bg       => bg_rgb(28, 30, 44),
+        tree_fg               => fg_rgb(169, 177, 214),
+        tree_cursor_bg        => bg_rgb(52, 79, 138),
+        tree_cursor_fg        => fg_rgb(255, 255, 255),
+        tree_dir_fg           => fg_rgb(125, 207, 255),
+        tree_indent_fg        => fg_rgb(61, 66, 91),
+        tree_sticky_bg        => bg_rgb(30, 32, 44),
+        tree_sticky_fg        => fg_rgb(120, 130, 165),
+        tree_filter_bg        => bg_rgb(36, 40, 59),
+        tree_filter_fg        => fg_rgb(192, 202, 245),
+        tree_match_fg         => fg_rgb(255, 200, 100),
+        tree_scrollbar_fg     => fg_rgb(86, 95, 137),
+        tree_scrollbar_bg     => bg_rgb(22, 23, 34),
+        tree_border_fg        => fg_rgb(61, 66, 91),
+        tree_border_active_fg => fg_rgb(125, 207, 255),
+        tree_border_drag_fg   => fg_rgb(125, 207, 255),
+        tree_vcs_modified     => fg_rgb(224, 175, 104),
+        tree_vcs_added        => fg_rgb(158, 206, 106),
+        tree_vcs_untracked    => fg_rgb(158, 206, 106),
+        tree_vcs_staged       => fg_rgb(138, 173, 244),
+        tree_vcs_ignored      => fg_rgb(86, 95, 137),
+        tree_preview_fg       => fg_rgb(140, 148, 190),
+
         # Syntax highlighting (Tokyo Night inspired)
         # Comments are prominent - they're documentation, not noise!
         syntax_keyword     => fg_rgb(187, 154, 247),  # Purple - control flow
@@ -386,6 +411,31 @@ sub light_theme {
         capture_group_2_dim_bg => bg_rgb(220, 242, 225),  # Pale green
         capture_group_3_dim_bg => bg_rgb(252, 235, 200),  # Pale gold
         capture_group_4_dim_bg => bg_rgb(235, 225, 248),  # Pale purple
+
+        # File tree panel
+        tree_bg               => bg_rgb(240, 242, 248),
+        tree_focused_bg       => bg_rgb(230, 233, 242),
+        tree_fg               => fg_rgb(76, 79, 105),
+        tree_cursor_bg        => bg_rgb(114, 135, 253),
+        tree_cursor_fg        => fg_rgb(255, 255, 255),
+        tree_dir_fg           => fg_rgb(10, 80, 190),
+        tree_indent_fg        => fg_rgb(172, 176, 190),
+        tree_sticky_bg        => bg_rgb(230, 233, 239),
+        tree_sticky_fg        => fg_rgb(100, 104, 120),
+        tree_filter_bg        => bg_rgb(239, 241, 245),
+        tree_filter_fg        => fg_rgb(76, 79, 105),
+        tree_match_fg         => fg_rgb(223, 142, 29),
+        tree_scrollbar_fg     => fg_rgb(156, 160, 176),
+        tree_scrollbar_bg     => bg_rgb(240, 242, 248),
+        tree_border_fg        => fg_rgb(172, 176, 190),
+        tree_border_active_fg => fg_rgb(114, 135, 253),
+        tree_border_drag_fg   => fg_rgb(114, 135, 253),
+        tree_vcs_modified     => fg_rgb(140, 90, 20),
+        tree_vcs_added        => fg_rgb(22, 120, 55),
+        tree_vcs_untracked    => fg_rgb(22, 120, 55),
+        tree_vcs_staged       => fg_rgb(30, 70, 180),
+        tree_vcs_ignored      => fg_rgb(156, 160, 176),
+        tree_preview_fg       => fg_rgb(130, 136, 156),
 
         # Syntax highlighting - high contrast for light backgrounds
         # Comments are prominent - they're documentation, not noise!

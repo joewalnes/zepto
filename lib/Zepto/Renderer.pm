@@ -20,6 +20,7 @@ use strict;
 use warnings;
 use utf8;
 use Zepto::Chars;
+use Zepto::FileTree;
 use Zepto::Minimap;
 
 # Escape sequences
@@ -69,6 +70,8 @@ use constant {
     DIALOG_WIDTH       => 50,
     DIALOG_HEIGHT      => 5,
     MINIMAP_WIDTH      => 8,  # Must match Zepto::Minimap::MINIMAP_TOTAL_WIDTH
+    TREE_INDENT_PER_LEVEL => 2,   # Must match Zepto::FileTree::INDENT_PER_LEVEL
+    TREE_MAX_INDENT       => 16,  # Must match Zepto::FileTree::MAX_INDENT
 };
 
 # Menu definitions (single source of truth for menu names, order, and items)
@@ -113,6 +116,7 @@ our %MENU_ITEMS = (
         { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
         { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
         { label => 'Minimap',      shortcut => 'Alt+M',  action => 'toggle_minimap', toggle => 'show_minimap' },
+        { label => 'File Tree',    shortcut => 'Ctrl+B', action => 'toggle_tree', toggle => 'show_tree' },
         { separator => 1 },
         { label => 'Next Tab',       shortcut => 'Alt+.',     action => 'next_tab' },
         { label => 'Prev Tab',       shortcut => 'Alt+,',     action => 'prev_tab' },
@@ -225,6 +229,7 @@ sub visual_to_char_col {
 
 # Menu bar buttons on the right side
 our @MENU_BAR_BUTTONS = (
+    { label => 'Files', key => '^B', action => 'toggle_tree', icon => 'folder' },
     { label => 'Open', key => '^O', action => 'open', icon => 'folder_open' },
     { label => 'Save', key => '^S', action => 'save', icon => 'save' },
     { label => 'Quit', key => '^Q', action => 'quit', icon => 'quit' },
@@ -350,20 +355,40 @@ sub render {
         }
     }
 
-    my $text_width = $cols - $gutter_width - $minimap_width;
+    # Calculate tree panel width (panel + border column)
+    my $tree = $ui->{file_tree};
+    my $tree_width = 0;
+    if ($tree && $tree->panel_width() > 0) {
+        my $tw = $tree->panel_width() + 1;  # +1 for border column
+        my $remaining = $cols - $tw - $gutter_width - $minimap_width;
+        if ($remaining >= MIN_TEXT_WIDTH) {
+            $tree_width = $tw;
+        }
+    }
+
+    my $text_width = $cols - $tree_width - $gutter_width - $minimap_width;
     $text_width = MIN_TEXT_WIDTH if $text_width < MIN_TEXT_WIDTH;
 
     # Render menu bar (row 1)
     $output .= _move_to(1, 1);
     $output .= $class->_render_menu_bar($theme, $cols, $ui);
 
-    # Render tab bar (row 2)
-    $output .= _move_to(2, 1);
-    $output .= $class->_render_tab_bar($theme, $cols, $ui);
+    # Render tree panel (rows 2..N-1, left columns)
+    # Tree starts at row 2 so it spans the full height below the menu bar
+    if ($tree_width > 0) {
+        my $tree_height = $text_height + 2;  # +2 for tab bar and ruler rows
+        $output .= $class->_render_tree_panel(
+            $tree, $tree_height, $theme, $tree_width, $ui
+        );
+    }
 
-    # Render ruler bar (row 3)
-    $output .= _move_to(3, 1);
-    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc);
+    # Render tab bar (row 2, right of tree)
+    $output .= _move_to(2, $tree_width + 1);
+    $output .= $class->_render_tab_bar($theme, $cols, $ui, $tree_width);
+
+    # Render ruler bar (row 3, right of tree)
+    $output .= _move_to(3, $tree_width + 1);
+    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui);
 
     # Render text area or file picker
     if ($ui->{file_picker}) {
@@ -376,7 +401,7 @@ sub render {
         $output .= $class->_render_text_area(
             $doc, $view, $theme,
             $text_height, $text_width, $gutter_width, $highlighter,
-            $ui->{find_mode}, $minimap_width
+            $ui->{find_mode}, $minimap_width, $tree_width
         );
     }
 
@@ -397,26 +422,36 @@ sub render {
     } else {
         # Compute contextual hint for status bar
         my ($status_hint, $hint_color);
-        if ($doc && $view && !$message) {
-            my $cl = $view->cursor_line();
-            my $hunk_idx = $doc->vcs_hunk_at_line($cl);
-            if (defined $hunk_idx) {
-                my $hunks = $doc->vcs_hunks();
-                my $h = $hunks->[$hunk_idx];
-                my $type = $h->{type} // 'modified';
-                if ($type eq 'added') {
-                    $hint_color = $theme->color('vcs_added');
-                } elsif ($type eq 'deleted') {
-                    $hint_color = $theme->color('vcs_deleted');
-                } else {
-                    $hint_color = $theme->color('vcs_modified');
+        if ($tree && $tree->focused()) {
+            # Tree focused: show tree-specific hints
+            my $node = $tree->cursor_node();
+            my $node_path = $node ? $node->{path} : '';
+            $status_hint = "\x{2191}\x{2193} nav  \x{2190}\x{2192} fold  Enter open  { } resize  / filter  Esc back";
+            $output .= $class->_render_status_bar(
+                $doc, $view, $theme, $cols, $node_path, $status_hint, undef
+            );
+        } else {
+            if ($doc && $view && !$message) {
+                my $cl = $view->cursor_line();
+                my $hunk_idx = $doc->vcs_hunk_at_line($cl);
+                if (defined $hunk_idx) {
+                    my $hunks = $doc->vcs_hunks();
+                    my $h = $hunks->[$hunk_idx];
+                    my $type = $h->{type} // 'modified';
+                    if ($type eq 'added') {
+                        $hint_color = $theme->color('vcs_added');
+                    } elsif ($type eq 'deleted') {
+                        $hint_color = $theme->color('vcs_deleted');
+                    } else {
+                        $hint_color = $theme->color('vcs_modified');
+                    }
+                    $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
                 }
-                $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
             }
+            $output .= $class->_render_status_bar(
+                $doc, $view, $theme, $cols, $message, $status_hint, $hint_color
+            );
         }
-        $output .= $class->_render_status_bar(
-            $doc, $view, $theme, $cols, $message, $status_hint, $hint_color
-        );
     }
 
     # Render dropdown menu if open
@@ -524,10 +559,20 @@ sub render {
     } elsif ($ui->{prompt}) {
         # Hide cursor during prompt - no text input
         $output .= HIDE_CURSOR;
+    } elsif ($ui->{file_tree} && $ui->{file_tree}->focused()) {
+        # Tree is focused — hide cursor (or show in filter input)
+        if ($ui->{file_tree}->filter_active()) {
+            my $filter_len = length($ui->{file_tree}->filter_query() // '');
+            my $sticky_count = scalar @{$ui->{file_tree}->sticky_headers()};
+            $output .= _move_to(2 + $sticky_count, 4 + $filter_len);  # tree starts at row 2, " / " = 3 chars prefix
+            $output .= SHOW_CURSOR;
+        } else {
+            $output .= HIDE_CURSOR;
+        }
     } elsif ($view && $doc) {
         # Position terminal cursor for editing
         my ($cursor_row, $cursor_col) = $class->_cursor_screen_pos(
-            $view, $gutter_width, $menu_height, $doc
+            $view, $gutter_width, $menu_height, $doc, $tree_width
         );
         $output .= _move_to($cursor_row, $cursor_col);
         $output .= SHOW_CURSOR;
@@ -651,9 +696,12 @@ sub _render_menu_bar {
 
 # Render the tab bar showing open file tabs
 sub _render_tab_bar {
-    my ($class, $theme, $cols, $ui) = @_;
+    my ($class, $theme, $cols, $ui, $tree_width) = @_;
+    $tree_width //= 0;
 
     my $output = '';
+
+    my $tab_cols = $cols - $tree_width;  # available width for tabs
     my $tabs = $ui->{tabs} // [];
     my $active_idx = $ui->{active_tab_index} // 0;
     my $tab_manager = $ui->{tab_manager};
@@ -695,21 +743,21 @@ sub _render_tab_bar {
     my $show_left_arrow = 0;
     my $show_right_arrow = 0;
 
-    if ($total_width > $cols && @tab_info > 1) {
+    if ($total_width > $tab_cols && @tab_info > 1) {
         # Phase 1: Try progressive name truncation
-        _truncate_tab_names(\@tab_info, $cols - $LEADING_SPACE);
+        _truncate_tab_names(\@tab_info, $tab_cols - $LEADING_SPACE);
 
         $total_width = $LEADING_SPACE;
         $total_width += $_->{width} for @tab_info;
     }
 
-    if ($total_width > $cols && @tab_info > 1) {
+    if ($total_width > $tab_cols && @tab_info > 1) {
         # Phase 2: Scroll-based subset rendering
         my $left_arrow_width = 2;
         my $right_arrow_width = 2;
 
         ($first_visible, $last_visible) = _calc_visible_tab_range(
-            \@tab_info, $active_idx, $cols - $LEADING_SPACE,
+            \@tab_info, $active_idx, $tab_cols - $LEADING_SPACE,
             $left_arrow_width, $right_arrow_width,
         );
 
@@ -867,12 +915,18 @@ sub _render_tab_bar {
     }
 
     # Fill remaining space with bar bg (underlined)
-    my $remaining = $cols - $x;
+    my $remaining = $tab_cols - $x;
     if ($remaining > 0) {
         $output .= $bar_bg;
         $output .= ' ' x $remaining;
     }
     $output .= $UL_OFF . RESET;
+
+    # Offset button positions by tree_width so mouse clicks map correctly
+    if ($tree_width > 0) {
+        $_->{start} += $tree_width for @buttons;
+        $_->{end}   += $tree_width for @buttons;
+    }
 
     $class->_set_tab_bar_buttons(\@buttons);
 
@@ -1001,7 +1055,8 @@ sub _calc_visible_tab_range {
 
 # Render the ruler bar showing column positions
 sub _render_ruler_bar {
-    my ($class, $theme, $cols, $gutter_width, $view, $doc) = @_;
+    my ($class, $theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui) = @_;
+    $tree_width //= 0;
 
     my $output = '';
 
@@ -1025,8 +1080,8 @@ sub _render_ruler_bar {
     $output .= $theme->color('ruler_bg') . $theme->color('ruler_fg');
     $output .= ' ' x $gutter_width;
 
-    # Calculate ruler width (text area width)
-    my $ruler_width = $cols - $gutter_width;
+    # Calculate ruler width (text area width, excluding tree)
+    my $ruler_width = $cols - $tree_width - $gutter_width;
 
     # Build ruler string: |10      |20      |30 ... (1-indexed columns, marks at multiples of 10)
     my $ruler = '';
@@ -1091,8 +1146,9 @@ sub _render_ruler_bar {
 
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width) = @_;
     $minimap_width //= 0;
+    $tree_width //= 0;
 
     my $output = '';
 
@@ -1245,7 +1301,7 @@ sub _render_text_area {
         my $entry = $entries[$screen_row];
 
         # Position cursor at start of this row (row 4 is first text row, after menu, tabs, and ruler)
-        $output .= _move_to($screen_row + 4, 1);
+        $output .= _move_to($screen_row + 4, $tree_width + 1);
 
         # Handle old-line entries (expanded hunk base content)
         if ($entry && $entry->{type} eq 'old') {
@@ -1596,6 +1652,350 @@ sub _render_minimap_column {
     } else {
         # Empty row (beyond document content)
         $output .= $text_bg . (' ' x $text_cols);
+    }
+
+    return $output;
+}
+
+# =============================================================================
+# File Tree Panel Rendering
+# =============================================================================
+
+sub _render_tree_panel {
+    my ($class, $tree, $height, $theme, $tree_width, $ui) = @_;
+
+    my $output = '';
+    my $panel_w = $tree_width - 1;  # Subtract border column
+    my $border_char = Zepto::Chars->get('tree_vertical') || '|';
+
+    my $focused = $tree->focused();
+    my $tree_bg = $focused ? $theme->color('tree_focused_bg') : $theme->color('tree_bg');
+    my $tree_fg = $theme->color('tree_fg');
+    my $border_fg = $focused
+        ? $theme->color('tree_border_active_fg')
+        : $theme->color('tree_border_fg');
+
+    # Get sticky headers and filter state
+    my $stickies = $tree->sticky_headers();
+    my $filter_active = $tree->filter_active();
+    my $flat = $tree->flat_list();
+    my $scroll = $tree->scroll();
+    my $cursor = $tree->cursor();
+
+    # Scrollbar data
+    my $sb = $tree->scrollbar_data();
+    my $has_scrollbar = ($sb->{total} > $sb->{visible});
+
+    my $content_width = $panel_w - ($has_scrollbar ? 1 : 0);
+
+    # Pre-compute "is_last_child" for every node in the flat list.
+    # A node at index i with depth d is the last child if no subsequent node
+    # shares the same depth before one appears at a lesser depth.
+    my @is_last;
+    for my $i (0 .. $#$flat) {
+        my $d = $flat->[$i]{depth};
+        my $last = 1;
+        for my $j ($i + 1 .. $#$flat) {
+            if ($flat->[$j]{depth} <= $d) {
+                $last = ($flat->[$j]{depth} < $d) ? 1 : 0;
+                last;
+            }
+        }
+        $is_last[$i] = $last;
+    }
+
+    # Build a guide stack that tracks which ancestor depths have more siblings.
+    # guide_active[level] = 1 means there are more items at that level below.
+    # We walk from the top of the flat list up to the end of the visible window
+    # so the stack is correct for every visible row.
+    my @guide_active;
+    my $walk_end = $scroll + $height;  # upper bound of what we need
+    $walk_end = $#$flat if $walk_end > $#$flat;
+
+    # Initialize guide state by walking from start to scroll position
+    for my $i (0 .. $scroll - 1) {
+        last if $i > $#$flat;
+        my $d = $flat->[$i]{depth};
+        # Clear deeper levels when we step back to a shallower depth
+        for my $l ($d .. $#guide_active) { $guide_active[$l] = 0; }
+        $guide_active[$d] = $is_last[$i] ? 0 : 1;
+    }
+
+    # Track which row we're rendering
+    my $row_idx = 0;
+
+    # Render sticky headers at top
+    for my $sticky (@$stickies) {
+        last if $row_idx >= $height;
+        my $screen_row = $row_idx + 2;  # tree starts at row 2
+
+        $output .= _move_to($screen_row, 1);
+        $output .= $class->_render_tree_node_content(
+            $sticky, $content_width, $theme, 0, 1, $focused,
+            $has_scrollbar, $row_idx, $sb, undef, []
+        );
+        # Border
+        $output .= $border_fg . $tree_bg . $border_char;
+        $row_idx++;
+    }
+
+    # Render filter input row if active
+    if ($filter_active && $row_idx < $height) {
+        my $screen_row = $row_idx + 2;
+        $output .= _move_to($screen_row, 1);
+        $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
+        my $query = $tree->filter_query() // '';
+        my $prefix = ' / ';
+        my $display = $prefix . $query;
+        if (length($display) > $content_width) {
+            $display = substr($display, 0, $content_width);
+        }
+        $output .= $display;
+        my $pad = $content_width - length($display);
+        $output .= ' ' x $pad if $pad > 0;
+
+        # Scrollbar column
+        if ($has_scrollbar) {
+            $output .= $tree_bg . ' ';
+        }
+
+        # Border
+        $output .= $border_fg . $tree_bg . $border_char;
+        $row_idx++;
+    }
+
+    # Render tree content rows
+    my $sticky_count = $row_idx;  # rows consumed by stickies + filter
+    my $available = $height - $sticky_count;
+
+    for my $i (0 .. $available - 1) {
+        last if $row_idx >= $height;
+        my $flat_idx = $scroll + $i;
+        my $screen_row = $row_idx + 2;
+
+        $output .= _move_to($screen_row, 1);
+
+        if ($flat_idx <= $#$flat) {
+            my $node = $flat->[$flat_idx];
+            my $d = $node->{depth};
+            my $is_cursor = ($focused && $flat_idx == $cursor);
+            my $node_is_last = $is_last[$flat_idx];
+
+            # Snapshot the current guide state for this node's ancestors
+            my @guides_for_node;
+            for my $l (0 .. $d - 1) {
+                push @guides_for_node, ($guide_active[$l] ? 1 : 0);
+            }
+
+            $output .= $class->_render_tree_node_content(
+                $node, $content_width, $theme, $is_cursor, 0, $focused,
+                $has_scrollbar, $row_idx, $sb, $node_is_last, \@guides_for_node
+            );
+
+            # Update guide state after rendering this node
+            for my $l ($d .. $#guide_active) { $guide_active[$l] = 0; }
+            $guide_active[$d] = $node_is_last ? 0 : 1;
+        } else {
+            # Empty row
+            $output .= $tree_bg . (' ' x $content_width);
+            if ($has_scrollbar) {
+                $output .= $tree_bg . ' ';
+            }
+        }
+
+        # Border
+        $output .= $border_fg . $tree_bg . $border_char;
+        $row_idx++;
+    }
+
+    return $output;
+}
+
+sub _render_tree_node_content {
+    my ($class, $node, $width, $theme, $is_cursor, $is_sticky, $focused,
+        $has_scrollbar, $row_idx, $sb, $is_last, $guides) = @_;
+
+    my $output = '';
+
+    # Choose background/foreground
+    my ($bg, $fg);
+    if ($is_sticky) {
+        $bg = $theme->color('tree_sticky_bg');
+        $fg = $theme->color('tree_sticky_fg');
+    } elsif ($is_cursor) {
+        $bg = $theme->color('tree_cursor_bg');
+        $fg = $theme->color('tree_cursor_fg');
+    } else {
+        $bg = $focused ? $theme->color('tree_focused_bg') : $theme->color('tree_bg');
+        $fg = $theme->color('tree_fg');
+    }
+
+    $output .= $bg;
+
+    my $depth = $node->{depth} // 0;
+    my $indent_fg = $theme->color('tree_indent_fg');
+
+    # Get tree drawing characters
+    my $ch_vertical = Zepto::Chars->get('tree_vertical');   # │
+    my $ch_branch   = Zepto::Chars->get('tree_branch');     # ├
+    my $ch_last     = Zepto::Chars->get('tree_last');       # ╰
+    my $ch_dash     = Zepto::Chars->get('tree_dash');       # ─
+    my $ch_arrow_r  = Zepto::Chars->get('tree_arrow_right'); # ▸
+    my $ch_arrow_d  = Zepto::Chars->get('tree_arrow_down');  # ▾
+
+    # === Left padding (1 space) ===
+    $output .= ' ';
+    my $used = 1;
+
+    if ($depth == 0) {
+        # Depth 0: arrow + space (dirs) or 2 spaces (files)
+        if ($node->{is_dir}) {
+            my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_dir_fg');
+            my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
+            $output .= $arrow_fg . $bg . $arrow . ' ';
+        } else {
+            $output .= $bg . '  ';
+        }
+        $used += 2;
+    } elsif ($is_sticky) {
+        # Sticky headers: indented to match original depth (spaces, no guide lines)
+        my $indent_chars = 2 * $depth + 1;  # spaces before arrow/dash
+        $output .= $bg . (' ' x $indent_chars);
+        $used += $indent_chars;
+        # Arrow for dirs
+        if ($node->{is_dir}) {
+            my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_sticky_fg');
+            my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
+            $output .= $arrow_fg . $bg . $arrow;
+        } else {
+            $output .= $ch_dash;
+        }
+        $used += 1;
+    } else {
+        # Depth > 0: indent zone with guides aligned under parent folder icons,
+        # then connector, then dash (files) or arrow (dirs).
+        #
+        # Guide char for ancestor level k sits at column 4+2*k, which is the
+        # icon column of the depth-k directory ancestor.  The connector char
+        # (├ or ╰) sits at column 2+2*depth (= icon column of the parent dir).
+        $output .= $indent_fg . $bg;
+
+        my $connector_col = 2 + 2 * $depth;
+        for my $col (2 .. $connector_col - 1) {
+            if ($col >= 4 && ($col - 4) % 2 == 0) {
+                my $guide_level = ($col - 4) / 2;
+                if ($guides && $guide_level < scalar @$guides && $guides->[$guide_level]) {
+                    $output .= $ch_vertical;
+                } else {
+                    $output .= ' ';
+                }
+            } else {
+                $output .= ' ';
+            }
+        }
+        $used += $connector_col - 2;
+
+        if ($node->{is_dir}) {
+            # Dirs: arrow replaces connector for a cleaner look
+            my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_dir_fg');
+            my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
+            $output .= $arrow_fg . $bg . $arrow . ' ';
+        } else {
+            # Files: connector (├ or ╰) + dash
+            if ($is_last) {
+                $output .= $ch_last;
+            } else {
+                $output .= $ch_branch;
+            }
+            $output .= $ch_dash;
+        }
+        $used += 2;
+    }
+
+    # === Icon ===
+    my $icon;
+    if ($node->{is_dir}) {
+        $icon = $node->{expanded}
+            ? Zepto::Chars->get('folder_open')
+            : Zepto::Chars->get('folder');
+    } else {
+        $icon = Zepto::Chars->file_icon($node->{name});
+    }
+    $icon //= ' ';
+
+    # Name color: VCS status overrides default
+    my $name_fg;
+    if (!$is_cursor && !$is_sticky) {
+        my $vcs = $node->{vcs_status};
+        if ($vcs && $theme->color("tree_vcs_$vcs")) {
+            $name_fg = $theme->color("tree_vcs_$vcs");
+        } elsif ($node->{is_dir}) {
+            $name_fg = $theme->color('tree_dir_fg');
+        } else {
+            $name_fg = $fg;
+        }
+    } else {
+        $name_fg = $fg;
+    }
+
+    my $icon_str = "$icon ";
+    $used += 2;  # icon + space
+
+    # === Name (truncated if needed) ===
+    my $name = $node->{name} // '';
+    my $name_space = $width - $used;
+
+    if ($name_space > 0) {
+        if (length($name) > $name_space) {
+            $name = substr($name, 0, $name_space - 1) . "\x{2026}";  # …
+        }
+    } else {
+        $name = '';
+    }
+
+    # Render icon
+    if ($node->{is_dir}) {
+        $output .= $theme->color('tree_dir_fg') . $bg . $icon_str;
+    } else {
+        $output .= $name_fg . $bg . $icon_str;
+    }
+
+    # Render name with potential filter match highlighting
+    my $match_positions = $node->{_filter_match_positions};
+    if ($match_positions && @$match_positions) {
+        my $path = $node->{path} // '';
+        my $name_start = length($path) - length($node->{name} // '');
+        my %highlight_cols;
+        for my $pos (@$match_positions) {
+            my $rel = $pos - $name_start;
+            $highlight_cols{$rel} = 1 if $rel >= 0 && $rel < length($name);
+        }
+
+        my $match_fg = $theme->color('tree_match_fg');
+        for my $ci (0 .. length($name) - 1) {
+            if ($highlight_cols{$ci}) {
+                $output .= $match_fg . $bg . substr($name, $ci, 1);
+            } else {
+                $output .= $name_fg . $bg . substr($name, $ci, 1);
+            }
+        }
+    } else {
+        $output .= $name_fg . $bg . $name;
+    }
+
+    # Pad remainder
+    my $total_used = $used + length($name);
+    my $pad = $width - $total_used;
+    $output .= $bg . (' ' x $pad) if $pad > 0;
+
+    # Scrollbar column
+    if ($has_scrollbar) {
+        my $sb_bg = $theme->color('tree_scrollbar_bg');
+        if ($row_idx >= $sb->{thumb_start} && $row_idx <= $sb->{thumb_end}) {
+            $output .= $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";  # █
+        } else {
+            $output .= $sb_bg . ' ';
+        }
     }
 
     return $output;
@@ -2302,7 +2702,8 @@ sub _render_dialog {
 
 # Calculate screen position for cursor
 sub _cursor_screen_pos {
-    my ($class, $view, $gutter_width, $menu_height, $doc) = @_;
+    my ($class, $view, $gutter_width, $menu_height, $doc, $tree_width) = @_;
+    $tree_width //= 0;
 
     my $cursor_line = $view->cursor_line();
     my $cursor_col = $view->cursor_col();
@@ -2326,7 +2727,7 @@ sub _cursor_screen_pos {
         # +3 for menu bar, tab bar, and ruler bar
         $screen_row = $cursor_line - $scroll_line + $menu_height + 3;
     }
-    my $screen_col = $visual_cursor_col - $scroll_col + $gutter_width + 1;  # +1 for 1-indexed
+    my $screen_col = $visual_cursor_col - $scroll_col + $tree_width + $gutter_width + 1;  # +1 for 1-indexed
 
     return ($screen_row, $screen_col);
 }
