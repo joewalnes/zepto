@@ -338,8 +338,8 @@ sub get_gutter_width {
     my ($class, $line_count) = @_;
     $line_count //= 1;  # Default if undef
     my $max_digits = length("$line_count");
+    $max_digits = 4 if $max_digits < 4;  # Stable gutter up to 9999 lines
     my $gutter_width = $max_digits + 3;  # +3 for VCS (1) + badge chars (round_left + arrow_right = 2)
-    $gutter_width = MIN_GUTTER_WIDTH + 1 if $gutter_width < MIN_GUTTER_WIDTH + 1;
     return $gutter_width;
 }
 
