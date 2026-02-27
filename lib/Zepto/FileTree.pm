@@ -7,6 +7,10 @@ package Zepto::FileTree;
 # Manages the tree structure, expand/collapse state, navigation,
 # filtering, and VCS status propagation.
 #
+# Lazy loading: only scans one directory level at a time. Children are
+# loaded on-demand when the user expands a directory. Single-child dir
+# chains are collapsed by peeking ahead (cheap: one readdir per level).
+#
 # =============================================================================
 
 use strict;
@@ -49,6 +53,7 @@ sub new {
         filter_active   => 0,
         current_file    => undef,    # relative path of active tab's file
         _all_files      => [],       # flat list of all file paths for filter scoring
+        _all_files_loaded => 0,      # whether _all_files has been populated
         _vcs_statuses   => {},       # path => status
         _vcs_last_update => 0,       # debounce timestamp
 
@@ -66,7 +71,7 @@ sub new {
 }
 
 # =============================================================================
-# Tree Construction
+# Tree Construction (lazy — one level at a time)
 # =============================================================================
 
 sub _build_tree {
@@ -74,17 +79,24 @@ sub _build_tree {
 
     my $root = $self->{root_path};
     my %skip = Zepto::Config::skip_directories_hash();
-    my $max_depth = Zepto::Config::max_depth();
 
-    my @all_files;
-    $self->{nodes} = $self->_scan_dir($root, 0, \%skip, $max_depth, \@all_files);
-    $self->{_all_files} = \@all_files;
+    # Scan only the root directory's immediate children
+    $self->{nodes} = $self->_scan_dir_one_level($root, 0, \%skip);
+
+    # Collapse single-child dir chains at root by peeking deeper
+    for my $node (@{$self->{nodes}}) {
+        $self->_collapse_single_child_chain($node, \%skip) if $node->{is_dir};
+    }
+
+    # File list for filter is built lazily on first filter activation
+    $self->{_all_files} = [];
+    $self->{_all_files_loaded} = 0;
 }
 
-sub _scan_dir {
-    my ($self, $dir_path, $depth, $skip, $max_depth, $all_files) = @_;
-
-    return [] if $depth > $max_depth;
+# Scan a single directory level — returns arrayref of nodes.
+# Directory nodes get children => undef (loaded lazily on expand).
+sub _scan_dir_one_level {
+    my ($self, $dir_path, $depth, $skip) = @_;
 
     opendir(my $dh, $dir_path) or return [];
     my @entries = sort { lc($a) cmp lc($b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
@@ -100,23 +112,18 @@ sub _scan_dir {
         if (-d $full_path) {
             next if $skip->{$entry};
 
-            my $children = $self->_scan_dir($full_path, $depth + 1, $skip, $max_depth, $all_files);
-            # Skip empty directories
-            next unless @$children;
-
             push @dirs, {
                 name       => $entry,
                 path       => $rel_path,
                 is_dir     => 1,
                 depth      => $depth,
                 expanded   => 0,
-                children   => $children,
+                children   => undef,  # lazy — loaded on expand
                 vcs_status => undef,
                 collapsed_prefix => undef,
             };
         }
         elsif (-f $full_path && -r $full_path) {
-            push @$all_files, $rel_path;
             push @files, {
                 name       => $entry,
                 path       => $rel_path,
@@ -128,30 +135,55 @@ sub _scan_dir {
     }
 
     # Dirs first, then files (both already alpha-sorted)
-    my @result = (@dirs, @files);
-
-    # Collapse single-child directory chains
-    $self->_collapse_single_children(\@result, $depth);
-
-    return \@result;
+    return [@dirs, @files];
 }
 
-sub _collapse_single_children {
-    my ($self, $nodes, $parent_depth) = @_;
+# Follow single-child dir chains, loading just enough to detect and merge.
+# E.g. com/ → com/stripe/ → com/stripe/api/ (with files) becomes "com/stripe/api".
+# Each step is a single readdir — no deep recursion.
+sub _collapse_single_child_chain {
+    my ($self, $node, $skip) = @_;
+    return unless $node->{is_dir};
 
-    for my $node (@$nodes) {
-        next unless $node->{is_dir};
+    while (1) {
+        # Load children if not yet loaded
+        if (!defined $node->{children}) {
+            my $full_path = "$self->{root_path}/$node->{path}";
+            $node->{children} = $self->_scan_dir_one_level($full_path, $node->{depth} + 1, $skip);
+        }
 
-        # Keep collapsing while dir has exactly one child that is also a dir
-        while (@{$node->{children}} == 1 && $node->{children}[0]{is_dir}) {
-            my $child = $node->{children}[0];
+        # Stop if not a single-child dir chain
+        last unless @{$node->{children}} == 1 && $node->{children}[0]{is_dir};
 
-            # Merge: "a" with single child "b" becomes "a/b"
-            my $prefix = $node->{collapsed_prefix} // $node->{name};
-            $node->{name} = $prefix . '/' . $child->{name};
-            $node->{collapsed_prefix} = $node->{name};
-            $node->{path} = $child->{path};
-            $node->{children} = $child->{children};
+        my $child = $node->{children}[0];
+
+        # Merge: "a" with single child "b" becomes "a/b"
+        my $prefix = $node->{collapsed_prefix} // $node->{name};
+        $node->{name} = $prefix . '/' . $child->{name};
+        $node->{collapsed_prefix} = $node->{name};
+        $node->{path} = $child->{path};
+        $node->{children} = $child->{children};  # may be undef — loop will load
+    }
+}
+
+# Load a dir node's children on demand (called before expanding).
+sub _ensure_children_loaded {
+    my ($self, $node) = @_;
+    return unless $node->{is_dir};
+
+    my %skip = Zepto::Config::skip_directories_hash();
+
+    if (!defined $node->{children}) {
+        my $full_path = "$self->{root_path}/$node->{path}";
+        $node->{children} = $self->_scan_dir_one_level($full_path, $node->{depth} + 1, \%skip);
+    }
+
+    # Collapse single-child chains among dir children that haven't been loaded yet.
+    # This handles the case where a parent's children were loaded during the root
+    # collapse check, but the children's own chains weren't followed.
+    for my $child (@{$node->{children}}) {
+        if ($child->{is_dir} && !defined $child->{children}) {
+            $self->_collapse_single_child_chain($child, \%skip);
         }
     }
 }
@@ -185,7 +217,7 @@ sub _flatten_nodes {
 
         push @$flat, $node;
 
-        if ($node->{is_dir} && $node->{expanded} && $node->{children}) {
+        if ($node->{is_dir} && $node->{expanded} && defined $node->{children}) {
             $self->_flatten_nodes($node->{children}, $depth + 1, $flat);
         }
     }
@@ -274,7 +306,12 @@ sub toggle_current {
     my $node = $self->cursor_node();
     return unless $node && $node->{is_dir};
 
-    $node->{expanded} = !$node->{expanded};
+    if ($node->{expanded}) {
+        $node->{expanded} = 0;
+    } else {
+        $self->_ensure_children_loaded($node);
+        $node->{expanded} = 1;
+    }
     $self->_flatten();
 }
 
@@ -285,6 +322,7 @@ sub expand_current {
 
     if ($node->{is_dir}) {
         unless ($node->{expanded}) {
+            $self->_ensure_children_loaded($node);
             $node->{expanded} = 1;
             $self->_flatten();
         }
@@ -336,9 +374,11 @@ sub expand_to_path {
     # Split path into components to find ancestor dirs
     my @parts = split m{/}, $path;
 
-    # Expand each ancestor directory
+    # Expand each ancestor directory, loading children lazily
     my $current_nodes = $self->{nodes};
     for my $i (0 .. $#parts - 1) {
+        last unless $current_nodes;
+
         # Build the prefix we're looking for
         my $prefix = join('/', @parts[0 .. $i]);
 
@@ -348,12 +388,14 @@ sub expand_to_path {
             # Check if this node matches the prefix
             # Handle collapsed dirs: node path might span multiple levels
             if ($node->{path} eq $prefix || _path_starts_with($prefix, $node->{path})) {
+                $self->_ensure_children_loaded($node);
                 $node->{expanded} = 1;
                 $current_nodes = $node->{children};
                 last;
             }
             # Also check if the collapsed prefix covers our path
             if (_path_starts_with($node->{path}, $prefix)) {
+                $self->_ensure_children_loaded($node);
                 $node->{expanded} = 1;
                 $current_nodes = $node->{children};
                 last;
@@ -394,10 +436,10 @@ sub refresh {
     my %expanded;
     $self->_collect_expanded($self->{nodes}, \%expanded);
 
-    # Rebuild tree
+    # Rebuild tree (lazy)
     $self->_build_tree();
 
-    # Restore expand states
+    # Restore expand states — triggers lazy loading for previously-expanded dirs
     $self->_restore_expanded($self->{nodes}, \%expanded);
 
     $self->_flatten();
@@ -408,7 +450,7 @@ sub _collect_expanded {
     for my $node (@$nodes) {
         next unless $node->{is_dir};
         $expanded->{$node->{path}} = 1 if $node->{expanded};
-        $self->_collect_expanded($node->{children}, $expanded);
+        $self->_collect_expanded($node->{children}, $expanded) if defined $node->{children};
     }
 }
 
@@ -416,8 +458,11 @@ sub _restore_expanded {
     my ($self, $nodes, $expanded) = @_;
     for my $node (@$nodes) {
         next unless $node->{is_dir};
-        $node->{expanded} = 1 if $expanded->{$node->{path}};
-        $self->_restore_expanded($node->{children}, $expanded);
+        if ($expanded->{$node->{path}}) {
+            $self->_ensure_children_loaded($node);
+            $node->{expanded} = 1;
+            $self->_restore_expanded($node->{children}, $expanded) if defined $node->{children};
+        }
     }
 }
 
@@ -427,6 +472,8 @@ sub _restore_expanded {
 
 sub start_filter {
     my ($self) = @_;
+    # Build the full file list on first filter activation (capped walk)
+    $self->_build_all_files_list();
     $self->{filter_active} = 1;
     $self->{filter_query} = '';
     # Don't reflatten yet — empty query shows everything
@@ -459,6 +506,43 @@ sub clear_filter {
     $self->_flatten();
     $self->{cursor} = 0;
     $self->{scroll} = 0;
+}
+
+# Build flat file list for fuzzy filter — capped at MAX_FILES to bound cost.
+# Called lazily on first filter activation, not at construction time.
+sub _build_all_files_list {
+    my ($self) = @_;
+    return if $self->{_all_files_loaded};
+
+    my %skip = Zepto::Config::skip_directories_hash();
+    my $max = Zepto::Config::max_files();
+    my $max_depth = Zepto::Config::max_depth();
+    my @files;
+    $self->_walk_for_files($self->{root_path}, \%skip, \@files, $max, 0, $max_depth);
+    $self->{_all_files} = \@files;
+    $self->{_all_files_loaded} = 1;
+}
+
+sub _walk_for_files {
+    my ($self, $dir, $skip, $files, $max, $depth, $max_depth) = @_;
+    return if @$files >= $max;
+    return if $depth > $max_depth;
+
+    opendir(my $dh, $dir) or return;
+    my @entries = sort { lc($a) cmp lc($b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+    closedir($dh);
+
+    for my $entry (@entries) {
+        last if @$files >= $max;
+        my $full = "$dir/$entry";
+        if (-d $full) {
+            next if $skip->{$entry};
+            $self->_walk_for_files($full, $skip, $files, $max, $depth + 1, $max_depth);
+        }
+        elsif (-f $full && -r $full) {
+            push @$files, File::Spec->abs2rel($full, $self->{root_path});
+        }
+    }
 }
 
 sub _apply_filter {
@@ -498,6 +582,9 @@ sub _apply_filter {
     }
 
     # Rebuild flat list: walk tree, include matching files + needed ancestor dirs
+    # For filter, we need all files loaded — _build_all_files_list handles that
+    # But the tree nodes may not all be loaded, so use _all_files paths to create
+    # a filtered view. Walk loaded tree nodes and include matches.
     my @flat;
     $self->_flatten_filtered($self->{nodes}, 0, \@flat, \%needed_dirs, \%match_positions);
     $self->{flat_list} = \@flat;
@@ -527,17 +614,22 @@ sub _flatten_filtered {
                 $include = 1;
             }
             # Also check if this collapsed dir is a prefix of any needed dir
-            for my $dir (keys %$needed_dirs) {
-                if (_path_starts_with($dir, $node->{path})) {
-                    $include = 1;
-                    last;
+            if (!$include) {
+                for my $dir (keys %$needed_dirs) {
+                    if (_path_starts_with($dir, $node->{path})) {
+                        $include = 1;
+                        last;
+                    }
                 }
             }
 
             if ($include) {
                 push @$flat, $node;
-                # Always show children of needed dirs (they're expanded in filter mode)
-                $self->_flatten_filtered($node->{children}, $depth + 1, $flat, $needed_dirs, $match_positions);
+                # Load children to walk into them for filter results
+                $self->_ensure_children_loaded($node);
+                if (defined $node->{children}) {
+                    $self->_flatten_filtered($node->{children}, $depth + 1, $flat, $needed_dirs, $match_positions);
+                }
             }
         }
         else {
@@ -621,7 +713,7 @@ sub update_vcs_statuses {
     my $statuses = eval { $vcs_provider->get_worktree_status() } // {};
     $self->{_vcs_statuses} = $statuses;
 
-    # Apply statuses to tree nodes
+    # Apply statuses to loaded tree nodes
     $self->_apply_vcs_statuses($self->{nodes});
     $self->_propagate_dir_status($self->{nodes});
 }
@@ -633,7 +725,7 @@ sub _apply_vcs_statuses {
     for my $node (@$nodes) {
         if ($node->{is_dir}) {
             $node->{vcs_status} = undef;  # will be set by propagation
-            $self->_apply_vcs_statuses($node->{children});
+            $self->_apply_vcs_statuses($node->{children}) if defined $node->{children};
         }
         else {
             $node->{vcs_status} = $statuses->{$node->{path}};
@@ -655,24 +747,51 @@ sub _propagate_dir_status {
     for my $node (@$nodes) {
         next unless $node->{is_dir};
 
-        $self->_propagate_dir_status($node->{children});
+        if (defined $node->{children}) {
+            $self->_propagate_dir_status($node->{children});
 
-        # Find worst status among children
-        my $worst_priority = 0;
-        my $worst_status = undef;
+            # Find worst status among children
+            my $worst_priority = 0;
+            my $worst_status = undef;
 
-        for my $child (@{$node->{children}}) {
-            my $status = $child->{vcs_status};
-            next unless defined $status;
-            my $p = $VCS_PRIORITY{$status} // 0;
-            if ($p > $worst_priority) {
-                $worst_priority = $p;
-                $worst_status = $status;
+            for my $child (@{$node->{children}}) {
+                my $status = $child->{vcs_status};
+                next unless defined $status;
+                my $p = $VCS_PRIORITY{$status} // 0;
+                if ($p > $worst_priority) {
+                    $worst_priority = $p;
+                    $worst_status = $status;
+                }
             }
-        }
 
-        $node->{vcs_status} = $worst_status;
+            $node->{vcs_status} = $worst_status;
+        } else {
+            # Children not loaded — compute dir status from the status hash directly
+            $node->{vcs_status} = $self->_dir_vcs_status_from_hash($node->{path});
+        }
     }
+}
+
+# Compute worst VCS status for a dir by scanning the status hash for paths
+# under this directory. Used for dirs whose children aren't loaded yet.
+sub _dir_vcs_status_from_hash {
+    my ($self, $dir_path) = @_;
+    my $statuses = $self->{_vcs_statuses};
+    my $prefix = "$dir_path/";
+    my $worst_priority = 0;
+    my $worst_status = undef;
+
+    for my $path (keys %$statuses) {
+        next unless index($path, $prefix) == 0;
+        my $status = $statuses->{$path};
+        my $p = $VCS_PRIORITY{$status} // 0;
+        if ($p > $worst_priority) {
+            $worst_priority = $p;
+            $worst_status = $status;
+        }
+    }
+
+    return $worst_status;
 }
 
 # =============================================================================
@@ -732,7 +851,7 @@ sub sticky_headers {
         my $node = $self->{flat_list}[$i];
         next unless $node->{is_dir};
 
-        # Check if this dir is an ancestor of current_file
+        # Check if this dir is an ancestor of cursor node
         for my $ap (@ancestor_paths) {
             if ($node->{path} eq $ap || _path_starts_with($ap, $node->{path})) {
                 push @ancestors, $node;
