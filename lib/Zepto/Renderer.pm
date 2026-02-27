@@ -142,6 +142,55 @@ use constant MENU_ESC_PREFIX_WIDTH => 11;
 # Tab width for visual rendering
 use constant TAB_WIDTH => 4;
 
+# Terminal display width of a single character.
+# Returns 2 for wide chars (CJK, emoji), 0 for control/combining, 1 otherwise.
+sub _char_display_width {
+    my $ord = ord($_[0]);
+    return 0 if $ord < 0x20;       # control chars
+    return 1 if $ord < 0x1100;     # ASCII, Latin, Cyrillic, etc.
+    return 2 if ($ord >= 0x1100 && $ord <= 0x115F)    # Hangul Jamo
+             || ($ord >= 0x231A && $ord <= 0x23FF)    # Misc Technical (⌚ etc.)
+             || ($ord >= 0x2600 && $ord <= 0x27BF)    # Misc Symbols, Dingbats (❌ etc.)
+             || ($ord >= 0x2B50 && $ord <= 0x2B55)    # Stars
+             || ($ord >= 0x2E80 && $ord <= 0x303E)    # CJK Radicals
+             || ($ord >= 0x3040 && $ord <= 0x33BF)    # Japanese
+             || ($ord >= 0x3400 && $ord <= 0x4DBF)    # CJK Extension A
+             || ($ord >= 0x4E00 && $ord <= 0x9FFF)    # CJK Unified
+             || ($ord >= 0xAC00 && $ord <= 0xD7AF)    # Hangul Syllables
+             || ($ord >= 0xF900 && $ord <= 0xFAFF)    # CJK Compatibility
+             || ($ord >= 0xFE30 && $ord <= 0xFE6F)    # CJK Compatibility Forms
+             || ($ord >= 0xFF01 && $ord <= 0xFF60)    # Fullwidth Forms
+             || ($ord >= 0xFFE0 && $ord <= 0xFFE6)    # Fullwidth Signs
+             || ($ord >= 0x1F000 && $ord <= 0x1FFFF)  # Emoji, Mahjong, etc.
+             || ($ord >= 0x20000 && $ord <= 0x2FFFF); # CJK Extension B+
+    return 1;
+}
+
+# Display width of a string (sum of character display widths)
+sub _display_width {
+    my ($str) = @_;
+    my $w = 0;
+    for my $i (0 .. length($str) - 1) {
+        $w += _char_display_width(substr($str, $i, 1));
+    }
+    return $w;
+}
+
+# Truncate string to fit within $max_width terminal columns.
+# Returns ($truncated_string, $display_width_used).
+sub _truncate_to_display_width {
+    my ($str, $max_width) = @_;
+    my $w = 0;
+    for my $i (0 .. length($str) - 1) {
+        my $cw = _char_display_width(substr($str, $i, 1));
+        if ($w + $cw > $max_width) {
+            return (substr($str, 0, $i), $w);
+        }
+        $w += $cw;
+    }
+    return ($str, $w);
+}
+
 # Expand tabs in a string to spaces, respecting tab stops
 # Also returns a mapping from original char positions to visual positions
 # Returns: ($expanded_string, \@char_to_visual)
@@ -165,7 +214,7 @@ sub _expand_tabs {
             $visual_col += $spaces;
         } else {
             $expanded .= $char;
-            $visual_col++;
+            $visual_col += _char_display_width($char);
         }
     }
 
@@ -1540,9 +1589,10 @@ sub _render_text_area {
                 $expanded_content = '';
             }
 
-            # Truncate to width
-            if (length($expanded_content) > $width) {
-                $expanded_content = substr($expanded_content, 0, $width);
+            # Truncate to width (display columns, not character count)
+            my $content_display_width = _display_width($expanded_content);
+            if ($content_display_width > $width) {
+                ($expanded_content, $content_display_width) = _truncate_to_display_width($expanded_content, $width);
             }
 
             # Compute char-level highlight range for green (new) lines in expanded hunks
@@ -1582,11 +1632,10 @@ sub _render_text_area {
             );
 
             # Fill remaining space with appropriate background
-            my $fill_start = length($expanded_content);
             my $fill_bg = $is_cursor_line ? $line_bg
                         : $is_hunk_line   ? $line_bg
                         :                   $theme->color('bg');
-            $output .= $fill_bg . (' ' x ($width - $fill_start)) if $fill_start < $width;
+            $output .= $fill_bg . (' ' x ($width - $content_display_width)) if $content_display_width < $width;
         }
         else {
             # Empty line (beyond document)
@@ -2161,9 +2210,10 @@ sub _render_old_line_row {
         $expanded_content = '';
     }
 
-    # Truncate to width
-    if (length($expanded_content) > $width) {
-        $expanded_content = substr($expanded_content, 0, $width);
+    # Truncate to width (display columns, not character count)
+    my $old_content_display_width = _display_width($expanded_content);
+    if ($old_content_display_width > $width) {
+        ($expanded_content, $old_content_display_width) = _truncate_to_display_width($expanded_content, $width);
     }
 
     # Render character by character with syntax highlighting on red background
@@ -2212,10 +2262,9 @@ sub _render_old_line_row {
         }
     }
 
-    # Fill rest with red background
-    for (my $i = $len; $i < $width; $i++) {
-        $output .= $line_bg . ' ';
-    }
+    # Fill rest with red background (use display width for correct padding)
+    my $fill_cols = $width - $old_content_display_width;
+    $output .= $line_bg . (' ' x $fill_cols) if $fill_cols > 0;
 
     return $output;
 }

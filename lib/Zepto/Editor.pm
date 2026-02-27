@@ -2690,7 +2690,21 @@ sub _tree_preview_current {
     my ($self) = @_;
     my $tree = $self->{file_tree};
     my $node = $tree->cursor_node();
-    return unless $node && !$node->{is_dir};
+
+    # Cancel preview when cursor is on a directory or no node
+    if (!$node || $node->{is_dir}) {
+        if ($tree->{preview_active}) {
+            $self->_close_preview_tab();
+            if (defined $tree->{pre_preview_tab_index}) {
+                my $idx = $tree->{pre_preview_tab_index};
+                $idx = 0 if $idx >= $self->{tab_manager}->tab_count();
+                $self->_switch_to_tab($idx);
+            }
+            $tree->{preview_active} = 0;
+            $tree->{preview_path} = undef;
+        }
+        return;
+    }
 
     my $path = $node->{path};
     return if $tree->{preview_path} && $tree->{preview_path} eq $path;

@@ -1148,4 +1148,54 @@ subtest 'get_minimap_width returns 0 for narrow terminal' => sub {
     is($width, 0, 'Minimap hidden for narrow terminal');
 };
 
+# =============================================================================
+# Display width helpers for wide character handling
+# =============================================================================
+
+subtest 'char display width - ASCII' => sub {
+    is(Zepto::Renderer::_char_display_width('a'), 1, 'ASCII letter is 1 column');
+    is(Zepto::Renderer::_char_display_width(' '), 1, 'space is 1 column');
+    is(Zepto::Renderer::_char_display_width('!'), 1, 'ASCII punctuation is 1 column');
+};
+
+subtest 'char display width - wide characters' => sub {
+    # Emoji
+    is(Zepto::Renderer::_char_display_width("\x{274C}"), 2, 'cross mark emoji (❌) is 2 columns');
+    is(Zepto::Renderer::_char_display_width("\x{2705}"), 2, 'check mark emoji (✅) is 2 columns');
+    is(Zepto::Renderer::_char_display_width("\x{1F600}"), 2, 'grinning face emoji is 2 columns');
+    # CJK
+    is(Zepto::Renderer::_char_display_width("\x{4E2D}"), 2, 'CJK character (中) is 2 columns');
+    # Fullwidth
+    is(Zepto::Renderer::_char_display_width("\x{FF01}"), 2, 'fullwidth exclamation is 2 columns');
+};
+
+subtest 'display width - string' => sub {
+    is(Zepto::Renderer::_display_width('hello'), 5, 'ASCII string');
+    is(Zepto::Renderer::_display_width("abc\x{274C}def"), 8, 'string with emoji (3+2+3)');
+    is(Zepto::Renderer::_display_width("\x{4E2D}\x{6587}"), 4, 'two CJK chars = 4 columns');
+};
+
+subtest 'truncate to display width' => sub {
+    my ($str, $w);
+
+    # No truncation needed
+    ($str, $w) = Zepto::Renderer::_truncate_to_display_width('hello', 10);
+    is($str, 'hello', 'no truncation when fits');
+    is($w, 5, 'width correct');
+
+    # Truncate ASCII
+    ($str, $w) = Zepto::Renderer::_truncate_to_display_width('hello world', 5);
+    is($str, 'hello', 'truncated ASCII to 5 cols');
+    is($w, 5, 'width = 5');
+
+    # Truncate before wide char that would overflow
+    ($str, $w) = Zepto::Renderer::_truncate_to_display_width("abc\x{274C}def", 4);
+    is($str, 'abc', 'stops before emoji that would exceed width');
+    is($w, 3, 'width = 3 (emoji needs 2 but only 1 col left)');
+
+    ($str, $w) = Zepto::Renderer::_truncate_to_display_width("abc\x{274C}def", 5);
+    is($str, "abc\x{274C}", 'includes emoji when it fits exactly');
+    is($w, 5, 'width = 5 (3 + 2)');
+};
+
 done_testing();
