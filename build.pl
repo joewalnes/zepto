@@ -156,6 +156,14 @@ for my $arg (@ARGV) {
     }
 }
 
+# Special case: if the only non-option arg is a directory, chdir to it
+my $focus_tree = 0;
+if (@files == 1 && -d $files[0]) {
+    chdir $files[0] or die "Cannot chdir to $files[0]: $!\n";
+    @files = ();
+    $focus_tree = 1;
+}
+
 # Check environment variable for powerline setting
 my $powerline = 1;  # Default ON
 if ($no_powerline || (defined $ENV{ZEPTO_POWERLINE} && $ENV{ZEPTO_POWERLINE} eq '0')) {
@@ -166,6 +174,6 @@ if ($no_powerline || (defined $ENV{ZEPTO_POWERLINE} && $ENV{ZEPTO_POWERLINE} eq 
 my $prefs = Zepto::Preferences->new(powerline => $powerline);
 Zepto::Chars->set_enabled($powerline);
 
-my $editor = Zepto::Editor->new(files => \@files, prefs => $prefs);
+my $editor = Zepto::Editor->new(files => \@files, prefs => $prefs, focus_tree => $focus_tree);
 $editor->run();
 MAIN

@@ -126,6 +126,7 @@ sub new {
         # File tree state
         file_tree            => undef,
         tree_border_dragging => 0,
+        focus_tree           => $opts{focus_tree} // 0,
 
         # Title cache — avoids redundant terminal writes
         _last_title => '',
@@ -219,8 +220,15 @@ sub init {
         $self->render();
     };
 
-    # Create tabs from initial files (or one empty tab if none specified)
+    # Special case: if the only arg is a directory, chdir to it
     my @files = @{$self->{initial_files}};
+    if (@files == 1 && -d $files[0]) {
+        chdir $files[0] or die "Cannot chdir to $files[0]: $!\n";
+        @files = ();
+        $self->{focus_tree} = 1;
+    }
+
+    # Create tabs from initial files (or one empty tab if none specified)
     if (@files) {
         for my $file_path (@files) {
             my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state($file_path);
@@ -251,6 +259,9 @@ sub init {
         if ($self->active_file_path()) {
             $self->{file_tree}->set_current_file($self->active_file_path());
             $self->{file_tree}->expand_to_path($self->active_file_path());
+        }
+        if ($self->{focus_tree}) {
+            $self->{file_tree}->set_focused(1);
         }
     }
 
