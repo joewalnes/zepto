@@ -2,6 +2,12 @@
 
 This document demonstrates various Markdown syntax elements.
 
+Word wrap is especially useful for prose files like this one, where paragraphs can be quite long and extend well beyond the visible width of a typical terminal window. When word wrap is enabled, lines break at word boundaries so you can read the full content without scrolling horizontally, which makes editing markdown documents, README files, and other text-heavy content much more pleasant and efficient.
+
+This second paragraph tests **bold text** that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes *italic text*, some `inline code`, and a [link to the project](https://github.com/example/zepto-editor) to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
+
+> This is a long blockquote that should also demonstrate word wrap behavior. Blockquotes in markdown are prefixed with the greater-than sign, and when the quoted text is long enough it will wrap across multiple visual rows. The wrap indicator and indentation should still look correct even inside quoted blocks.
+
 ## Table of Contents
 
 1. [Headers](#headers)

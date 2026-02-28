@@ -377,6 +377,7 @@ sub render {
     my $cols        = $args{cols} // DEFAULT_COLS;
     my $message     = $args{message} // '';
     my $highlighter = $args{highlighter};  # Optional syntax highlighter
+    my $word_wrap_active = $args{word_wrap_active} // ($prefs ? $prefs->word_wrap() : 0);
 
     # Sync Chars module with prefs
     if ($prefs) {
@@ -491,7 +492,7 @@ sub render {
 
                     # Check line overflow first (higher priority, makes word wrap discoverable)
                     my $line_overflows = 0;
-                    if (!$prefs || !$prefs->word_wrap()) {
+                    if (!$word_wrap_active) {
                         my $cursor_content = $doc->get_line_content($cl);
                         my ($exp_line) = _expand_tabs($cursor_content);
                         $line_overflows = 1 if length($exp_line) > $text_width;

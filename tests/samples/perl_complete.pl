@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 # A complete Perl program demonstrating various syntax elements
 
+# This is a very long comment that extends well beyond the typical terminal width of eighty columns to test word wrap behavior in code files. When wrap is toggled on with Alt+Z, this line should break at word boundaries and display a continuation indicator on wrapped rows.
+my $LONG_MESSAGE = "This is a very long string literal that also extends well beyond eighty columns to test how the editor handles syntax highlighting when a single string value wraps across multiple visual rows in the terminal viewport.";
+
 use strict;
 use warnings;
 use Data::Dumper;

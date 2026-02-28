@@ -60,6 +60,10 @@ sub new {
         # 'left' = cursor at boundary belongs to current segment (used by END key)
         _cursor_affinity => 'right',
 
+        # Per-view word wrap override:
+        # undef = use filetype/global default, 0 = forced off, 1 = forced on
+        _word_wrap => undef,
+
         # Column (rectangular) selection mode
         column_select => 0,
     }, $class;
@@ -75,6 +79,9 @@ sub set_wrap_map { $_[0]->{_wrap_map} = $_[1]; $_[0]->{_scroll_wrap_offset} = 0;
 sub invalidate_wrap_map { $_[0]->{_wrap_map}->invalidate() if $_[0]->{_wrap_map} }
 sub scroll_wrap_offset { $_[0]->{_scroll_wrap_offset} }
 sub cursor_affinity { $_[0]->{_cursor_affinity} // 'right' }
+
+sub word_wrap_override     { $_[0]->{_word_wrap} }
+sub set_word_wrap_override { $_[0]->{_word_wrap} = $_[1] }
 
 # Compute the effective scroll visual row (used by renderer and coordinate conversion)
 sub scroll_visual_row {

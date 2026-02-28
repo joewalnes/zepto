@@ -671,10 +671,10 @@ sub cmd_toggle_minimap {
 
 sub cmd_toggle_word_wrap {
     my ($self) = @_;
-    my $current = $self->{prefs}->word_wrap();
-    $self->{prefs}->set_word_wrap($current ? 0 : 1);
+    my $current = $self->_effective_word_wrap();
     my $view = $self->active_view();
     if ($view) {
+        $view->set_word_wrap_override($current ? 0 : 1);
         # Reset horizontal scroll when enabling wrap
         $view->{scroll_col} = 0 if !$current;
         # Force WrapMap rebuild on next render

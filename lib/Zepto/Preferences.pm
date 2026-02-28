@@ -195,6 +195,18 @@ sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
 sub word_wrap { $_[0]->get('word_wrap') }
 sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
 
+# Extensions that default to word wrap on (prose file types)
+my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);
+
+sub should_default_wrap {
+    my ($self, $filename) = @_;
+    return 0 unless defined $filename;
+    if ($filename =~ /\.([^.]+)$/) {
+        return 1 if exists $WRAP_DEFAULT_EXTENSIONS{lc $1};
+    }
+    return 0;
+}
+
 # =============================================================================
 # Tab/space conversion helpers
 # =============================================================================

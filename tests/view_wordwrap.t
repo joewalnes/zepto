@@ -367,4 +367,26 @@ subtest 'Home at segment boundary with left affinity' => sub {
     is($view->cursor_affinity(), 'right', 'Affinity resets to right after Home');
 };
 
+# =============================================================================
+# Per-view word wrap override
+# =============================================================================
+
+subtest 'word_wrap_override defaults to undef' => sub {
+    my ($view, $doc, $wm) = make_view(10, "short");
+    is($view->word_wrap_override(), undef, 'Default override is undef');
+};
+
+subtest 'set_word_wrap_override persists' => sub {
+    my ($view, $doc, $wm) = make_view(10, "short");
+
+    $view->set_word_wrap_override(1);
+    is($view->word_wrap_override(), 1, 'Override set to 1');
+
+    $view->set_word_wrap_override(0);
+    is($view->word_wrap_override(), 0, 'Override set to 0');
+
+    $view->set_word_wrap_override(undef);
+    is($view->word_wrap_override(), undef, 'Override cleared to undef');
+};
+
 done_testing();

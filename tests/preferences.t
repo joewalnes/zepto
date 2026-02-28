@@ -323,4 +323,44 @@ subtest 'Round-trip serialization' => sub {
     is($prefs2->get('tab_width'), '2', 'Tab width round-trip');
 };
 
+# ============================================================================
+# Filetype word wrap defaults
+# ============================================================================
+subtest 'should_default_wrap for prose filetypes' => sub {
+    my $prefs = Zepto::Preferences->new();
+
+    # Extensions that should default to wrap
+    ok($prefs->should_default_wrap('README.md'), 'Markdown files wrap');
+    ok($prefs->should_default_wrap('notes.txt'), 'Text files wrap');
+    ok($prefs->should_default_wrap('doc.rst'), 'RST files wrap');
+    ok($prefs->should_default_wrap('guide.adoc'), 'AsciiDoc files wrap');
+    ok($prefs->should_default_wrap('README.markdown'), 'Long markdown ext wraps');
+    ok($prefs->should_default_wrap('file.text'), 'Long text ext wraps');
+
+    # Case insensitive
+    ok($prefs->should_default_wrap('NOTES.TXT'), 'Case insensitive extension');
+    ok($prefs->should_default_wrap('readme.MD'), 'Mixed case extension');
+};
+
+subtest 'should_default_wrap for code filetypes' => sub {
+    my $prefs = Zepto::Preferences->new();
+
+    # Code files should not default to wrap
+    ok(!$prefs->should_default_wrap('main.py'), 'Python files do not wrap');
+    ok(!$prefs->should_default_wrap('app.js'), 'JavaScript files do not wrap');
+    ok(!$prefs->should_default_wrap('lib.rs'), 'Rust files do not wrap');
+    ok(!$prefs->should_default_wrap('Main.java'), 'Java files do not wrap');
+    ok(!$prefs->should_default_wrap('editor.pm'), 'Perl files do not wrap');
+    ok(!$prefs->should_default_wrap('Makefile'), 'No extension does not wrap');
+};
+
+subtest 'should_default_wrap edge cases' => sub {
+    my $prefs = Zepto::Preferences->new();
+
+    ok(!$prefs->should_default_wrap(undef), 'Undef filename does not wrap');
+    ok(!$prefs->should_default_wrap(''), 'Empty filename does not wrap');
+    ok($prefs->should_default_wrap('/path/to/README.md'), 'Full path with md wraps');
+    ok($prefs->should_default_wrap('some.file.txt'), 'Multi-dot filename wraps on last ext');
+};
+
 done_testing();

@@ -8,6 +8,10 @@ Introduction
 This document demonstrates **reStructuredText** syntax for highlighting.
 reStructuredText is used by Sphinx_ for Python documentation.
 
+Word wrap is especially useful for prose-heavy documents like this reStructuredText file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical specifications, and long-form writing much more pleasant and efficient.
+
+This second paragraph includes *emphasized text* and **strongly emphasized text** mixed with ``inline code`` to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests an `external link <https://example.com>`_ and a footnote reference [2]_ to exercise various inline reStructuredText elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+
 Basic Formatting
 ----------------
 

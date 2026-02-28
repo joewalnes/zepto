@@ -143,6 +143,27 @@ sub active_highlighter { $_[0]->{tab_manager}->active_highlighter() }
 sub active_file_path  { $_[0]->{tab_manager}->active_file_path() }
 sub active_tab        { $_[0]->{tab_manager}->active_tab() }
 
+# Resolve effective word wrap state for active view:
+# explicit per-view toggle > filetype default > global preference
+sub _effective_word_wrap {
+    my ($self) = @_;
+    my $view = $self->active_view();
+    return 0 unless $view;
+
+    # Per-view explicit override wins
+    my $override = $view->word_wrap_override();
+    return $override if defined $override;
+
+    # Filetype default
+    my $doc = $self->active_doc();
+    if ($doc) {
+        return 1 if $self->{prefs}->should_default_wrap($doc->filename());
+    }
+
+    # Global preference
+    return $self->{prefs}->word_wrap();
+}
+
 sub _create_document_state {
     my ($self, $file_path, %opts) = @_;
 
@@ -3133,7 +3154,8 @@ sub render {
     $self->active_view()->set_viewport_size($rows - RESERVED_ROWS, $text_width);
 
     # Build/rebuild WrapMap for word wrap mode
-    if ($self->{prefs}->word_wrap()) {
+    my $word_wrap_active = $self->_effective_word_wrap();
+    if ($word_wrap_active) {
         my $lm = $self->active_view()->line_map();
         if ($lm && $lm->has_expanded_hunks()) {
             # Disable wrap while diff hunks are expanded
@@ -3181,6 +3203,7 @@ sub render {
         cols        => $cols,
         message     => $self->{message},
         highlighter => $self->active_highlighter(),
+        word_wrap_active => $word_wrap_active,
         ui          => {
             menu_open => $self->{menu_open},
             menu_selected => $self->{menu_selected},

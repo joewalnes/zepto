@@ -10,6 +10,9 @@
 
 <STRING>'use strict'</STRING>;
 
+<COMMENT>// This is a very long comment that extends well beyond the typical terminal width of eighty columns to test word wrap behavior in code files. When wrap is toggled on with Alt+Z, this line should break at word boundaries and show continuation indicators.</COMMENT>
+<KEYWORD>const</KEYWORD> <CONSTANT>LONG_DESCRIPTION</CONSTANT> <OPERATOR>=</OPERATOR> <STRING>"This is a very long string literal that also extends well beyond eighty columns to test how the editor handles syntax highlighting when a single string value wraps across multiple visual rows in the terminal viewport."</STRING>;
+
 <COMMENT>// Imports (ES6 modules)</COMMENT>
 <KEYWORD>import</KEYWORD> { readFile, writeFile } from <STRING>'fs/promises'</STRING>;
 <KEYWORD>import</KEYWORD> path from <STRING>'path'</STRING>;

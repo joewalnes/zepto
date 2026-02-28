@@ -5,6 +5,10 @@
 <COMMENT>#!/usr/bin/env python3</COMMENT>
 <STRING>"""A complete Python program demonstrating various syntax elements."""</STRING>
 
+<COMMENT># This is a very long comment that extends well beyond the typical terminal width of eighty columns to test word wrap behavior in code files. When wrap is toggled on with Alt+Z, this line should break at word boundaries and display a continuation indicator on wrapped rows.</COMMENT>
+
+<CONSTANT>LONG_MESSAGE</CONSTANT> <OPERATOR>=</OPERATOR> <STRING>"This is a very long string literal that also extends well beyond eighty columns to test how the editor handles syntax highlighting when a single string value wraps across multiple visual rows in the terminal viewport."</STRING>
+
 <KEYWORD>import</KEYWORD> os
 <KEYWORD>import</KEYWORD> sys
 <KEYWORD>from</KEYWORD> typing <KEYWORD>import</KEYWORD> <TYPE>List</TYPE>, <TYPE>Dict</TYPE>, <TYPE>Optional</TYPE>

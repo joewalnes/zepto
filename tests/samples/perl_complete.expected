@@ -5,6 +5,9 @@
 <COMMENT>#!/usr/bin/env perl</COMMENT>
 <COMMENT># A complete Perl program demonstrating various syntax elements</COMMENT>
 
+<COMMENT># This is a very long comment that extends well beyond the typical terminal width of eighty columns to test word wrap behavior in code files. When wrap is toggled on with Alt+Z, this line should break at word boundaries and display a continuation indicator on wrapped rows.</COMMENT>
+<KEYWORD>my</KEYWORD> <VARIABLE>$LONG_MESSAGE</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>"This is a very long string literal that also extends well beyond eighty columns to test how the editor handles syntax highlighting when a single string value wraps across multiple visual rows in the terminal viewport."</STRING>;
+
 <KEYWORD>use</KEYWORD> <TYPE>strict</TYPE>;
 <KEYWORD>use</KEYWORD> <TYPE>warnings</TYPE>;
 <KEYWORD>use</KEYWORD> <TYPE>Data::Dumper</TYPE>;

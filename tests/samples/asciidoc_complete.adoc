@@ -13,6 +13,10 @@ v2.0, 2024-01-15
 This document demonstrates *AsciiDoc* syntax for highlighting.
 AsciiDoc is a lightweight markup language for writing documentation.
 
+Word wrap is especially useful for prose-heavy documents like this AsciiDoc file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical manuals, and long-form content much more pleasant and efficient for writers and developers alike.
+
+This second paragraph includes *bold text* and _italic text_ mixed with `inline monospaced code` to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests a https://example.com[link to an example site] and references an {author} attribute to exercise various inline AsciiDoc elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+
 === Basic Formatting
 
 Text can be *bold*, _italic_, `monospaced`, or [.underline]#underlined#.
