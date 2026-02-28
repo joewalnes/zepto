@@ -47,7 +47,7 @@ This is <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</
 
 This is <PUNCTUATION>**</PUNCTUATION><BOLD>*bold and italic</BOLD><PUNCTUATION>**</PUNCTUATION>* and also <PUNCTUATION>__</PUNCTUATION><BOLD>_bold italic</BOLD><PUNCTUATION>__</PUNCTUATION>_.
 
-This is ~~strikethrough~~ text.
+This is <PUNCTUATION>~~</PUNCTUATION><STRIKETHROUGH>strikethrough</STRIKETHROUGH><PUNCTUATION>~~</PUNCTUATION> text.
 
 This is ==highlighted== text (some flavors).
 

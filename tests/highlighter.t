@@ -610,6 +610,10 @@ subtest 'Markdown syntax' => sub {
     ($tokens) = $hl->tokenize_line('_italic text_', 0);
     ok(has_token($tokens, 'italic', 1), '_italic_ uses TOKEN_ITALIC');
 
+    # Strikethrough
+    ($tokens) = $hl->tokenize_line('~~deleted text~~', 0);
+    ok(has_token($tokens, 'strikethrough', 2), '~~text~~ uses TOKEN_STRIKETHROUGH');
+
     # Code
     ($tokens) = $hl->tokenize_line('inline `code` here', 0);
     ok(has_token($tokens, 'function', 7), 'inline code');
@@ -675,6 +679,17 @@ subtest 'AsciiDoc syntax' => sub {
     ($tokens) = $hl->tokenize_line('use `code` here', 0);
     ok(has_token($tokens, 'function', 4), 'inline code');
 
+    # URL with link text (scheme included in link)
+    ($tokens) = $hl->tokenize_line('visit https://example.com[Example] now', 0);
+    ok(has_token($tokens, 'link', 6), 'URL with [text] includes scheme in TOKEN_LINK');
+    is(token_at($tokens, 6), 'link', 'https: is part of link token');
+    is(token_at($tokens, 14), 'link', '//example.com is part of link token');
+
+    # Bare URL
+    ($tokens) = $hl->tokenize_line('visit https://example.com for info', 0);
+    ok(has_token($tokens, 'link', 6), 'bare URL uses TOKEN_LINK');
+    is(token_at($tokens, 6), 'link', 'bare URL scheme is link');
+
     # Inline macro links
     ($tokens) = $hl->tokenize_line('link:http://example.com[click here]', 0);
     ok(has_token($tokens, 'link', 5), 'inline macro URL uses TOKEN_LINK');
@@ -682,6 +697,14 @@ subtest 'AsciiDoc syntax' => sub {
     # Cross-reference
     ($tokens) = $hl->tokenize_line('see <<section-id>>', 0);
     ok(has_token($tokens, 'link', 4), '<<xref>> uses TOKEN_LINK');
+
+    # Role-annotated underline: [. underline ]# text #
+    ($tokens) = $hl->tokenize_line('[.underline]#underlined text#', 0);
+    ok(has_token($tokens, 'underline', 13), '[.underline]#text# uses TOKEN_UNDERLINE');
+
+    # Role-annotated strikethrough: [. line-through ]# text #
+    ($tokens) = $hl->tokenize_line('[.line-through]#deleted text#', 0);
+    ok(has_token($tokens, 'strikethrough', 16), '[.line-through]#text# uses TOKEN_STRIKETHROUGH');
 
     # Admonition
     ($tokens) = $hl->tokenize_line('NOTE: something', 0);

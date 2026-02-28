@@ -52,6 +52,8 @@ my %type_names = (
     'bold'        => 'BOLD',
     'italic'      => 'ITALIC',
     'link'        => 'LINK',
+    'underline'   => 'UNDERLINE',
+    'strikethrough' => 'STRIKETHROUGH',
 );
 
 # Get list of sample files to process

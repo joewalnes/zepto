@@ -105,6 +105,17 @@ sub tokenize {
             next;
         }
 
+        # Strikethrough ~~text~~
+        if ($rest =~ /^(~~)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_STRIKETHROUGH);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            next;
+        }
+
         if ($rest =~ /^(\*\*|__)(.+?)\1/) {
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;

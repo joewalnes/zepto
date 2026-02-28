@@ -19,8 +19,9 @@ use constant {
     BOLD    => "\x1b[1m",
     DIM     => "\x1b[2m",
     ITALIC  => "\x1b[3m",
-    UNDERLINE => "\x1b[4m",
-    REVERSE => "\x1b[7m",
+    UNDERLINE      => "\x1b[4m",
+    STRIKETHROUGH  => "\x1b[9m",
+    REVERSE        => "\x1b[7m",
 };
 
 # Create a new theme
@@ -282,6 +283,8 @@ sub dark_theme {
         syntax_bold        => BOLD . fg_rgb(255, 158, 100),  # Bold orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(158, 206, 106),  # Italic green - prose italic
         syntax_link        => UNDERLINE . fg_rgb(242, 143, 173),  # Underlined pink - hyperlinks
+        syntax_underline   => UNDERLINE . fg_rgb(192, 202, 245),  # Underlined fg - prose underline
+        syntax_strikethrough => STRIKETHROUGH . fg_rgb(130, 140, 170),  # Strikethrough dimmed
     });
 }
 
@@ -494,6 +497,8 @@ sub light_theme {
         syntax_bold        => BOLD . fg_rgb(180, 60, 10),    # Bold deep orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(22, 120, 55),  # Italic deep green - prose italic
         syntax_link        => UNDERLINE . fg_rgb(180, 60, 130),  # Underlined deep pink - hyperlinks
+        syntax_underline   => UNDERLINE . fg_rgb(76, 79, 105),   # Underlined fg - prose underline
+        syntax_strikethrough => STRIKETHROUGH . fg_rgb(120, 125, 140),  # Strikethrough dimmed
     });
 }
 

@@ -207,6 +207,26 @@ sub tokenize {
             next;
         }
 
+        # URL with link text: https://example.com[text]
+        if ($rest =~ /^(https?:\/\/[^\s\[]+)(\[)([^\]]*)(\])/) {
+            push @tokens, _token($pos, $pos + length($1), TOKEN_LINK);
+            $pos += length($1);
+            push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
+            $pos += 1;
+            push @tokens, _token($pos, $pos + length($3), TOKEN_STRING);
+            $pos += length($3);
+            push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
+            $pos += 1;
+            next;
+        }
+
+        # Bare URL: https://example.com
+        if ($rest =~ /^(https?:\/\/[^\s\[,;)]+)/) {
+            push @tokens, _token($pos, $pos + length($1), TOKEN_LINK);
+            $pos += length($1);
+            next;
+        }
+
         # Inline macros: link:url[text], image:url[text]
         if ($rest =~ /^(\w+:)([\w.\/:-]+)(\[)([^\]]*)(\])/) {
             push @tokens, _token($pos, $pos + length($1), TOKEN_FUNCTION);
@@ -219,6 +239,28 @@ sub tokenize {
             $pos += length($4);
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
+            next;
+        }
+
+        # Role-annotated marked text: [.role]#text#
+        if ($rest =~ /^(\[\.)([\w-]+)(\])(#)([^#]+)(#)/) {
+            my $role = $2;
+            my $full_len = length($1) + length($2) + length($3) + length($4) + length($5) + length($6);
+            my $text_start = $pos + length($1) + length($2) + length($3) + length($4);
+            my $text_end = $text_start + length($5);
+            # Punctuation for [. ]# #
+            push @tokens, _token($pos, $pos + length($1), TOKEN_PUNCTUATION);
+            push @tokens, _token($pos + length($1), $pos + length($1) + length($2), TOKEN_ATTRIBUTE);
+            push @tokens, _token($pos + length($1) + length($2), $pos + length($1) + length($2) + length($3) + length($4), TOKEN_PUNCTUATION);
+            if ($role eq 'underline') {
+                push @tokens, _token($text_start, $text_end, TOKEN_UNDERLINE);
+            } elsif ($role =~ /^(?:line-through|strike|del)$/) {
+                push @tokens, _token($text_start, $text_end, TOKEN_STRIKETHROUGH);
+            } else {
+                push @tokens, _token($text_start, $text_end, TOKEN_STRING);
+            }
+            push @tokens, _token($text_end, $text_end + 1, TOKEN_PUNCTUATION);
+            $pos += $full_len;
             next;
         }
 
