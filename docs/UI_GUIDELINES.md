@@ -60,6 +60,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - Do not mix shape roles in a single component. A menu item is an `Action` inside a `Surface` container.
 - Use background fill to indicate state (active, selected, focused), not category. Category is conveyed by shape.
 - Use borders or edge glyphs to indicate focus; use fill to indicate selection. Do not use both unless necessary.
+- Use Nerd Font icons to enhance meaning of actions and surfaces when available; fall back to generic Unicode icons when not.
 - Shortcut keys are always rendered as a consistent badge:
   - Same shape, size, and padding across the UI.
   - Default badge treatment is neutral (not attention-grabbing) and becomes emphasized only when the action is focused or active.
