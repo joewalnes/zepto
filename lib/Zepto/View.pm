@@ -396,7 +396,6 @@ sub clear_selection {
     my ($self) = @_;
     $self->{selection_anchor_line} = undef;
     $self->{selection_anchor_col} = undef;
-    $self->{column_select} = 0;
 }
 
 # Get selection as (start_line, start_col, end_line, end_col)
@@ -719,6 +718,20 @@ sub is_selected {
 # ============================================================================
 
 sub column_select { $_[0]->{column_select} }
+
+# Enter column mode without forcing a selection
+sub enter_column_mode {
+    my ($self) = @_;
+    $self->{column_select} = 1;
+    $self->clear_selection();
+}
+
+# Exit column mode and clear any selection
+sub exit_column_mode {
+    my ($self) = @_;
+    $self->{column_select} = 0;
+    $self->clear_selection();
+}
 
 # Enter column selection mode, setting anchor at current cursor
 sub start_column_selection {

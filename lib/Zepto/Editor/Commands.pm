@@ -393,6 +393,8 @@ sub _column_paste {
     # Remove trailing empty element from split if text ended with newline
     pop @paste_lines if @paste_lines > 1 && $paste_lines[-1] eq '';
 
+    $doc->begin_undo_group();
+
     # Delete existing column selection content if any
     my $start_col;
     my $start_line;
@@ -403,7 +405,6 @@ sub _column_paste {
 
         if ($left != $right) {
             # Delete rectangle content bottom-to-top
-            $doc->break_undo_group();
             for my $ln (reverse $top .. $bottom) {
                 my $line_len = $doc->line_length($ln);
                 next if $line_len <= $left;
@@ -418,8 +419,6 @@ sub _column_paste {
         $start_line = $view->cursor_line();
         $start_col = $view->cursor_col();
     }
-
-    $doc->break_undo_group();
 
     # Single-line paste with column selection: replicate on each line
     my $num_target_lines;
@@ -451,7 +450,7 @@ sub _column_paste {
         $doc->insert($offset, $paste_text);
     }
 
-    $doc->break_undo_group();
+    $doc->end_undo_group();
 
     $view->clear_selection();
     my $paste_len = CORE::length($paste_lines[0] // '');
@@ -461,7 +460,9 @@ sub _column_paste {
 
 sub cmd_select_all {
     my ($self) = @_;
-    $self->active_view()->select_all();
+    my $view = $self->active_view();
+    $view->exit_column_mode() if $view->column_select();
+    $view->select_all();
 }
 
 # =============================================================================
@@ -628,6 +629,19 @@ sub cmd_goto_line {
 # =============================================================================
 # View Commands
 # =============================================================================
+
+sub cmd_toggle_column_mode {
+    my ($self) = @_;
+
+    my $view = $self->active_view();
+    return unless $view;
+
+    if ($view->column_select()) {
+        $view->exit_column_mode();
+    } else {
+        $view->enter_column_mode();
+    }
+}
 
 sub cmd_toggle_theme {
     my ($self) = @_;

@@ -525,23 +525,25 @@ sub handle_editing_event {
 
         # Navigation / Line movement
         if ($key eq 'up') {
-            if ($alt && $shift) { $self->do_column_select_up(); }
+            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_up(); }
             elsif ($ctrl && $shift) { $self->do_duplicate_line_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
             else { $view->move_up($shift); }
         }
         elsif ($key eq 'down') {
-            if ($alt && $shift) { $self->do_column_select_down(); }
+            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_down(); }
             elsif ($ctrl && $shift) { $self->do_duplicate_line_down(); }
             elsif ($alt) { $self->do_move_line_down(); }
             else { $view->move_down($shift); }
         }
         elsif ($key eq 'left')  {
-            if ($alt) { $view->move_word_left($shift); }
+            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_left(); }
+            elsif ($alt) { $view->move_word_left($shift); }
             else { $view->move_left($shift); }
         }
         elsif ($key eq 'right') {
-            if ($alt) { $view->move_word_right($shift); }
+            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_right(); }
+            elsif ($alt) { $view->move_word_right($shift); }
             else { $view->move_right($shift); }
         }
         elsif ($key eq 'home')  {
@@ -576,6 +578,9 @@ sub handle_editing_event {
         elsif ($key eq 'escape') {
             if ($self->{menu_open}) {
                 $self->close_menu();
+            }
+            elsif ($view->column_select()) {
+                $view->exit_column_mode();
             }
             elsif ($view->has_selection()) {
                 $view->clear_selection();
@@ -659,6 +664,9 @@ sub handle_alt_char {
     # Inline diff expansion
     elsif ($char eq 'd') { $self->cmd_toggle_diff(); }
 
+    # Column mode toggle
+    elsif ($char eq 'c') { $self->cmd_toggle_column_mode(); }
+
     # Minimap toggle
     elsif ($char eq 'm') { $self->cmd_toggle_minimap(); }
 
@@ -714,8 +722,19 @@ sub handle_mouse_event {
             return;
         }
 
-        # Ignore clicks on ruler bar (row 3)
-        return if $y == 3;
+        # Ruler bar (row 3) - check for clickable buttons
+        if ($y == 3) {
+            my @buttons = Zepto::Renderer::get_ruler_buttons();
+            for my $btn (@buttons) {
+                if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
+                    if ($btn->{action} eq 'toggle_column_mode') {
+                        $self->cmd_toggle_column_mode();
+                    }
+                    return;
+                }
+            }
+            return;
+        }
 
         # Check if click is on status bar (last row) in find mode
         my ($rows, $cols) = $term->get_size();
@@ -2441,6 +2460,23 @@ sub do_column_select_down {
     $view->move_down(1);  # extend_selection = true
 }
 
+sub do_column_select_left {
+    my ($self) = @_;
+    my $view = $self->active_view();
+    return if $view->cursor_col() <= 0;
+
+    $view->start_column_selection() unless $view->column_select();
+    $view->move_left(1);  # extend_selection = true
+}
+
+sub do_column_select_right {
+    my ($self) = @_;
+    my $view = $self->active_view();
+
+    $view->start_column_selection() unless $view->column_select();
+    $view->move_right(1);  # extend_selection = true
+}
+
 sub _duplicate_lines {
     my ($self, $direction) = @_;  # -1 = up, 1 = down
 
@@ -2539,7 +2575,7 @@ sub _column_delete_selection {
     my ($top, $left, $bottom, $right) = $view->column_selection();
     return unless defined $top;
 
-    $doc->break_undo_group();
+    $doc->begin_undo_group();
 
     for my $ln (reverse $top .. $bottom) {
         my $line_len = $doc->line_length($ln);
@@ -2551,7 +2587,7 @@ sub _column_delete_selection {
         $doc->delete($offset, $del_len);
     }
 
-    $doc->break_undo_group();
+    $doc->end_undo_group();
 
     # Collapse to zero-width column cursor at left edge
     $view->clear_selection();
@@ -2574,7 +2610,7 @@ sub _column_insert_char {
     return unless defined $top;
     my $has_width = ($left != $right);
 
-    $doc->break_undo_group();
+    $doc->begin_undo_group();
 
     for my $ln (reverse $top .. $bottom) {
         my $line_len = $doc->line_length($ln);
@@ -2602,7 +2638,7 @@ sub _column_insert_char {
         $doc->insert($offset, $char);
     }
 
-    $doc->break_undo_group();
+    $doc->end_undo_group();
 
     # Collapse to zero-width column cursor at left + char_length
     my $new_col = $left + CORE::length($char);
@@ -2635,7 +2671,7 @@ sub _column_backspace {
     # Zero-width: delete one char before cursor column on each line
     return if $left == 0;
 
-    $doc->break_undo_group();
+    $doc->begin_undo_group();
 
     for my $ln (reverse $top .. $bottom) {
         my $line_len = $doc->line_length($ln);
@@ -2644,7 +2680,7 @@ sub _column_backspace {
         $doc->delete($offset, 1);
     }
 
-    $doc->break_undo_group();
+    $doc->end_undo_group();
 
     # Move cursor column left by 1
     my $new_col = $left - 1;
@@ -2671,7 +2707,7 @@ sub _column_delete {
     }
 
     # Zero-width: delete one char at cursor column on each line
-    $doc->break_undo_group();
+    $doc->begin_undo_group();
 
     for my $ln (reverse $top .. $bottom) {
         my $line_len = $doc->line_length($ln);
@@ -2680,7 +2716,7 @@ sub _column_delete {
         $doc->delete($offset, 1);
     }
 
-    $doc->break_undo_group();
+    $doc->end_undo_group();
     $view->ensure_cursor_visible();
 }
 

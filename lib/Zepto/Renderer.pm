@@ -107,7 +107,7 @@ our %MENU_ITEMS = (
         { label => "Dup Down",     shortcut => "Ctrl+\x{21E7}\x{2193}", action => 'dup_line_down' },
         { separator => 1 },
         { label => 'Select All',   shortcut => 'Ctrl+A', action => 'select_all' },
-        { label => 'Column Select', shortcut => "Alt+\x{21E7}\x{2191}", action => 'column_select' },
+        { label => 'Column Mode',  shortcut => 'Alt+C',  action => 'column_mode' },
     ],
     s => [
         { label => 'Find/Replace', shortcut => 'Ctrl+F', action => 'find' },
@@ -489,20 +489,27 @@ sub render {
             );
         } else {
             if ($doc && $view && !$message) {
-                my $cl = $view->cursor_line();
-                my $hunk_idx = $doc->vcs_hunk_at_line($cl);
-                if (defined $hunk_idx) {
-                    my $hunks = $doc->vcs_hunks();
-                    my $h = $hunks->[$hunk_idx];
-                    my $type = $h->{type} // 'modified';
-                    if ($type eq 'added') {
-                        $hint_color = $theme->color('vcs_added');
-                    } elsif ($type eq 'deleted') {
-                        $hint_color = $theme->color('vcs_deleted');
+                if ($view->column_select()) {
+                    $status_hint = "COL MODE: Shift+Arrows resize  Alt+Click/Drag add  Ctrl+C/X/V column  Del/BS  Esc";
+                    $hint_color = $theme->color('column_indicator_fg');
+                } else {
+                    my $cl = $view->cursor_line();
+                    my $hunk_idx = $doc->vcs_hunk_at_line($cl);
+                    if (defined $hunk_idx) {
+                        my $hunks = $doc->vcs_hunks();
+                        my $h = $hunks->[$hunk_idx];
+                        my $type = $h->{type} // 'modified';
+                        if ($type eq 'added') {
+                            $hint_color = $theme->color('vcs_added');
+                        } elsif ($type eq 'deleted') {
+                            $hint_color = $theme->color('vcs_deleted');
+                        } else {
+                            $hint_color = $theme->color('vcs_modified');
+                        }
+                        $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
                     } else {
-                        $hint_color = $theme->color('vcs_modified');
+                        $status_hint = "Alt+Shift+Arrows column select  Alt+Click/Drag  Alt+C column mode";
                     }
-                    $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
                 }
             }
             $output .= $class->_render_status_bar(
@@ -744,7 +751,6 @@ sub _render_menu_bar {
     }
     $class->_set_menu_bar_buttons(\@buttons_copy);
 
-    # Reset before clear to show terminal default on right edge (consistent with text rows)
     $output .= RESET;
     $output .= CLEAR_LINE;
 
@@ -1194,6 +1200,24 @@ sub _render_ruler_bar {
             $i++;
         }
     }
+
+    my @ruler_buttons;
+    if ($view && $view->column_select()) {
+        my $label = " COL ";
+        my $label_width = length($label);
+        if ($label_width < $cols) {
+            my $col_start = $cols - $label_width + 1;
+            $output .= _move_to(3, $col_start);
+            $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+            $output .= $label;
+            push @ruler_buttons, {
+                x_start => $col_start,
+                x_end   => $col_start + $label_width - 1,
+                action  => 'toggle_column_mode',
+            };
+        }
+    }
+    $class->_set_ruler_buttons(\@ruler_buttons);
 
     $output .= RESET;
     $output .= CLEAR_LINE;
@@ -2593,14 +2617,18 @@ sub _render_status_bar {
     # Column selection indicator segment
     my $col_text = '';
     my $col_width = 0;
-    if ($view && $view->column_select() && $view->has_selection()) {
-        my ($top, $left, $bottom, $right) = $view->column_selection();
-        my $lines = $bottom - $top + 1;
-        my $rect_cols = $right - $left;
-        if ($rect_cols > 0) {
-            $col_text = " COL ${lines}\x{00D7}${rect_cols} ";  # e.g. "COL 5×3"
+    if ($view && $view->column_select()) {
+        if ($view->has_selection()) {
+            my ($top, $left, $bottom, $right) = $view->column_selection();
+            my $lines = $bottom - $top + 1;
+            my $rect_cols = $right - $left;
+            if ($rect_cols > 0) {
+                $col_text = " COL ${lines}\x{00D7}${rect_cols} ";  # e.g. "COL 5×3"
+            } else {
+                $col_text = " COL ${lines} lines ";
+            }
         } else {
-            $col_text = " COL ${lines} lines ";
+            $col_text = " COL MODE ";
         }
         $col_width = length($col_text);
         $col_width += $segment_overhead;  # Arrow char
@@ -2650,8 +2678,15 @@ sub _render_status_bar {
 # Store and retrieve status button positions for click handling
 {
     my $_status_buttons = [];
-    sub _set_status_buttons { shift; $_status_buttons = shift; }
-    sub get_status_buttons { return @{$_status_buttons}; }
+sub _set_status_buttons { shift; $_status_buttons = shift; }
+sub get_status_buttons { return @{$_status_buttons}; }
+}
+
+# Store and retrieve ruler button positions for click handling
+{
+    my $_ruler_buttons = [];
+    sub _set_ruler_buttons { shift; $_ruler_buttons = shift; }
+    sub get_ruler_buttons { return @{$_ruler_buttons}; }
 }
 
 # Render dropdown menu

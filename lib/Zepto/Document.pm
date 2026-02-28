@@ -31,6 +31,7 @@ sub new {
         _last_edit_time => 0,
         _last_edit_type => '',
         _last_edit_pos  => -1,
+        _undo_group     => undef,
         # VCS integration
         _vcs_provider   => undef,
         _vcs_base       => undef,  # Cached HEAD content
@@ -182,6 +183,17 @@ sub _push_undo {
     my $now = time();
     my $should_group = 0;
 
+    if ($self->{_undo_group}) {
+        push @{$self->{_undo_group}}, $action;
+        $self->{redo_stack} = [];
+        $self->{dirty} = 1;
+        $self->{_vcs_dirty} = 1;
+        $self->{_last_edit_time} = $now;
+        $self->{_last_edit_type} = $action->{type};
+        $self->{_last_edit_pos} = $action->{pos};
+        return;
+    }
+
     # Group consecutive single-char inserts/deletes at adjacent positions
     if (@{$self->{undo_stack}} > 0) {
         my $last = $self->{undo_stack}[-1];
@@ -296,18 +308,12 @@ sub undo {
 
     my $action = pop @{$self->{undo_stack}};
 
-    if ($action->{type} eq 'insert') {
-        # Undo insert: delete the text
-        $self->{buffer}->delete($action->{pos}, CORE::length($action->{text}));
-    }
-    elsif ($action->{type} eq 'delete') {
-        # Undo delete: re-insert the text
-        $self->{buffer}->insert($action->{pos}, $action->{text});
-    }
-    elsif ($action->{type} eq 'replace') {
-        # Undo replace: delete new text, insert old text
-        $self->{buffer}->delete($action->{pos}, CORE::length($action->{new_text}));
-        $self->{buffer}->insert($action->{pos}, $action->{old_text});
+    if ($action->{type} eq 'group') {
+        for my $a (reverse @{$action->{actions}}) {
+            $self->_apply_action($a, 'undo');
+        }
+    } else {
+        $self->_apply_action($action, 'undo');
     }
 
     push @{$self->{redo_stack}}, $action;
@@ -330,18 +336,12 @@ sub redo {
 
     my $action = pop @{$self->{redo_stack}};
 
-    if ($action->{type} eq 'insert') {
-        # Redo insert: insert the text again
-        $self->{buffer}->insert($action->{pos}, $action->{text});
-    }
-    elsif ($action->{type} eq 'delete') {
-        # Redo delete: delete the text again
-        $self->{buffer}->delete($action->{pos}, CORE::length($action->{text}));
-    }
-    elsif ($action->{type} eq 'replace') {
-        # Redo replace: delete old text, insert new text
-        $self->{buffer}->delete($action->{pos}, CORE::length($action->{old_text}));
-        $self->{buffer}->insert($action->{pos}, $action->{new_text});
+    if ($action->{type} eq 'group') {
+        for my $a (@{$action->{actions}}) {
+            $self->_apply_action($a, 'redo');
+        }
+    } else {
+        $self->_apply_action($action, 'redo');
     }
 
     push @{$self->{undo_stack}}, $action;
@@ -375,6 +375,54 @@ sub mark_clean {
 sub break_undo_group {
     my ($self) = @_;
     $self->{_last_edit_type} = '';
+}
+
+sub begin_undo_group {
+    my ($self) = @_;
+    return if $self->{_undo_group};
+    $self->{_undo_group} = [];
+    $self->{_last_edit_type} = '';
+}
+
+sub end_undo_group {
+    my ($self) = @_;
+    my $group = $self->{_undo_group};
+    $self->{_undo_group} = undef;
+    return unless $group && @$group;
+
+    push @{$self->{undo_stack}}, { type => 'group', actions => $group };
+    $self->{redo_stack} = [];
+    $self->{dirty} = 1;
+    $self->{_vcs_dirty} = 1;
+    $self->{_last_edit_type} = '';
+}
+
+sub _apply_action {
+    my ($self, $action, $direction) = @_;
+
+    if ($action->{type} eq 'insert') {
+        if ($direction eq 'undo') {
+            $self->{buffer}->delete($action->{pos}, CORE::length($action->{text}));
+        } else {
+            $self->{buffer}->insert($action->{pos}, $action->{text});
+        }
+    }
+    elsif ($action->{type} eq 'delete') {
+        if ($direction eq 'undo') {
+            $self->{buffer}->insert($action->{pos}, $action->{text});
+        } else {
+            $self->{buffer}->delete($action->{pos}, CORE::length($action->{text}));
+        }
+    }
+    elsif ($action->{type} eq 'replace') {
+        if ($direction eq 'undo') {
+            $self->{buffer}->delete($action->{pos}, CORE::length($action->{new_text}));
+            $self->{buffer}->insert($action->{pos}, $action->{old_text});
+        } else {
+            $self->{buffer}->delete($action->{pos}, CORE::length($action->{old_text}));
+            $self->{buffer}->insert($action->{pos}, $action->{new_text});
+        }
+    }
 }
 
 # ============================================================================
@@ -572,4 +620,3 @@ sub vcs_hunk_at_line {
 }
 
 1;
-

@@ -247,6 +247,7 @@ sub execute_menu_item {
     elsif ($action eq 'dup_line_up')    { $self->do_duplicate_line_up(); }
     elsif ($action eq 'dup_line_down')  { $self->do_duplicate_line_down(); }
     elsif ($action eq 'select_all') { $self->cmd_select_all(); }
+    elsif ($action eq 'column_mode') { $self->cmd_toggle_column_mode(); }
     elsif ($action eq 'find')       { $self->cmd_find(); }
     elsif ($action eq 'goto')       { $self->cmd_goto_line(); }
     elsif ($action eq 'toggle_theme') { $self->cmd_toggle_theme(); }
