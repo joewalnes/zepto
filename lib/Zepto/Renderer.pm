@@ -119,6 +119,7 @@ our %MENU_ITEMS = (
         { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
         { label => 'Minimap',      shortcut => 'Alt+M',  action => 'toggle_minimap', toggle => 'show_minimap' },
         { label => 'File Tree',    shortcut => 'Ctrl+B', action => 'toggle_tree', toggle => 'show_tree' },
+        { label => 'Word Wrap',   shortcut => 'Alt+Z',  action => 'toggle_word_wrap', toggle => 'word_wrap' },
         { separator => 1 },
         { label => 'Next Tab',       shortcut => 'Alt+.',     action => 'next_tab' },
         { label => 'Prev Tab',       shortcut => 'Alt+,',     action => 'prev_tab' },
@@ -487,21 +488,34 @@ sub render {
                     $hint_color = $theme->color('column_indicator_fg');
                 } else {
                     my $cl = $view->cursor_line();
-                    my $hunk_idx = $doc->vcs_hunk_at_line($cl);
-                    if (defined $hunk_idx) {
-                        my $hunks = $doc->vcs_hunks();
-                        my $h = $hunks->[$hunk_idx];
-                        my $type = $h->{type} // 'modified';
-                        if ($type eq 'added') {
-                            $hint_color = $theme->color('vcs_added');
-                        } elsif ($type eq 'deleted') {
-                            $hint_color = $theme->color('vcs_deleted');
-                        } else {
-                            $hint_color = $theme->color('vcs_modified');
-                        }
-                        $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
+
+                    # Check line overflow first (higher priority, makes word wrap discoverable)
+                    my $line_overflows = 0;
+                    if (!$prefs || !$prefs->word_wrap()) {
+                        my $cursor_content = $doc->get_line_content($cl);
+                        my ($exp_line) = _expand_tabs($cursor_content);
+                        $line_overflows = 1 if length($exp_line) > $text_width;
+                    }
+
+                    if ($line_overflows) {
+                        $status_hint = "Line extends beyond screen \x{00B7} Alt+Z toggle word wrap";
                     } else {
-                        $status_hint = "Alt+Shift+Arrows column select  Alt+Click/Drag  Alt+C column mode";
+                        my $hunk_idx = $doc->vcs_hunk_at_line($cl);
+                        if (defined $hunk_idx) {
+                            my $hunks = $doc->vcs_hunks();
+                            my $h = $hunks->[$hunk_idx];
+                            my $type = $h->{type} // 'modified';
+                            if ($type eq 'added') {
+                                $hint_color = $theme->color('vcs_added');
+                            } elsif ($type eq 'deleted') {
+                                $hint_color = $theme->color('vcs_deleted');
+                            } else {
+                                $hint_color = $theme->color('vcs_modified');
+                            }
+                            $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
+                        } else {
+                            $status_hint = "Alt+Shift+Arrows column select  Alt+Click/Drag  Alt+C column mode";
+                        }
                     }
                 }
             }
@@ -1125,6 +1139,13 @@ sub _render_ruler_bar {
     # Visible cursor position (relative to viewport)
     my $visible_cursor = $visual_cursor_col - $scroll_col;
 
+    # In wrap mode, position badge at cursor's visual col within the wrap row
+    my $wm = $view ? $view->wrap_map() : undef;
+    if ($wm) {
+        my ($vrow, $vcol) = $wm->doc_to_visual($cursor_line, $cursor_col_char, $view->cursor_affinity());
+        $visible_cursor = $vcol;
+    }
+
     # Start with gutter area (empty, matches gutter width)
     $output .= $theme->color('ruler_bg') . $theme->color('ruler_fg');
     $output .= ' ' x $gutter_width;
@@ -1229,9 +1250,33 @@ sub _render_text_area {
     my $line_map = $view->line_map();
     my $has_expanded = $line_map && $line_map->has_expanded_hunks();
 
-    # Build visible entries from LineMap or simple doc-line mapping
+    # Build visible entries from WrapMap, LineMap, or simple doc-line mapping
     my @entries;
-    if ($has_expanded) {
+    my $wrap_map = $view->wrap_map();
+    if ($wrap_map) {
+        my $scroll_vrow = $view->scroll_visual_row();
+        for my $i (0 .. $height - 1) {
+            my $seg = $wrap_map->segment_at_visual_row($scroll_vrow + $i);
+            if ($seg) {
+                push @entries, {
+                    type         => ($seg->{wrap_index} == 0) ? 'doc' : 'wrap_cont',
+                    line         => $seg->{doc_line},
+                    wrap_index   => $seg->{wrap_index},
+                    col_start    => $seg->{col_start},
+                    col_end      => $seg->{col_end},
+                    vis_start    => $seg->{vis_start},
+                    vis_end      => $seg->{vis_end},
+                    indent_width => $seg->{indent_width},
+                };
+            } else {
+                push @entries, undef;
+            }
+        }
+        # Update visible_start/visible_end for find match binary search
+        $visible_start = $entries[0] ? $entries[0]{line} : $scroll_line;
+        my $last_entry = $entries[$#entries];
+        $visible_end = $last_entry ? ($last_entry->{line} + 1) : ($scroll_line + $height);
+    } elsif ($has_expanded) {
         my $raw = $line_map->visible_entries($scroll_line, $height);
         @entries = @$raw;
         # Pad with undef if fewer entries than height (end of file)
@@ -1400,9 +1445,26 @@ sub _render_text_area {
         my $doc_line = $entry ? $entry->{line} : ($scroll_line + $screen_row);
         my $is_cursor_line = ($doc_line == $cursor_line);
         my $is_hunk_line = $entry && defined $entry->{hunk_idx};
+        my $is_wrap_cont = $entry && ($entry->{type} // '') eq 'wrap_cont';
 
+        # Wrap continuation gutter: blank line number, ↪ placed before first content char
+        if ($is_wrap_cont) {
+            my $gutter_bg = $theme->color('gutter_bg');
+            my $indent_w = $entry->{indent_width} // 0;
+            if ($indent_w == 0) {
+                # No hanging indent: ↪ goes in last gutter column (under line number)
+                $output .= $gutter_bg . $theme->color('gutter_fg');
+                $output .= ' ' x ($gutter_width - 1);
+                $output .= $theme->color('wrap_indicator_fg');
+                $output .= Zepto::Chars->get('wrap_indicator');
+            } else {
+                # Has hanging indent: gutter is fully blank, ↪ goes in content indent area
+                $output .= $gutter_bg . $theme->color('gutter_fg');
+                $output .= ' ' x $gutter_width;
+            }
+        }
         # Line number gutter with VCS indicator (single column)
-        if ($doc_line < $doc->line_count()) {
+        elsif ($doc_line < $doc->line_count()) {
             my $line_num_str = sprintf("%d", $doc_line + 1);
 
             # Get VCS indicator for this line (single column)
@@ -1599,18 +1661,42 @@ sub _render_text_area {
                 }
             }
 
-            # Apply horizontal scroll (now in visual columns)
-            if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
-                $expanded_content = substr($expanded_content, $scroll_col);
-            }
-            elsif ($scroll_col >= length($expanded_content)) {
-                $expanded_content = '';
+            # Determine effective scroll column
+            # In wrap mode, each segment is rendered as a slice of the full line
+            # using effective_scroll_col = vis_start - indent_width
+            my $effective_scroll_col = $scroll_col;
+            my $has_wrap_segment = $entry && defined $entry->{wrap_index};
+
+            # Compute wrap indicator width early for correct truncation
+            my $wrap_indicator_width = 0;
+            if ($is_wrap_cont && $has_wrap_segment && ($entry->{indent_width} // 0) > 0) {
+                $wrap_indicator_width = $entry->{indent_width};
             }
 
-            # Truncate to width (display columns, not character count)
+            if ($has_wrap_segment) {
+                my $vis_start = $entry->{vis_start};
+                my $vis_end   = $entry->{vis_end};
+                my $seg_vis_len = $vis_end - $vis_start;
+
+                # Extract just the segment portion (no indent padding)
+                $expanded_content = substr($expanded_content, $vis_start, $seg_vis_len);
+
+                $effective_scroll_col = $vis_start;
+            } else {
+                # Apply horizontal scroll (now in visual columns)
+                if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
+                    $expanded_content = substr($expanded_content, $scroll_col);
+                }
+                elsif ($scroll_col >= length($expanded_content)) {
+                    $expanded_content = '';
+                }
+            }
+
+            # Truncate to available width (accounting for wrap indicator prefix)
+            my $avail_width = $width - $wrap_indicator_width;
             my $content_display_width = _display_width($expanded_content);
-            if ($content_display_width > $width) {
-                ($expanded_content, $content_display_width) = _truncate_to_display_width($expanded_content, $width);
+            if ($content_display_width > $avail_width) {
+                ($expanded_content, $content_display_width) = _truncate_to_display_width($expanded_content, $avail_width);
             }
 
             # Compute char-level highlight range for green (new) lines in expanded hunks
@@ -1640,9 +1726,16 @@ sub _render_text_area {
                 }
             }
 
+            # Emit wrap indicator prefix: [indent spaces] + ↪ for indented continuation rows
+            if ($wrap_indicator_width > 0) {
+                $output .= $line_bg . (' ' x ($wrap_indicator_width - 1));
+                $output .= $theme->color('wrap_indicator_fg') . Zepto::Chars->get('wrap_indicator');
+                $output .= $line_bg . $theme->color('fg');
+            }
+
             # Render with selection, syntax, match, and cursor highlighting
             $output .= $class->_render_line_with_highlights(
-                $expanded_content, $doc_line, $scroll_col, $width,
+                $expanded_content, $doc_line, $effective_scroll_col, $avail_width,
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
                 $full_line_content, \@visual_matches,
                 $is_hunk_line ? 'new' : undef, $new_char_hl,
@@ -1653,7 +1746,7 @@ sub _render_text_area {
             my $fill_bg = $is_cursor_line ? $line_bg
                         : $is_hunk_line   ? $line_bg
                         :                   $theme->color('bg');
-            my $fill_remaining = $width - $content_display_width;
+            my $fill_remaining = $avail_width - $content_display_width;
             if ($fill_remaining > 0 && $view->column_select() && $view->has_selection()) {
                 # Column selection may extend past line content into fill area
                 my ($col_top, $col_left, $col_bottom, $col_right) = $view->column_selection();
@@ -3017,6 +3110,16 @@ sub _cursor_screen_pos {
         ? $doc->get_line_content($cursor_line)
         : '';
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
+
+    # Account for word wrap via WrapMap
+    my $wm = $view->wrap_map();
+    if ($wm) {
+        my ($vrow, $vcol) = $wm->doc_to_visual($cursor_line, $cursor_col, $view->cursor_affinity());
+        my $scroll_vrow = $view->scroll_visual_row();
+        my $screen_row = $vrow - $scroll_vrow + $menu_height + 3;
+        my $screen_col = $vcol + $tree_width + $gutter_width + 1;
+        return ($screen_row, $screen_col);
+    }
 
     # Account for expanded hunk rows via LineMap
     my $lm = $view->line_map();

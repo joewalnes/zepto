@@ -47,6 +47,19 @@ sub new {
         # LineMap for inline diff expansion (undef when no hunks expanded)
         line_map => undef,
 
+        # WrapMap for word wrap mode (undef when word wrap is off)
+        _wrap_map => undef,
+
+        # Visual row offset within scroll_line when word wrap is active
+        # e.g., if scroll_line=5 and _scroll_wrap_offset=2, viewport starts
+        # at the 3rd visual row of document line 5
+        _scroll_wrap_offset => 0,
+
+        # Cursor affinity for wrap segment boundaries:
+        # 'right' (default) = cursor at boundary belongs to next segment
+        # 'left' = cursor at boundary belongs to current segment (used by END key)
+        _cursor_affinity => 'right',
+
         # Column (rectangular) selection mode
         column_select => 0,
     }, $class;
@@ -56,6 +69,20 @@ sub new {
 
 sub line_map     { $_[0]->{line_map} }
 sub set_line_map { $_[0]->{line_map} = $_[1] }
+
+sub wrap_map     { $_[0]->{_wrap_map} }
+sub set_wrap_map { $_[0]->{_wrap_map} = $_[1]; $_[0]->{_scroll_wrap_offset} = 0; }
+sub invalidate_wrap_map { $_[0]->{_wrap_map}->invalidate() if $_[0]->{_wrap_map} }
+sub scroll_wrap_offset { $_[0]->{_scroll_wrap_offset} }
+sub cursor_affinity { $_[0]->{_cursor_affinity} // 'right' }
+
+# Compute the effective scroll visual row (used by renderer and coordinate conversion)
+sub scroll_visual_row {
+    my ($self) = @_;
+    my $wm = $self->{_wrap_map};
+    return 0 unless $wm;
+    return $wm->doc_line_to_visual_row($self->{scroll_line}) + ($self->{_scroll_wrap_offset} // 0);
+}
 
 # ============================================================================
 # Document access
@@ -77,7 +104,7 @@ sub cursor {
 }
 
 sub set_cursor {
-    my ($self, $line, $col, $extend_selection) = @_;
+    my ($self, $line, $col, $extend_selection, $affinity) = @_;
 
     my $doc = $self->{document};
     return unless $doc;
@@ -108,7 +135,15 @@ sub set_cursor {
 
     $self->{cursor_line} = $line;
     $self->{cursor_col} = $col;
-    $self->{_preferred_col} = $col;
+    $self->{_cursor_affinity} = $affinity // 'right';
+
+    # In wrap mode, preferred_col is the visual column within the wrap row
+    if ($self->{_wrap_map}) {
+        my (undef, $vcol) = $self->{_wrap_map}->doc_to_visual($line, $col, $self->{_cursor_affinity});
+        $self->{_preferred_col} = $vcol;
+    } else {
+        $self->{_preferred_col} = $col;
+    }
 
     $self->ensure_cursor_visible();
 }
@@ -164,6 +199,26 @@ sub move_right {
 sub move_up {
     my ($self, $extend_selection) = @_;
 
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        # Word wrap: move one visual row up
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        if ($cur_vrow > 0) {
+            my ($new_line, $new_col) = $wm->visual_to_doc($cur_vrow - 1, $self->{_preferred_col});
+            my $max_col = $self->{document}->line_length($new_line);
+            $new_col = $max_col if $new_col > $max_col;
+
+            if ($extend_selection) { $self->_start_selection_if_needed(); }
+            else { $self->clear_selection(); }
+
+            $self->{cursor_line} = $new_line;
+            $self->{cursor_col} = $new_col;
+            $self->{_cursor_affinity} = 'right';
+            $self->ensure_cursor_visible();
+        }
+        return;
+    }
+
     if ($self->{cursor_line} > 0) {
         my $new_line = $self->{cursor_line} - 1;
         my $new_col = $self->{_preferred_col};
@@ -191,6 +246,26 @@ sub move_up {
 sub move_down {
     my ($self, $extend_selection) = @_;
 
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        # Word wrap: move one visual row down
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        if ($cur_vrow < $wm->total_visual_rows() - 1) {
+            my ($new_line, $new_col) = $wm->visual_to_doc($cur_vrow + 1, $self->{_preferred_col});
+            my $max_col = $self->{document}->line_length($new_line);
+            $new_col = $max_col if $new_col > $max_col;
+
+            if ($extend_selection) { $self->_start_selection_if_needed(); }
+            else { $self->clear_selection(); }
+
+            $self->{cursor_line} = $new_line;
+            $self->{cursor_col} = $new_col;
+            $self->{_cursor_affinity} = 'right';
+            $self->ensure_cursor_visible();
+        }
+        return;
+    }
+
     if ($self->{cursor_line} < $self->{document}->line_count() - 1) {
         my $new_line = $self->{cursor_line} + 1;
         my $new_col = $self->{_preferred_col};
@@ -216,11 +291,34 @@ sub move_down {
 
 sub move_to_line_start {
     my ($self, $extend_selection) = @_;
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        # Move to start of current visual row
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        my ($doc_line, $doc_col) = $wm->visual_to_doc($cur_vrow, 0);
+        $self->set_cursor($doc_line, $doc_col, $extend_selection);
+        return;
+    }
     $self->set_cursor($self->{cursor_line}, 0, $extend_selection);
 }
 
 sub move_to_line_end {
     my ($self, $extend_selection) = @_;
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        # Move to end of current visual row
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        my $seg = $wm->segment_at_visual_row($cur_vrow);
+        if ($seg) {
+            my $line_len = $self->{document}->line_length($seg->{doc_line});
+            my $end_col = $seg->{col_end};
+            $end_col = $line_len if $end_col > $line_len;
+            # Use 'left' affinity so cursor renders at end of THIS visual row,
+            # not at start of next row (col_end is a segment boundary)
+            $self->set_cursor($seg->{doc_line}, $end_col, $extend_selection, 'left');
+            return;
+        }
+    }
     my $end_col = $self->{document}->line_length($self->{cursor_line});
     $self->set_cursor($self->{cursor_line}, $end_col, $extend_selection);
 }
@@ -242,6 +340,25 @@ sub move_page_up {
     my ($self, $extend_selection) = @_;
     my $page_size = $self->{viewport_rows} - 1;
     $page_size = 1 if $page_size < 1;
+
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        my $target_vrow = $cur_vrow - $page_size;
+        $target_vrow = 0 if $target_vrow < 0;
+        my ($new_line, $new_col) = $wm->visual_to_doc($target_vrow, $self->{_preferred_col});
+        my $max_col = $self->{document}->line_length($new_line);
+        $new_col = $max_col if $new_col > $max_col;
+
+        if ($extend_selection) { $self->_start_selection_if_needed(); }
+        else { $self->clear_selection(); }
+
+        $self->{cursor_line} = $new_line;
+        $self->{cursor_col} = $new_col;
+        $self->{_cursor_affinity} = 'right';
+        $self->ensure_cursor_visible();
+        return;
+    }
 
     my $new_line = $self->{cursor_line} - $page_size;
     $new_line = 0 if $new_line < 0;
@@ -265,6 +382,26 @@ sub move_page_down {
     my ($self, $extend_selection) = @_;
     my $page_size = $self->{viewport_rows} - 1;
     $page_size = 1 if $page_size < 1;
+
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        my $max_vrow = $wm->total_visual_rows() - 1;
+        my $target_vrow = $cur_vrow + $page_size;
+        $target_vrow = $max_vrow if $target_vrow > $max_vrow;
+        my ($new_line, $new_col) = $wm->visual_to_doc($target_vrow, $self->{_preferred_col});
+        my $max_col = $self->{document}->line_length($new_line);
+        $new_col = $max_col if $new_col > $max_col;
+
+        if ($extend_selection) { $self->_start_selection_if_needed(); }
+        else { $self->clear_selection(); }
+
+        $self->{cursor_line} = $new_line;
+        $self->{cursor_col} = $new_col;
+        $self->{_cursor_affinity} = 'right';
+        $self->ensure_cursor_visible();
+        return;
+    }
 
     my $max_line = $self->{document}->line_count() - 1;
     my $new_line = $self->{cursor_line} + $page_size;
@@ -529,6 +666,20 @@ sub visible_line_range {
     my $start = $self->{scroll_line};
     my $max = $self->{document}->line_count();
 
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        my $scroll_vrow = $self->scroll_visual_row();
+        my $end_line = $start;
+        for my $i (0 .. $self->{viewport_rows} - 1) {
+            my $seg = $wm->segment_at_visual_row($scroll_vrow + $i);
+            if ($seg && $seg->{doc_line} >= $end_line) {
+                $end_line = $seg->{doc_line} + 1;
+            }
+        }
+        $end_line = $max if $end_line > $max;
+        return ($start, $end_line);
+    }
+
     my $lm = $self->{line_map};
     if ($lm && $lm->has_expanded_hunks()) {
         # Walk visible entries to find the last doc line shown
@@ -551,6 +702,44 @@ sub visible_line_range {
 # Ensure cursor is within visible viewport
 sub ensure_cursor_visible {
     my ($self) = @_;
+
+    # Word wrap mode: scroll by visual rows, no horizontal scroll
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        $self->{scroll_col} = 0;
+
+        my ($cursor_vrow, $_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+        my $scroll_vrow = $self->scroll_visual_row();
+
+        if ($cursor_vrow < $scroll_vrow) {
+            # Cursor above viewport: scroll up to show cursor at top
+            my $seg = $wm->segment_at_visual_row($cursor_vrow);
+            if ($seg) {
+                $self->{scroll_line} = $seg->{doc_line};
+                my $line_start_vrow = $wm->doc_line_to_visual_row($seg->{doc_line});
+                $self->{_scroll_wrap_offset} = $cursor_vrow - $line_start_vrow;
+            } else {
+                $self->{scroll_line} = 0;
+                $self->{_scroll_wrap_offset} = 0;
+            }
+        }
+        elsif ($cursor_vrow >= $scroll_vrow + $self->{viewport_rows}) {
+            # Cursor below viewport: scroll down so cursor is at bottom
+            my $target_vrow = $cursor_vrow - $self->{viewport_rows} + 1;
+            my $seg = $wm->segment_at_visual_row($target_vrow);
+            if ($seg) {
+                $self->{scroll_line} = $seg->{doc_line};
+                my $line_start_vrow = $wm->doc_line_to_visual_row($seg->{doc_line});
+                $self->{_scroll_wrap_offset} = $target_vrow - $line_start_vrow;
+            } else {
+                $self->{scroll_line} = 0;
+                $self->{_scroll_wrap_offset} = 0;
+            }
+        }
+
+        $self->{scroll_line} = 0 if $self->{scroll_line} < 0;
+        return;
+    }
 
     # Vertical scrolling (no margins - scroll exactly when needed)
     my $lm = $self->{line_map};
@@ -646,6 +835,15 @@ sub scroll_down {
 sub doc_to_screen {
     my ($self, $line, $col) = @_;
 
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        my ($vrow, $vcol) = $wm->doc_to_visual($line, $col);
+        my $scroll_vrow = $self->scroll_visual_row();
+        my $row = $vrow - $scroll_vrow;
+        return (undef, undef) if $row < 0 || $row >= $self->{viewport_rows};
+        return ($row, $vcol);
+    }
+
     my $lm = $self->{line_map};
     my $row;
     if ($lm && $lm->has_expanded_hunks()) {
@@ -667,6 +865,14 @@ sub doc_to_screen {
 # Returns ($line, $col) or (undef, undef) if the screen row is an old-line row
 sub screen_to_doc {
     my ($self, $row, $col) = @_;
+
+    my $wm = $self->{_wrap_map};
+    if ($wm) {
+        my $scroll_vrow = $self->scroll_visual_row();
+        my $target_vrow = $scroll_vrow + $row;
+        my ($line, $dcol) = $wm->visual_to_doc($target_vrow, $col);
+        return ($line, $dcol);
+    }
 
     my $lm = $self->{line_map};
     my $line;

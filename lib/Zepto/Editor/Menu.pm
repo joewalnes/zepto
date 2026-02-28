@@ -254,6 +254,7 @@ sub execute_menu_item {
     elsif ($action eq 'toggle_powerline') { $self->cmd_toggle_powerline(); }
     elsif ($action eq 'toggle_minimap')   { $self->cmd_toggle_minimap(); }
     elsif ($action eq 'toggle_tree')      { $self->cmd_toggle_tree(); }
+    elsif ($action eq 'toggle_word_wrap') { $self->cmd_toggle_word_wrap(); }
     elsif ($action eq 'toggle_diff')    { $self->cmd_toggle_diff(); }
     elsif ($action eq 'next_tab')       { $self->cmd_next_tab(); }
     elsif ($action eq 'prev_tab')       { $self->cmd_prev_tab(); }

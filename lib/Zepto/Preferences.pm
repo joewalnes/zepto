@@ -25,6 +25,7 @@ my %DEFAULTS = (
     powerline        => 1,            # Use Powerline/Nerd Font glyphs
     show_minimap     => 1,            # Show minimap/scrollbar
     show_tree        => 1,            # Show file tree panel
+    word_wrap        => 0,            # Word wrap mode (break long lines at viewport edge)
 
     # Editing
     tab_width        => 4,
@@ -190,6 +191,9 @@ sub set_show_minimap { $_[0]->set('show_minimap', $_[1]) }
 
 sub show_tree { $_[0]->get('show_tree') }
 sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
+
+sub word_wrap { $_[0]->get('word_wrap') }
+sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
 
 # =============================================================================
 # Tab/space conversion helpers

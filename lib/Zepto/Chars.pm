@@ -180,6 +180,9 @@ my %CHARS = (
     # Minimap VCS indicator (thinnest bar — compact to match minimap scale)
     minimap_vcs         => [ "\x{258f}",          '|' ],  # ▏ Left one eighth block
 
+    # Word wrap continuation indicator
+    wrap_indicator      => [ "\x{21AA}",          '\\' ],  # ↪ / backslash fallback
+
     # Tree structure (powerline → ascii)
     tree_branch         => [ "\x{251c}",          '|' ],  # ├
     tree_last           => [ BOX_ROUND_BL,        '`' ],  # ╰

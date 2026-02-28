@@ -36,6 +36,7 @@ use Zepto::Theme;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
 use Zepto::LineMap;
+use Zepto::WrapMap;
 use Zepto::Editor::TabManager;
 use Zepto::FileTree;
 
@@ -662,6 +663,9 @@ sub handle_alt_char {
     # Minimap toggle
     elsif ($char eq 'm') { $self->cmd_toggle_minimap(); }
 
+    # Word wrap toggle
+    elsif ($char eq 'z') { $self->cmd_toggle_word_wrap(); }
+
     # Change navigation
     elsif ($char eq 'n') { $self->cmd_next_change(); }
     elsif ($char eq 'p') { $self->cmd_prev_change(); }
@@ -850,7 +854,13 @@ sub handle_mouse_event {
         # Gutter click: toggle hunk expansion
         if ($visual_col < 0 && $self->active_doc()) {
             my $doc_line;
-            if ($entry) {
+            my $wm = $view->wrap_map();
+            if ($wm) {
+                my $scroll_vrow = $view->scroll_visual_row();
+                my $target_vrow = $scroll_vrow + $text_row;
+                my $seg = $wm->segment_at_visual_row($target_vrow);
+                $doc_line = $seg ? $seg->{doc_line} : ($view->scroll_line() + $text_row);
+            } elsif ($entry) {
                 if ($entry->{type} eq 'old') {
                     # Click on old-line gutter — collapse this hunk
                     if ($line_map && defined $entry->{hunk_idx}) {
@@ -882,23 +892,31 @@ sub handle_mouse_event {
                 return;
             }
 
-            my $doc_line;
-            if ($entry) {
-                $doc_line = $entry->{line};
+            my ($doc_line, $doc_col);
+            my $wm = $view->wrap_map();
+            if ($wm) {
+                # Word wrap: convert screen position through WrapMap
+                my $scroll_vrow = $view->scroll_visual_row();
+                my $target_vrow = $scroll_vrow + $text_row;
+                ($doc_line, $doc_col) = $wm->visual_to_doc($target_vrow, $visual_col);
             } else {
-                $doc_line = $view->scroll_line() + $text_row;
+                if ($entry) {
+                    $doc_line = $entry->{line};
+                } else {
+                    $doc_line = $view->scroll_line() + $text_row;
+                }
+
+                # Clamp line to document bounds
+                $doc_line = 0 if $doc_line < 0;
+                $doc_line = $self->active_doc()->line_count() - 1
+                    if $doc_line >= $self->active_doc()->line_count();
+
+                # Convert visual column to document column, accounting for tabs
+                # Need to add scroll_col to visual position first
+                my $absolute_visual_col = $view->scroll_col() + $visual_col;
+                my $line_content = $self->active_doc()->get_line($doc_line) // '';
+                $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
             }
-
-            # Clamp line to document bounds
-            $doc_line = 0 if $doc_line < 0;
-            $doc_line = $self->active_doc()->line_count() - 1
-                if $doc_line >= $self->active_doc()->line_count();
-
-            # Convert visual column to document column, accounting for tabs
-            # Need to add scroll_col to visual position first
-            my $absolute_visual_col = $view->scroll_col() + $visual_col;
-            my $line_content = $self->active_doc()->get_line($doc_line) // '';
-            my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
             if ($alt) {
                 # Alt+Click: start column selection at click position.
@@ -1013,17 +1031,35 @@ sub handle_mouse_event {
         }
         my $visual_col = $x - $drag_tree_w - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
 
-        # Resolve display row via LineMap
-        my $line_map = $view->line_map();
-        my $doc_line;
-        if ($line_map && $line_map->has_expanded_hunks()) {
-            my $scroll_display = $line_map->scroll_display_start($view->scroll_line());
-            my $display_row = $scroll_display + $text_row;
-            my $drag_entry = $line_map->display_entry($display_row);
-            return if !$drag_entry || $drag_entry->{type} eq 'old';
-            $doc_line = $drag_entry->{line};
+        # Resolve display row to document coordinates
+        my ($doc_line, $doc_col);
+        my $wm = $view->wrap_map();
+        if ($wm) {
+            # Word wrap: convert screen position through WrapMap
+            my $scroll_vrow = $view->scroll_visual_row();
+            my $target_vrow = $scroll_vrow + $text_row;
+            ($doc_line, $doc_col) = $wm->visual_to_doc($target_vrow, $visual_col);
         } else {
-            $doc_line = $view->scroll_line() + $text_row;
+            my $line_map = $view->line_map();
+            if ($line_map && $line_map->has_expanded_hunks()) {
+                my $scroll_display = $line_map->scroll_display_start($view->scroll_line());
+                my $display_row = $scroll_display + $text_row;
+                my $drag_entry = $line_map->display_entry($display_row);
+                return if !$drag_entry || $drag_entry->{type} eq 'old';
+                $doc_line = $drag_entry->{line};
+            } else {
+                $doc_line = $view->scroll_line() + $text_row;
+            }
+
+            # Clamp line to document bounds
+            $doc_line = 0 if $doc_line < 0;
+            $doc_line = $self->active_doc()->line_count() - 1
+                if $doc_line >= $self->active_doc()->line_count();
+
+            # Convert visual column to document column, accounting for tabs
+            my $absolute_visual_col = $view->scroll_col() + $visual_col;
+            my $line_content = $self->active_doc()->get_line($doc_line) // '';
+            $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
         }
 
         if ($visual_col >= 0 && !$view->has_selection()) {
@@ -1034,16 +1070,6 @@ sub handle_mouse_event {
                 $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
             }
         }
-
-        # Clamp line to document bounds
-        $doc_line = 0 if $doc_line < 0;
-        $doc_line = $self->active_doc()->line_count() - 1
-            if $doc_line >= $self->active_doc()->line_count();
-
-        # Convert visual column to document column, accounting for tabs
-        my $absolute_visual_col = $view->scroll_col() + $visual_col;
-        my $line_content = $self->active_doc()->get_line($doc_line) // '';
-        my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
         # Extend selection (column or linear)
         if ($visual_col >= 0) {
@@ -3105,6 +3131,45 @@ sub render {
     $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
     $self->active_view()->set_viewport_size($rows - RESERVED_ROWS, $text_width);
+
+    # Build/rebuild WrapMap for word wrap mode
+    if ($self->{prefs}->word_wrap()) {
+        my $lm = $self->active_view()->line_map();
+        if ($lm && $lm->has_expanded_hunks()) {
+            # Disable wrap while diff hunks are expanded
+            $self->active_view()->set_wrap_map(undef);
+        } else {
+            # Compute actual text content width (accounting for tree, minimap)
+            my $minimap_width = 0;
+            if ($self->{prefs}->show_minimap() && $self->active_doc()->line_count() > ($rows - RESERVED_ROWS)) {
+                my $tentative = $cols - $gutter_width - Zepto::Renderer::MINIMAP_WIDTH;
+                $minimap_width = Zepto::Renderer::MINIMAP_WIDTH if $tentative >= Zepto::Renderer::MIN_TEXT_WIDTH;
+            }
+            my $tree_width = 0;
+            if ($self->{file_tree} && $self->{prefs}->show_tree() && $self->{file_tree}->panel_width() > 0) {
+                my $tw = $self->{file_tree}->panel_width() + 1;
+                my $remaining = $cols - $tw - $gutter_width - $minimap_width;
+                $tree_width = $tw if $remaining >= Zepto::Renderer::MIN_TEXT_WIDTH;
+            }
+            my $wrap_width = $cols - $tree_width - $gutter_width - $minimap_width;
+            $wrap_width = Zepto::Renderer::MIN_TEXT_WIDTH if $wrap_width < Zepto::Renderer::MIN_TEXT_WIDTH;
+
+            my $wm = $self->active_view()->wrap_map();
+            if (!$wm || $wm->{width} != $wrap_width) {
+                $wm = Zepto::WrapMap->new(
+                    document  => $self->active_doc(),
+                    width     => $wrap_width,
+                    tab_width => $self->{prefs}->tab_width(),
+                );
+                $self->active_view()->set_wrap_map($wm);
+            }
+            # Always invalidate and rebuild — content may have changed
+            $wm->invalidate();
+        }
+    } else {
+        $self->active_view()->set_wrap_map(undef) if $self->active_view()->wrap_map();
+    }
+
     $self->active_view()->ensure_cursor_visible();
 
     my $output = Zepto::Renderer->render(

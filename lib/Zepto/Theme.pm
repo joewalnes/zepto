@@ -85,6 +85,7 @@ sub dark_theme {
         # Line numbers gutter
         gutter_fg   => fg_rgb(86, 95, 137),    # Muted blue-gray
         gutter_bg   => bg_rgb(22, 22, 30),     # Darker blue
+        wrap_indicator_fg => fg_rgb(65, 72, 104),  # Dim gutter color for ↪ wrap indicator
 
         # Selection
         selection_fg => fg_rgb(192, 202, 245),
@@ -287,6 +288,7 @@ sub light_theme {
         # Line numbers gutter
         gutter_fg   => fg_rgb(156, 160, 176),  # Overlay0
         gutter_bg   => bg_rgb(255, 255, 255),  # Match main bg
+        wrap_indicator_fg => fg_rgb(188, 192, 204),  # Dim gutter color for ↪ wrap indicator
 
         # Selection
         selection_fg => fg_rgb(76, 79, 105),

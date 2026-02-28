@@ -669,6 +669,19 @@ sub cmd_toggle_minimap {
     $self->{prefs}->set_show_minimap($current ? 0 : 1);
 }
 
+sub cmd_toggle_word_wrap {
+    my ($self) = @_;
+    my $current = $self->{prefs}->word_wrap();
+    $self->{prefs}->set_word_wrap($current ? 0 : 1);
+    my $view = $self->active_view();
+    if ($view) {
+        # Reset horizontal scroll when enabling wrap
+        $view->{scroll_col} = 0 if !$current;
+        # Force WrapMap rebuild on next render
+        $view->set_wrap_map(undef);
+    }
+}
+
 # =============================================================================
 # Tab Commands
 # =============================================================================
