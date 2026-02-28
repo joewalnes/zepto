@@ -3,9 +3,214 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Zepto Editor</title>
+    <title>Zepto - A modern, intuitive terminal text editor</title>
 </head>
 <body>
-    <h1>Zepto Editor</h1>
+
+<!-- ==================== HERO ==================== -->
+<header>
+    <h1>Zepto</h1>
+    <p>A modern, intuitive, fast text editor for people who just need to edit text.</p>
+
+    <!-- SCREENCAP: Full editor window showing a source file open with syntax
+         highlighting. Menu bar visible at top, line numbers in gutter,
+         colorful syntax-highlighted code in the buffer, status bar at bottom.
+         Dark theme. Shows that this is a real, modern-looking terminal editor. -->
+    <div>[screencap: editor overview with syntax highlighting]</div>
+
+    <h3>Install</h3>
+    <pre>curl -fsSL https://github.com/joewalnes/zepto/releases/download/latest/zepto -o ~/.local/bin/zepto &amp;&amp; chmod +x ~/.local/bin/zepto</pre>
+    <p>Then: <code>zepto myfile.txt</code></p>
+    <p>That's it. One file. No dependencies. No config.</p>
+</header>
+
+<!-- ==================== WHY ZEPTO ==================== -->
+<section>
+    <h2>Why Zepto?</h2>
+
+    <h3>Feels like a desktop editor, runs in a terminal</h3>
+    <p>
+        Mouse support, menus, dialogs, true-color themes, a minimap, a file
+        explorer. Zepto brings the comforts of a GUI editor to your terminal
+        without pretending to be an IDE.
+    </p>
+
+    <h3>Nothing to learn</h3>
+    <p>
+        Ctrl+S saves. Ctrl+Z undoes. Ctrl+C copies. Click where you want the
+        cursor. Drag tabs to reorder them. Everything works the way you'd
+        expect. No modes, no manuals, no tutorials. If you've used any text
+        editor made in the last 30 years, you already know how to use Zepto.
+    </p>
+
+    <h3>Batteries included, not bloat included</h3>
+    <p>
+        Syntax highlighting, find and replace, fuzzy file opener, undo/redo,
+        block selection, themes &mdash; it's all built in. No plugins to
+        install, no config files to write. Open it and start working.
+    </p>
+
+    <h3>Wicked fast</h3>
+    <p>
+        Loads instantly. No splash screen, no indexing, no startup lag. The
+        UI stays snappy even with large files and deep directory trees.
+        Zepto launches faster than your terminal finishes redrawing.
+    </p>
+
+    <h3>Runs anywhere in seconds</h3>
+    <p>
+        Zepto is a single Perl script. Copy it onto a server, a Docker
+        container, a Raspberry Pi &mdash; anywhere with Perl (which is
+        everywhere). No root access, no package manager, no compiler, no
+        internet connection required.
+    </p>
+</section>
+
+<!-- ==================== FEATURES ==================== -->
+<section>
+    <h2>Features</h2>
+
+    <h3>A crafted terminal UI</h3>
+    <p>
+        Menus, dialogs, buttons, and panels &mdash; all rendered in the terminal
+        with true-color and optional Nerd Font glyphs for a polished look.
+        Every feature is accessible by mouse, by keyboard shortcut, or from
+        the menu bar. Use it however feels natural.
+    </p>
+    <!-- SCREENCAP: A dropdown menu open (e.g. Edit menu) with Nerd Font
+         icons, showing menu items with keyboard shortcuts on the right.
+         Demonstrates the polished, desktop-like UI in the terminal. -->
+    <div>[screencap: menu bar with Nerd Font glyphs]</div>
+
+    <h3>Syntax highlighting</h3>
+    <p>
+        Built-in highlighting for dozens of languages. Colors adapt to your
+        theme. No configuration or plugins required.
+    </p>
+    <!-- SCREENCAP: A source file (e.g. Python or Rust) with syntax
+         highlighting showing keywords, strings, comments, and functions
+         in distinct colors. -->
+    <div>[screencap: syntax highlighted code]</div>
+
+    <h3>Fuzzy file finder</h3>
+    <p>Ctrl+O to quickly open files by typing partial names. No need to remember exact paths.</p>
+    <!-- SCREENCAP: Fuzzy finder dialog open, with a partial query typed
+         and a filtered list of matching filenames below it. -->
+    <div>[screencap: fuzzy file finder]</div>
+
+    <h3>Full mouse support</h3>
+    <p>
+        Click to place cursor. Drag to select. Scroll wheel works. Click
+        menus to open them. Drag tabs to reorder. Resize panels by dragging
+        borders. It just works.
+    </p>
+    <!-- SCREENCAP: Editor with a text selection visible (highlighted region),
+         showing click-and-drag selection in action. -->
+    <div>[screencap: mouse selection]</div>
+
+    <h3>Find and replace</h3>
+    <p>
+        Ctrl+F to find, Ctrl+R to replace. Matches highlight live as you
+        type. Step through results one at a time or replace all at once.
+        Regex supported with interactive inline previews &mdash; see exactly
+        what each replacement will do before you commit.
+    </p>
+    <!-- SCREENCAP: Find/replace dialog open with a regex pattern, showing
+         inline replacement previews in the document &mdash; original text
+         highlighted with the replacement text shown alongside or overlaid. -->
+    <div>[screencap: find and replace with inline preview]</div>
+
+    <h3>Column (block) selection</h3>
+    <p>Alt+Shift+arrows or Alt+drag for rectangular selections. Type to insert on all lines at once.</p>
+    <!-- SCREENCAP: A rectangular/columnar selection highlighted in purple
+         across several lines, showing the block selection feature. -->
+    <div>[screencap: column selection]</div>
+
+    <h3>File explorer</h3>
+    <p>Ctrl+B to toggle a tree panel. Directory browsing, fuzzy filter, git status colors, and file preview.</p>
+    <!-- SCREENCAP: Editor with the file explorer panel open on the left side,
+         showing a directory tree with some files/folders expanded. -->
+    <div>[screencap: file explorer panel]</div>
+
+    <h3>Minimap</h3>
+    <p>A braille-character scrollbar that shows your position in the file and highlights git changes.</p>
+    <!-- SCREENCAP: Right edge of the editor showing the minimap/scrollbar
+         with tiny braille-rendered text density and a viewport indicator. -->
+    <div>[screencap: minimap]</div>
+
+    <h3>Dark and light themes</h3>
+    <p>True-color (24-bit) themes. Switch instantly with Ctrl+T.</p>
+    <!-- SCREENCAP: Side-by-side or two shots showing the same file in dark
+         theme and light theme. -->
+    <div>[screencap: dark and light themes]</div>
+
+    <h3>Undo, redo, and clipboard</h3>
+    <p>Ctrl+Z, Ctrl+Y, Ctrl+X/C/V. System clipboard integration. All the editing basics, done right.</p>
+</section>
+
+<!-- ==================== FAQ ==================== -->
+<section>
+    <h2>FAQ</h2>
+
+    <h3>What about Vim / Emacs / Nano / Helix?</h3>
+    <p>
+        Those are great editors. Vim, Emacs, and Helix are powerful but have
+        steep learning curves and modal editing. Nano is simple but limited.
+        Zepto aims for a sweet spot: the features you actually need with zero
+        learning curve.
+    </p>
+
+    <h3>What about VS Code / Sublime Text / Zed?</h3>
+    <p>
+        Also great editors &mdash; and a big inspiration for Zepto's
+        usability. But they're GUI apps. Zepto brings that same intuitive,
+        discoverable experience to the terminal, where you need it most:
+        SSH sessions, Docker containers, headless servers.
+    </p>
+
+    <h3>Why Perl?</h3>
+    <p>
+        Perl is pre-installed on virtually every Unix system, including
+        minimal Docker images and locked-down servers where you can't
+        install software. A single Perl script can run anywhere without a
+        build step, a runtime download, or root access. That's the whole
+        point.
+    </p>
+
+    <h3>Can I configure it?</h3>
+    <p>
+        Zepto is deliberately config-free. There are a few runtime
+        toggles (theme, powerline glyphs) but no config files to manage.
+        This is a feature, not a limitation.
+    </p>
+
+    <h3>Has AI been used to create this?</h3>
+    <p>
+        Yes. Every line of code has been written by
+        <a href="https://claude.ai/code">Claude Code</a>. None of it has
+        been hand-written in an editor (ironically). Requirements, system
+        design and architecture, UX guidelines, testing approaches, and core
+        abstractions were defined by a human.
+    </p>
+
+    <h3>How big is it?</h3>
+    <p>
+        One file. Under 10,000 lines of Perl. No external dependencies
+        beyond the Perl standard library.
+    </p>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer>
+    <p>
+        Built by <a href="https://github.com/joewalnes">Joe Walnes</a>
+        and <a href="https://claude.ai">Claude</a>.
+    </p>
+    <p>
+        <a href="https://github.com/joewalnes/zepto">GitHub</a>
+        &middot; MIT License
+    </p>
+</footer>
+
 </body>
 </html>
