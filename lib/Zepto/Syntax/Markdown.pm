@@ -84,6 +84,12 @@ sub tokenize {
     while ($pos < $len) {
         my $rest = substr($line, $pos);
 
+        # Backslash escape: \ before markdown delimiters (consumes full delimiter)
+        if ($rest =~ /^\\(\*{1,3}|_{1,3}|~~|==|`+|[\\{}\[\]()#+\-.!])/) {
+            $pos += 1 + length($1);
+            next;
+        }
+
         if ($rest =~ /^(`+)([^`]+)\1/) {
             my $full_match = $&;
             push @tokens, _token($pos, $pos + length($full_match), TOKEN_FUNCTION);
@@ -105,6 +111,17 @@ sub tokenize {
             next;
         }
 
+        # Highlighted ==text==
+        if ($rest =~ /^(==)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_HIGHLIGHT);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            next;
+        }
+
         # Strikethrough ~~text~~
         if ($rest =~ /^(~~)(.+?)\1/) {
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
@@ -113,6 +130,17 @@ sub tokenize {
             $pos += length($2);
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;
+            next;
+        }
+
+        # Bold+italic ***text*** or ___text___
+        if ($rest =~ /^(\*\*\*|___)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 3, TOKEN_PUNCTUATION);
+            $pos += 3;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD_ITALIC);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 3, TOKEN_PUNCTUATION);
+            $pos += 3;
             next;
         }
 

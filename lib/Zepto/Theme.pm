@@ -282,9 +282,11 @@ sub dark_theme {
         syntax_heading6    => BOLD . fg_rgb(178, 175, 195),  # Gray-lavender - h6
         syntax_bold        => BOLD . fg_rgb(255, 158, 100),  # Bold orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(158, 206, 106),  # Italic green - prose italic
+        syntax_bold_italic => BOLD . ITALIC . fg_rgb(255, 158, 100),  # Bold+italic orange
         syntax_link        => UNDERLINE . fg_rgb(242, 143, 173),  # Underlined pink - hyperlinks
         syntax_underline   => UNDERLINE . fg_rgb(192, 202, 245),  # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(130, 140, 170),  # Strikethrough dimmed
+        syntax_highlight   => bg_rgb(120, 100, 30) . fg_rgb(255, 255, 220),  # Yellow highlighter pen
     });
 }
 
@@ -496,9 +498,11 @@ sub light_theme {
         syntax_heading6    => BOLD . fg_rgb(108, 72, 128),   # Gray-purple - h6
         syntax_bold        => BOLD . fg_rgb(180, 60, 10),    # Bold deep orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(22, 120, 55),  # Italic deep green - prose italic
+        syntax_bold_italic => BOLD . ITALIC . fg_rgb(180, 60, 10),  # Bold+italic deep orange
         syntax_link        => UNDERLINE . fg_rgb(180, 60, 130),  # Underlined deep pink - hyperlinks
         syntax_underline   => UNDERLINE . fg_rgb(76, 79, 105),   # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(120, 125, 140),  # Strikethrough dimmed
+        syntax_highlight   => bg_rgb(255, 235, 120) . fg_rgb(50, 40, 10),   # Yellow highlighter pen
     });
 }
 

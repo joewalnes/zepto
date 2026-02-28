@@ -144,8 +144,8 @@ BEGIN {
         TOKEN_PUNCTUATION TOKEN_ESCAPE TOKEN_HEADING
         TOKEN_HEADING1 TOKEN_HEADING2 TOKEN_HEADING3
         TOKEN_HEADING4 TOKEN_HEADING5 TOKEN_HEADING6
-        TOKEN_BOLD TOKEN_ITALIC TOKEN_LINK
-        TOKEN_UNDERLINE TOKEN_STRIKETHROUGH
+        TOKEN_BOLD TOKEN_ITALIC TOKEN_BOLD_ITALIC TOKEN_LINK
+        TOKEN_UNDERLINE TOKEN_STRIKETHROUGH TOKEN_HIGHLIGHT
         STATE_NORMAL STATE_STRING_DOUBLE STATE_STRING_SINGLE
         STATE_STRING_TEMPLATE STATE_COMMENT_BLOCK STATE_HEREDOC
         STATE_POD STATE_STRING_RAW
@@ -183,9 +183,11 @@ use constant {
     TOKEN_HEADING6    => 'heading6',     # H6 heading
     TOKEN_BOLD        => 'bold',         # Bold text in prose formats (rendered bold)
     TOKEN_ITALIC      => 'italic',       # Italic text in prose formats (rendered italic)
+    TOKEN_BOLD_ITALIC => 'bold_italic',  # Bold+italic text in prose formats
     TOKEN_LINK        => 'link',         # Hyperlinks/URLs in prose formats (rendered underlined)
     TOKEN_UNDERLINE   => 'underline',    # Underlined text in prose formats
     TOKEN_STRIKETHROUGH => 'strikethrough', # Strikethrough text in prose formats
+    TOKEN_HIGHLIGHT     => 'highlight',      # Highlighted/marked text in prose formats
 };
 
 # =============================================================================

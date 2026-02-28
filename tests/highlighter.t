@@ -610,9 +610,20 @@ subtest 'Markdown syntax' => sub {
     ($tokens) = $hl->tokenize_line('_italic text_', 0);
     ok(has_token($tokens, 'italic', 1), '_italic_ uses TOKEN_ITALIC');
 
+    # Bold+italic
+    ($tokens) = $hl->tokenize_line('***bold italic***', 0);
+    ok(has_token($tokens, 'bold_italic', 3), '***text*** uses TOKEN_BOLD_ITALIC');
+
+    ($tokens) = $hl->tokenize_line('___bold italic___', 0);
+    ok(has_token($tokens, 'bold_italic', 3), '___text___ uses TOKEN_BOLD_ITALIC');
+
     # Strikethrough
     ($tokens) = $hl->tokenize_line('~~deleted text~~', 0);
     ok(has_token($tokens, 'strikethrough', 2), '~~text~~ uses TOKEN_STRIKETHROUGH');
+
+    # Highlighted
+    ($tokens) = $hl->tokenize_line('==highlighted text==', 0);
+    ok(has_token($tokens, 'highlight', 2), '==text== uses TOKEN_HIGHLIGHT');
 
     # Code
     ($tokens) = $hl->tokenize_line('inline `code` here', 0);
@@ -639,6 +650,16 @@ subtest 'Markdown syntax' => sub {
     # Autolinks
     ($tokens) = $hl->tokenize_line('<http://example.com>', 0);
     ok(has_token($tokens, 'link', 1), 'autolink URL uses TOKEN_LINK');
+
+    # Escaping — backslash prevents markup
+    ($tokens) = $hl->tokenize_line('\*Not italic\*', 0);
+    is(scalar @$tokens, 0, 'escaped asterisks produce no tokens');
+
+    ($tokens) = $hl->tokenize_line('\**Not bold\**', 0);
+    is(scalar @$tokens, 0, 'escaped double asterisks produce no tokens');
+
+    ($tokens) = $hl->tokenize_line('\`Not code\`', 0);
+    is(scalar @$tokens, 0, 'escaped backticks produce no tokens');
 };
 
 # =============================================================================
@@ -705,6 +726,18 @@ subtest 'AsciiDoc syntax' => sub {
     # Role-annotated strikethrough: [. line-through ]# text #
     ($tokens) = $hl->tokenize_line('[.line-through]#deleted text#', 0);
     ok(has_token($tokens, 'strikethrough', 16), '[.line-through]#text# uses TOKEN_STRIKETHROUGH');
+
+    # Marked/highlighted text ##text##
+    ($tokens) = $hl->tokenize_line('this is ##marked text## here', 0);
+    ok(has_token($tokens, 'highlight', 10), '##text## uses TOKEN_HIGHLIGHT');
+
+    # Role-annotated highlight: [.highlight]#text#
+    ($tokens) = $hl->tokenize_line('[.highlight]#important text#', 0);
+    ok(has_token($tokens, 'highlight', 13), '[.highlight]#text# uses TOKEN_HIGHLIGHT');
+
+    # Role-annotated mark: [.mark]#text#
+    ($tokens) = $hl->tokenize_line('[.mark]#key info#', 0);
+    ok(has_token($tokens, 'highlight', 8), '[.mark]#text# uses TOKEN_HIGHLIGHT');
 
     # Admonition
     ($tokens) = $hl->tokenize_line('NOTE: something', 0);

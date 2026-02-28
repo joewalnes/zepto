@@ -149,8 +149,8 @@ sub tokenize {
             next;
         }
 
-        # Substitution |text|
-        if ($rest =~ /^(\|[\w\s-]+\|)/) {
+        # Substitution |text| (no spaces — avoids matching table cell delimiters)
+        if ($rest =~ /^(\|[\w-]+\|)/) {
             push @tokens, _token($pos, $pos + length($1), TOKEN_VARIABLE);
             $pos += length($1);
             next;

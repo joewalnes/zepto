@@ -242,6 +242,17 @@ sub tokenize {
             next;
         }
 
+        # Marked/highlighted text ##text##
+        if ($rest =~ /^(##)([^#]+)(##)/) {
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_HIGHLIGHT);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            next;
+        }
+
         # Role-annotated marked text: [.role]#text#
         if ($rest =~ /^(\[\.)([\w-]+)(\])(#)([^#]+)(#)/) {
             my $role = $2;
@@ -256,6 +267,8 @@ sub tokenize {
                 push @tokens, _token($text_start, $text_end, TOKEN_UNDERLINE);
             } elsif ($role =~ /^(?:line-through|strike|del)$/) {
                 push @tokens, _token($text_start, $text_end, TOKEN_STRIKETHROUGH);
+            } elsif ($role =~ /^(?:highlight|mark)$/) {
+                push @tokens, _token($text_start, $text_end, TOKEN_HIGHLIGHT);
             } else {
                 push @tokens, _token($text_start, $text_end, TOKEN_STRING);
             }

@@ -130,11 +130,11 @@ Tables
 <HEADING>------</HEADING>
 
 +------------+----------+----------+
-<VARIABLE>| Header 1   |</VARIABLE> Header 2 <VARIABLE>| Header 3 |</VARIABLE>
+| Header 1   | Header 2 | Header 3 |
 +============+==========+==========+
-<VARIABLE>| Row 1      |</VARIABLE> Cell     <VARIABLE>| Cell     |</VARIABLE>
+| Row 1      | Cell     | Cell     |
 +------------+----------+----------+
-<VARIABLE>| Row 2      |</VARIABLE> Cell     <VARIABLE>| Cell     |</VARIABLE>
+| Row 2      | Cell     | Cell     |
 +------------+----------+----------+
 
 Comments
