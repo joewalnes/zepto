@@ -30,7 +30,7 @@ Zepto is:
 - Full mouse support (click, drag, scroll)
 - Undo/redo
 - Find and replace (regex supported)
-- Text selection (keyboard and mouse)
+- Text selection (keyboard and mouse) with column/block selection mode
 - Line numbers
 - Dark and light themes
 - Go to line
@@ -117,6 +117,18 @@ make test     # Run tests
 - Click and drag to select
 - Typing replaces selection
 - Cut/copy/paste work with selection
+
+### Column (Block) Selection
+
+- Alt+Shift+Up/Down to enter column selection mode
+- Alt+Click and Alt+Drag for mouse-driven column selection
+- Rectangular selection with visual highlight (purple tint)
+- Virtual whitespace: cursor can extend past line endings in column mode
+- Type to insert on all selected lines simultaneously
+- Backspace/Delete operate across the rectangle
+- Columnar cut/copy/paste (paste distributes lines vertically)
+- Status bar COL indicator shows selection dimensions
+- Escape to exit column mode
 
 ### Search & Replace
 

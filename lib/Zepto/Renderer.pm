@@ -103,10 +103,11 @@ our %MENU_ITEMS = (
         { separator => 1 },
         { label => "Move Up",      shortcut => "Alt+\x{2191}", action => 'move_line_up' },
         { label => "Move Down",    shortcut => "Alt+\x{2193}", action => 'move_line_down' },
-        { label => "Dup Up",       shortcut => "Alt+\x{21E7}\x{2191}", action => 'dup_line_up' },
-        { label => "Dup Down",     shortcut => "Alt+\x{21E7}\x{2193}", action => 'dup_line_down' },
+        { label => "Dup Up",       shortcut => "Ctrl+\x{21E7}\x{2191}", action => 'dup_line_up' },
+        { label => "Dup Down",     shortcut => "Ctrl+\x{21E7}\x{2193}", action => 'dup_line_down' },
         { separator => 1 },
         { label => 'Select All',   shortcut => 'Ctrl+A', action => 'select_all' },
+        { label => 'Column Select', shortcut => "Alt+\x{21E7}\x{2191}", action => 'column_select' },
     ],
     s => [
         { label => 'Find/Replace', shortcut => 'Ctrl+F', action => 'find' },
@@ -228,15 +229,21 @@ sub _char_to_visual_col {
 
     my $visual_col = 0;
     my $len = length($text);
-    $char_pos = $len if $char_pos > $len;
 
-    for my $i (0 .. $char_pos - 1) {
+    # Walk through actual characters (tabs expand)
+    my $walk = $char_pos < $len ? $char_pos : $len;
+    for my $i (0 .. $walk - 1) {
         my $char = substr($text, $i, 1);
         if ($char eq "\t") {
             $visual_col += TAB_WIDTH - ($visual_col % TAB_WIDTH);
         } else {
             $visual_col++;
         }
+    }
+
+    # Virtual whitespace: positions past line end are 1 visual col each
+    if ($char_pos > $len) {
+        $visual_col += $char_pos - $len;
     }
 
     return $visual_col;
@@ -272,8 +279,9 @@ sub visual_to_char_col {
         $current_visual += $char_width;
     }
 
-    # Visual column is beyond end of line, return line length
-    return $len;
+    # Visual column is beyond end of line — return virtual position
+    # (line length + overshoot in virtual whitespace)
+    return $len + ($visual_col - $current_visual);
 }
 
 # Menu bar buttons on the right side
@@ -1635,7 +1643,44 @@ sub _render_text_area {
             my $fill_bg = $is_cursor_line ? $line_bg
                         : $is_hunk_line   ? $line_bg
                         :                   $theme->color('bg');
-            $output .= $fill_bg . (' ' x ($width - $content_display_width)) if $content_display_width < $width;
+            my $fill_remaining = $width - $content_display_width;
+            if ($fill_remaining > 0 && $view->column_select() && $view->has_selection()) {
+                # Column selection may extend past line content into fill area
+                my ($col_top, $col_left, $col_bottom, $col_right) = $view->column_selection();
+                if ($doc_line >= $col_top && $doc_line <= $col_bottom) {
+                    my $col_sel_bg = ($col_left == $col_right)
+                        ? $theme->color('column_cursor_bg')
+                        : $theme->color('column_selection_bg');
+                    # Convert column bounds to visual positions relative to viewport
+                    my $vis_left = _char_to_visual_col($full_line_content, $col_left) - $scroll_col;
+                    my $vis_right = _char_to_visual_col($full_line_content, $col_right) - $scroll_col;
+                    # For zero-width cursor, show one column
+                    $vis_right = $vis_left + 1 if $col_left == $col_right;
+
+                    my $fill_start = $content_display_width;
+                    my $fill_end = $fill_start + $fill_remaining;
+
+                    # Clamp selection bounds to fill region
+                    my $sel_left = $vis_left < $fill_start ? $fill_start : $vis_left;
+                    my $sel_right = $vis_right > $fill_end ? $fill_end : $vis_right;
+
+                    if ($sel_right > $sel_left && $sel_left < $fill_end) {
+                        # Three segments: pre-selection, selection, post-selection
+                        my $pre = $sel_left - $fill_start;
+                        my $sel = $sel_right - $sel_left;
+                        my $post = $fill_end - $sel_right;
+                        $output .= $fill_bg . (' ' x $pre) if $pre > 0;
+                        $output .= $col_sel_bg . (' ' x $sel) if $sel > 0;
+                        $output .= $fill_bg . (' ' x $post) if $post > 0;
+                    } else {
+                        $output .= $fill_bg . (' ' x $fill_remaining);
+                    }
+                } else {
+                    $output .= $fill_bg . (' ' x $fill_remaining);
+                }
+            } elsif ($fill_remaining > 0) {
+                $output .= $fill_bg . (' ' x $fill_remaining);
+            }
         }
         else {
             # Empty line (beyond document)
@@ -2375,11 +2420,33 @@ sub _render_line_with_highlights {
 
     # Get selection info
     my $has_selection = $view->has_selection();
-    my ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col);
+    my $is_column_select = $view->column_select();
     my ($sel_start, $sel_end) = (-1, -1);
+    my $sel_bg_color = $theme->color('selection_bg');
 
-    if ($has_selection) {
-        ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col) = $view->selection();
+    if ($has_selection && $is_column_select) {
+        # Column (rectangular) selection: fixed column range on each line
+        my ($col_top, $col_left, $col_bottom, $col_right) = $view->column_selection();
+        $sel_bg_color = $theme->color('column_selection_bg');
+
+        if ($line_num >= $col_top && $line_num <= $col_bottom) {
+            my $visual_left = _char_to_visual_col($orig_content, $col_left);
+            my $visual_right = _char_to_visual_col($orig_content, $col_right);
+            $sel_start = $visual_left - $scroll_col;
+            $sel_end = $visual_right - $scroll_col;
+            $sel_start = 0 if $sel_start < 0;
+            $sel_end = 0 if $sel_end < 0;
+
+            # Zero-width column cursor: highlight single column position
+            if ($col_left == $col_right && $sel_start >= 0) {
+                $sel_bg_color = $theme->color('column_cursor_bg');
+                $sel_end = $sel_start + 1;  # One column wide for cursor bar
+            }
+        }
+    }
+    elsif ($has_selection) {
+        # Linear selection
+        my ($sel_start_line, $sel_start_col, $sel_end_line, $sel_end_col) = $view->selection();
         my $line_in_selection = ($line_num >= $sel_start_line && $line_num <= $sel_end_line);
 
         if ($line_in_selection) {
@@ -2387,14 +2454,12 @@ sub _render_line_with_highlights {
             $sel_end = $len;
 
             if ($line_num == $sel_start_line) {
-                # Convert character position to visual column
                 my $visual_sel_start = _char_to_visual_col($orig_content, $sel_start_col);
                 $sel_start = $visual_sel_start - $scroll_col;
                 $sel_start = 0 if $sel_start < 0;
             }
 
             if ($line_num == $sel_end_line) {
-                # Convert character position to visual column
                 my $visual_sel_end = _char_to_visual_col($orig_content, $sel_end_col);
                 $sel_end = $visual_sel_end - $scroll_col;
                 $sel_end = 0 if $sel_end < 0;
@@ -2439,11 +2504,12 @@ sub _render_line_with_highlights {
                 }
             }
         }
-        # Check if in selection
+        # Check if in selection (linear or column)
         elsif ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
-            $char_bg = $theme->color('selection_bg');
+            $char_bg = $sel_bg_color;
             $char_fg = $syntax_fg[$i] // $fg;  # Preserve syntax highlighting
-            $style_key = "sel:" . ($syntax_fg[$i] // 'def');
+            my $sel_prefix = $is_column_select ? "csel:" : "sel:";
+            $style_key = $sel_prefix . ($syntax_fg[$i] // 'def');
         }
         # Check crosshair highlighting
         elsif ($is_cursor_line) {
@@ -2510,12 +2576,10 @@ sub _render_status_bar {
         $hint_width = length($hint_text);
     }
 
-    # Calculate middle fill (arrow char only in powerline mode)
+    # Calculate segment overhead (arrow char only in powerline mode)
     my $segment_overhead = Zepto::Chars->enabled() ? 1 : 0;
-    my $middle = $cols - $file_width - $segment_overhead - $hint_width;
-    $middle = 0 if $middle < 0;
 
-    # Render: [file segment][arrow][middle fill][hint]
+    # Render: [file segment][arrow][col indicator?][arrow][middle fill][hint]
     # File segment
     $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
     $output .= " $display_path";
@@ -2526,13 +2590,47 @@ sub _render_status_bar {
     }
     $output .= ' ';
 
-    # Arrow transition: file -> middle (only in powerline mode)
-    if (Zepto::Chars->enabled()) {
-        $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
-        $output .= $ar;
+    # Column selection indicator segment
+    my $col_text = '';
+    my $col_width = 0;
+    if ($view && $view->column_select() && $view->has_selection()) {
+        my ($top, $left, $bottom, $right) = $view->column_selection();
+        my $lines = $bottom - $top + 1;
+        my $rect_cols = $right - $left;
+        if ($rect_cols > 0) {
+            $col_text = " COL ${lines}\x{00D7}${rect_cols} ";  # e.g. "COL 5×3"
+        } else {
+            $col_text = " COL ${lines} lines ";
+        }
+        $col_width = length($col_text);
+        $col_width += $segment_overhead;  # Arrow char
     }
 
-    # Middle fill
+    # Arrow transition: file -> column indicator or middle
+    if (Zepto::Chars->enabled()) {
+        if ($col_width > 0) {
+            # file -> column indicator
+            $output .= $theme->color('column_indicator_bg') . $theme->color('status_file_edge');
+            $output .= $ar;
+            # Column indicator text
+            $output .= $theme->color('column_indicator_fg') . $col_text;
+            # column indicator -> middle
+            $output .= $theme->color('status_bg') . $theme->color('column_indicator_edge');
+            $output .= $ar;
+        } else {
+            # file -> middle
+            $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
+            $output .= $ar;
+        }
+    } elsif ($col_width > 0) {
+        # No powerline, just show text
+        $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+        $output .= $col_text;
+    }
+
+    # Middle fill (account for column indicator width)
+    my $middle = $cols - $file_width - $segment_overhead - $col_width - $hint_width;
+    $middle = 0 if $middle < 0;
     $output .= $theme->color('status_bg') . $theme->color('status_fg');
     $output .= ' ' x $middle if $middle > 0;
 

@@ -46,6 +46,9 @@ sub new {
 
         # LineMap for inline diff expansion (undef when no hunks expanded)
         line_map => undef,
+
+        # Column (rectangular) selection mode
+        column_select => 0,
     }, $class;
 
     return $self;
@@ -85,10 +88,15 @@ sub set_cursor {
     $line = 0 if $line < 0;
     $line = $max_line if $line > $max_line;
 
-    # Clamp column to line length
-    my $max_col = $doc->line_length($line);
+    # Clamp column to line length (skip upper clamp in column select mode
+    # to allow virtual whitespace positioning past line end)
     $col = 0 if $col < 0;
-    $col = $max_col if $col > $max_col;
+    if ($self->{column_select}) {
+        # Virtual whitespace: no upper clamp in column mode
+    } else {
+        my $max_col = $doc->line_length($line);
+        $col = $max_col if $col > $max_col;
+    }
 
     # Handle selection extension
     if ($extend_selection) {
@@ -159,8 +167,12 @@ sub move_up {
     if ($self->{cursor_line} > 0) {
         my $new_line = $self->{cursor_line} - 1;
         my $new_col = $self->{_preferred_col};
-        my $max_col = $self->{document}->line_length($new_line);
-        $new_col = $max_col if $new_col > $max_col;
+
+        # In column select mode with extend, allow virtual whitespace
+        unless ($self->{column_select} && $extend_selection) {
+            my $max_col = $self->{document}->line_length($new_line);
+            $new_col = $max_col if $new_col > $max_col;
+        }
 
         if ($extend_selection) {
             $self->_start_selection_if_needed();
@@ -182,8 +194,12 @@ sub move_down {
     if ($self->{cursor_line} < $self->{document}->line_count() - 1) {
         my $new_line = $self->{cursor_line} + 1;
         my $new_col = $self->{_preferred_col};
-        my $max_col = $self->{document}->line_length($new_line);
-        $new_col = $max_col if $new_col > $max_col;
+
+        # In column select mode with extend, allow virtual whitespace
+        unless ($self->{column_select} && $extend_selection) {
+            my $max_col = $self->{document}->line_length($new_line);
+            $new_col = $max_col if $new_col > $max_col;
+        }
 
         if ($extend_selection) {
             $self->_start_selection_if_needed();
@@ -380,6 +396,7 @@ sub clear_selection {
     my ($self) = @_;
     $self->{selection_anchor_line} = undef;
     $self->{selection_anchor_col} = undef;
+    $self->{column_select} = 0;
 }
 
 # Get selection as (start_line, start_col, end_line, end_col)
@@ -695,6 +712,97 @@ sub is_selected {
     return 0 if $line > $el || ($line == $el && $col >= $ec);
 
     return 1;
+}
+
+# ============================================================================
+# Column (rectangular) selection
+# ============================================================================
+
+sub column_select { $_[0]->{column_select} }
+
+# Enter column selection mode, setting anchor at current cursor
+sub start_column_selection {
+    my ($self) = @_;
+    $self->{column_select} = 1;
+    $self->_start_selection_if_needed();
+}
+
+# Get column selection as normalized rectangle: (top, left, bottom, right)
+# Returns empty list if not in column mode or no selection
+sub column_selection {
+    my ($self) = @_;
+    return () unless $self->{column_select} && $self->has_selection();
+
+    my ($al, $ac) = ($self->{selection_anchor_line}, $self->{selection_anchor_col});
+    my ($cl, $cc) = ($self->{cursor_line}, $self->{cursor_col});
+
+    my $top    = $al < $cl ? $al : $cl;
+    my $bottom = $al > $cl ? $al : $cl;
+    my $left   = $ac < $cc ? $ac : $cc;
+    my $right  = $ac > $cc ? $ac : $cc;
+
+    return ($top, $left, $bottom, $right);
+}
+
+# Check if a position is inside the column selection rectangle
+sub is_column_selected {
+    my ($self, $line, $col) = @_;
+    return 0 unless $self->{column_select} && $self->has_selection();
+
+    my ($top, $left, $bottom, $right) = $self->column_selection();
+    return ($line >= $top && $line <= $bottom && $col >= $left && $col < $right);
+}
+
+# Extract rectangular text as arrayref of strings (one per line).
+# Short lines are space-padded to fill the rectangle width.
+sub column_selected_text {
+    my ($self) = @_;
+    return [] unless $self->{column_select} && $self->has_selection();
+
+    my ($top, $left, $bottom, $right) = $self->column_selection();
+    my $width = $right - $left;
+    my @lines;
+
+    for my $ln ($top .. $bottom) {
+        my $content = $self->{document}->get_line_content($ln);
+        my $len = CORE::length($content);
+
+        if ($left >= $len) {
+            # Entire selection is past line end — all spaces
+            push @lines, ' ' x $width;
+        } else {
+            my $avail = $len - $left;
+            my $take = $avail < $width ? $avail : $width;
+            my $chunk = substr($content, $left, $take);
+            # Pad with spaces if line is shorter than right edge
+            if ($take < $width) {
+                $chunk .= ' ' x ($width - $take);
+            }
+            push @lines, $chunk;
+        }
+    }
+
+    return \@lines;
+}
+
+# Get per-line edit ranges for column operations.
+# Returns arrayref of {line, start_col, end_col} hashes.
+sub column_edit_ranges {
+    my ($self) = @_;
+    return [] unless $self->{column_select} && $self->has_selection();
+
+    my ($top, $left, $bottom, $right) = $self->column_selection();
+    my @ranges;
+
+    for my $ln ($top .. $bottom) {
+        push @ranges, {
+            line      => $ln,
+            start_col => $left,
+            end_col   => $right,
+        };
+    }
+
+    return \@ranges;
 }
 
 1;

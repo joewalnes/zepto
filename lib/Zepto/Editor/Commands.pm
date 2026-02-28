@@ -274,11 +274,23 @@ sub cmd_cut {
 
     my $view = $self->active_view();
 
+    # Column selection: copy rectangle then delete
+    if ($view->column_select() && $view->has_selection()) {
+        my $lines = $view->column_selected_text();
+        $self->{clipboard} = join("\n", @$lines);
+        $self->{clipboard_columnar} = 1;
+        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->delete_selection();
+        $self->show_message("Cut " . scalar(@$lines) . " lines (column)");
+        return;
+    }
+
     # If no selection, select current line first
     $view->select_line() unless $view->has_selection();
 
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
+        $self->{clipboard_columnar} = 0;
         $self->{terminal}->copy_to_clipboard($self->{clipboard});
         $self->delete_selection();
         $self->show_message("Cut");
@@ -291,6 +303,16 @@ sub cmd_copy {
     my $view = $self->active_view();
     my $doc = $self->active_doc();
 
+    # Column selection: copy rectangle
+    if ($view->column_select() && $view->has_selection()) {
+        my $lines = $view->column_selected_text();
+        $self->{clipboard} = join("\n", @$lines);
+        $self->{clipboard_columnar} = 1;
+        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->show_message("Copied " . scalar(@$lines) . " lines (column)");
+        return;
+    }
+
     # If no selection, copy current line (including newline if not last line)
     unless ($view->has_selection()) {
         my $line = $view->cursor_line();
@@ -302,6 +324,7 @@ sub cmd_copy {
         }
 
         $self->{clipboard} = $content;
+        $self->{clipboard_columnar} = 0;
         $self->{terminal}->copy_to_clipboard($self->{clipboard});
 
         # Select the line visually (cursor stays at end of line)
@@ -314,6 +337,7 @@ sub cmd_copy {
     }
 
     $self->{clipboard} = $view->selected_text();
+    $self->{clipboard_columnar} = 0;
     $self->{terminal}->copy_to_clipboard($self->{clipboard});
     $self->show_message("Copied");
 }
@@ -324,13 +348,20 @@ sub cmd_paste {
     # Try system clipboard first, fall back to internal clipboard
     my $text = $self->{terminal}->paste_from_clipboard();
     if (length $text) {
-        $self->{clipboard} = $text;  # Sync internal clipboard
+        $self->{clipboard} = $text;
+        $self->{clipboard_columnar} = 0;  # System clipboard is always linear
     }
 
     return unless length $self->{clipboard};
 
     my $doc = $self->active_doc();
     my $view = $self->active_view();
+
+    # Columnar paste (from column copy/cut or into column selection)
+    if ($self->{clipboard_columnar} || $view->column_select()) {
+        $self->_column_paste($self->{clipboard});
+        return;
+    }
 
     # Delete selection first
     if ($view->has_selection()) {
@@ -350,6 +381,82 @@ sub cmd_paste {
     $view->set_cursor($line, $col);
 
     $self->show_message("Pasted");
+}
+
+# Paste text in column (vertical) mode
+sub _column_paste {
+    my ($self, $text) = @_;
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my @paste_lines = split(/\n/, $text, -1);
+    # Remove trailing empty element from split if text ended with newline
+    pop @paste_lines if @paste_lines > 1 && $paste_lines[-1] eq '';
+
+    # Delete existing column selection content if any
+    my $start_col;
+    my $start_line;
+    if ($view->column_select() && $view->has_selection()) {
+        my ($top, $left, $bottom, $right) = $view->column_selection();
+        $start_line = $top;
+        $start_col = $left;
+
+        if ($left != $right) {
+            # Delete rectangle content bottom-to-top
+            $doc->break_undo_group();
+            for my $ln (reverse $top .. $bottom) {
+                my $line_len = $doc->line_length($ln);
+                next if $line_len <= $left;
+                my $del_end = $right < $line_len ? $right : $line_len;
+                my $del_len = $del_end - $left;
+                next if $del_len <= 0;
+                my $offset = $doc->line_col_to_offset($ln, $left);
+                $doc->delete($offset, $del_len);
+            }
+        }
+    } else {
+        $start_line = $view->cursor_line();
+        $start_col = $view->cursor_col();
+    }
+
+    $doc->break_undo_group();
+
+    # Single-line paste with column selection: replicate on each line
+    my $num_target_lines;
+    if ($view->column_select() && $view->has_selection()) {
+        my ($top, $left, $bottom, $right) = $view->column_selection();
+        $num_target_lines = $bottom - $top + 1;
+    } else {
+        $num_target_lines = scalar @paste_lines;
+    }
+
+    for my $i (reverse 0 .. $num_target_lines - 1) {
+        my $target_line = $start_line + $i;
+        last if $target_line >= $doc->line_count();
+
+        # Use corresponding paste line, or replicate single line
+        my $paste_text = @paste_lines == 1 ? $paste_lines[0]
+                       : $i < @paste_lines ? $paste_lines[$i]
+                       : '';
+
+        my $line_len = $doc->line_length($target_line);
+        # Pad if line is shorter than insertion point
+        if ($line_len < $start_col) {
+            my $pad = ' ' x ($start_col - $line_len);
+            my $offset = $doc->line_col_to_offset($target_line, $line_len);
+            $doc->insert($offset, $pad);
+        }
+
+        my $offset = $doc->line_col_to_offset($target_line, $start_col);
+        $doc->insert($offset, $paste_text);
+    }
+
+    $doc->break_undo_group();
+
+    $view->clear_selection();
+    my $paste_len = CORE::length($paste_lines[0] // '');
+    $view->set_cursor($start_line, $start_col + $paste_len);
+    $self->show_message("Pasted (column)");
 }
 
 sub cmd_select_all {

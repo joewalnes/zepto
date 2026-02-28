@@ -90,6 +90,13 @@ sub dark_theme {
         selection_fg => fg_rgb(192, 202, 245),
         selection_bg => bg_rgb(51, 70, 124),   # Deep blue highlight
 
+        # Column (rectangular) selection
+        column_selection_bg => bg_rgb(60, 55, 120),  # Purple-blue tint
+        column_cursor_bg    => bg_rgb(80, 70, 150),  # Brighter for zero-width bars
+        column_indicator_fg   => fg_rgb(220, 215, 255),  # Light lavender text
+        column_indicator_bg   => bg_rgb(75, 60, 140),    # Purple accent
+        column_indicator_edge => fg_rgb(75, 60, 140),    # Matches bg for powerline arrow
+
         # Cursor line (subtle highlight)
         cursor_line_bg => bg_rgb(41, 46, 66),
 
@@ -281,6 +288,13 @@ sub light_theme {
         # Selection
         selection_fg => fg_rgb(76, 79, 105),
         selection_bg => bg_rgb(188, 192, 204),  # Surface1
+
+        # Column (rectangular) selection
+        column_selection_bg => bg_rgb(200, 195, 230),  # Light purple tint
+        column_cursor_bg    => bg_rgb(180, 170, 215),  # Brighter for zero-width bars
+        column_indicator_fg   => fg_rgb(60, 40, 110),    # Dark purple text
+        column_indicator_bg   => bg_rgb(190, 180, 230),  # Light purple accent
+        column_indicator_edge => fg_rgb(190, 180, 230),  # Matches bg for powerline arrow
 
         # Cursor line
         cursor_line_bg => bg_rgb(231, 234, 242),

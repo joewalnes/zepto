@@ -102,7 +102,8 @@ sub new {
         find_replace_all    => 1,       # Replace all mode (vs replace one)
 
         # Clipboard
-        clipboard    => '',
+        clipboard          => '',
+        clipboard_columnar => 0,
 
         # Quit confirmation
         quit_pending => 0,
@@ -524,12 +525,14 @@ sub handle_editing_event {
 
         # Navigation / Line movement
         if ($key eq 'up') {
-            if ($alt && $shift) { $self->do_duplicate_line_up(); }
+            if ($alt && $shift) { $self->do_column_select_up(); }
+            elsif ($ctrl && $shift) { $self->do_duplicate_line_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
             else { $view->move_up($shift); }
         }
         elsif ($key eq 'down') {
-            if ($alt && $shift) { $self->do_duplicate_line_down(); }
+            if ($alt && $shift) { $self->do_column_select_down(); }
+            elsif ($ctrl && $shift) { $self->do_duplicate_line_down(); }
             elsif ($alt) { $self->do_move_line_down(); }
             else { $view->move_down($shift); }
         }
@@ -680,6 +683,7 @@ sub handle_mouse_event {
     my $x = $event->{x};
     my $y = $event->{y};
     my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+    my $alt = Zepto::InputParser::has_modifier($event, 'alt');
 
     my $term = $self->{terminal};
     my $view = $self->active_view();
@@ -872,7 +876,28 @@ sub handle_mouse_event {
             my $line_content = $self->active_doc()->get_line($doc_line) // '';
             my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
-            $view->set_cursor($doc_line, $doc_col, $shift);
+            if ($alt) {
+                # Alt+Click: start column selection at click position.
+                # We set column_select=1 before positioning so the cursor
+                # can land past short line ends (virtual whitespace).
+                $view->clear_selection();
+                $view->{column_select} = 1;
+                # Clamp line only (col allowed past end in column mode)
+                my $max_line = $self->active_doc()->line_count() - 1;
+                $doc_line = 0 if $doc_line < 0;
+                $doc_line = $max_line if $doc_line > $max_line;
+                $doc_col = 0 if $doc_col < 0;
+                $view->{cursor_line} = $doc_line;
+                $view->{cursor_col} = $doc_col;
+                $view->{_preferred_col} = $doc_col;
+                $view->start_column_selection();
+                $view->ensure_cursor_visible();
+            } elsif ($shift && $view->column_select()) {
+                # Shift+Click with column mode: extend column selection
+                $view->set_cursor($doc_line, $doc_col, 1);
+            } else {
+                $view->set_cursor($doc_line, $doc_col, $shift);
+            }
         }
     }
     elsif ($action eq 'release') {
@@ -979,7 +1004,11 @@ sub handle_mouse_event {
 
         if ($visual_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
-            $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
+            if ($alt) {
+                $view->start_column_selection();
+            } else {
+                $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
+            }
         }
 
         # Clamp line to document bounds
@@ -992,8 +1021,13 @@ sub handle_mouse_event {
         my $line_content = $self->active_doc()->get_line($doc_line) // '';
         my $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
 
-        # Extend selection
-        $view->set_cursor($doc_line, $doc_col, 1) if $visual_col >= 0;
+        # Extend selection (column or linear)
+        if ($visual_col >= 0) {
+            if ($alt && !$view->column_select()) {
+                $view->start_column_selection();
+            }
+            $view->set_cursor($doc_line, $doc_col, 1);
+        }
     }
 }
 
@@ -1338,6 +1372,11 @@ sub handle_footer_input_event {
 
 sub enter_find_mode {
     my ($self) = @_;
+    # Column selection is incompatible with find mode — clear it
+    my $view = $self->active_view();
+    if ($view && $view->column_select()) {
+        $view->clear_selection();
+    }
     $self->{state} = STATE_FIND;
     $self->{find_input} = $self->{search_term};  # Pre-fill with last search
     $self->{find_input_cursor} = length($self->{find_input});
@@ -2052,6 +2091,12 @@ sub do_insert_char {
     my $doc = $self->active_doc();
     my $view = $self->active_view();
 
+    # Column selection: insert on each line
+    if ($view->column_select() && $view->has_selection()) {
+        $self->_column_insert_char($char);
+        return;
+    }
+
     # Delete selection first if any
     if ($view->has_selection()) {
         $self->delete_selection();
@@ -2071,6 +2116,11 @@ sub do_backspace {
 
     my $doc = $self->active_doc();
     my $view = $self->active_view();
+
+    if ($view->column_select() && $view->has_selection()) {
+        $self->_column_backspace();
+        return;
+    }
 
     if ($view->has_selection()) {
         $self->delete_selection();
@@ -2097,6 +2147,11 @@ sub do_delete {
 
     my $doc = $self->active_doc();
     my $view = $self->active_view();
+
+    if ($view->column_select() && $view->has_selection()) {
+        $self->_column_delete();
+        return;
+    }
 
     if ($view->has_selection()) {
         $self->delete_selection();
@@ -2366,6 +2421,26 @@ sub do_duplicate_line_down {
     $self->_duplicate_lines(1);
 }
 
+# Column selection: extend (or start) rectangular selection vertically
+sub do_column_select_up {
+    my ($self) = @_;
+    my $view = $self->active_view();
+    return if $view->cursor_line() <= 0;
+
+    $view->start_column_selection() unless $view->column_select();
+    $view->move_up(1);  # extend_selection = true
+}
+
+sub do_column_select_down {
+    my ($self) = @_;
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
+    return if $view->cursor_line() >= $doc->line_count() - 1;
+
+    $view->start_column_selection() unless $view->column_select();
+    $view->move_down(1);  # extend_selection = true
+}
+
 sub _duplicate_lines {
     my ($self, $direction) = @_;  # -1 = up, 1 = down
 
@@ -2437,12 +2512,176 @@ sub delete_selection {
 
     return unless $view->has_selection();
 
+    # Column selection: delete rectangle content
+    if ($view->column_select()) {
+        $self->_column_delete_selection();
+        return;
+    }
+
     my ($start, $end) = $view->selection_offsets();
     $doc->delete($start, $end - $start);
 
     my ($line, $col) = $doc->offset_to_line_col($start);
     $view->clear_selection();
     $view->set_cursor($line, $col);
+}
+
+# =============================================================================
+# Column (rectangular) editing helpers
+# =============================================================================
+
+# Delete the content within the column selection rectangle
+sub _column_delete_selection {
+    my ($self) = @_;
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my ($top, $left, $bottom, $right) = $view->column_selection();
+    return unless defined $top;
+
+    $doc->break_undo_group();
+
+    for my $ln (reverse $top .. $bottom) {
+        my $line_len = $doc->line_length($ln);
+        next if $line_len <= $left;
+        my $del_end = $right < $line_len ? $right : $line_len;
+        my $del_len = $del_end - $left;
+        next if $del_len <= 0;
+        my $offset = $doc->line_col_to_offset($ln, $left);
+        $doc->delete($offset, $del_len);
+    }
+
+    $doc->break_undo_group();
+
+    # Collapse to zero-width column cursor at left edge
+    $view->clear_selection();
+    $view->{column_select} = 1;
+    $view->{selection_anchor_line} = $top;
+    $view->{selection_anchor_col} = $left;
+    $view->{cursor_line} = $bottom;
+    $view->{cursor_col} = $left;
+    $view->{_preferred_col} = $left;
+    $view->ensure_cursor_visible();
+}
+
+# Insert a character at each line in the column selection
+sub _column_insert_char {
+    my ($self, $char) = @_;
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my ($top, $left, $bottom, $right) = $view->column_selection();
+    return unless defined $top;
+    my $has_width = ($left != $right);
+
+    $doc->break_undo_group();
+
+    for my $ln (reverse $top .. $bottom) {
+        my $line_len = $doc->line_length($ln);
+
+        # Pad line with spaces if shorter than left edge
+        if ($line_len < $left) {
+            my $pad = ' ' x ($left - $line_len);
+            my $offset = $doc->line_col_to_offset($ln, $line_len);
+            $doc->insert($offset, $pad);
+        }
+
+        if ($has_width) {
+            # Delete the rectangle content first
+            my $cur_len = $doc->line_length($ln);
+            my $del_end = $right < $cur_len ? $right : $cur_len;
+            my $del_len = $del_end - $left;
+            if ($del_len > 0) {
+                my $offset = $doc->line_col_to_offset($ln, $left);
+                $doc->delete($offset, $del_len);
+            }
+        }
+
+        # Insert the character
+        my $offset = $doc->line_col_to_offset($ln, $left);
+        $doc->insert($offset, $char);
+    }
+
+    $doc->break_undo_group();
+
+    # Collapse to zero-width column cursor at left + char_length
+    my $new_col = $left + CORE::length($char);
+    $view->clear_selection();
+    $view->{column_select} = 1;
+    $view->{selection_anchor_line} = $top;
+    $view->{selection_anchor_col} = $new_col;
+    $view->{cursor_line} = $bottom;
+    $view->{cursor_col} = $new_col;
+    $view->{_preferred_col} = $new_col;
+    $view->ensure_cursor_visible();
+}
+
+# Backspace in column selection mode
+sub _column_backspace {
+    my ($self) = @_;
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my ($top, $left, $bottom, $right) = $view->column_selection();
+    return unless defined $top;
+    my $has_width = ($left != $right);
+
+    if ($has_width) {
+        # Delete rectangle content
+        $self->_column_delete_selection();
+        return;
+    }
+
+    # Zero-width: delete one char before cursor column on each line
+    return if $left == 0;
+
+    $doc->break_undo_group();
+
+    for my $ln (reverse $top .. $bottom) {
+        my $line_len = $doc->line_length($ln);
+        next if $line_len < $left;  # Skip lines shorter than cursor
+        my $offset = $doc->line_col_to_offset($ln, $left - 1);
+        $doc->delete($offset, 1);
+    }
+
+    $doc->break_undo_group();
+
+    # Move cursor column left by 1
+    my $new_col = $left - 1;
+    $view->{selection_anchor_col} = $new_col;
+    $view->{cursor_col} = $new_col;
+    $view->{_preferred_col} = $new_col;
+    $view->ensure_cursor_visible();
+}
+
+# Delete key in column selection mode
+sub _column_delete {
+    my ($self) = @_;
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my ($top, $left, $bottom, $right) = $view->column_selection();
+    return unless defined $top;
+    my $has_width = ($left != $right);
+
+    if ($has_width) {
+        # Delete rectangle content
+        $self->_column_delete_selection();
+        return;
+    }
+
+    # Zero-width: delete one char at cursor column on each line
+    $doc->break_undo_group();
+
+    for my $ln (reverse $top .. $bottom) {
+        my $line_len = $doc->line_length($ln);
+        next if $line_len <= $left;  # Skip lines at or shorter than cursor
+        my $offset = $doc->line_col_to_offset($ln, $left);
+        $doc->delete($offset, 1);
+    }
+
+    $doc->break_undo_group();
+    $view->ensure_cursor_visible();
 }
 
 # =============================================================================
