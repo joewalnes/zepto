@@ -2,17 +2,17 @@
 # Generated from Markdown grammar
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
-<PUNCTUATION>#</PUNCTUATION> <HEADING>Complete Markdown Example</HEADING>
+<PUNCTUATION>#</PUNCTUATION> <HEADING1>Complete Markdown Example</HEADING1>
 
 This document demonstrates various Markdown syntax elements.
 
 Word wrap is especially useful for prose files like this one, where paragraphs can be quite long and extend well beyond the visible width of a typical terminal window. When word wrap is enabled, lines break at word boundaries so you can read the full content without scrolling horizontally, which makes editing markdown documents, README files, and other text-heavy content much more pleasant and efficient.
 
-This second paragraph tests <PUNCTUATION>**</PUNCTUATION><CONSTANT>bold text</CONSTANT><PUNCTUATION>**</PUNCTUATION> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <PUNCTUATION>*</PUNCTUATION><STRING>italic text</STRING><PUNCTUATION>*</PUNCTUATION>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://github.com/example/zepto-editor</TAG><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
+This second paragraph tests <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://github.com/example/zepto-editor</TAG><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
 
 <PUNCTUATION>&gt;</PUNCTUATION> This is a long blockquote that should also demonstrate word wrap behavior. Blockquotes in markdown are prefixed with the greater-than sign, and when the quoted text is long enough it will wrap across multiple visual rows. The wrap indicator and indentation should still look correct even inside quoted blocks.
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Table of Contents</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Table of Contents</HEADING2>
 
 <KEYWORD>1.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Headers</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
 <KEYWORD>2.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Emphasis</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#emphasis</TAG><PUNCTUATION>)</PUNCTUATION>
@@ -22,38 +22,38 @@ This second paragraph tests <PUNCTUATION>**</PUNCTUATION><CONSTANT>bold text</CO
 <KEYWORD>6.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Tables</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#tables</TAG><PUNCTUATION>)</PUNCTUATION>
 <KEYWORD>7.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Blockquotes</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#blockquotes</TAG><PUNCTUATION>)</PUNCTUATION>
 
-<HEADING>---</HEADING>
+<HEADING2>---</HEADING2>
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Headers</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Headers</HEADING2>
 
-<PUNCTUATION>#</PUNCTUATION> <HEADING>Heading 1</HEADING>
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Heading 2</HEADING>
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Heading 3</HEADING>
-<PUNCTUATION>####</PUNCTUATION> <HEADING>Heading 4</HEADING>
-<PUNCTUATION>#####</PUNCTUATION> <HEADING>Heading 5</HEADING>
-<PUNCTUATION>######</PUNCTUATION> <HEADING>Heading 6</HEADING>
+<PUNCTUATION>#</PUNCTUATION> <HEADING1>Heading 1</HEADING1>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Heading 2</HEADING2>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Heading 3</HEADING3>
+<PUNCTUATION>####</PUNCTUATION> <HEADING4>Heading 4</HEADING4>
+<PUNCTUATION>#####</PUNCTUATION> <HEADING5>Heading 5</HEADING5>
+<PUNCTUATION>######</PUNCTUATION> <HEADING6>Heading 6</HEADING6>
 
 Alternative H1
-<HEADING>==============</HEADING>
+<HEADING1>==============</HEADING1>
 
 Alternative H2
-<HEADING>--------------</HEADING>
+<HEADING2>--------------</HEADING2>
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Emphasis</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Emphasis</HEADING2>
 
-This is <PUNCTUATION>**</PUNCTUATION><CONSTANT>bold text</CONSTANT><PUNCTUATION>**</PUNCTUATION> and this is also <PUNCTUATION>__</PUNCTUATION><CONSTANT>bold</CONSTANT><PUNCTUATION>__</PUNCTUATION>.
+This is <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> and this is also <PUNCTUATION>__</PUNCTUATION><BOLD>bold</BOLD><PUNCTUATION>__</PUNCTUATION>.
 
-This is <PUNCTUATION>*</PUNCTUATION><STRING>italic text</STRING><PUNCTUATION>*</PUNCTUATION> and this is also <PUNCTUATION>_</PUNCTUATION><STRING>italic</STRING><PUNCTUATION>_</PUNCTUATION>.
+This is <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION> and this is also <PUNCTUATION>_</PUNCTUATION><ITALIC>italic</ITALIC><PUNCTUATION>_</PUNCTUATION>.
 
-This is <PUNCTUATION>**</PUNCTUATION><CONSTANT>*bold and italic</CONSTANT><PUNCTUATION>**</PUNCTUATION>* and also <PUNCTUATION>__</PUNCTUATION><CONSTANT>_bold italic</CONSTANT><PUNCTUATION>__</PUNCTUATION>_.
+This is <PUNCTUATION>**</PUNCTUATION><BOLD>*bold and italic</BOLD><PUNCTUATION>**</PUNCTUATION>* and also <PUNCTUATION>__</PUNCTUATION><BOLD>_bold italic</BOLD><PUNCTUATION>__</PUNCTUATION>_.
 
 This is ~~strikethrough~~ text.
 
 This is ==highlighted== text (some flavors).
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Lists</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Lists</HEADING2>
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Unordered Lists</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Unordered Lists</HEADING3>
 
 <KEYWORD>-</KEYWORD> Item 1
 <KEYWORD>-</KEYWORD> Item 2
@@ -68,7 +68,7 @@ This is ==highlighted== text (some flavors).
 <KEYWORD>+</KEYWORD> Another marker 1
 <KEYWORD>+</KEYWORD> Another marker 2
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Ordered Lists</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Ordered Lists</HEADING3>
 
 <KEYWORD>1.</KEYWORD> First item
 <KEYWORD>2.</KEYWORD> Second item
@@ -79,7 +79,7 @@ This is ==highlighted== text (some flavors).
 1) Alternative style 1
 2) Alternative style 2
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Task Lists</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Task Lists</HEADING3>
 
 <KEYWORD>-</KEYWORD> [x] Completed task
 <KEYWORD>-</KEYWORD> [ ] Incomplete task
@@ -87,7 +87,7 @@ This is ==highlighted== text (some flavors).
   <KEYWORD>-</KEYWORD> [ ] Nested incomplete
   <KEYWORD>-</KEYWORD> [x] Nested complete
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Definition Lists</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Definition Lists</HEADING3>
 
 Term 1
 : Definition for term 1
@@ -96,9 +96,9 @@ Term 2
 : Definition for term 2
 : Another definition
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Links and Images</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Links and Images</HEADING2>
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Links</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Links</HEADING3>
 
 <PUNCTUATION>[</PUNCTUATION><STRING>Inline link</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://example.com</TAG><PUNCTUATION>)</PUNCTUATION>
 
@@ -117,7 +117,7 @@ Term 2
 [ref1]: https://example.com "Reference 1"
 [1]: https://example.com "Numbered Reference"
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Images</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Images</HEADING3>
 
 !<PUNCTUATION>[</PUNCTUATION><STRING>Alt text</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png</TAG><PUNCTUATION>)</PUNCTUATION>
 
@@ -129,9 +129,9 @@ Term 2
 
 [img1]: image.png "Reference image title"
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Code</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Code</HEADING2>
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Inline Code</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Inline Code</HEADING3>
 
 Use <FUNCTION>`console.log()`</FUNCTION> for debugging.
 
@@ -139,7 +139,7 @@ The <FUNCTION>`&lt;html&gt;`</FUNCTION> element is the root.
 
 Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Code Blocks</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Code Blocks</HEADING3>
 
 <PUNCTUATION>```</PUNCTUATION>
 <FUNCTION>Plain code block</FUNCTION>
@@ -180,7 +180,7 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 <FUNCTION>    Also works for code</FUNCTION>
 <FUNCTION>    No syntax highlighting</FUNCTION>
 
-<PUNCTUATION>###</PUNCTUATION> <HEADING>Diff Syntax</HEADING>
+<PUNCTUATION>###</PUNCTUATION> <HEADING3>Diff Syntax</HEADING3>
 
 <PUNCTUATION>```</PUNCTUATION><TYPE>diff</TYPE>
 <FUNCTION>- Removed line</FUNCTION>
@@ -190,7 +190,7 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 <FUNCTION># Comment</FUNCTION>
 <PUNCTUATION>```</PUNCTUATION>
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Tables</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Tables</HEADING2>
 
 | Header 1 | Header 2 | Header 3 |
 |----------|----------|----------|
@@ -207,7 +207,7 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 | A | B |
 | C | D |
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Blockquotes</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Blockquotes</HEADING2>
 
 <PUNCTUATION>&gt;</PUNCTUATION> Simple blockquote
 
@@ -232,15 +232,15 @@ Press <FUNCTION>`Ctrl+C`</FUNCTION> to copy.
 <PUNCTUATION>&gt;&gt;</PUNCTUATION>
 <PUNCTUATION>&gt;&gt;</PUNCTUATION> Back to second level
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Horizontal Rules</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Horizontal Rules</HEADING2>
 
-<HEADING>---</HEADING>
+<HEADING2>---</HEADING2>
 
 <PUNCTUATION>***</PUNCTUATION>
 
 <PUNCTUATION>___</PUNCTUATION>
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Footnotes</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Footnotes</HEADING2>
 
 Here is a footnote reference[^1] and another[^2].
 
@@ -253,7 +253,7 @@ Here is a named footnote[^named].
 
 [^named]: A named footnote for clarity.
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Math (LaTeX)</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Math (LaTeX)</HEADING2>
 
 Inline math: $E = mc^2$
 
@@ -263,14 +263,14 @@ $$
 \frac{n!}{k!(n-k)!} = \binom{n}{k}
 $$
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>HTML in Markdown</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>HTML in Markdown</HEADING2>
 
 &lt;details&gt;
 &lt;summary&gt;Click to expand&lt;/summary&gt;
 
 Hidden content that can be expanded.
 
-<KEYWORD>-</KEYWORD> Can contain <PUNCTUATION>**</PUNCTUATION><CONSTANT>Markdown</CONSTANT><PUNCTUATION>**</PUNCTUATION>
+<KEYWORD>-</KEYWORD> Can contain <PUNCTUATION>**</PUNCTUATION><BOLD>Markdown</BOLD><PUNCTUATION>**</PUNCTUATION>
 <KEYWORD>-</KEYWORD> With <FUNCTION>`code`</FUNCTION> and other elements
 
 &lt;/details&gt;
@@ -283,11 +283,11 @@ Hidden content that can be expanded.
 
 Text with &lt;mark&gt;highlighted&lt;/mark&gt; content.
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Escaping</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Escaping</HEADING2>
 
-\<PUNCTUATION>*</PUNCTUATION><STRING>Not italic\</STRING><PUNCTUATION>*</PUNCTUATION>
+\<PUNCTUATION>*</PUNCTUATION><ITALIC>Not italic\</ITALIC><PUNCTUATION>*</PUNCTUATION>
 
-\<PUNCTUATION>**</PUNCTUATION><CONSTANT>Not bold\</CONSTANT><PUNCTUATION>**</PUNCTUATION>
+\<PUNCTUATION>**</PUNCTUATION><BOLD>Not bold\</BOLD><PUNCTUATION>**</PUNCTUATION>
 
 \# Not a header
 
@@ -295,26 +295,26 @@ Text with &lt;mark&gt;highlighted&lt;/mark&gt; content.
 
 \<FUNCTION>`Not code\`</FUNCTION>
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Abbreviations</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Abbreviations</HEADING2>
 
 HTML is a markup language.
 
 *[HTML]: Hypertext Markup Language
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Emoji</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Emoji</HEADING2>
 
 :smile: :heart: :thumbsup: :rocket:
 
 😀 ❤️ 👍 🚀 (Unicode emoji)
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Comments</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Comments</HEADING2>
 
 [//]: # (This is a comment)
 [comment]: &lt;&gt; (Another comment style)
 
 &lt;!-- HTML comment also works --&gt;
 
-<PUNCTUATION>##</PUNCTUATION> <HEADING>Admonitions (Some flavors)</HEADING>
+<PUNCTUATION>##</PUNCTUATION> <HEADING2>Admonitions (Some flavors)</HEADING2>
 
 !!! note "Title"
 <FUNCTION>    This is a note admonition.</FUNCTION>
@@ -325,6 +325,6 @@ HTML is a markup language.
 !!! danger "Important"
 <FUNCTION>    Critical information here.</FUNCTION>
 
-<HEADING>---</HEADING>
+<HEADING2>---</HEADING2>
 
-<PUNCTUATION>*</PUNCTUATION><STRING>Document end</STRING><PUNCTUATION>*</PUNCTUATION>
+<PUNCTUATION>*</PUNCTUATION><ITALIC>Document end</ITALIC><PUNCTUATION>*</PUNCTUATION>

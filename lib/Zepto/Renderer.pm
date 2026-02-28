@@ -47,6 +47,7 @@ use constant {
     CURSOR_COLOR_SUFFIX => "\x1b\\",
     RESET       => "\x1b[0m",
     BOLD        => "\x1b[1m",
+    ATTR_RESET  => "\x1b[22;23m",  # Reset bold(22) and italic(23) without affecting colors
 };
 
 # Box-drawing characters (Unicode)
@@ -2533,16 +2534,17 @@ sub _render_old_line_row {
     }
 
     my $last_bg = '';
+    my $last_fg = '';
     for my $i (0 .. $len - 1) {
         my $char = substr($expanded_content, $i, 1);
         my $char_fg = $syntax_fg[$i] // $fg;
         my $bg = ($i >= $vis_hl_start && $i < $vis_hl_end) ? $hl_bg : $line_bg;
-        if ($bg ne $last_bg) {
-            $output .= $bg . $char_fg . $char;
+        if ($bg ne $last_bg || $char_fg ne $last_fg) {
+            $output .= ATTR_RESET . $bg . $char_fg;
             $last_bg = $bg;
-        } else {
-            $output .= $char_fg . $char;
+            $last_fg = $char_fg;
         }
+        $output .= $char;
     }
 
     # Fill rest with red background (use display width for correct padding)
@@ -2768,8 +2770,9 @@ sub _render_line_with_highlights {
         }
 
         # Only emit escape codes when style changes
+        # ATTR_RESET clears bold/italic so syntax_bold/italic/heading work correctly
         if ($style_key ne $last_style) {
-            $output .= $char_bg . $char_fg;
+            $output .= ATTR_RESET . $char_bg . $char_fg;
             $last_style = $style_key;
         }
 

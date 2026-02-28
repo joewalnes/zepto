@@ -123,14 +123,14 @@ sub tokenize {
 
         # Strong emphasis **text**
         if ($rest =~ /^(\*\*[^*]+\*\*)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_CONSTANT);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_BOLD);
             $pos += length($1);
             next;
         }
 
         # Emphasis *text*
         if ($rest =~ /^(\*[^*]+\*)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_STRING);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_ITALIC);
             $pos += length($1);
             next;
         }

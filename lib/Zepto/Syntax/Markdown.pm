@@ -38,13 +38,21 @@ sub tokenize {
     if ($line =~ /^(\s*)(#{1,6})(\s+)(.*)$/) {
         my $indent = length($1);
         my $hashes = $2;
+        my @h = (undef, TOKEN_HEADING1, TOKEN_HEADING2, TOKEN_HEADING3,
+                 TOKEN_HEADING4, TOKEN_HEADING5, TOKEN_HEADING6);
+        my $h_tok = $h[length($hashes)] // TOKEN_HEADING;
         push @tokens, _token($indent, $indent + length($hashes), TOKEN_PUNCTUATION);
-        push @tokens, _token($indent + length($hashes) + length($3), $len, TOKEN_HEADING);
+        push @tokens, _token($indent + length($hashes) + length($3), $len, $h_tok);
         return (\@tokens, STATE_NORMAL);
     }
 
-    if ($line =~ /^(\s*)(={3,}|-{3,})\s*$/) {
-        push @tokens, _token(length($1), $len, TOKEN_HEADING);
+    # Setext headings: === is h1, --- is h2
+    if ($line =~ /^(\s*)(={3,})\s*$/) {
+        push @tokens, _token(length($1), $len, TOKEN_HEADING1);
+        return (\@tokens, STATE_NORMAL);
+    }
+    if ($line =~ /^(\s*)-{3,}\s*$/) {
+        push @tokens, _token(length($1), $len, TOKEN_HEADING2);
         return (\@tokens, STATE_NORMAL);
     }
 
@@ -100,7 +108,7 @@ sub tokenize {
         if ($rest =~ /^(\*\*|__)(.+?)\1/) {
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;
-            push @tokens, _token($pos, $pos + length($2), TOKEN_CONSTANT);
+            push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD);
             $pos += length($2);
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;
@@ -110,7 +118,7 @@ sub tokenize {
         if ($rest =~ /^(\*|_)(.+?)\1/) {
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
-            push @tokens, _token($pos, $pos + length($2), TOKEN_STRING);
+            push @tokens, _token($pos, $pos + length($2), TOKEN_ITALIC);
             $pos += length($2);
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;

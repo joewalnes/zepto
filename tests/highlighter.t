@@ -563,13 +563,32 @@ subtest 'Markdown syntax' => sub {
     my $hl = Zepto::Highlighter->new();
     $hl->set_file('test.md');
 
-    # Headings
+    # Headings - each level gets its own token type
     my ($tokens) = $hl->tokenize_line('# Heading 1', 0);
     ok(has_token($tokens, 'punctuation', 0), '# is punctuation');
-    ok(has_token($tokens, 'heading', 2), 'heading text');
+    ok(has_token($tokens, 'heading1', 2), 'h1 heading text');
 
     ($tokens) = $hl->tokenize_line('## Heading 2', 0);
-    ok(has_token($tokens, 'heading', 3), 'h2 heading text');
+    ok(has_token($tokens, 'heading2', 3), 'h2 heading text');
+
+    ($tokens) = $hl->tokenize_line('### Heading 3', 0);
+    ok(has_token($tokens, 'heading3', 4), 'h3 heading text');
+
+    ($tokens) = $hl->tokenize_line('#### Heading 4', 0);
+    ok(has_token($tokens, 'heading4', 5), 'h4 heading text');
+
+    ($tokens) = $hl->tokenize_line('##### Heading 5', 0);
+    ok(has_token($tokens, 'heading5', 6), 'h5 heading text');
+
+    ($tokens) = $hl->tokenize_line('###### Heading 6', 0);
+    ok(has_token($tokens, 'heading6', 7), 'h6 heading text');
+
+    # Setext headings
+    ($tokens) = $hl->tokenize_line('========', 0);
+    ok(has_token($tokens, 'heading1', 0), 'setext === is heading1');
+
+    ($tokens) = $hl->tokenize_line('--------', 0);
+    ok(has_token($tokens, 'heading2', 0), 'setext --- is heading2');
 
     # Lists
     ($tokens) = $hl->tokenize_line('- list item', 0);
@@ -580,10 +599,16 @@ subtest 'Markdown syntax' => sub {
 
     # Bold and italic
     ($tokens) = $hl->tokenize_line('**bold text**', 0);
-    ok(has_token($tokens, 'constant', 2), 'bold text');
+    ok(has_token($tokens, 'bold', 2), 'bold text uses TOKEN_BOLD');
+
+    ($tokens) = $hl->tokenize_line('__bold text__', 0);
+    ok(has_token($tokens, 'bold', 2), '__bold__ uses TOKEN_BOLD');
 
     ($tokens) = $hl->tokenize_line('*italic text*', 0);
-    ok(has_token($tokens, 'string', 1), 'italic text');
+    ok(has_token($tokens, 'italic', 1), 'italic text uses TOKEN_ITALIC');
+
+    ($tokens) = $hl->tokenize_line('_italic text_', 0);
+    ok(has_token($tokens, 'italic', 1), '_italic_ uses TOKEN_ITALIC');
 
     # Code
     ($tokens) = $hl->tokenize_line('inline `code` here', 0);
@@ -610,6 +635,83 @@ subtest 'Markdown syntax' => sub {
     # Autolinks
     ($tokens) = $hl->tokenize_line('<http://example.com>', 0);
     ok(has_token($tokens, 'tag', 1), 'autolink URL');
+};
+
+# =============================================================================
+# AsciiDoc Grammar Tests
+# =============================================================================
+
+subtest 'AsciiDoc syntax' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.adoc');
+
+    # Section titles - level-specific tokens
+    my ($tokens) = $hl->tokenize_line('= Document Title', 0);
+    ok(has_token($tokens, 'punctuation', 0), '= is punctuation');
+    ok(has_token($tokens, 'heading1', 2), 'h1 section title');
+
+    ($tokens) = $hl->tokenize_line('== Section Title', 0);
+    ok(has_token($tokens, 'punctuation', 0), '== is punctuation');
+    ok(has_token($tokens, 'heading2', 3), 'h2 section title');
+
+    ($tokens) = $hl->tokenize_line('=== Subsection', 0);
+    ok(has_token($tokens, 'heading3', 4), 'h3 section title');
+
+    # Bold
+    ($tokens) = $hl->tokenize_line('this is **bold** text', 0);
+    ok(has_token($tokens, 'bold', 8), '**bold** uses TOKEN_BOLD');
+
+    ($tokens) = $hl->tokenize_line('this is *bold* text', 0);
+    ok(has_token($tokens, 'bold', 8), '*bold* uses TOKEN_BOLD');
+
+    # Italic
+    ($tokens) = $hl->tokenize_line('this is __italic__ text', 0);
+    ok(has_token($tokens, 'italic', 8), '__italic__ uses TOKEN_ITALIC');
+
+    ($tokens) = $hl->tokenize_line('this is _italic_ text', 0);
+    ok(has_token($tokens, 'italic', 8), '_italic_ uses TOKEN_ITALIC');
+
+    # Inline code
+    ($tokens) = $hl->tokenize_line('use `code` here', 0);
+    ok(has_token($tokens, 'function', 4), 'inline code');
+
+    # Admonition
+    ($tokens) = $hl->tokenize_line('NOTE: something', 0);
+    ok(has_token($tokens, 'keyword', 0), 'NOTE is keyword');
+};
+
+# =============================================================================
+# ReStructuredText Grammar Tests
+# =============================================================================
+
+subtest 'ReStructuredText syntax' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.rst');
+
+    # Section title underlines
+    my ($tokens) = $hl->tokenize_line('============', 0);
+    ok(has_token($tokens, 'heading', 0), 'underline is heading');
+
+    # Strong emphasis (bold)
+    ($tokens) = $hl->tokenize_line('this is **bold** text', 0);
+    ok(has_token($tokens, 'bold', 8), '**bold** uses TOKEN_BOLD');
+
+    # Emphasis (italic)
+    ($tokens) = $hl->tokenize_line('this is *italic* text', 0);
+    ok(has_token($tokens, 'italic', 8), '*italic* uses TOKEN_ITALIC');
+
+    # Directive
+    ($tokens) = $hl->tokenize_line('.. code-block:: python', 0);
+    ok(has_token($tokens, 'keyword', 3), 'directive name is keyword');
+    ok(has_token($tokens, 'punctuation', 13), ':: is punctuation');
+
+    # Field list
+    ($tokens) = $hl->tokenize_line(':author: John', 0);
+    ok(has_token($tokens, 'attribute', 0), ':field: is attribute');
+
+    # Inline literal
+    ($tokens) = $hl->tokenize_line('use ``code`` here', 0);
+    ok(has_token($tokens, 'function', 4), '``code`` is function');
 };
 
 # =============================================================================

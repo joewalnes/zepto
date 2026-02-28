@@ -142,6 +142,9 @@ BEGIN {
         TOKEN_OPERATOR TOKEN_FUNCTION TOKEN_TYPE TOKEN_VARIABLE
         TOKEN_CONSTANT TOKEN_REGEX TOKEN_ATTRIBUTE TOKEN_TAG
         TOKEN_PUNCTUATION TOKEN_ESCAPE TOKEN_HEADING
+        TOKEN_HEADING1 TOKEN_HEADING2 TOKEN_HEADING3
+        TOKEN_HEADING4 TOKEN_HEADING5 TOKEN_HEADING6
+        TOKEN_BOLD TOKEN_ITALIC
         STATE_NORMAL STATE_STRING_DOUBLE STATE_STRING_SINGLE
         STATE_STRING_TEMPLATE STATE_COMMENT_BLOCK STATE_HEREDOC
         STATE_POD STATE_STRING_RAW
@@ -170,7 +173,15 @@ use constant {
     TOKEN_TAG         => 'tag',          # HTML/XML tags, Markdown formatting
     TOKEN_PUNCTUATION => 'punctuation',  # Brackets, semicolons, etc.
     TOKEN_ESCAPE      => 'escape',       # Escape sequences in strings (\n, \t)
-    TOKEN_HEADING     => 'heading',      # Markdown headings
+    TOKEN_HEADING     => 'heading',      # Generic heading (RST underlines, setext)
+    TOKEN_HEADING1    => 'heading1',     # H1 heading
+    TOKEN_HEADING2    => 'heading2',     # H2 heading
+    TOKEN_HEADING3    => 'heading3',     # H3 heading
+    TOKEN_HEADING4    => 'heading4',     # H4 heading
+    TOKEN_HEADING5    => 'heading5',     # H5 heading
+    TOKEN_HEADING6    => 'heading6',     # H6 heading
+    TOKEN_BOLD        => 'bold',         # Bold text in prose formats (rendered bold)
+    TOKEN_ITALIC      => 'italic',       # Italic text in prose formats (rendered italic)
 };
 
 # =============================================================================

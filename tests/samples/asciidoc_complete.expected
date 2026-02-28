@@ -2,7 +2,7 @@
 # Generated from AsciiDoc grammar
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
-<PUNCTUATION>=</PUNCTUATION> <HEADING>AsciiDoc Syntax Guide</HEADING>
+<PUNCTUATION>=</PUNCTUATION> <HEADING1>AsciiDoc Syntax Guide</HEADING1>
 Author Name &lt;author@example.com&gt;
 v2.0, 2024-01-15
 <ATTRIBUTE>:toc:</ATTRIBUTE><STRING> left</STRING>
@@ -12,31 +12,31 @@ v2.0, 2024-01-15
 <ATTRIBUTE>:sectnums:</ATTRIBUTE>
 <ATTRIBUTE>:experimental:</ATTRIBUTE>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Introduction</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Introduction</HEADING2>
 
-This document demonstrates <CONSTANT>*AsciiDoc*</CONSTANT> syntax for highlighting.
+This document demonstrates <BOLD>*AsciiDoc*</BOLD> syntax for highlighting.
 AsciiDoc is a lightweight markup language for writing documentation.
 
 Word wrap is especially useful for prose-heavy documents like this AsciiDoc file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical manuals, and long-form content much more pleasant and efficient for writers and developers alike.
 
-This second paragraph includes <CONSTANT>*bold text*</CONSTANT> and _italic text_ mixed with <FUNCTION>`inline monospaced code`</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests a <FUNCTION>https:</FUNCTION><TAG>//example.com</TAG><PUNCTUATION>[</PUNCTUATION><STRING>link to an example site</STRING><PUNCTUATION>]</PUNCTUATION> and references an <VARIABLE>{author}</VARIABLE> attribute to exercise various inline AsciiDoc elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+This second paragraph includes <BOLD>*bold text*</BOLD> and _italic text_ mixed with <FUNCTION>`inline monospaced code`</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests a <FUNCTION>https:</FUNCTION><TAG>//example.com</TAG><PUNCTUATION>[</PUNCTUATION><STRING>link to an example site</STRING><PUNCTUATION>]</PUNCTUATION> and references an <VARIABLE>{author}</VARIABLE> attribute to exercise various inline AsciiDoc elements within long wrapped content that should span at least three or four visual rows at eighty columns.
 
-<PUNCTUATION>===</PUNCTUATION> <HEADING>Basic Formatting</HEADING>
+<PUNCTUATION>===</PUNCTUATION> <HEADING3>Basic Formatting</HEADING3>
 
-Text can be <CONSTANT>*bold*</CONSTANT>, <STRING>_italic_</STRING>, <FUNCTION>`monospaced`</FUNCTION>, or [.underline]#underlined#.
-You can also use <CONSTANT>**bold within**</CONSTANT> a word and <STRING>__italic within__</STRING> a word.
+Text can be <BOLD>*bold*</BOLD>, <ITALIC>_italic_</ITALIC>, <FUNCTION>`monospaced`</FUNCTION>, or [.underline]#underlined#.
+You can also use <BOLD>**bold within**</BOLD> a word and <ITALIC>__italic within__</ITALIC> a word.
 
 Superscript: E=mc^2^ and subscript: H~2~O.
 
-<PUNCTUATION>===</PUNCTUATION> <HEADING>Links and Cross-References</HEADING>
+<PUNCTUATION>===</PUNCTUATION> <HEADING3>Links and Cross-References</HEADING3>
 
 Visit https://asciidoctor.org for more info.
 See <FUNCTION>link:</FUNCTION><TAG>api.html</TAG><PUNCTUATION>[</PUNCTUATION><STRING>API Documentation</STRING><PUNCTUATION>]</PUNCTUATION> for details.
 Cross-reference: <TAG>&lt;&lt;_tables,Tables section&gt;&gt;</TAG>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Lists</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Lists</HEADING2>
 
-<PUNCTUATION>===</PUNCTUATION> <HEADING>Unordered</HEADING>
+<PUNCTUATION>===</PUNCTUATION> <HEADING3>Unordered</HEADING3>
 
 <KEYWORD>*</KEYWORD> First item
 <KEYWORD>**</KEYWORD> Nested item
@@ -44,7 +44,7 @@ Cross-reference: <TAG>&lt;&lt;_tables,Tables section&gt;&gt;</TAG>
 <KEYWORD>*</KEYWORD> Second item
 <KEYWORD>*</KEYWORD> Third item
 
-<PUNCTUATION>===</PUNCTUATION> <HEADING>Ordered</HEADING>
+<PUNCTUATION>===</PUNCTUATION> <HEADING3>Ordered</HEADING3>
 
 <KEYWORD>.</KEYWORD> Step one
 <KEYWORD>.</KEYWORD> Step two
@@ -52,12 +52,12 @@ Cross-reference: <TAG>&lt;&lt;_tables,Tables section&gt;&gt;</TAG>
 <KEYWORD>..</KEYWORD> Sub-step b
 <KEYWORD>.</KEYWORD> Step three
 
-<PUNCTUATION>===</PUNCTUATION> <HEADING>Description List</HEADING>
+<PUNCTUATION>===</PUNCTUATION> <HEADING3>Description List</HEADING3>
 
 Term 1:: Definition of term 1.
 Term 2:: Definition of term 2.
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Code Blocks</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Code Blocks</HEADING2>
 
 Inline code: <FUNCTION>`System.out.println("Hello")`</FUNCTION>
 
@@ -86,7 +86,7 @@ Inline code: <FUNCTION>`System.out.println("Hello")`</FUNCTION>
 <FUNCTION>Special chars: * _ ` #</FUNCTION>
 <PUNCTUATION>....</PUNCTUATION>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Tables</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Tables</HEADING2>
 
 <PUNCTUATION>.</PUNCTUATION><HEADING>Sample Data Table</HEADING>
 <PUNCTUATION>[</PUNCTUATION><ATTRIBUTE>cols="1,2,1",options="header"</ATTRIBUTE><PUNCTUATION>]</PUNCTUATION>
@@ -106,7 +106,7 @@ Inline code: <FUNCTION>`System.out.println("Hello")`</FUNCTION>
 | 71
 |===
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Admonitions</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Admonitions</HEADING2>
 
 <KEYWORD>NOTE</KEYWORD><PUNCTUATION>:</PUNCTUATION> This is a note.
 
@@ -118,11 +118,11 @@ Inline code: <FUNCTION>`System.out.println("Hello")`</FUNCTION>
 
 <KEYWORD>CAUTION</KEYWORD><PUNCTUATION>:</PUNCTUATION> Proceed with care.
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Images and Media</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Images and Media</HEADING2>
 
 <FUNCTION>image::</FUNCTION><STRING>screenshot.png</STRING><ATTRIBUTE>[Application Screenshot,width=600]</ATTRIBUTE>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Sidebars and Examples</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Sidebars and Examples</HEADING2>
 
 <PUNCTUATION>****</PUNCTUATION>
 This is a sidebar block.
@@ -134,14 +134,14 @@ This is an example block.
 It can contain any content.
 ====
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Includes and Attributes</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Includes and Attributes</HEADING2>
 
 The project version is <VARIABLE>{version}</VARIABLE>.
 The author is <VARIABLE>{author}</VARIABLE>.
 
 <KEYWORD>include::</KEYWORD><STRING>chapters/getting-started.adoc</STRING><ATTRIBUTE>[]</ATTRIBUTE>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Passthrough</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Passthrough</HEADING2>
 
 <PUNCTUATION>++++</PUNCTUATION>
 <STRING>&lt;div class="custom-html"&gt;</STRING>
@@ -157,6 +157,6 @@ The author is <VARIABLE>{author}</VARIABLE>.
 
 <COMMENT>// This is a single-line comment</COMMENT>
 
-<PUNCTUATION>==</PUNCTUATION> <HEADING>Conclusion</HEADING>
+<PUNCTUATION>==</PUNCTUATION> <HEADING2>Conclusion</HEADING2>
 
 For more information, see the <FUNCTION>https:</FUNCTION><TAG>//docs.asciidoctor.org</TAG><PUNCTUATION>[</PUNCTUATION><STRING>Asciidoctor Documentation</STRING><PUNCTUATION>]</PUNCTUATION>.

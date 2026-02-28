@@ -41,8 +41,16 @@ my %type_names = (
     'tag'         => 'TAG',
     'attribute'   => 'ATTRIBUTE',
     'heading'     => 'HEADING',
+    'heading1'    => 'HEADING1',
+    'heading2'    => 'HEADING2',
+    'heading3'    => 'HEADING3',
+    'heading4'    => 'HEADING4',
+    'heading5'    => 'HEADING5',
+    'heading6'    => 'HEADING6',
     'punctuation' => 'PUNCTUATION',
     'escape'      => 'ESCAPE',
+    'bold'        => 'BOLD',
+    'italic'      => 'ITALIC',
 );
 
 # Get list of sample files to process

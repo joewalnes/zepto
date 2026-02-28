@@ -70,8 +70,11 @@ sub tokenize {
 
     # Section titles: = Title, == Title, === Title, etc.
     if ($line =~ /^(={1,6})(\s+)(.+)$/) {
+        my @h = (undef, TOKEN_HEADING1, TOKEN_HEADING2, TOKEN_HEADING3,
+                 TOKEN_HEADING4, TOKEN_HEADING5, TOKEN_HEADING6);
+        my $h_tok = $h[length($1)] // TOKEN_HEADING;
         push @tokens, _token(0, length($1), TOKEN_PUNCTUATION);
-        push @tokens, _token(length($1) + length($2), $len, TOKEN_HEADING);
+        push @tokens, _token(length($1) + length($2), $len, $h_tok);
         return (\@tokens, $state);
     }
 
@@ -178,28 +181,28 @@ sub tokenize {
 
         # Bold **text**
         if ($rest =~ /^(\*\*[^*]+\*\*)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_CONSTANT);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_BOLD);
             $pos += length($1);
             next;
         }
 
         # Bold *text*
         if ($rest =~ /^(\*[^*]+\*)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_CONSTANT);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_BOLD);
             $pos += length($1);
             next;
         }
 
         # Italic __text__
         if ($rest =~ /^(__[^_]+__)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_STRING);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_ITALIC);
             $pos += length($1);
             next;
         }
 
         # Italic _text_
         if ($rest =~ /^(_[^_\s]+_)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_STRING);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_ITALIC);
             $pos += length($1);
             next;
         }

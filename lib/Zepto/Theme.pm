@@ -272,7 +272,15 @@ sub dark_theme {
         syntax_tag         => fg_rgb(242, 143, 173),  # Pink - HTML/JSX tags
         syntax_punctuation => fg_rgb(166, 173, 200),  # Subtle gray - brackets
         syntax_escape      => fg_rgb(245, 169, 127),  # Peach - escape sequences
-        syntax_heading     => fg_rgb(122, 162, 247),  # Blue - markdown headings
+        syntax_heading     => BOLD . fg_rgb(122, 162, 247),  # Bold blue - generic heading
+        syntax_heading1    => BOLD . fg_rgb(100, 149, 255),  # Bright blue - h1
+        syntax_heading2    => BOLD . fg_rgb(120, 155, 245),  # Blue - h2
+        syntax_heading3    => BOLD . fg_rgb(140, 160, 232),  # Blue-violet - h3
+        syntax_heading4    => BOLD . fg_rgb(158, 162, 218),  # Muted violet - h4
+        syntax_heading5    => BOLD . fg_rgb(170, 168, 205),  # Dim lavender - h5
+        syntax_heading6    => BOLD . fg_rgb(178, 175, 195),  # Gray-lavender - h6
+        syntax_bold        => BOLD . fg_rgb(255, 158, 100),  # Bold orange - prose bold
+        syntax_italic      => ITALIC . fg_rgb(158, 206, 106),  # Italic green - prose italic
     });
 }
 
@@ -475,7 +483,15 @@ sub light_theme {
         syntax_tag         => fg_rgb(180, 60, 130),   # Deep pink - high contrast
         syntax_punctuation => fg_rgb(90, 95, 115),    # Dark gray - readable
         syntax_escape      => fg_rgb(180, 60, 10),    # Deep orange - high contrast
-        syntax_heading     => fg_rgb(10, 80, 190),    # Deep blue - high contrast
+        syntax_heading     => BOLD . fg_rgb(10, 80, 190),    # Bold deep blue - generic heading
+        syntax_heading1    => BOLD . fg_rgb(10, 70, 195),    # Deep blue - h1
+        syntax_heading2    => BOLD . fg_rgb(30, 65, 185),    # Blue - h2
+        syntax_heading3    => BOLD . fg_rgb(55, 58, 172),    # Blue-violet - h3
+        syntax_heading4    => BOLD . fg_rgb(78, 55, 155),    # Muted violet - h4
+        syntax_heading5    => BOLD . fg_rgb(95, 60, 140),    # Dim purple - h5
+        syntax_heading6    => BOLD . fg_rgb(108, 72, 128),   # Gray-purple - h6
+        syntax_bold        => BOLD . fg_rgb(180, 60, 10),    # Bold deep orange - prose bold
+        syntax_italic      => ITALIC . fg_rgb(22, 120, 55),  # Italic deep green - prose italic
     });
 }
 

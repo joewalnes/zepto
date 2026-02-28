@@ -9,17 +9,17 @@ reStructuredText Guide
 Introduction
 <HEADING>============</HEADING>
 
-This document demonstrates <CONSTANT>**reStructuredText**</CONSTANT> syntax for highlighting.
+This document demonstrates <BOLD>**reStructuredText**</BOLD> syntax for highlighting.
 reStructuredText is used by Sphinx_ for Python documentation.
 
 Word wrap is especially useful for prose-heavy documents like this reStructuredText file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical specifications, and long-form writing much more pleasant and efficient.
 
-This second paragraph includes <STRING>*emphasized text*</STRING> and <CONSTANT>**strongly emphasized text**</CONSTANT> mixed with <FUNCTION>``inline code``</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests an <STRING>`external link &lt;https://example.com&gt;`</STRING>_ and a footnote reference <TAG>[2]_</TAG> to exercise various inline reStructuredText elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+This second paragraph includes <ITALIC>*emphasized text*</ITALIC> and <BOLD>**strongly emphasized text**</BOLD> mixed with <FUNCTION>``inline code``</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests an <STRING>`external link &lt;https://example.com&gt;`</STRING>_ and a footnote reference <TAG>[2]_</TAG> to exercise various inline reStructuredText elements within long wrapped content that should span at least three or four visual rows at eighty columns.
 
 Basic Formatting
 <HEADING>----------------</HEADING>
 
-Text can be <STRING>*emphasized*</STRING>, <CONSTANT>**strongly emphasized**</CONSTANT>, or use <FUNCTION>``inline code``</FUNCTION>.
+Text can be <ITALIC>*emphasized*</ITALIC>, <BOLD>**strongly emphasized**</BOLD>, or use <FUNCTION>``inline code``</FUNCTION>.
 This is a <STRING>`hyperlink &lt;https://example.com&gt;`</STRING>_ and a standalone link:
 https://example.com.
 
@@ -31,7 +31,7 @@ Lists
 Bullet list:
 
 <KEYWORD>-</KEYWORD> First item
-<KEYWORD>-</KEYWORD> Second item with <STRING>*emphasis*</STRING>
+<KEYWORD>-</KEYWORD> Second item with <ITALIC>*emphasis*</ITALIC>
 <KEYWORD>-</KEYWORD> Third item
 
   - Nested item
@@ -116,7 +116,7 @@ Literal Blocks
 
     This is a literal block.
     It preserves formatting and whitespace.
-    No <CONSTANT>**markup**</CONSTANT> is processed here.
+    No <BOLD>**markup**</BOLD> is processed here.
 
 Substitutions
 <HEADING>-------------</HEADING>
