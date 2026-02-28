@@ -345,21 +345,80 @@ subtest 'Sticky headers' => sub {
 
     my $flat = $tree->flat_list();
 
-    # Cursor is now on lib/Editor/Commands.pm deep in the tree
-    # Scroll down so lib/ and lib/Editor/ are above viewport
+    # Scroll down so lib/ and lib/Editor/ are above viewport.
+    # The top visible item (Commands.pm) is inside lib/Editor/, so both
+    # lib/ and Editor/ should appear as sticky headers.
     if (@$flat > 5) {
-        $tree->{scroll} = 2;  # scroll past lib/
+        $tree->{scroll} = 2;  # scroll past lib/ and Editor/
         my $stickies = $tree->sticky_headers();
-        # lib/ at index 0 should be a sticky header since it's ancestor of cursor node
         ok(ref($stickies) eq 'ARRAY', 'sticky_headers returns arrayref');
-        ok(scalar @$stickies > 0, 'ancestors of cursor node become sticky headers');
+        ok(scalar @$stickies > 0, 'ancestors of top-visible item become sticky headers');
+
+        my @sticky_paths = map { $_->{path} } @$stickies;
+        ok((grep { $_ eq 'lib' } @sticky_paths), 'lib/ pinned as grandparent');
+        ok((grep { $_ eq 'lib/Editor' } @sticky_paths), 'lib/Editor/ pinned as parent');
     }
 
-    # Cursor at top-level item with no scroll = no stickies
-    $tree->home();  # cursor to first item
+    # No scroll = no stickies
+    $tree->home();
     $tree->{scroll} = 0;
     my $stickies = $tree->sticky_headers();
-    is(scalar @$stickies, 0, 'no stickies when cursor is at top-level and no scroll');
+    is(scalar @$stickies, 0, 'no stickies when scroll is at top');
+};
+
+subtest 'Sticky headers track scroll position, not cursor' => sub {
+    # Reproduce the exact bug: cursor on a shallow sibling while viewport
+    # top shows content from a deeper expanded branch.
+    #
+    # Structure:
+    #   alpha/
+    #     deep/
+    #       file1..file5.txt
+    #     other/
+    #       other.txt
+    #   beta.txt
+
+    my $deep_dir = tempdir(CLEANUP => 1);
+    make_path("$deep_dir/alpha/deep");
+    for my $i (1..5) {
+        open my $fh3, '>', "$deep_dir/alpha/deep/file$i.txt" or die $!;
+        close $fh3;
+    }
+    make_path("$deep_dir/alpha/other");
+    open my $fh3, '>', "$deep_dir/alpha/other/other.txt" or die $!;
+    close $fh3;
+    open $fh3, '>', "$deep_dir/beta.txt" or die $!;
+    close $fh3;
+
+    my $tree = Zepto::FileTree->new(root_path => $deep_dir, viewport_height => 5);
+
+    # Expand both branches so the full flat list is visible
+    $tree->expand_to_path('alpha/deep/file1.txt');
+    $tree->expand_to_path('alpha/other/other.txt');
+
+    my $flat = $tree->flat_list();
+
+    # Find indices
+    my ($file4_idx) = grep { $flat->[$_]{path} eq 'alpha/deep/file4.txt' } 0..$#$flat;
+    my ($other_idx) = grep { $flat->[$_]{path} eq 'alpha/other' } 0..$#$flat;
+
+    ok(defined $file4_idx, 'found file4.txt in flat list');
+    ok(defined $other_idx, 'found alpha/other/ in flat list');
+
+    if (defined $file4_idx && defined $other_idx) {
+        # Scroll so file4.txt is at top, but put cursor on other/ (different branch)
+        $tree->{scroll} = $file4_idx;
+        $tree->set_cursor($other_idx);
+
+        my $stickies = $tree->sticky_headers();
+        my @sticky_paths = map { $_->{path} } @$stickies;
+
+        # file4.txt is inside alpha/deep/, so both alpha/ and alpha/deep/
+        # must appear as sticky headers — regardless of where the cursor is
+        is(scalar @$stickies, 2, 'two sticky levels for deeply nested top-visible item');
+        ok((grep { $_ eq 'alpha' } @sticky_paths), 'alpha/ pinned as grandparent');
+        ok((grep { $_ eq 'alpha/deep' } @sticky_paths), 'alpha/deep/ pinned as parent of top-visible');
+    }
 };
 
 # =============================================================================

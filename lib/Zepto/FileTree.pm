@@ -817,41 +817,32 @@ sub shrink {
 
 sub sticky_headers {
     my ($self) = @_;
-
-    # Use cursor node's path for computing ancestor context — this reflects
-    # where the user is looking, whether the tree is focused or not
-    my $node = $self->cursor_node();
-    return [] unless $node;
-
-    my $path = $node->{path};
-    return [] unless defined $path;
-
-    # Find ancestor dir nodes that are scrolled above viewport
-    my @ancestors;
-    my @parts = split m{/}, $path;
-
-    # Build list of ancestor dir paths
-    my @ancestor_paths;
-    for my $i (0 .. $#parts - 1) {
-        push @ancestor_paths, join('/', @parts[0 .. $i]);
-    }
-
-    return [] unless @ancestor_paths;
-
-    # Find these ancestors in flat_list that are above scroll position
+    my $flat = $self->{flat_list};
     my $scroll = $self->{scroll};
-    for my $i (0 .. $scroll - 1) {
-        last if $i > $#{$self->{flat_list}};
-        my $node = $self->{flat_list}[$i];
-        next unless $node->{is_dir};
 
-        # Check if this dir is an ancestor of cursor node
-        for my $ap (@ancestor_paths) {
-            if ($node->{path} eq $ap || _path_starts_with($ap, $node->{path})) {
-                push @ancestors, $node;
-                last;
-            }
-        }
+    return [] unless $scroll > 0 && @$flat > $scroll;
+
+    # Determine ancestors based on the top-visible item (at scroll position),
+    # not the cursor.  This ensures the pinned context always matches the
+    # content the user sees at the top of the viewport.
+    my $top_node = $flat->[$scroll];
+    my $top_depth = $top_node->{depth};
+
+    return [] if $top_depth == 0;
+
+    # Walk backwards from scroll to collect the nearest expanded directory
+    # at each decreasing depth level — these are the ancestor dirs whose
+    # content is still visible.
+    my @ancestors;
+    my $need_depth = $top_depth - 1;
+
+    for my $i (reverse 0 .. $scroll - 1) {
+        my $node = $flat->[$i];
+        next unless $node->{is_dir} && $node->{depth} <= $need_depth;
+
+        unshift @ancestors, $node;
+        $need_depth = $node->{depth} - 1;
+        last if $need_depth < 0;
     }
 
     return \@ancestors;
