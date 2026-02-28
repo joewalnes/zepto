@@ -33,8 +33,8 @@ my %priority = (
     'lib/Zepto/Preferences.pm'  => 18,
     'lib/Zepto/Terminal.pm'     => 19,
     'lib/Zepto/Config.pm'       => 20,
-    'lib/Zepto/FilePicker.pm'   => 21,
-    'lib/Zepto/Chars.pm'        => 22,
+    'lib/Zepto/Chars.pm'        => 21,
+    'lib/Zepto/FileTree.pm'     => 22,
     # Syntax/Base must come first among Syntax modules
     'lib/Zepto/Syntax/Base.pm' => 50,
     # Highlighter needs all Syntax modules loaded

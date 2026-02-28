@@ -46,6 +46,7 @@ use constant {
     CURSOR_COLOR_PREFIX => "\x1b]12;",
     CURSOR_COLOR_SUFFIX => "\x1b\\",
     RESET       => "\x1b[0m",
+    BOLD        => "\x1b[1m",
 };
 
 # Box-drawing characters (Unicode)
@@ -447,20 +448,12 @@ sub render {
     $output .= _move_to(3, $tree_width + 1);
     $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui);
 
-    # Render text area or file picker
-    if ($ui->{file_picker}) {
-        # File picker replaces the text area
-        $output .= $class->_render_file_picker(
-            $theme, $ui->{file_picker}, $text_height, $cols
-        );
-    } else {
-        # Normal text area with line numbers (rows 4 to 4+text_height-1)
-        $output .= $class->_render_text_area(
-            $doc, $view, $theme,
-            $text_height, $text_width, $gutter_width, $highlighter,
-            $ui->{find_mode}, $minimap_width, $tree_width
-        );
-    }
+    # Render text area with line numbers (rows 4 to 4+text_height-1)
+    $output .= $class->_render_text_area(
+        $doc, $view, $theme,
+        $text_height, $text_width, $gutter_width, $highlighter,
+        $ui->{find_mode}, $minimap_width, $tree_width
+    );
 
     # Render status bar (last row) - prompt/footer_input/find replace normal content
     $output .= _move_to($rows, 1);
@@ -535,12 +528,6 @@ sub render {
     # Position cursor
     if ($ui->{dialog}) {
         # Dialogs position cursor themselves
-        $output .= SHOW_CURSOR;
-    } elsif ($ui->{file_picker}) {
-        # Position cursor in file picker search input
-        my $picker = $ui->{file_picker};
-        my $query_len = length($picker->query() // '');
-        $output .= _move_to(4, 4 + $query_len);  # Row 4, after "> "
         $output .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
@@ -624,11 +611,10 @@ sub render {
         # Hide cursor during prompt - no text input
         $output .= HIDE_CURSOR;
     } elsif ($ui->{file_tree} && $ui->{file_tree}->focused()) {
-        # Tree is focused — hide cursor (or show in filter input)
+        # Tree is focused — show cursor in search bar (always row 2, above stickies)
         if ($ui->{file_tree}->filter_active()) {
             my $filter_len = length($ui->{file_tree}->filter_query() // '');
-            my $sticky_count = scalar @{$ui->{file_tree}->sticky_headers()};
-            $output .= _move_to(2 + $sticky_count, 4 + $filter_len);  # tree starts at row 2, " / " = 3 chars prefix
+            $output .= _move_to(2, 4 + $filter_len);  # search bar at row 2, " {icon} " = 3 chars prefix
             $output .= SHOW_CURSOR;
         } else {
             $output .= HIDE_CURSOR;
@@ -1799,6 +1785,7 @@ sub _render_tree_panel {
     my $flat = $tree->flat_list();
     my $scroll = $tree->scroll();
     my $cursor = $tree->cursor();
+    my $current_file = $tree->current_file();
 
     # Scrollbar data
     my $sb = $tree->scrollbar_data();
@@ -1842,7 +1829,50 @@ sub _render_tree_panel {
     # Track which row we're rendering
     my $row_idx = 0;
 
-    # Render sticky headers at top
+    # Always render search bar first (above stickies)
+    if ($row_idx < $height) {
+        my $screen_row = $row_idx + 2;
+        $output .= _move_to($screen_row, 1);
+        $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
+        my $query = $tree->filter_query() // '';
+        my $search_icon = Zepto::Chars->get('search');
+        my $prefix = " $search_icon ";
+        my $match_count = $tree->filter_match_count();
+        my $suffix = '';
+        if ($filter_active && length($query)) {
+            my $unit = $match_count == 1 ? 'file' : 'files';
+            $suffix = " $match_count $unit ";
+        } elsif (!$filter_active) {
+            $suffix = " ^O ";
+        }
+
+        my $display = $prefix . $query;
+        my $suffix_space = length($suffix);
+        my $max_query_width = $content_width - length($prefix) - $suffix_space;
+        if (length($query) > $max_query_width && $max_query_width > 0) {
+            $display = $prefix . substr($query, 0, $max_query_width);
+        }
+
+        $output .= $display;
+
+        # Right-align suffix (match count or keyboard hint)
+        my $pad = $content_width - length($display) - $suffix_space;
+        $output .= ' ' x $pad if $pad > 0;
+        if (length($suffix)) {
+            $output .= $theme->color('tree_filter_fg') . $suffix;
+        }
+
+        # Scrollbar column
+        if ($has_scrollbar) {
+            $output .= $tree_bg . ' ';
+        }
+
+        # Border
+        $output .= $border_fg . $tree_bg . $border_char;
+        $row_idx++;
+    }
+
+    # Render sticky headers below search bar
     for my $sticky (@$stickies) {
         last if $row_idx >= $height;
         my $screen_row = $row_idx + 2;  # tree starts at row 2
@@ -1852,31 +1882,6 @@ sub _render_tree_panel {
             $sticky, $content_width, $theme, 0, 1, $focused,
             $has_scrollbar, $row_idx, $sb, undef, []
         );
-        # Border
-        $output .= $border_fg . $tree_bg . $border_char;
-        $row_idx++;
-    }
-
-    # Render filter input row if active
-    if ($filter_active && $row_idx < $height) {
-        my $screen_row = $row_idx + 2;
-        $output .= _move_to($screen_row, 1);
-        $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
-        my $query = $tree->filter_query() // '';
-        my $prefix = ' / ';
-        my $display = $prefix . $query;
-        if (length($display) > $content_width) {
-            $display = substr($display, 0, $content_width);
-        }
-        $output .= $display;
-        my $pad = $content_width - length($display);
-        $output .= ' ' x $pad if $pad > 0;
-
-        # Scrollbar column
-        if ($has_scrollbar) {
-            $output .= $tree_bg . ' ';
-        }
-
         # Border
         $output .= $border_fg . $tree_bg . $border_char;
         $row_idx++;
@@ -1897,6 +1902,8 @@ sub _render_tree_panel {
             my $node = $flat->[$flat_idx];
             my $d = $node->{depth};
             my $is_cursor = ($focused && $flat_idx == $cursor);
+            my $is_current = (!$node->{is_dir} && defined $current_file
+                && $node->{path} eq $current_file);
             my $node_is_last = $is_last[$flat_idx];
 
             # Snapshot the current guide state for this node's ancestors
@@ -1907,7 +1914,8 @@ sub _render_tree_panel {
 
             $output .= $class->_render_tree_node_content(
                 $node, $content_width, $theme, $is_cursor, 0, $focused,
-                $has_scrollbar, $row_idx, $sb, $node_is_last, \@guides_for_node
+                $has_scrollbar, $row_idx, $sb, $node_is_last, \@guides_for_node,
+                $filter_active, $is_current
             );
 
             # Update guide state after rendering this node
@@ -1931,7 +1939,8 @@ sub _render_tree_panel {
 
 sub _render_tree_node_content {
     my ($class, $node, $width, $theme, $is_cursor, $is_sticky, $focused,
-        $has_scrollbar, $row_idx, $sb, $is_last, $guides) = @_;
+        $has_scrollbar, $row_idx, $sb, $is_last, $guides, $filter_active,
+        $is_current) = @_;
 
     my $output = '';
 
@@ -1943,12 +1952,118 @@ sub _render_tree_node_content {
     } elsif ($is_cursor) {
         $bg = $theme->color('tree_cursor_bg');
         $fg = $theme->color('tree_cursor_fg');
+    } elsif ($is_current) {
+        $bg = $theme->color('tree_current_bg') // ($focused ? $theme->color('tree_focused_bg') : $theme->color('tree_bg'));
+        $fg = $theme->color('tree_current_fg') // $theme->color('tree_fg');
     } else {
         $bg = $focused ? $theme->color('tree_focused_bg') : $theme->color('tree_bg');
         $fg = $theme->color('tree_fg');
     }
 
     $output .= $bg;
+
+    # --- Flat filter mode: skip indent/icon, render full path with match highlight ---
+    # Only use flat rendering when there's an actual query producing flat results;
+    # empty query with filter_active still shows the normal hierarchical tree.
+    if ($filter_active && !$node->{is_dir} && $node->{depth} == 0 && $node->{_filter_match_positions}) {
+        my $path = $node->{name} // '';  # In flat mode, name == full path
+        my $used = 1;  # leading space
+        $output .= ' ';
+
+        # File type icon (based on filename, last path component)
+        my ($filename) = $path =~ m{([^/]+)$};
+        $filename //= $path;
+        my $icon = Zepto::Chars->file_icon($filename) // ' ';
+
+        # VCS coloring
+        my $name_fg = $fg;
+        if (!$is_cursor) {
+            my $vcs = $node->{vcs_status};
+            if ($vcs && $theme->color("tree_vcs_$vcs")) {
+                $name_fg = $theme->color("tree_vcs_$vcs");
+            }
+            $name_fg = BOLD . $name_fg if $is_current;
+        }
+
+        # Render icon
+        $output .= $name_fg . $bg . "$icon ";
+        $used += 2;  # icon + space
+
+        my $name_space = $width - $used;
+
+        # Truncate from the LEFT so filename stays visible: …eep/path/file.pm
+        my $display_path = $path;
+        my $trim_offset = 0;  # how many chars trimmed from the left
+        if ($name_space > 0 && length($path) > $name_space) {
+            $trim_offset = length($path) - ($name_space - 1);  # 1 for ellipsis
+            $display_path = "\x{2026}" . substr($path, $trim_offset);
+        } elsif ($name_space <= 0) {
+            $display_path = '';
+        }
+
+        # Find where filename starts in display string (for dim dirs / bright filename)
+        my $filename_start_in_path = length($path) - length($filename);
+        my $dir_fg = $is_cursor ? $fg : $theme->color('tree_result_dir_fg');
+        my $file_fg = $name_fg;
+
+        # Build match highlight set (adjusted for left-truncation)
+        my $match_positions = $node->{_filter_match_positions};
+        my %highlight_cols;
+        if ($match_positions && @$match_positions) {
+            for my $pos (@$match_positions) {
+                my $display_col;
+                if ($trim_offset > 0) {
+                    # Skip positions that were trimmed; offset remaining by trim + 1 for ellipsis
+                    next if $pos < $trim_offset;
+                    $display_col = $pos - $trim_offset + 1;
+                } else {
+                    $display_col = $pos;
+                }
+                $highlight_cols{$display_col} = 1 if $display_col >= 0 && $display_col < length($display_path);
+            }
+        }
+
+        # Render each character with: match highlight, dim dirs, bright filename
+        my $match_fg = $theme->color('tree_match_fg');
+        for my $ci (0 .. length($display_path) - 1) {
+            my $ch = substr($display_path, $ci, 1);
+            # Map display column back to path position to decide dir vs filename
+            my $path_pos;
+            if ($trim_offset > 0 && $ci == 0) {
+                $path_pos = -1;  # ellipsis char — treat as dir part
+            } elsif ($trim_offset > 0) {
+                $path_pos = $trim_offset + $ci - 1;
+            } else {
+                $path_pos = $ci;
+            }
+
+            my $base_fg = ($path_pos >= $filename_start_in_path) ? $file_fg : $dir_fg;
+            if ($highlight_cols{$ci}) {
+                $output .= $match_fg . $bg . $ch;
+            } else {
+                $output .= $base_fg . $bg . $ch;
+            }
+        }
+
+        # Pad remainder
+        my $pad = $width - $used - length($display_path);
+        $output .= $bg . (' ' x $pad) if $pad > 0;
+
+        # Reset bold/attributes before scrollbar and border
+        $output .= RESET if $is_current;
+
+        # Scrollbar column
+        if ($has_scrollbar) {
+            my $sb_bg = $theme->color('tree_scrollbar_bg');
+            if ($row_idx >= $sb->{thumb_start} && $row_idx < $sb->{thumb_end}) {
+                $output .= $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";
+            } else {
+                $output .= $sb_bg . ' ';
+            }
+        }
+
+        return $output;
+    }
 
     my $depth = $node->{depth} // 0;
     my $indent_fg = $theme->color('tree_indent_fg');
@@ -2052,6 +2167,8 @@ sub _render_tree_node_content {
         } else {
             $name_fg = $fg;
         }
+        # Bold for current file (active tab) regardless of VCS color
+        $name_fg = BOLD . $name_fg if $is_current;
     } else {
         $name_fg = $fg;
     }
@@ -2105,6 +2222,9 @@ sub _render_tree_node_content {
     my $total_used = $used + length($name);
     my $pad = $width - $total_used;
     $output .= $bg . (' ' x $pad) if $pad > 0;
+
+    # Reset bold/attributes before scrollbar and border
+    $output .= RESET if $is_current;
 
     # Scrollbar column
     if ($has_scrollbar) {
@@ -3454,85 +3574,5 @@ sub _render_prompt {
 # =============================================================================
 # File Picker Rendering
 # =============================================================================
-
-sub _render_file_picker {
-    my ($class, $theme, $picker, $text_height, $cols) = @_;
-
-    my $output = '';
-
-    my $query = $picker->query() // '';
-    my @filtered = @{$picker->filtered() // []};
-    my $selected = $picker->selected() // 0;
-    my $scroll = $picker->scroll() // 0;
-    my $total = $picker->total_files();
-    my $filtered_count = $picker->filtered_count();
-
-    # Row 4: Search input (after menu, tabs, and ruler)
-    $output .= _move_to(4, 1);
-    $output .= $theme->color('dialog_bg');
-    $output .= $theme->color('dialog_fg');
-    $output .= ' > ';
-    $output .= $theme->color('dialog_input_fg');
-    $output .= $query;
-
-    # Fill rest of search row
-    my $search_fill = $cols - 3 - length($query);
-    $output .= ' ' x $search_fill if $search_fill > 0;
-    $output .= RESET;
-    $output .= CLEAR_LINE;
-
-    # Separator line
-    $output .= _move_to(5, 1);
-    $output .= $theme->color('dialog_border');
-    $output .= Zepto::Chars->get('box_h') x $cols;
-    $output .= RESET;
-
-    # File list (rows 6+ to text_height)
-    my $list_height = $text_height - 2;  # -2 for search row and separator
-    $list_height = 1 if $list_height < 1;
-
-    for my $i (0 .. $list_height - 1) {
-        my $row = 6 + $i;
-        my $file_idx = $scroll + $i;
-
-        $output .= _move_to($row, 1);
-
-        if ($file_idx < @filtered) {
-            my $file = $filtered[$file_idx];
-            my $is_selected = ($file_idx == $selected);
-
-            if ($is_selected) {
-                $output .= $theme->color('dropdown_selected_bg');
-                $output .= $theme->color('dropdown_selected_fg');
-                $output .= ' > ';
-            } else {
-                $output .= $theme->color('bg');
-                $output .= $theme->color('fg');
-                $output .= '   ';
-            }
-
-            # Truncate filename if needed
-            my $max_len = $cols - 4;
-            my $display = $file;
-            if (length($display) > $max_len) {
-                $display = '...' . substr($display, length($display) - $max_len + 3);
-            }
-            $output .= $display;
-
-            # Fill rest of line
-            my $fill = $cols - 3 - length($display);
-            $output .= ' ' x $fill if $fill > 0;
-        } else {
-            # Empty row (beyond file list)
-            $output .= $theme->color('empty_line_bg');
-            $output .= ' ' x $cols;
-        }
-
-        $output .= RESET;
-        $output .= CLEAR_LINE;
-    }
-
-    return $output;
-}
 
 1;

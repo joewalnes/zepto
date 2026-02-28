@@ -21,7 +21,7 @@ use Carp;
 use Time::HiRes qw(time);
 
 use Exporter 'import';
-our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FILE_PICKER STATE_FIND STATE_QUIT);
+our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FIND STATE_QUIT);
 
 # Version for crash reports
 our $VERSION = '0.1.0';
@@ -33,7 +33,6 @@ use Zepto::Renderer;
 use Zepto::InputParser;
 use Zepto::Preferences;
 use Zepto::Theme;
-use Zepto::FilePicker;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
 use Zepto::LineMap;
@@ -47,7 +46,6 @@ use constant {
     STATE_DIALOG       => 'dialog',
     STATE_PROMPT       => 'prompt',        # Simple choice in status bar
     STATE_FOOTER_INPUT => 'footer_input',  # Text input in status bar
-    STATE_FILE_PICKER  => 'file_picker',   # Fuzzy file finder
     STATE_FIND         => 'find',          # Incremental find in status bar
     STATE_QUIT         => 'quit',
 };
@@ -120,9 +118,6 @@ sub new {
 
         # Footer input state (for text input in status bar)
         footer_input => undef,
-
-        # File picker state
-        file_picker  => undef,
 
         # File tree state
         file_tree            => undef,
@@ -478,9 +473,6 @@ sub handle_event {
     elsif ($self->{state} eq STATE_FOOTER_INPUT) {
         $self->handle_footer_input_event($event);
     }
-    elsif ($self->{state} eq STATE_FILE_PICKER) {
-        $self->handle_file_picker_event($event);
-    }
     elsif ($self->{state} eq STATE_FIND) {
         $self->handle_find_event($event);
     }
@@ -706,8 +698,12 @@ sub handle_mouse_event {
             return;
         }
 
-        # Check if click is in tab bar (row 2)
-        if ($y == 2) {
+        # Check if click is in tab bar (row 2) — but not in tree panel area
+        my $_tree_w = 0;
+        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+            $_tree_w = $self->{file_tree}->panel_width() + 1;
+        }
+        if ($y == 2 && $x > $_tree_w) {
             $self->handle_tab_bar_click($x);
             # Start tab drag if we clicked on a tab (not close/scroll buttons)
             my @buttons = Zepto::Renderer->get_tab_bar_buttons();
@@ -759,7 +755,16 @@ sub handle_mouse_event {
             my $tree_row = $y - 2;
             my $stickies = $tree->sticky_headers();
             my $sticky_count = scalar @$stickies;
-            my $filter_rows = $tree->filter_active() ? 1 : 0;
+            my $search_bar_rows = 1;  # search bar always present
+
+            # Click on search bar (row 0) — focus tree and activate filter
+            if ($tree_row == 0) {
+                $tree->set_focused(1);
+                if (!$tree->filter_active()) {
+                    $tree->start_filter();
+                }
+                return;
+            }
 
             # Check if click is on scrollbar column (rightmost col of panel)
             my $sb = $tree->scrollbar_data();
@@ -767,11 +772,11 @@ sub handle_mouse_event {
             if ($has_scrollbar && $x == $tree_width - 1) {
                 # Start scrollbar drag
                 $self->{tree_scrollbar_dragging} = 1;
-                $self->_handle_tree_scrollbar_drag($tree_row - $sticky_count - $filter_rows, $sb);
+                $self->_handle_tree_scrollbar_drag($tree_row - $search_bar_rows - $sticky_count, $sb);
                 return;
             }
 
-            my $content_row = $tree_row - $sticky_count - $filter_rows;
+            my $content_row = $tree_row - $search_bar_rows - $sticky_count;
             if ($content_row >= 0) {
                 my $flat_idx = $tree->scroll() + $content_row;
                 if ($flat_idx < $tree->visible_count()) {
@@ -1996,110 +2001,6 @@ sub _apply_replace_preview {
 # File Picker Handling
 # =============================================================================
 
-sub open_file_picker {
-    my ($self, %opts) = @_;
-
-    my $base_dir = $opts{base_dir} // '.';
-
-    $self->{state} = STATE_FILE_PICKER;
-    $self->{file_picker} = Zepto::FilePicker->new(
-        base_dir  => $base_dir,
-        on_select => $opts{on_select},
-        on_cancel => $opts{on_cancel},
-    );
-}
-
-sub close_file_picker {
-    my ($self) = @_;
-    $self->{state} = STATE_EDITING;
-    $self->{file_picker} = undef;
-}
-
-sub handle_file_picker_event {
-    my ($self, $event) = @_;
-
-    my $picker = $self->{file_picker};
-    return unless $picker;
-
-    my $type = $event->{type};
-
-    if ($type eq 'key') {
-        my $key = $event->{key};
-
-        if ($key eq 'escape') {
-            $picker->cancel();
-            $self->close_file_picker();
-        }
-        elsif ($key eq 'enter') {
-            $picker->confirm();
-            $self->close_file_picker();
-        }
-        elsif ($key eq 'up') {
-            $picker->move_up();
-        }
-        elsif ($key eq 'down') {
-            $picker->move_down();
-        }
-        elsif ($key eq 'page_up') {
-            my ($rows, $cols) = $self->{terminal}->get_size();
-            my $visible = $rows - RESERVED_ROWS - 2;  # -2 for picker header
-            $picker->page_up($visible);
-        }
-        elsif ($key eq 'page_down') {
-            my ($rows, $cols) = $self->{terminal}->get_size();
-            my $visible = $rows - RESERVED_ROWS - 2;
-            $picker->page_down($visible);
-        }
-        elsif ($key eq 'backspace') {
-            $picker->backspace();
-        }
-    }
-    elsif ($type eq 'char') {
-        my $char = $event->{char};
-        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
-            $picker->append_char($char);
-        }
-    }
-    elsif ($type eq 'mouse') {
-        $self->_handle_file_picker_mouse($event);
-    }
-}
-
-sub _handle_file_picker_mouse {
-    my ($self, $event) = @_;
-
-    my $picker = $self->{file_picker};
-    return unless $picker;
-
-    my $action = $event->{action};
-    my $x = $event->{x};
-    my $y = $event->{y};
-
-    # Calculate which row was clicked
-    # Row 1 = menu bar, Row 2 = tab bar, Row 3 = ruler, Row 4 = search input, Row 5 = separator, Row 6+ = file list
-    my $list_start_row = 5;
-    my ($rows, $cols) = $self->{terminal}->get_size();
-    my $list_end_row = $rows - 1;  # -1 for status bar
-
-    if ($action eq 'press') {
-        if ($y >= $list_start_row && $y < $list_end_row) {
-            my $list_index = ($y - $list_start_row) + $picker->scroll();
-            my $max = $picker->filtered_count() - 1;
-            if ($list_index >= 0 && $list_index <= $max) {
-                $picker->select_index($list_index);
-                $picker->confirm();
-                $self->close_file_picker();
-            }
-        }
-    }
-    elsif ($action eq 'scroll_up') {
-        $picker->move_up();
-    }
-    elsif ($action eq 'scroll_down') {
-        $picker->move_down();
-    }
-}
-
 # =============================================================================
 # Editing Commands
 # =============================================================================
@@ -2919,22 +2820,37 @@ sub handle_tree_event {
         elsif ($key eq 'right')    { $tree->expand_current(); }
         elsif ($key eq 'enter')    { $self->_tree_open_selected(); }
         elsif ($key eq 'escape') {
-            if ($tree->filter_active()) { $tree->clear_filter(); }
+            if ($tree->filter_active()) {
+                my $had_query = length($tree->filter_query() // '');
+                $tree->clear_filter();
+                # If filter had no query, also unfocus (single Esc exits)
+                $self->_tree_unfocus() unless $had_query;
+            }
             else { $self->_tree_unfocus(); }
         }
         elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); }
         elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); }
         elsif ($key eq 'home')     { $tree->home(); }
         elsif ($key eq 'end')      { $tree->end(); }
-        elsif ($key eq 'backspace' && $tree->filter_active()) { $tree->filter_backspace(); }
+        elsif ($key eq 'backspace') { $tree->filter_backspace(); }
     }
     elsif ($event->{type} eq 'char') {
         my $char = $event->{char};
         if    ($char eq '{') { $tree->shrink(2); }
         elsif ($char eq '}') { $tree->grow(2); }
-        elsif ($char eq ' ') { $tree->toggle_current(); }
-        elsif ($char eq '/') { $tree->start_filter(); }
-        elsif ($tree->filter_active()) { $tree->filter_append_char($char); }
+        elsif ($char eq ' ') {
+            if ($tree->filter_active()) { $tree->filter_append_char($char); }
+            else { $tree->toggle_current(); }
+        }
+        elsif ($char eq '/') {
+            if (!$tree->filter_active()) { $tree->start_filter(); }
+            else { $tree->filter_append_char($char); }
+        }
+        else {
+            # Auto-start filter on any other character
+            if (!$tree->filter_active()) { $tree->start_filter(); }
+            $tree->filter_append_char($char);
+        }
     }
     elsif ($event->{type} eq 'mouse') {
         $self->handle_mouse_event($event);
@@ -3110,7 +3026,13 @@ sub _tree_open_selected {
         $self->_load_file($node->{path});
     }
 
+    # Clear filter if active (return tree to browse mode)
+    if ($tree->filter_active()) {
+        $tree->clear_filter();
+    }
+
     $tree->set_current_file($node->{path});
+    $tree->expand_to_path($node->{path});
     $tree->set_focused(0);
 }
 
@@ -3165,11 +3087,14 @@ sub render {
         # Tree spans rows 2..N-1 (2 more rows than text area which starts at row 4)
         $self->{file_tree}->set_viewport_height($rows - RESERVED_ROWS + 2);
         # Update VCS statuses (debounced internally)
-        # Skip while tree is focused — git status blocks too long on large repos
-        if (!$self->{file_tree}->focused()) {
-            my $vcs = $self->active_doc()->{_vcs_provider};
-            $self->{file_tree}->update_vcs_statuses($vcs) if $vcs;
+        # Use tree's own VCS provider (not tied to active doc which may be a preview tab)
+        if (!$self->{_tree_vcs_provider}) {
+            $self->{_tree_vcs_provider} = Zepto::VCS::Provider->detect(
+                $self->{file_tree}->root_path()
+            );
         }
+        $self->{file_tree}->update_vcs_statuses($self->{_tree_vcs_provider})
+            if $self->{_tree_vcs_provider};
     }
 
     # Update view size - account for gutter width
@@ -3196,7 +3121,6 @@ sub render {
             dialog => $self->{dialog},
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
-            file_picker => $self->{file_picker},
             tabs => $self->{tab_manager}->tabs_for_render(),
             active_tab_index => $self->{tab_manager}->active_index(),
             tab_manager => $self->{tab_manager},

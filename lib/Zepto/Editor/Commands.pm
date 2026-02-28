@@ -202,22 +202,16 @@ sub cmd_new_file {
 
 sub cmd_open_file {
     my ($self) = @_;
-    $self->_open_file_picker();
-}
-
-sub _open_file_picker {
-    my ($self) = @_;
-
-    $self->open_file_picker(
-        base_dir => '.',
-        on_select => sub {
-            my ($file) = @_;
-            $self->_load_file($file);
-        },
-        on_cancel => sub {
-            # Just close picker, do nothing
-        },
-    );
+    # Focus tree and activate filter mode (replaces old file picker overlay)
+    if (!$self->{file_tree}) {
+        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    }
+    my $tree = $self->{file_tree};
+    $tree->set_focused(1);
+    if ($tree->filter_active()) {
+        $tree->clear_filter();
+    }
+    $tree->start_filter();
 }
 
 sub _load_file {

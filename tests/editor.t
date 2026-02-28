@@ -85,7 +85,6 @@ subtest 'State constants' => sub {
     is(Zepto::Editor::STATE_DIALOG, 'dialog', 'STATE_DIALOG');
     is(Zepto::Editor::STATE_PROMPT, 'prompt', 'STATE_PROMPT');
     is(Zepto::Editor::STATE_FOOTER_INPUT, 'footer_input', 'STATE_FOOTER_INPUT');
-    is(Zepto::Editor::STATE_FILE_PICKER, 'file_picker', 'STATE_FILE_PICKER');
     is(Zepto::Editor::STATE_FIND, 'find', 'STATE_FIND');
     is(Zepto::Editor::STATE_QUIT, 'quit', 'STATE_QUIT');
 };
@@ -1048,11 +1047,13 @@ subtest 'Open file on clean document shows picker' => sub {
 
     $editor->cmd_open_file();
 
-    is($editor->{state}, 'file_picker', 'File picker state activated');
-    ok($editor->{file_picker}, 'File picker is set');
+    is($editor->{state}, 'editing', 'State remains editing');
+    ok($editor->{file_tree}, 'File tree is created');
+    ok($editor->{file_tree}->focused(), 'File tree is focused');
+    ok($editor->{file_tree}->filter_active(), 'Filter mode is active');
 };
 
-subtest 'Open file on dirty document opens picker directly' => sub {
+subtest 'Open file on dirty document opens tree filter' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Original\n");
     my $editor = Zepto::Editor->new(
@@ -1067,9 +1068,9 @@ subtest 'Open file on dirty document opens picker directly' => sub {
 
     $editor->cmd_open_file();
 
-    # With tabs, open file goes straight to picker (dirty doc stays in its tab)
-    is($editor->{state}, 'file_picker', 'File picker opens directly');
-    ok($editor->{file_picker}, 'File picker is set');
+    # With tabs, open file goes straight to tree filter (dirty doc stays in its tab)
+    ok($editor->{file_tree}->focused(), 'File tree focused');
+    ok($editor->{file_tree}->filter_active(), 'Filter active');
 };
 
 # ============================================================================
@@ -1131,9 +1132,9 @@ subtest 'Prompt escape cancels' => sub {
 };
 
 # ============================================================================
-# File picker handling
+# Tree-based file search (replaces file picker)
 # ============================================================================
-subtest 'File picker navigation' => sub {
+subtest 'Tree filter navigation' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1144,20 +1145,21 @@ subtest 'File picker navigation' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    ok($editor->{file_picker}, 'File picker opened');
+    ok($editor->{file_tree}->focused(), 'Tree focused');
+    ok($editor->{file_tree}->filter_active(), 'Filter active');
 
-    my $initial = $editor->{file_picker}->selected();
+    my $initial = $editor->{file_tree}->cursor();
 
     # Arrow down
     $editor->handle_input("\e[B");  # Down arrow
-    is($editor->{file_picker}->selected(), $initial + 1, 'Down arrow moves selection');
+    is($editor->{file_tree}->cursor(), $initial + 1, 'Down arrow moves cursor');
 
     # Arrow up
     $editor->handle_input("\e[A");  # Up arrow
-    is($editor->{file_picker}->selected(), $initial, 'Up arrow moves selection back');
+    is($editor->{file_tree}->cursor(), $initial, 'Up arrow moves cursor back');
 };
 
-subtest 'File picker typing filters' => sub {
+subtest 'Tree filter typing filters' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1168,17 +1170,17 @@ subtest 'File picker typing filters' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    my $initial_count = $editor->{file_picker}->filtered_count();
+    my $initial_count = $editor->{file_tree}->visible_count();
 
     # Type to filter
-    $editor->handle_input('xyz');  # Unlikely to match much
+    $editor->handle_input('xyznonexistent');  # Unlikely to match much
 
-    my $new_count = $editor->{file_picker}->filtered_count();
+    my $new_count = $editor->{file_tree}->visible_count();
     ok($new_count <= $initial_count, 'Typing filters results');
-    is($editor->{file_picker}->query(), 'xyz', 'Query updated');
+    is($editor->{file_tree}->filter_query(), 'xyznonexistent', 'Query updated');
 };
 
-subtest 'File picker escape closes' => sub {
+subtest 'Tree filter escape clears then unfocuses' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1189,12 +1191,27 @@ subtest 'File picker escape closes' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    is($editor->{state}, 'file_picker', 'File picker open');
+    ok($editor->{file_tree}->filter_active(), 'Filter active');
 
-    $editor->handle_input("\e");  # Escape
+    # Escape with empty query clears filter AND unfocuses in one step
+    $editor->handle_input("\e");
     $editor->flush_pending_input();
-    is($editor->{state}, 'editing', 'Back to editing after escape');
-    ok(!$editor->{file_picker}, 'File picker cleared');
+    ok(!$editor->{file_tree}->filter_active(), 'Filter cleared');
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused (empty query = single Esc exits)');
+
+    # With a query: Esc clears filter but tree stays focused
+    $editor->cmd_open_file();
+    $editor->{file_tree}->filter_append_char('t');
+    ok($editor->{file_tree}->filter_active(), 'Filter active with query');
+    $editor->handle_input("\e");
+    $editor->flush_pending_input();
+    ok(!$editor->{file_tree}->filter_active(), 'Filter cleared');
+    ok($editor->{file_tree}->focused(), 'Tree still focused (had query)');
+
+    # Second escape unfocuses tree
+    $editor->handle_input("\e");
+    $editor->flush_pending_input();
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused');
 };
 
 # ============================================================================
@@ -1307,7 +1324,7 @@ subtest 'Click Open button in menu bar' => sub {
     my $x = int(($open_btn->{x_start} + $open_btn->{x_end}) / 2);
     $editor->handle_menu_click($x);
 
-    is($editor->{state}, 'file_picker', 'Clicking Open button opens file picker');
+    ok($editor->{file_tree} && $editor->{file_tree}->focused(), 'Clicking Open button focuses tree with filter');
 };
 
 # ============================================================================

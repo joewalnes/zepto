@@ -21,7 +21,7 @@ use Zepto::Config;
 # --- Constants ---
 
 use constant {
-    DEFAULT_TREE_WIDTH => 28,
+    DEFAULT_TREE_WIDTH => 42,
     MIN_TREE_WIDTH     => 15,
     MAX_TREE_WIDTH     => 60,
     INDENT_PER_LEVEL   => 2,
@@ -275,12 +275,18 @@ sub end {
     $self->_ensure_visible();
 }
 
-sub _ensure_visible {
+# Rows available for tree content (total viewport minus search bar and stickies)
+sub _content_rows {
     my ($self) = @_;
     my $vh = $self->{viewport_height};
     my $sticky_count = scalar @{$self->sticky_headers()};
-    my $effective_vh = $vh - $sticky_count;
-    $effective_vh = 1 if $effective_vh < 1;
+    my $rows = $vh - $sticky_count - 1;  # -1 for always-present search bar
+    return $rows > 1 ? $rows : 1;
+}
+
+sub _ensure_visible {
+    my ($self) = @_;
+    my $effective_vh = $self->_content_rows();
 
     if ($self->{cursor} < $self->{scroll}) {
         $self->{scroll} = $self->{cursor};
@@ -492,6 +498,9 @@ sub filter_backspace {
     if (length($self->{filter_query}) > 0) {
         $self->{filter_query} = substr($self->{filter_query}, 0, -1);
         $self->_apply_filter();
+    } else {
+        # Empty query + backspace = exit filter mode
+        $self->clear_filter();
     }
 }
 
@@ -499,10 +508,7 @@ sub clear_filter {
     my ($self) = @_;
     $self->{filter_active} = 0;
     $self->{filter_query} = '';
-    # Clear any filter match data from nodes
-    for my $node (@{$self->{flat_list}}) {
-        delete $node->{_filter_match_positions};
-    }
+    $self->{_filter_match_count} = 0;
     $self->_flatten();
     $self->{cursor} = 0;
     $self->{scroll} = 0;
@@ -551,6 +557,7 @@ sub _apply_filter {
 
     if (!length($query)) {
         $self->_flatten();
+        $self->{_filter_match_count} = 0;
         return;
     }
 
@@ -566,36 +573,22 @@ sub _apply_filter {
     # Sort by score descending
     @matches = sort { $b->{score} <=> $a->{score} } @matches;
 
-    # Build a flat list of matching files with their ancestor dirs
-    my %needed_dirs;  # dir path => 1
-    my %match_positions;  # file path => positions arrayref
+    $self->{_filter_match_count} = scalar @matches;
 
-    for my $m (@matches) {
-        $match_positions{$m->{path}} = $m->{positions};
-
-        # Collect ancestor dirs
-        my @parts = split m{/}, $m->{path};
-        for my $i (0 .. $#parts - 1) {
-            my $dir = join('/', @parts[0 .. $i]);
-            $needed_dirs{$dir} = 1;
-        }
-    }
-
-    # Rebuild flat list: walk tree, include matching files + needed ancestor dirs
-    # For filter, we need all files loaded — _build_all_files_list handles that
-    # But the tree nodes may not all be loaded, so use _all_files paths to create
-    # a filtered view. Walk loaded tree nodes and include matches.
+    # Build flat list of result nodes (no hierarchy, sorted by score)
     my @flat;
-    $self->_flatten_filtered($self->{nodes}, 0, \@flat, \%needed_dirs, \%match_positions);
-    $self->{flat_list} = \@flat;
-
-    # Store match positions on nodes for rendering
-    for my $node (@flat) {
-        if (!$node->{is_dir} && $match_positions{$node->{path}}) {
-            $node->{_filter_match_positions} = $match_positions{$node->{path}};
-        }
+    for my $m (@matches) {
+        push @flat, {
+            name       => $m->{path},
+            path       => $m->{path},
+            is_dir     => 0,
+            depth      => 0,
+            vcs_status => $self->{_vcs_statuses}{$m->{path}},
+            _filter_match_positions => $m->{positions},
+        };
     }
 
+    $self->{flat_list} = \@flat;
     $self->{cursor} = 0;
     $self->{scroll} = 0;
 }
@@ -870,10 +863,7 @@ sub sticky_headers {
 sub scrollbar_data {
     my ($self) = @_;
     my $total = scalar @{$self->{flat_list}};
-    my $vh = $self->{viewport_height};
-    my $sticky_count = scalar @{$self->sticky_headers()};
-    my $visible = $vh - $sticky_count;
-    $visible = 1 if $visible < 1;
+    my $visible = $self->_content_rows();
 
     return { total => $total, visible => $visible, thumb_start => 0, thumb_end => 0 }
         if $total <= $visible;
@@ -907,8 +897,9 @@ sub cursor          { $_[0]->{cursor} }
 sub scroll          { $_[0]->{scroll} }
 sub focused         { $_[0]->{focused} }
 sub panel_width     { $_[0]->{panel_width} }
-sub filter_query    { $_[0]->{filter_query} }
-sub filter_active   { $_[0]->{filter_active} }
+sub filter_query       { $_[0]->{filter_query} }
+sub filter_active      { $_[0]->{filter_active} }
+sub filter_match_count { $_[0]->{_filter_match_count} // 0 }
 sub current_file    { $_[0]->{current_file} }
 sub visible_count   { scalar @{$_[0]->{flat_list}} }
 sub flat_list       { $_[0]->{flat_list} }
@@ -946,9 +937,7 @@ sub set_cursor {
 sub set_scroll {
     my ($self, $scroll) = @_;
     my $total = scalar @{$self->{flat_list}};
-    my $sticky_count = scalar @{$self->sticky_headers()};
-    my $visible = $self->{viewport_height} - $sticky_count;
-    $visible = 1 if $visible < 1;
+    my $visible = $self->_content_rows();
 
     my $max_scroll = $total - $visible;
     $max_scroll = 0 if $max_scroll < 0;

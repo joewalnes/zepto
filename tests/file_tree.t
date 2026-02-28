@@ -74,7 +74,7 @@ subtest 'Construction' => sub {
     isa_ok($tree, 'Zepto::FileTree');
 
     is($tree->root_path(), $tmpdir, 'root_path set correctly');
-    is($tree->panel_width(), 28, 'default panel width');
+    is($tree->panel_width(), 42, 'default panel width');
     is($tree->focused(), 0, 'not focused by default');
     is($tree->filter_active(), 0, 'filter not active by default');
     ok($tree->visible_count() > 0, 'flat_list has entries');
@@ -312,13 +312,13 @@ subtest 'expand_to_path nonexistent' => sub {
 subtest 'Resize' => sub {
     my $tree = Zepto::FileTree->new(root_path => $tmpdir);
 
-    is($tree->panel_width(), 28, 'default width');
+    is($tree->panel_width(), 42, 'default width');
 
     $tree->grow(5);
-    is($tree->panel_width(), 33, 'grow increases width');
+    is($tree->panel_width(), 47, 'grow increases width');
 
     $tree->shrink(10);
-    is($tree->panel_width(), 23, 'shrink decreases width');
+    is($tree->panel_width(), 37, 'shrink decreases width');
 
     # Clamp to min
     $tree->shrink(100);
@@ -418,7 +418,7 @@ subtest 'Fuzzy filter' => sub {
     is($tree->filter_query(), '', 'query cleared');
 };
 
-subtest 'Filter preserves ancestor dirs' => sub {
+subtest 'Filter produces flat ranked results' => sub {
     my $tree = Zepto::FileTree->new(root_path => $tmpdir);
 
     $tree->start_filter();
@@ -428,15 +428,27 @@ subtest 'Filter preserves ancestor dirs' => sub {
 
     my $flat = $tree->flat_list();
 
-    # Commands.pm should match, and lib/ + Editor/ should be visible as ancestors
+    # Should have flat file results only (no directory nodes)
     my @files = grep { !$_->{is_dir} } @$flat;
     my @dirs = grep { $_->{is_dir} } @$flat;
 
     ok(scalar(@files) > 0, 'matching files present');
     if (scalar(@files) > 0) {
         ok((grep { $_->{path} =~ /Commands/ } @files), 'Commands.pm matches');
+        # In flat mode, name == path (full relative path shown)
+        my ($cmd) = grep { $_->{path} =~ /Commands/ } @files;
+        is($cmd->{name}, $cmd->{path}, 'flat mode: name equals full path');
+        is($cmd->{depth}, 0, 'flat mode: depth is 0');
+        ok(defined $cmd->{_filter_match_positions}, 'match positions set');
     }
-    ok(scalar(@dirs) > 0, 'ancestor dirs preserved');
+    is(scalar(@dirs), 0, 'no directory nodes in flat filter results');
+    is($tree->filter_match_count(), scalar(@files), 'filter_match_count matches');
+
+    # Clear filter restores tree hierarchy
+    $tree->clear_filter();
+    ok(!$tree->filter_active(), 'filter cleared');
+    my @restored_dirs = grep { $_->{is_dir} } @{$tree->flat_list()};
+    ok(scalar(@restored_dirs) > 0, 'tree hierarchy restored after clear');
 };
 
 # =============================================================================
