@@ -211,7 +211,7 @@ sub tokenize {
         if ($rest =~ /^(\w+:)([\w.\/:-]+)(\[)([^\]]*)(\])/) {
             push @tokens, _token($pos, $pos + length($1), TOKEN_FUNCTION);
             $pos += length($1);
-            push @tokens, _token($pos, $pos + length($2), TOKEN_TAG);
+            push @tokens, _token($pos, $pos + length($2), TOKEN_LINK);
             $pos += length($2);
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
@@ -224,7 +224,7 @@ sub tokenize {
 
         # Cross-reference <<anchor>>
         if ($rest =~ /^(<<[^>]+>>)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_TAG);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_LINK);
             $pos += length($1);
             next;
         }

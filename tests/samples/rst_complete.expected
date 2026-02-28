@@ -14,16 +14,16 @@ reStructuredText is used by Sphinx_ for Python documentation.
 
 Word wrap is especially useful for prose-heavy documents like this reStructuredText file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical specifications, and long-form writing much more pleasant and efficient.
 
-This second paragraph includes <ITALIC>*emphasized text*</ITALIC> and <BOLD>**strongly emphasized text**</BOLD> mixed with <FUNCTION>``inline code``</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests an <STRING>`external link &lt;https://example.com&gt;`</STRING>_ and a footnote reference <TAG>[2]_</TAG> to exercise various inline reStructuredText elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+This second paragraph includes <ITALIC>*emphasized text*</ITALIC> and <BOLD>**strongly emphasized text**</BOLD> mixed with <FUNCTION>``inline code``</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests an <LINK>`external link &lt;https://example.com&gt;`_</LINK> and a footnote reference <LINK>[2]_</LINK> to exercise various inline reStructuredText elements within long wrapped content that should span at least three or four visual rows at eighty columns.
 
 Basic Formatting
 <HEADING>----------------</HEADING>
 
 Text can be <ITALIC>*emphasized*</ITALIC>, <BOLD>**strongly emphasized**</BOLD>, or use <FUNCTION>``inline code``</FUNCTION>.
-This is a <STRING>`hyperlink &lt;https://example.com&gt;`</STRING>_ and a standalone link:
+This is a <LINK>`hyperlink &lt;https://example.com&gt;`_</LINK> and a standalone link:
 https://example.com.
 
-A footnote reference <TAG>[1]_</TAG> and a citation reference <TAG>[CIT2024]_</TAG>.
+A footnote reference <LINK>[1]_</LINK> and a citation reference <LINK>[CIT2024]_</LINK>.
 
 Lists
 <HEADING>-----</HEADING>

@@ -47,7 +47,7 @@ use constant {
     CURSOR_COLOR_SUFFIX => "\x1b\\",
     RESET       => "\x1b[0m",
     BOLD        => "\x1b[1m",
-    ATTR_RESET  => "\x1b[22;23m",  # Reset bold(22) and italic(23) without affecting colors
+    ATTR_RESET  => "\x1b[22;23;24m",  # Reset bold(22), italic(23), underline(24)
 };
 
 # Box-drawing characters (Unicode)

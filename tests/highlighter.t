@@ -630,11 +630,11 @@ subtest 'Markdown syntax' => sub {
     # Links
     ($tokens) = $hl->tokenize_line('[link text](http://url)', 0);
     ok(has_token($tokens, 'string', 1), 'link text');
-    ok(has_token($tokens, 'tag', 12), 'link URL');
+    ok(has_token($tokens, 'link', 12), 'link URL uses TOKEN_LINK');
 
     # Autolinks
     ($tokens) = $hl->tokenize_line('<http://example.com>', 0);
-    ok(has_token($tokens, 'tag', 1), 'autolink URL');
+    ok(has_token($tokens, 'link', 1), 'autolink URL uses TOKEN_LINK');
 };
 
 # =============================================================================
@@ -675,6 +675,14 @@ subtest 'AsciiDoc syntax' => sub {
     ($tokens) = $hl->tokenize_line('use `code` here', 0);
     ok(has_token($tokens, 'function', 4), 'inline code');
 
+    # Inline macro links
+    ($tokens) = $hl->tokenize_line('link:http://example.com[click here]', 0);
+    ok(has_token($tokens, 'link', 5), 'inline macro URL uses TOKEN_LINK');
+
+    # Cross-reference
+    ($tokens) = $hl->tokenize_line('see <<section-id>>', 0);
+    ok(has_token($tokens, 'link', 4), '<<xref>> uses TOKEN_LINK');
+
     # Admonition
     ($tokens) = $hl->tokenize_line('NOTE: something', 0);
     ok(has_token($tokens, 'keyword', 0), 'NOTE is keyword');
@@ -712,6 +720,14 @@ subtest 'ReStructuredText syntax' => sub {
     # Inline literal
     ($tokens) = $hl->tokenize_line('use ``code`` here', 0);
     ok(has_token($tokens, 'function', 4), '``code`` is function');
+
+    # Hyperlink reference
+    ($tokens) = $hl->tokenize_line('see `Python <http://python.org>`_', 0);
+    ok(has_token($tokens, 'link', 4), 'hyperlink ref uses TOKEN_LINK');
+
+    # Footnote reference
+    ($tokens) = $hl->tokenize_line('see [1]_ for details', 0);
+    ok(has_token($tokens, 'link', 4), 'footnote ref uses TOKEN_LINK');
 };
 
 # =============================================================================

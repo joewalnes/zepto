@@ -115,6 +115,13 @@ sub tokenize {
             next;
         }
 
+        # Hyperlink reference `text <url>`_ (must check before plain interpreted text)
+        if ($rest =~ /^(`[^`]+`_)/) {
+            push @tokens, _token($pos, $pos + length($1), TOKEN_LINK);
+            $pos += length($1);
+            next;
+        }
+
         if ($rest =~ /^(`[^`]+`)/) {
             push @tokens, _token($pos, $pos + length($1), TOKEN_STRING);
             $pos += length($1);
@@ -135,16 +142,9 @@ sub tokenize {
             next;
         }
 
-        # Hyperlink reference `text <url>`_
-        if ($rest =~ /^(`[^`]+`_)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_TAG);
-            $pos += length($1);
-            next;
-        }
-
         # Footnote/citation reference [#]_ or [*]_ or [name]_
         if ($rest =~ /^(\[(?:#?\w*|\*)\]_)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_TAG);
+            push @tokens, _token($pos, $pos + length($1), TOKEN_LINK);
             $pos += length($1);
             next;
         }

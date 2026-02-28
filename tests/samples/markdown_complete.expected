@@ -8,19 +8,19 @@ This document demonstrates various Markdown syntax elements.
 
 Word wrap is especially useful for prose files like this one, where paragraphs can be quite long and extend well beyond the visible width of a typical terminal window. When word wrap is enabled, lines break at word boundaries so you can read the full content without scrolling horizontally, which makes editing markdown documents, README files, and other text-heavy content much more pleasant and efficient.
 
-This second paragraph tests <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://github.com/example/zepto-editor</TAG><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
+This second paragraph tests <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><LINK>https://github.com/example/zepto-editor</LINK><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
 
 <PUNCTUATION>&gt;</PUNCTUATION> This is a long blockquote that should also demonstrate word wrap behavior. Blockquotes in markdown are prefixed with the greater-than sign, and when the quoted text is long enough it will wrap across multiple visual rows. The wrap indicator and indentation should still look correct even inside quoted blocks.
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING2>Table of Contents</HEADING2>
 
-<KEYWORD>1.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Headers</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>2.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Emphasis</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#emphasis</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>3.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Lists</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#lists</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>4.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Links and Images</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#links-and-images</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>5.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Code</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#code</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>6.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Tables</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#tables</TAG><PUNCTUATION>)</PUNCTUATION>
-<KEYWORD>7.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Blockquotes</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#blockquotes</TAG><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>1.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Headers</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#headers</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>2.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Emphasis</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#emphasis</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>3.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Lists</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#lists</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>4.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Links and Images</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#links-and-images</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>5.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Code</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#code</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>6.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Tables</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#tables</LINK><PUNCTUATION>)</PUNCTUATION>
+<KEYWORD>7.</KEYWORD> <PUNCTUATION>[</PUNCTUATION><STRING>Blockquotes</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#blockquotes</LINK><PUNCTUATION>)</PUNCTUATION>
 
 <HEADING2>---</HEADING2>
 
@@ -100,30 +100,30 @@ Term 2
 
 <PUNCTUATION>###</PUNCTUATION> <HEADING3>Links</HEADING3>
 
-<PUNCTUATION>[</PUNCTUATION><STRING>Inline link</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://example.com</TAG><PUNCTUATION>)</PUNCTUATION>
+<PUNCTUATION>[</PUNCTUATION><STRING>Inline link</STRING><PUNCTUATION>](</PUNCTUATION><LINK>https://example.com</LINK><PUNCTUATION>)</PUNCTUATION>
 
-<PUNCTUATION>[</PUNCTUATION><STRING>Inline link with title</STRING><PUNCTUATION>](</PUNCTUATION><TAG>https://example.com "Title text"</TAG><PUNCTUATION>)</PUNCTUATION>
+<PUNCTUATION>[</PUNCTUATION><STRING>Inline link with title</STRING><PUNCTUATION>](</PUNCTUATION><LINK>https://example.com "Title text"</LINK><PUNCTUATION>)</PUNCTUATION>
 
 [Reference link][ref1]
 
 [Numbered reference][1]
 
-<PUNCTUATION>[</PUNCTUATION><STRING>Link to heading</STRING><PUNCTUATION>](</PUNCTUATION><TAG>#headers</TAG><PUNCTUATION>)</PUNCTUATION>
+<PUNCTUATION>[</PUNCTUATION><STRING>Link to heading</STRING><PUNCTUATION>](</PUNCTUATION><LINK>#headers</LINK><PUNCTUATION>)</PUNCTUATION>
 
-<PUNCTUATION>&lt;</PUNCTUATION><TAG>https://autolink-example.com</TAG><PUNCTUATION>&gt;</PUNCTUATION>
+<PUNCTUATION>&lt;</PUNCTUATION><LINK>https://autolink-example.com</LINK><PUNCTUATION>&gt;</PUNCTUATION>
 
-<PUNCTUATION>&lt;</PUNCTUATION><TAG>email@example.com</TAG><PUNCTUATION>&gt;</PUNCTUATION>
+<PUNCTUATION>&lt;</PUNCTUATION><LINK>email@example.com</LINK><PUNCTUATION>&gt;</PUNCTUATION>
 
 [ref1]: https://example.com "Reference 1"
 [1]: https://example.com "Numbered Reference"
 
 <PUNCTUATION>###</PUNCTUATION> <HEADING3>Images</HEADING3>
 
-!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png</TAG><PUNCTUATION>)</PUNCTUATION>
+!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text</STRING><PUNCTUATION>](</PUNCTUATION><LINK>image.png</LINK><PUNCTUATION>)</PUNCTUATION>
 
-!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text with title</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png "Image title"</TAG><PUNCTUATION>)</PUNCTUATION>
+!<PUNCTUATION>[</PUNCTUATION><STRING>Alt text with title</STRING><PUNCTUATION>](</PUNCTUATION><LINK>image.png "Image title"</LINK><PUNCTUATION>)</PUNCTUATION>
 
-<PUNCTUATION>[</PUNCTUATION><STRING>![Linked image</STRING><PUNCTUATION>](</PUNCTUATION><TAG>image.png</TAG><PUNCTUATION>)</PUNCTUATION>](https://example.com)
+<PUNCTUATION>[</PUNCTUATION><STRING>![Linked image</STRING><PUNCTUATION>](</PUNCTUATION><LINK>image.png</LINK><PUNCTUATION>)</PUNCTUATION>](https://example.com)
 
 ![Reference image][img1]
 
@@ -291,7 +291,7 @@ Text with &lt;mark&gt;highlighted&lt;/mark&gt; content.
 
 \# Not a header
 
-\<PUNCTUATION>[</PUNCTUATION><STRING>Not a link\</STRING><PUNCTUATION>](</PUNCTUATION><TAG>url</TAG><PUNCTUATION>)</PUNCTUATION>
+\<PUNCTUATION>[</PUNCTUATION><STRING>Not a link\</STRING><PUNCTUATION>](</PUNCTUATION><LINK>url</LINK><PUNCTUATION>)</PUNCTUATION>
 
 \<FUNCTION>`Not code\`</FUNCTION>
 

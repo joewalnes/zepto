@@ -51,6 +51,7 @@ my %type_names = (
     'escape'      => 'ESCAPE',
     'bold'        => 'BOLD',
     'italic'      => 'ITALIC',
+    'link'        => 'LINK',
 );
 
 # Get list of sample files to process

@@ -98,7 +98,7 @@ sub tokenize {
             $pos += length($2);
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;
-            push @tokens, _token($pos, $pos + length($4), TOKEN_TAG);
+            push @tokens, _token($pos, $pos + length($4), TOKEN_LINK);
             $pos += length($4);
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
@@ -128,7 +128,7 @@ sub tokenize {
         if ($rest =~ /^(<)(https?:\/\/[^>]+|[^@>]+@[^@>]+)(>)/) {
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
-            push @tokens, _token($pos, $pos + length($2), TOKEN_TAG);
+            push @tokens, _token($pos, $pos + length($2), TOKEN_LINK);
             $pos += length($2);
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;

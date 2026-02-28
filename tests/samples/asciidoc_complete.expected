@@ -19,7 +19,7 @@ AsciiDoc is a lightweight markup language for writing documentation.
 
 Word wrap is especially useful for prose-heavy documents like this AsciiDoc file. When a paragraph extends well beyond the visible width of a typical terminal window, the editor should break lines at word boundaries so the full content is readable without horizontal scrolling. This makes editing documentation, technical manuals, and long-form content much more pleasant and efficient for writers and developers alike.
 
-This second paragraph includes <BOLD>*bold text*</BOLD> and _italic text_ mixed with <FUNCTION>`inline monospaced code`</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests a <FUNCTION>https:</FUNCTION><TAG>//example.com</TAG><PUNCTUATION>[</PUNCTUATION><STRING>link to an example site</STRING><PUNCTUATION>]</PUNCTUATION> and references an <VARIABLE>{author}</VARIABLE> attribute to exercise various inline AsciiDoc elements within long wrapped content that should span at least three or four visual rows at eighty columns.
+This second paragraph includes <BOLD>*bold text*</BOLD> and _italic text_ mixed with <FUNCTION>`inline monospaced code`</FUNCTION> to verify that syntax highlighting tokens remain correct when the editor wraps text across multiple visual rows. It also tests a <FUNCTION>https:</FUNCTION><LINK>//example.com</LINK><PUNCTUATION>[</PUNCTUATION><STRING>link to an example site</STRING><PUNCTUATION>]</PUNCTUATION> and references an <VARIABLE>{author}</VARIABLE> attribute to exercise various inline AsciiDoc elements within long wrapped content that should span at least three or four visual rows at eighty columns.
 
 <PUNCTUATION>===</PUNCTUATION> <HEADING3>Basic Formatting</HEADING3>
 
@@ -31,8 +31,8 @@ Superscript: E=mc^2^ and subscript: H~2~O.
 <PUNCTUATION>===</PUNCTUATION> <HEADING3>Links and Cross-References</HEADING3>
 
 Visit https://asciidoctor.org for more info.
-See <FUNCTION>link:</FUNCTION><TAG>api.html</TAG><PUNCTUATION>[</PUNCTUATION><STRING>API Documentation</STRING><PUNCTUATION>]</PUNCTUATION> for details.
-Cross-reference: <TAG>&lt;&lt;_tables,Tables section&gt;&gt;</TAG>
+See <FUNCTION>link:</FUNCTION><LINK>api.html</LINK><PUNCTUATION>[</PUNCTUATION><STRING>API Documentation</STRING><PUNCTUATION>]</PUNCTUATION> for details.
+Cross-reference: <LINK>&lt;&lt;_tables,Tables section&gt;&gt;</LINK>
 
 <PUNCTUATION>==</PUNCTUATION> <HEADING2>Lists</HEADING2>
 
@@ -159,4 +159,4 @@ The author is <VARIABLE>{author}</VARIABLE>.
 
 <PUNCTUATION>==</PUNCTUATION> <HEADING2>Conclusion</HEADING2>
 
-For more information, see the <FUNCTION>https:</FUNCTION><TAG>//docs.asciidoctor.org</TAG><PUNCTUATION>[</PUNCTUATION><STRING>Asciidoctor Documentation</STRING><PUNCTUATION>]</PUNCTUATION>.
+For more information, see the <FUNCTION>https:</FUNCTION><LINK>//docs.asciidoctor.org</LINK><PUNCTUATION>[</PUNCTUATION><STRING>Asciidoctor Documentation</STRING><PUNCTUATION>]</PUNCTUATION>.

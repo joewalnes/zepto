@@ -281,6 +281,7 @@ sub dark_theme {
         syntax_heading6    => BOLD . fg_rgb(178, 175, 195),  # Gray-lavender - h6
         syntax_bold        => BOLD . fg_rgb(255, 158, 100),  # Bold orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(158, 206, 106),  # Italic green - prose italic
+        syntax_link        => UNDERLINE . fg_rgb(242, 143, 173),  # Underlined pink - hyperlinks
     });
 }
 
@@ -492,6 +493,7 @@ sub light_theme {
         syntax_heading6    => BOLD . fg_rgb(108, 72, 128),   # Gray-purple - h6
         syntax_bold        => BOLD . fg_rgb(180, 60, 10),    # Bold deep orange - prose bold
         syntax_italic      => ITALIC . fg_rgb(22, 120, 55),  # Italic deep green - prose italic
+        syntax_link        => UNDERLINE . fg_rgb(180, 60, 130),  # Underlined deep pink - hyperlinks
     });
 }
 
