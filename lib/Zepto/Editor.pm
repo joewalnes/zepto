@@ -2864,6 +2864,7 @@ sub cmd_toggle_tree {
         if ($self->{file_tree}->focused()) {
             $self->_tree_unfocus();
         } else {
+            $self->{file_tree}->refresh();
             $self->{file_tree}->set_focused(1);
             $self->_tree_reveal_current();
         }

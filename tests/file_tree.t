@@ -488,6 +488,73 @@ subtest 'Refresh preserves expand state' => sub {
     is($tree->visible_count(), $expanded_count, 'refresh preserves expand state');
 };
 
+subtest 'Refresh picks up new files in tree' => sub {
+    my $tree = Zepto::FileTree->new(root_path => $tmpdir);
+
+    # Expand lib/ so its children are loaded
+    $tree->expand_current();
+    my $flat_before = $tree->flat_list();
+    my @files_before = grep { !$_->{is_dir} && $_->{path} =~ m{^lib/} } @$flat_before;
+
+    # Add a new file to lib/ from "outside the editor"
+    my $new_file = "$tmpdir/lib/NewModule.pm";
+    open my $fh2, '>', $new_file or die "Can't create $new_file: $!";
+    print $fh2 "package NewModule;\n1;\n";
+    close $fh2;
+
+    # Before refresh, new file should NOT appear
+    my @files_still = grep { $_->{path} eq 'lib/NewModule.pm' } @{$tree->flat_list()};
+    is(scalar @files_still, 0, 'new file not visible before refresh');
+
+    # After refresh, new file SHOULD appear
+    $tree->refresh();
+    $tree->expand_to_path('lib/NewModule.pm');
+    my @files_after = grep { $_->{path} eq 'lib/NewModule.pm' } @{$tree->flat_list()};
+    is(scalar @files_after, 1, 'new file visible after refresh');
+
+    # Clean up
+    unlink $new_file;
+    $tree->refresh();
+};
+
+subtest 'Filter rescans filesystem on each activation' => sub {
+    my $tree = Zepto::FileTree->new(root_path => $tmpdir);
+
+    # Prime the filter — BrandNew doesn't exist yet
+    $tree->start_filter();
+    $tree->filter_append_char('B');
+    $tree->filter_append_char('r');
+    $tree->filter_append_char('a');
+    $tree->filter_append_char('n');
+    $tree->filter_append_char('d');
+    my @before = grep { $_->{path} =~ /BrandNew/ } @{$tree->flat_list()};
+    is(scalar @before, 0, 'BrandNew not in filter results before creation');
+    $tree->clear_filter();
+
+    # Add a new file from outside the editor (e.g. git pull)
+    my $new_file = "$tmpdir/BrandNew.txt";
+    open my $fh2, '>', $new_file or die "Can't create $new_file: $!";
+    print $fh2 "brand new content\n";
+    close $fh2;
+
+    # start_filter() rescans the filesystem each time, so the new file
+    # should appear without needing an explicit refresh() call.
+    # This is the Ctrl+O code path.
+    $tree->start_filter();
+    $tree->filter_append_char('B');
+    $tree->filter_append_char('r');
+    $tree->filter_append_char('a');
+    $tree->filter_append_char('n');
+    $tree->filter_append_char('d');
+    my @after = grep { $_->{path} =~ /BrandNew/ } @{$tree->flat_list()};
+    is(scalar @after, 1, 'new file appears in filter on next activation');
+
+    # Clean up
+    $tree->clear_filter();
+    unlink $new_file;
+    $tree->refresh();
+};
+
 # =============================================================================
 # Accessors
 # =============================================================================

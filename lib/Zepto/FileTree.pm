@@ -478,7 +478,8 @@ sub _restore_expanded {
 
 sub start_filter {
     my ($self) = @_;
-    # Build the full file list on first filter activation (capped walk)
+    # Always rescan so externally-added files (e.g. git pull) are found
+    $self->{_all_files_loaded} = 0;
     $self->_build_all_files_list();
     $self->{filter_active} = 1;
     $self->{filter_query} = '';
