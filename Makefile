@@ -1,4 +1,4 @@
-.PHONY: all test test-verbose clean build install check loc
+.PHONY: all test test-verbose clean build install check loc website website-clean
 
 PREFIX ?= $(HOME)/.local
 
@@ -21,10 +21,17 @@ test-one:
 test-timing:
 	@time prove -l tests/*.t
 
+# Build website (copy src to out)
+website:
+	@mkdir -p website/out
+	@cp -r website/src/* website/out
+	@echo "Website built: website/out/"
+
 # Clean temporary files
 clean:
 	@rm -f zepto
 	@rm -rf tests/tmp_*
+	@rm -rf website/out
 	@find . -name '*.bak' -delete
 
 # Build single-file distribution (to be implemented)
