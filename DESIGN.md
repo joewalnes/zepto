@@ -256,27 +256,10 @@ This allows consistent theming—change the theme, and every UI element updates 
 
 ## Testing Strategy
 
-### Pure Functions Enable Testing
+See `docs/CODE_QUALITY.md` for testing standards, test categories, and patterns.
 
-By keeping Renderer pure (state in → string out), we can test rendering without a terminal:
-
-```perl
-my $output = Zepto::Renderer->render($view, $doc, $state, $theme, $terminal);
-like($output, qr/expected pattern/, 'renders correctly');
-```
-
-### Test Categories
-
-| Category    | What it tests         | Example                    |
-|-------------|-----------------------|----------------------------|
-| Unit        | Individual functions  | Buffer insert/delete       |
-| Structural  | UI invariants         | All dialog rows same width |
-| Integration | Component interaction | Keystroke → screen update  |
-
-### No Mocking Terminal I/O
-
-The Terminal module is a thin wrapper (~200 lines). We don't mock it—we test everything else
-thoroughly, and Terminal's simplicity makes bugs unlikely.
+The key architectural enabler: keeping Renderer pure (state in → string out) means rendering can
+be tested without a terminal. `make test` runs the full suite; `make check` verifies Perl syntax.
 
 ## Build System
 

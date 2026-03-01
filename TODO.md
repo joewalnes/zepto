@@ -1,12 +1,11 @@
 # TODO
+
+Planned features not yet implemented.
+
 - Use Zepto as UI to Google doc
 - Release/install process
 - Atomic save (write to tmp file, then rename)
-- Preserve original file perms on save
-- Find/replace overhaul: live interactive, regexs
-- Transform text
-- Expand selection: double click select word, triple line, quad paragraph, 5 all. And shortcut key
-- Detect if file changed and prompt for reload
-- Git change status
-- Large files
-- State: find/replace, theme
+- Transform text (uppercase, lowercase, etc.)
+- Expand selection by paragraph (quad-click) and select all (5 clicks)
+- Large file support
+- Persist state across sessions (find/replace history, theme preference)
