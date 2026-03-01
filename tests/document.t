@@ -384,4 +384,91 @@ subtest 'Many edits performance' => sub {
     is($doc->text(), '', 'All undone');
 };
 
+# ============================================================================
+# External file change detection
+# ============================================================================
+
+subtest 'capture_file_mtime records mtime on load' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "original\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($filename);
+    ok(defined $doc->{_file_mtime}, 'mtime captured after load');
+    ok(!$doc->check_external_changes(), 'No external changes immediately after load');
+};
+
+subtest 'check_external_changes detects modifications' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "original\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($filename);
+
+    # Modify file externally (ensure different mtime by sleeping)
+    sleep 1;
+    open my $wfh, '>', $filename;
+    print $wfh "modified\n";
+    close $wfh;
+
+    ok($doc->check_external_changes(), 'External change detected after file modification');
+};
+
+subtest 'check_external_changes returns 0 for untitled docs' => sub {
+    my $doc = Zepto::Document->new(text => 'hello');
+    ok(!$doc->check_external_changes(), 'No external changes for untitled document');
+};
+
+subtest 'reload_from_disk replaces buffer content' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "version 1\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($filename);
+    is($doc->text(), 'version 1', 'Initial content');
+
+    # Modify file externally
+    sleep 1;
+    open my $wfh, '>', $filename;
+    print $wfh "version 2\n";
+    close $wfh;
+
+    ok($doc->check_external_changes(), 'Change detected');
+    $doc->reload_from_disk();
+
+    is($doc->text(), 'version 2', 'Content reloaded');
+    ok(!$doc->is_dirty(), 'Document is clean after reload');
+    ok(!$doc->check_external_changes(), 'No external changes after reload');
+};
+
+subtest 'reload_from_disk clears undo/redo stacks' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "original\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($filename);
+    $doc->insert(0, 'edit ');
+    ok($doc->can_undo(), 'Can undo after edit');
+
+    sleep 1;
+    open my $wfh, '>', $filename;
+    print $wfh "replaced\n";
+    close $wfh;
+
+    $doc->reload_from_disk();
+    ok(!$doc->can_undo(), 'Undo stack cleared after reload');
+};
+
+subtest 'save updates mtime so check_external_changes returns false' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.txt');
+    print $fh "original\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($filename);
+    $doc->insert(0, 'edit ');
+    $doc->save();
+
+    ok(!$doc->check_external_changes(), 'No external change after save');
+};
+
 done_testing();

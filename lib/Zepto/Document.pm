@@ -38,6 +38,8 @@ sub new {
         _vcs_diff       => undef,  # { added => [], modified => [], deleted => [] }
         _vcs_dirty      => 0,      # Buffer changed since last diff
         _vcs_last_diff  => 0,      # Timestamp of last diff computation
+        # External file change detection
+        _file_mtime     => undef,  # mtime at last load/save
     }, $class;
 
     # Detect VCS if path is provided (skip_vcs defers this for preview tabs)
@@ -74,13 +76,15 @@ sub load {
     # Get file permissions
     my $permissions = (stat($path))[2] & 07777;
 
-    return $class->new(
+    my $doc = $class->new(
         text        => $content,
         path        => $path,
         line_ending => $line_ending,
         permissions => $permissions,
         ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
     );
+    $doc->_capture_file_mtime();
+    return $doc;
 }
 
 # Initialize VCS for a document that was loaded with skip_vcs
@@ -134,8 +138,56 @@ sub save {
 
     $self->{path} = $path;
     $self->{dirty} = 0;
+    $self->_capture_file_mtime();
 
     return 1;
+}
+
+# --- External file change detection ---
+
+sub _capture_file_mtime {
+    my ($self) = @_;
+    return unless defined $self->{path} && -f $self->{path};
+    $self->{_file_mtime} = (stat($self->{path}))[9];
+}
+
+sub check_external_changes {
+    my ($self) = @_;
+    return 0 unless defined $self->{path} && -f $self->{path};
+    return 0 unless defined $self->{_file_mtime};
+
+    my $current_mtime = (stat($self->{path}))[9];
+    return 0 unless defined $current_mtime;
+
+    return $current_mtime != $self->{_file_mtime};
+}
+
+sub reload_from_disk {
+    my ($self) = @_;
+    return unless defined $self->{path} && -f $self->{path};
+
+    open my $fh, '<:encoding(UTF-8)', $self->{path}
+        or die "Cannot open $self->{path}: $!";
+    local $/;
+    my $content = <$fh>;
+    close $fh;
+
+    # Normalize line endings
+    my $crlf_count = () = $content =~ /\r\n/g;
+    my $lf_count = () = $content =~ /(?<!\r)\n/g;
+    $self->{line_ending} = $crlf_count > $lf_count ? "\r\n" : "\n";
+    $content =~ s/\r\n/\n/g;
+    $content =~ s/\n$//;
+
+    # Replace buffer content
+    $self->{buffer} = Zepto::Buffer->new($content);
+    $self->{dirty} = 0;
+    $self->{undo_stack} = [];
+    $self->{redo_stack} = [];
+    $self->_capture_file_mtime();
+
+    # Mark VCS as needing a re-diff
+    $self->{_vcs_dirty} = 1;
 }
 
 # Buffer accessors
