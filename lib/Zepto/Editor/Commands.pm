@@ -15,8 +15,6 @@ package Zepto::Editor;
 
 use Zepto::Theme;
 
-# Note: STATE_QUIT constant is defined in Zepto::Editor and accessible here
-
 # =============================================================================
 # File Commands
 # =============================================================================
@@ -106,7 +104,7 @@ sub _do_close_tab {
 
     # If this is the last tab, quit
     if ($tm->tab_count() <= 1) {
-        $self->{state} = STATE_QUIT;
+        $self->{state} = 'quit';
         return;
     }
 
@@ -135,13 +133,13 @@ sub cmd_quit {
 
     # If no dirty tabs, quit immediately
     unless (@dirty) {
-        $self->{state} = STATE_QUIT;
+        $self->{state} = 'quit';
         return;
     }
 
     # Walk through dirty tabs one at a time
     $self->_prompt_close_dirty_tabs(\@dirty, sub {
-        $self->{state} = STATE_QUIT;
+        $self->{state} = 'quit';
     });
 }
 
