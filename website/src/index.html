@@ -232,18 +232,10 @@
 
         /* ---- Features layout ---- */
         .feature {
-            display: grid;
-            grid-template-columns: 1fr 1.4fr;
-            gap: 2rem;
-            align-items: center;
-            margin-bottom: 3rem;
+            margin-bottom: 2rem;
+            padding-left: 1rem;
+            border-left: 2px solid var(--border);
         }
-        /* Even features: screencap on left (larger), text on right */
-        .feature:nth-child(even) {
-            grid-template-columns: 1.4fr 1fr;
-        }
-        .feature:nth-child(even) .feature-text { order: 2; }
-        .feature:nth-child(even) .screencap-feature { order: 1; }
         .feature-text h3 { margin-top: 0; }
         .feature-text p { margin-top: 0.5rem; }
 
@@ -383,7 +375,7 @@
                     Use it however feels natural.
                 </p>
             </div>
-            <div class="screencap screencap-feature">screencap: menu bar with Nerd Font glyphs</div>
+            <!-- <div class="screencap screencap-feature">screencap: menu bar with Nerd Font glyphs</div> -->
         </div>
 
         <!-- SCREENCAP: A source file (e.g. Python or Rust) with syntax
@@ -397,7 +389,7 @@
                     theme. No configuration or plugins required.
                 </p>
             </div>
-            <div class="screencap screencap-feature">screencap: syntax highlighted code</div>
+            <!-- <div class="screencap screencap-feature">screencap: syntax highlighted code</div> -->
         </div>
 
         <!-- SCREENCAP: Editor with file explorer panel open on the left and
@@ -407,7 +399,7 @@
                 <h3>File explorer and fuzzy finder</h3>
                 <p>A tree panel with directory browsing, git status colors, and file preview. Or jump straight to any file by typing partial names - no need to remember exact paths.</p>
             </div>
-            <div class="screencap screencap-feature">screencap: file explorer and fuzzy finder</div>
+            <!-- <div class="screencap screencap-feature">screencap: file explorer and fuzzy finder</div> -->
         </div>
 
         <!-- SCREENCAP: Editor with a text selection visible (highlighted region),
@@ -421,7 +413,7 @@
                     borders. It just works.
                 </p>
             </div>
-            <div class="screencap screencap-feature">screencap: mouse selection</div>
+            <!-- <div class="screencap screencap-feature">screencap: mouse selection</div> -->
         </div>
 
         <!-- SCREENCAP: Find/replace dialog open with a regex pattern, showing
@@ -436,7 +428,7 @@
                     replacement will do before you commit.
                 </p>
             </div>
-            <div class="screencap screencap-feature">screencap: find and replace with inline preview</div>
+            <!-- <div class="screencap screencap-feature">screencap: find and replace with inline preview</div> -->
         </div>
 
         <!-- SCREENCAP: A rectangular/columnar selection highlighted in purple
@@ -446,7 +438,7 @@
                 <h3>Column (block) selection</h3>
                 <p>Rectangular selections across lines. Type to insert on all lines at once.</p>
             </div>
-            <div class="screencap screencap-feature">screencap: column selection</div>
+            <!-- <div class="screencap screencap-feature">screencap: column selection</div> -->
         </div>
 
         <!-- SCREENCAP: Right edge of the editor showing the minimap/scrollbar
@@ -456,7 +448,7 @@
                 <h3>Minimap</h3>
                 <p>A braille-character scrollbar that shows your position in the file and highlights git changes.</p>
             </div>
-            <div class="screencap screencap-feature">screencap: minimap</div>
+            <!-- <div class="screencap screencap-feature">screencap: minimap</div> -->
         </div>
 
         <!-- SCREENCAP: Side-by-side or two shots showing the same file in dark
@@ -466,7 +458,7 @@
                 <h3>Dark and light themes</h3>
                 <p>True-color (24-bit) themes. Switch instantly from the menu.</p>
             </div>
-            <div class="screencap screencap-feature">screencap: dark and light themes</div>
+            <!-- <div class="screencap screencap-feature">screencap: dark and light themes</div> -->
         </div>
 
 
