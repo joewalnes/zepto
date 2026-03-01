@@ -26,6 +26,7 @@ website:
 	@mkdir -p website/out/screencaps
 	@cp -r website/src/* website/out
 	@cp website/assets/screencaps/* website/out/screencaps/
+	@cp website/assets/preview-1200x630.png website/out/
 	@echo "Website built: website/out/"
 
 # Render screencaps from .tape files (requires vhs, ffmpeg, ttyd)
