@@ -148,6 +148,22 @@ At 160 columns the palette remains single-column with the same width as at 100 c
 
 **Fix:** Made palette width adaptive based on terminal width: 60 cols (standard), 80 cols at 120+ terminal width, 120 cols at 160+. Full multi-column layout was avoided as the 2D cursor navigation complexity outweighs the benefit. **Decision:** Single-column with wider box is simpler and still provides better use of space. **Manual test:** Open command palette at different terminal widths — palette should be wider at wider terminals.
 
+---
+
+## Open bugs
+
+### ~~P1: Shift+Alt+Left/Right should select by word, not column select~~ FIXED
+Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is word movement with selection (standard across most editors). Instead, it triggers column selection mode. Column selection needs an alternative keybinding.
+
+**Fix:** Changed arrow key dispatch in Editor.pm so `Shift+Alt+Arrow` passes through to the `Alt` branch (word movement for Left/Right, line movement for Up/Down) with `$shift` propagated for selection extension. Column selection via arrows now requires `Ctrl+Alt+Arrow` only (the `$alt && $shift` condition was removed from the column-select guard). Toggle via `⌥C` is unchanged. **Decision:** Chose `Ctrl+Alt+Arrow` over inventing a new shortcut because it's already one of the two original triggers and is a reasonable power-user combo. **Manual test:** Press `Shift+Alt+Right` — should select word-by-word. Press `Shift+Alt+Left` — should deselect/shrink by word. Column mode should NOT activate. `Ctrl+Alt+Down` should still start column selection.
+
+### P3: Add Shift+Ctrl+D for duplicate line up
+Ctrl+D duplicates the current line down. Shift+Ctrl+D should duplicate the line up — easy to remember since Shift is the "reverse direction" modifier.
+
+---
+
+## UI guideline audit bugs
+
 ### ~~P3: Rename "Powerline" to "Nerd Font" throughout the codebase~~ FIXED
 The feature that toggles Nerd Font glyph rendering is called "Powerline" everywhere — command palette label, preference key, variable names, CLI flags, comments, docs, and tests. The correct term is "Nerd Font" (Powerline refers specifically to the status line plugin whose glyph range is a small subset of Nerd Fonts). Occurrences span:
 - **UI-visible**: command palette label (`Powerline`), `README.md` references, `UI_GUIDELINES.md`, `website/src/index.html`

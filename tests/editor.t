@@ -1455,4 +1455,57 @@ subtest 'Enter key works with word wrap enabled' => sub {
     is($view->cursor_col(), 0, 'With word wrap: cursor at col 0 after Enter');
 };
 
+# ============================================================================
+# Key event dispatch: Shift+Alt+Arrow = word select (not column select)
+# ============================================================================
+
+subtest 'Shift+Alt+Right selects by word (not column mode)' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hello world test\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 0);
+
+    # Send Shift+Alt+Right key event
+    my $event = { type => 'key', key => 'right', modifiers => ['shift', 'alt'] };
+    $editor->handle_event($event);
+
+    # Should have moved to word boundary AND have selection (not column mode)
+    is($view->cursor_col(), 6, 'Cursor moved to next word boundary');
+    ok($view->has_selection(), 'Selection is active');
+    ok(!$view->column_select(), 'Column mode is NOT active');
+};
+
+subtest 'Shift+Alt+Left selects by word backwards' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hello world test\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 11);
+
+    # Send Shift+Alt+Left key event
+    my $event = { type => 'key', key => 'left', modifiers => ['shift', 'alt'] };
+    $editor->handle_event($event);
+
+    # Should have moved back by word AND have selection (not column mode)
+    is($view->cursor_col(), 6, 'Cursor moved to prev word boundary');
+    ok($view->has_selection(), 'Selection is active');
+    ok(!$view->column_select(), 'Column mode is NOT active');
+};
+
+subtest 'Ctrl+Alt+Right triggers column select (not word select)' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hello world\ntest  line\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 0);
+
+    # Send Ctrl+Alt+Right key event
+    my $event = { type => 'key', key => 'right', modifiers => ['ctrl', 'alt'] };
+    $editor->handle_event($event);
+
+    # Should have entered column select mode
+    ok($view->column_select(), 'Column mode IS active with Ctrl+Alt');
+};
+
 done_testing();

@@ -544,22 +544,22 @@ sub handle_editing_event {
 
         # Navigation / Line movement
         if ($key eq 'up') {
-            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_up(); }
+            if ($alt && $ctrl) { $self->do_column_select_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
             else { $view->move_up($shift); }
         }
         elsif ($key eq 'down') {
-            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_down(); }
+            if ($alt && $ctrl) { $self->do_column_select_down(); }
             elsif ($alt) { $self->do_move_line_down(); }
             else { $view->move_down($shift); }
         }
         elsif ($key eq 'left')  {
-            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_left(); }
+            if ($alt && $ctrl) { $self->do_column_select_left(); }
             elsif ($alt) { $view->move_word_left($shift); }
             else { $view->move_left($shift); }
         }
         elsif ($key eq 'right') {
-            if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_right(); }
+            if ($alt && $ctrl) { $self->do_column_select_right(); }
             elsif ($alt) { $view->move_word_right($shift); }
             else { $view->move_right($shift); }
         }
