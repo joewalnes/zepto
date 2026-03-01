@@ -1378,4 +1378,82 @@ subtest 'Mouse click in middle of tab jumps to tab position' => sub {
     is($editor->active_view()->cursor_col(), 1, 'Clicking in tab space positions cursor at tab character');
 };
 
+# ============================================================================
+# Enter key / newline insertion
+# ============================================================================
+
+# ============================================================================
+# Tab bar click should unfocus file tree
+# ============================================================================
+
+subtest 'Tab bar click unfocuses file tree' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    # Open a file so we have a tab
+    my $filename = create_temp_file("test content\n");
+    setup_editor_doc($editor, $filename);
+
+    # Set up file tree and focus it
+    require Zepto::FileTree;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    $editor->{file_tree}->set_focused(1);
+    ok($editor->{file_tree}->focused(), 'Tree starts focused');
+
+    # Simulate tab bar click (call handle_tab_bar_click)
+    # We need rendered tab bar buttons, so just call the function
+    # The unfocus logic runs at the beginning of handle_tab_bar_click
+    $editor->handle_tab_bar_click(50);
+
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused after tab bar click');
+};
+
+# ============================================================================
+# Enter key / newline insertion
+# ============================================================================
+
+subtest 'Enter key moves cursor to next line in new document' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    # Type some text
+    $doc->insert(0, "hello");
+    $view->set_cursor(0, 5);
+
+    # Press Enter (via do_enter)
+    $editor->do_enter();
+
+    # Cursor should be on line 1, not line 0
+    is($view->cursor_line(), 1, 'After Enter, cursor moves to next line');
+    is($view->cursor_col(), 0, 'After Enter, cursor at column 0');
+    is($doc->line_count(), 2, 'Document now has 2 lines');
+};
+
+subtest 'Enter key works with word wrap enabled' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    # Enable word wrap via WrapMap
+    $view->set_viewport_size(20, 80);
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    $view->set_wrap_map($wm);
+
+    # Type some text on last (only) line
+    $doc->insert(0, "hello world");
+    $view->set_cursor(0, 11);
+
+    # Press Enter
+    $editor->do_enter();
+
+    # Cursor should be on line 1
+    is($view->cursor_line(), 1, 'With word wrap: cursor on next line after Enter');
+    is($view->cursor_col(), 0, 'With word wrap: cursor at col 0 after Enter');
+};
+
 done_testing();

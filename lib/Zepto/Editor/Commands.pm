@@ -39,6 +39,10 @@ sub cmd_save {
                         $self->show_message("Error: $@");
                     }
                     else {
+                        # Update tab's file_path and clear untitled name
+                        my $tab = $self->active_tab();
+                        $tab->{file_path} = $filename;
+                        $tab->{untitled_name} = undef;
                         $self->show_message("Saved: $filename");
                     }
                 }
