@@ -278,7 +278,7 @@ sub render {
 
     # Sync Chars module with prefs
     if ($prefs) {
-        Zepto::Chars->set_enabled($prefs->powerline());
+        Zepto::Chars->set_enabled($prefs->nerd_font());
     }
 
     my $output = '';
@@ -1501,7 +1501,7 @@ sub _render_text_area {
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
                 $full_line_content, \@visual_matches,
                 $is_hunk_line ? 'new' : undef, $new_char_hl,
-                \@visual_capture_regions
+                \@visual_capture_regions, $is_wrap_cont
             );
 
             # Fill remaining space with appropriate background
@@ -2320,7 +2320,7 @@ sub _render_old_line_row {
 # $cursor_col: visual cursor column (already converted)
 # $matches: array of {start, end, is_current} for find matches on this line
 sub _render_line_with_highlights {
-    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight, $capture_regions) = @_;
+    my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight, $capture_regions, $is_wrap_cont) = @_;
 
     my $output = '';
     my $len = length($content);
@@ -2426,10 +2426,11 @@ sub _render_line_with_highlights {
 
     if ($has_selection && $is_column_select) {
         # Column (rectangular) selection: fixed column range on each line
+        # Skip continuation lines — column selection only applies to first row
         my ($col_top, $col_left, $col_bottom, $col_right) = $view->column_selection();
         $sel_bg_color = $theme->color('column_selection_bg');
 
-        if ($line_num >= $col_top && $line_num <= $col_bottom) {
+        if (!$is_wrap_cont && $line_num >= $col_top && $line_num <= $col_bottom) {
             my $visual_left = _char_to_visual_col($orig_content, $col_left);
             my $visual_right = _char_to_visual_col($orig_content, $col_right);
             $sel_start = $visual_left - $scroll_col;
@@ -2542,7 +2543,7 @@ sub _render_line_with_highlights {
     return $output;
 }
 
-# Render the status bar with Powerline segments
+# Render the status bar with Nerd Font segments
 sub _render_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $status_hint, $hint_color) = @_;
 
@@ -2577,7 +2578,7 @@ sub _render_status_bar {
         $hint_width = length($hint_text);
     }
 
-    # Calculate segment overhead (arrow char only in powerline mode)
+    # Calculate segment overhead (arrow char only in nerd font mode)
     my $segment_overhead = Zepto::Chars->enabled() ? 1 : 0;
 
     # Render: [file segment][arrow][col indicator?][arrow][middle fill][hint]
@@ -2628,7 +2629,7 @@ sub _render_status_bar {
             $output .= $ar;
         }
     } elsif ($col_width > 0) {
-        # No powerline, just show text
+        # No nerd font, just show text
         $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
         $output .= $col_text;
     }
@@ -2684,7 +2685,7 @@ sub _render_pill {
     my $output = '';
     my $rl = Zepto::Chars->get('round_left');
     my $rr = Zepto::Chars->get('round_right');
-    my $powerline = Zepto::Chars->enabled();
+    my $nerd_font = Zepto::Chars->enabled();
 
     my $text = '';
     $text .= "$icon " if $icon;
@@ -2693,8 +2694,8 @@ sub _render_pill {
 
     my $width;
 
-    if ($powerline) {
-        # Powerline pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
+    if ($nerd_font) {
+        # Nerd font pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
         $output .= $theme->color($bg_key) . $theme->color($fg_key);
         $output .= " $text ";
         $width = length($text) + 2;  # spaces
@@ -2713,7 +2714,7 @@ sub _render_context_status_bar {
     my $output = '';
     my @buttons;
     my $ar = Zepto::Chars->get('arrow_right');
-    my $powerline = Zepto::Chars->enabled();
+    my $nerd_font = Zepto::Chars->enabled();
 
     # If there's a message, show it simply (same as before)
     if ($message) {
@@ -2738,7 +2739,7 @@ sub _render_context_status_bar {
         $output .= $left_text;
         my $left_width = length($left_text);
 
-        if ($powerline) {
+        if ($nerd_font) {
             my $tree_round_r = Zepto::Chars->get('round_right');
             $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
             $output .= $tree_round_r;
@@ -2751,7 +2752,7 @@ sub _render_context_status_bar {
         # Right: palette trigger pill
         my $palette_icon = Zepto::Chars->get('palette');
         my $palette_text = " $palette_icon \x{2303}\x{2423} ";  # ⌃␣
-        my $palette_width = length($palette_text) + ($powerline ? 2 : 0);
+        my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
 
         # Middle: tree-context hint pills
         my $nav_icon = Zepto::Chars->get('cursor_pos');
@@ -2768,10 +2769,10 @@ sub _render_context_status_bar {
         my $center_col = $left_width + 1;
 
         for my $pill (@tree_pills) {
-            my $pw = length($pill->{text}) + 2 + ($powerline ? 3 : 1);
+            my $pw = length($pill->{text}) + 2 + ($nerd_font ? 3 : 1);
             last if ($center_col - $left_width) + $pw > $available;
 
-            if ($powerline) {
+            if ($nerd_font) {
                 $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
                 $output .= $round_l;
                 $center_col += 1;
@@ -2779,7 +2780,7 @@ sub _render_context_status_bar {
             $output .= $theme->color($pill->{bg}) . $theme->color($pill->{fg});
             $output .= " $pill->{text} ";
             $center_col += length($pill->{text}) + 2;
-            if ($powerline) {
+            if ($nerd_font) {
                 $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
                 $output .= $round_r;
                 $center_col += 1;
@@ -2795,7 +2796,7 @@ sub _render_context_status_bar {
         $output .= ' ' x $remaining if $remaining > 0;
 
         # Palette trigger with rounded caps
-        if ($powerline) {
+        if ($nerd_font) {
             $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
             $output .= $round_l;
             $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
@@ -2853,7 +2854,7 @@ sub _render_context_status_bar {
     my $round_l = Zepto::Chars->get('round_left');
     my $round_r = Zepto::Chars->get('round_right');
 
-    if ($powerline) {
+    if ($nerd_font) {
         $output .= $theme->color('status_bg') . $theme->color('status_pos_edge');
         $output .= $round_r;
         $left_width += 1;
@@ -2864,7 +2865,7 @@ sub _render_context_status_bar {
     my $palette_text = " $palette_icon \x{2303}\x{2423} ";
     my $palette_text_width = length($palette_text);
     # Total palette width includes the round caps (left + right)
-    my $palette_total_width = $palette_text_width + ($powerline ? 2 : 0);
+    my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
 
     # 3. CENTER: Priority-based pills
     my $editor = $ui->{editor};
@@ -2948,8 +2949,8 @@ sub _render_context_status_bar {
     my @pills_to_render;
     my $used = 0;
     for my $pill (@candidates) {
-        # Each pill costs: content + caps (2 if powerline) + 1 space gap
-        my $pw = $pill->{width} + ($powerline ? 3 : 1);
+        # Each pill costs: content + caps (2 if nerd font) + 1 space gap
+        my $pw = $pill->{width} + ($nerd_font ? 3 : 1);
         last if $used + $pw > $available;
         push @pills_to_render, $pill;
         $used += $pw;
@@ -2960,7 +2961,7 @@ sub _render_context_status_bar {
     for my $i (0 .. $#pills_to_render) {
         my $pill = $pills_to_render[$i];
 
-        if ($powerline) {
+        if ($nerd_font) {
             # Left round cap
             $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
             $output .= $round_l;
@@ -2976,7 +2977,7 @@ sub _render_context_status_bar {
         };
         $center_col += $pill->{width};
 
-        if ($powerline) {
+        if ($nerd_font) {
             # Right round cap
             $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
             $output .= $round_r;
@@ -2995,13 +2996,13 @@ sub _render_context_status_bar {
     $output .= ' ' x $remaining if $remaining > 0;
 
     # Palette trigger pill (rightmost) with rounded caps
-    if ($powerline) {
+    if ($nerd_font) {
         $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
         $output .= $round_l;
     }
     $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
     $output .= $palette_text;
-    if ($powerline) {
+    if ($nerd_font) {
         $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
         $output .= $round_r;
     }
@@ -3039,7 +3040,7 @@ sub _render_dialog {
     $x = 1 if $x < 1;
     $y = 1 if $y < 1;
 
-    # Get box drawing characters (rounded when powerline enabled)
+    # Get box drawing characters (rounded when nerd font enabled)
     my $box_tl = Zepto::Chars->get('box_tl');
     my $box_tr = Zepto::Chars->get('box_tr');
     my $box_bl = Zepto::Chars->get('box_bl');
@@ -3411,9 +3412,9 @@ sub _render_find_bar {
         $match_text .= '...' if $is_searching;
     }
 
-    # Powerline rounded pill characters
-    my $rl = Zepto::Chars->get('powerline_round_left');
-    my $rr = Zepto::Chars->get('powerline_round_right');
+    # Rounded pill characters (nerd font or space fallback)
+    my $rl = Zepto::Chars->get('round_left');
+    my $rr = Zepto::Chars->get('round_right');
 
     # Build capture hint string (e.g. "$0 $1 $2") for status bar
     my $capture_hint = '';
@@ -3713,9 +3714,15 @@ sub _render_command_palette {
     my $filtered = $palette->{filtered} // [];
     my $editor   = $palette->{editor};
 
-    # Palette dimensions
+    # Palette dimensions — adapts to terminal width
     my $pal_width = $total_cols - 4;
-    $pal_width = 60 if $pal_width > 60;
+    if ($total_cols >= 160) {
+        $pal_width = 120 if $pal_width > 120;  # Wide terminal: wider palette
+    } elsif ($total_cols >= 120) {
+        $pal_width = 80 if $pal_width > 80;    # Medium-wide: moderately wider
+    } else {
+        $pal_width = 60 if $pal_width > 60;    # Standard: default width
+    }
     $pal_width = 30 if $pal_width < 30;
 
     my $max_items = $total_rows - 6;

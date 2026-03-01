@@ -324,7 +324,7 @@ subtest 'Dialog box characters' => sub {
         },
     );
 
-    # Box drawing characters - use Chars module (rounded by default with powerline)
+    # Box drawing characters - use Chars module (rounded by default with nerd font)
     my $top_left = Zepto::Chars->get('box_tl');
     my $top_right = Zepto::Chars->get('box_tr');
     my $bottom_left = Zepto::Chars->get('box_bl');
@@ -562,7 +562,7 @@ subtest 'Text lines have consistent column alignment' => sub {
     ok($stripped =~ /CCC/, 'Found CCC in output');
 
     # Check that line numbers 1, 2, 3 appear before content
-    # Note: cursor line (1) has powerline chars between number and content
+    # Note: cursor line (1) has nerd font chars between number and content
     ok($stripped =~ /1.{0,5}AAA/s, 'Line 1 has AAA');
     ok($stripped =~ /2.{0,5}BBB/s, 'Line 2 has BBB');
     ok($stripped =~ /3.{0,5}CCC/s, 'Line 3 has CCC');

@@ -119,7 +119,7 @@ PERL
 
     # Create theme and prefs
     my $theme = Zepto::Theme->get_theme('dark');
-    my $prefs = Zepto::Preferences->new(powerline => 0);
+    my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     # Render
     my $output = Zepto::Renderer->render(
@@ -172,7 +172,7 @@ PYTHON
     $hl->set_file('test.py');
 
     my $theme = Zepto::Theme->get_theme('dark');
-    my $prefs = Zepto::Preferences->new(powerline => 0);
+    my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     my $output = Zepto::Renderer->render(
         document    => $doc,
@@ -209,7 +209,7 @@ JS
     $hl->set_file('test.js');
 
     my $theme = Zepto::Theme->get_theme('dark');
-    my $prefs = Zepto::Preferences->new(powerline => 0);
+    my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     my $output = Zepto::Renderer->render(
         document    => $doc,
@@ -308,7 +308,7 @@ subtest 'Unknown file type has no syntax colors' => sub {
     ok(!$hl->has_grammar(), 'No grammar for unknown extension');
 
     my $theme = Zepto::Theme->get_theme('dark');
-    my $prefs = Zepto::Preferences->new(powerline => 0);
+    my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     my $output = Zepto::Renderer->render(
         document    => $doc,
@@ -342,7 +342,7 @@ subtest 'Light theme syntax colors' => sub {
     $hl->set_file('test.pl');
 
     my $theme = Zepto::Theme->get_theme('light');
-    my $prefs = Zepto::Preferences->new(powerline => 0);
+    my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     my $output = Zepto::Renderer->render(
         document    => $doc,

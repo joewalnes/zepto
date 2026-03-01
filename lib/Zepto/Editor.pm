@@ -692,8 +692,8 @@ sub handle_alt_char {
     # Word wrap toggle
     elsif ($char eq 'z') { $self->cmd_toggle_word_wrap(); }
 
-    # Powerline/Nerd Font toggle
-    elsif ($char eq 'i') { $self->cmd_toggle_powerline(); }
+    # Nerd Font toggle
+    elsif ($char eq 'i') { $self->cmd_toggle_nerd_font(); }
 
     # Change navigation
     elsif ($char eq 'n') { $self->cmd_next_change(); }
@@ -2418,7 +2418,10 @@ sub do_column_select_up {
     return if $view->cursor_line() <= 0;
 
     $view->start_column_selection() unless $view->column_select();
-    $view->move_up(1);  # extend_selection = true
+    # Move by document line (skip continuation lines when word wrap is active)
+    my $new_line = $view->cursor_line() - 1;
+    $view->set_cursor($new_line, $view->cursor_col(), 1);
+    $view->ensure_cursor_visible();
 }
 
 sub do_column_select_down {
@@ -2428,7 +2431,10 @@ sub do_column_select_down {
     return if $view->cursor_line() >= $doc->line_count() - 1;
 
     $view->start_column_selection() unless $view->column_select();
-    $view->move_down(1);  # extend_selection = true
+    # Move by document line (skip continuation lines when word wrap is active)
+    my $new_line = $view->cursor_line() + 1;
+    $view->set_cursor($new_line, $view->cursor_col(), 1);
+    $view->ensure_cursor_visible();
 }
 
 sub do_column_select_left {

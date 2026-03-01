@@ -18,15 +18,15 @@ subtest 'Module loads' => sub {
 subtest 'Default state is enabled' => sub {
     # Reset to default
     Zepto::Chars->enable();
-    ok(Zepto::Chars->enabled(), 'Powerline is enabled by default');
+    ok(Zepto::Chars->enabled(), 'Nerd Font is enabled by default');
 };
 
 subtest 'Enable/disable/toggle' => sub {
     Zepto::Chars->disable();
-    ok(!Zepto::Chars->enabled(), 'Can disable powerline');
+    ok(!Zepto::Chars->enabled(), 'Can disable nerd font');
 
     Zepto::Chars->enable();
-    ok(Zepto::Chars->enabled(), 'Can enable powerline');
+    ok(Zepto::Chars->enabled(), 'Can enable nerd font');
 
     my $new_state = Zepto::Chars->toggle();
     ok(!$new_state, 'Toggle returns new state (off)');
@@ -52,12 +52,12 @@ subtest 'set_enabled' => sub {
 subtest 'Get characters when enabled' => sub {
     Zepto::Chars->enable();
 
-    # Powerline chars should be Unicode
+    # Nerd Font chars should be Unicode
     my $arrow = Zepto::Chars->get('arrow_right');
-    is($arrow, "\x{e0b0}", 'arrow_right returns powerline char');
+    is($arrow, "\x{e0b0}", 'arrow_right returns nerd font char');
 
     my $round = Zepto::Chars->get('round_left');
-    is($round, "\x{e0b6}", 'round_left returns powerline char');
+    is($round, "\x{e0b6}", 'round_left returns nerd font char');
 
     my $toggle = Zepto::Chars->get('toggle_on');
     is($toggle, "\x{25cf}", 'toggle_on returns filled circle');
