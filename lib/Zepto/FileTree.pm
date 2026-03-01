@@ -21,7 +21,7 @@ use Zepto::Config;
 # --- Constants ---
 
 use constant {
-    DEFAULT_TREE_WIDTH => 42,
+    DEFAULT_TREE_WIDTH => 23,
     MIN_TREE_WIDTH     => 15,
     MAX_TREE_WIDTH     => 60,
     INDENT_PER_LEVEL   => 2,
