@@ -58,7 +58,6 @@ use Zepto::Editor::Palette;
 # Timing and UI settings
 use constant {
     INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
-    MESSAGE_DISPLAY_SEC => 3,     # Seconds to show status messages
     RESERVED_ROWS       => 3,     # Rows for tab bar + ruler bar + status bar
 };
 
@@ -317,10 +316,10 @@ sub run {
 
             my $needs_render = 0;
 
-            # Clear message after timeout
-            if ($self->{message} && time() - $self->{message_time} > MESSAGE_DISPLAY_SEC) {
+            # Messages persist until replaced by a newer message (per UI guidelines).
+            # Clear on any user input so normal status bar returns after next action.
+            if ($self->{message} && length $input) {
                 $self->{message} = '';
-                $needs_render = 1;
             }
 
             if (length $input) {
@@ -605,7 +604,10 @@ sub handle_editing_event {
             elsif ($view->line_map() && $view->line_map()->has_expanded_hunks()) {
                 $view->line_map()->collapse_all();
             }
-            # else: nothing to cancel - Esc is a no-op
+            else {
+                # Nothing to cancel — open command palette as final fallback
+                $self->cmd_open_palette();
+            }
             $self->{quit_pending} = 0;
         }
 
@@ -3277,7 +3279,6 @@ sub render {
 sub show_message {
     my ($self, $msg) = @_;
     $self->{message} = $msg;
-    $self->{message_time} = time();
 }
 
 # =============================================================================
