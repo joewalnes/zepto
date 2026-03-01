@@ -193,15 +193,15 @@ my @COMMANDS = (
         method   => 'cmd_toggle_theme',
     },
     {
-        id       => 'toggle_powerline',
-        label    => 'Powerline',
+        id       => 'toggle_nerd_font',
+        label    => 'Nerd Font',
         icon     => 'keyboard',
         shortcut => SYM_ALT . 'I',
         section  => 'APP',
         type     => 'toggle',
-        pref     => 'powerline',
+        pref     => 'nerd_font',
         priority => 0,               # not on status bar normally
-        method   => 'cmd_toggle_powerline',
+        method   => 'cmd_toggle_nerd_font',
     },
     {
         id       => 'toggle_minimap',

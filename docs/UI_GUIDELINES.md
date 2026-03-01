@@ -108,7 +108,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - Use background fill to indicate state (active, selected, focused), not category. Category is conveyed by shape.
 - Use borders or edge glyphs to indicate focus; use fill to indicate selection. Do not use both unless necessary.
 - Use Nerd Font icons to enhance meaning of actions and surfaces when available; fall back to generic Unicode icons when not.
-- When Powerline mode is disabled, only single-width Unicode characters are permitted on screen.
+- When Nerd Font mode is disabled, only single-width Unicode characters are permitted on screen.
 - Shortcut keys are always rendered as a consistent badge:
   - Same shape, size, and padding across the UI.
   - Default badge treatment is neutral (not attention-grabbing) and becomes emphasized only when the action is focused or active.

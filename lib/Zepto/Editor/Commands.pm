@@ -657,13 +657,13 @@ sub cmd_toggle_theme {
     }
 }
 
-sub cmd_toggle_powerline {
+sub cmd_toggle_nerd_font {
     my ($self) = @_;
 
-    my $current = $self->{prefs}->powerline();
+    my $current = $self->{prefs}->nerd_font();
     my $new_state = $current ? 0 : 1;
 
-    $self->{prefs}->set_powerline($new_state);
+    $self->{prefs}->set_nerd_font($new_state);
     Zepto::Chars->set_enabled($new_state);
 }
 

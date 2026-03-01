@@ -97,7 +97,7 @@ sub dark_theme {
         column_cursor_bg    => bg_rgb(80, 70, 150),  # Brighter for zero-width bars
         column_indicator_fg   => fg_rgb(220, 215, 255),  # Light lavender text
         column_indicator_bg   => bg_rgb(75, 60, 140),    # Purple accent
-        column_indicator_edge => fg_rgb(75, 60, 140),    # Matches bg for powerline arrow
+        column_indicator_edge => fg_rgb(75, 60, 140),    # Matches bg for nerd font arrow
 
         # Cursor line (subtle highlight)
         cursor_line_bg => bg_rgb(41, 46, 66),
@@ -205,7 +205,7 @@ sub dark_theme {
 
         # Tab bar
         tab_bar_bg          => bg_rgb(30, 32, 44),     # Matches ruler_bg — seamless
-        tab_bar_bg_fg       => fg_rgb(30, 32, 44),     # Bar bg as foreground (for powerline edges)
+        tab_bar_bg_fg       => fg_rgb(30, 32, 44),     # Bar bg as foreground (for nerd font edges)
         tab_active_fg       => fg_rgb(255, 255, 255),  # Bright white text
         tab_active_bg       => bg_rgb(52, 79, 138),    # Blue accent — clearly active
         tab_active_edge     => fg_rgb(52, 79, 138),    # Matches active bg for smooth transition
@@ -326,7 +326,7 @@ sub light_theme {
         column_cursor_bg    => bg_rgb(180, 170, 215),  # Brighter for zero-width bars
         column_indicator_fg   => fg_rgb(60, 40, 110),    # Dark purple text
         column_indicator_bg   => bg_rgb(190, 180, 230),  # Light purple accent
-        column_indicator_edge => fg_rgb(190, 180, 230),  # Matches bg for powerline arrow
+        column_indicator_edge => fg_rgb(190, 180, 230),  # Matches bg for nerd font arrow
 
         # Cursor line
         cursor_line_bg => bg_rgb(231, 234, 242),
@@ -434,7 +434,7 @@ sub light_theme {
 
         # Tab bar
         tab_bar_bg          => bg_rgb(230, 233, 239),  # Matches ruler_bg — seamless
-        tab_bar_bg_fg       => fg_rgb(230, 233, 239),  # Bar bg as foreground (for powerline edges)
+        tab_bar_bg_fg       => fg_rgb(230, 233, 239),  # Bar bg as foreground (for nerd font edges)
         tab_active_fg       => fg_rgb(255, 255, 255),  # White text on accent bg
         tab_active_bg       => bg_rgb(114, 135, 253),  # Lavender accent — clearly active
         tab_active_edge     => fg_rgb(114, 135, 253),  # Matches active bg

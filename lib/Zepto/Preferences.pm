@@ -21,7 +21,7 @@ my %DEFAULTS = (
     theme            => 'dark',
     show_line_numbers => 1,
     show_status_bar  => 1,
-    powerline        => 1,            # Use Powerline/Nerd Font glyphs
+    nerd_font        => 1,            # Use Nerd Font glyphs
     show_minimap     => 1,            # Show minimap/scrollbar
     show_tree        => 1,            # Show file tree panel
     word_wrap        => 0,            # Word wrap mode (break long lines at viewport edge)
@@ -182,8 +182,8 @@ sub set_search_case_sensitive { $_[0]->set('search_case_sensitive', $_[1]) }
 sub search_wrap { $_[0]->get('search_wrap') }
 sub set_search_wrap { $_[0]->set('search_wrap', $_[1]) }
 
-sub powerline { $_[0]->get('powerline') }
-sub set_powerline { $_[0]->set('powerline', $_[1]) }
+sub nerd_font { $_[0]->get('nerd_font') }
+sub set_nerd_font { $_[0]->set('nerd_font', $_[1]) }
 
 sub show_minimap { $_[0]->get('show_minimap') }
 sub set_show_minimap { $_[0]->set('show_minimap', $_[1]) }

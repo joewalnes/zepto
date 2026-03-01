@@ -1,24 +1,24 @@
 package Zepto::Chars;
 # =============================================================================
-# Chars: Character set abstraction for Powerline/ASCII rendering
+# Chars: Character set abstraction for Nerd Font/ASCII rendering
 # =============================================================================
 #
 # Provides a unified interface for getting UI characters, with automatic
-# fallback from Powerline/Nerd Font glyphs to ASCII when Powerline is disabled.
+# fallback from Nerd Font glyphs to ASCII when Nerd Font is disabled.
 #
 # Character categories:
 #   - Rounded pills (for clickable buttons): round_left, round_right
 #   - Arrow segments (for info displays): arrow_left, arrow_right
 #   - Thin separators: sep_left, sep_right
 #   - Icons: toggle_on, toggle_off, menu, branch, lock
-#   - Box drawing: box_* (rounded when powerline, square when ASCII)
+#   - Box drawing: box_* (rounded when nerd font, square when ASCII)
 # =============================================================================
 
 use strict;
 use warnings;
 use utf8;
 
-# Powerline characters (Private Use Area E0xx)
+# Nerd Font characters (Private Use Area E0xx)
 use constant {
     PL_ARROW_RIGHT      => "\x{e0b0}",  #
     PL_ARROW_RIGHT_THIN => "\x{e0b1}",  #
@@ -95,7 +95,7 @@ use constant {
     NF_CHEVRON_DOWN     => "\x{f078}",  #  chevron down
     NF_FILTER           => "\x{f0b0}",  #  filter/funnel
     NF_KEYBOARD         => "\x{f11c}",  #  keyboard
-    NF_LINE_NUM_ICON    => "\x{e0a1}",  #  line number (powerline)
+    NF_LINE_NUM_ICON    => "\x{e0a1}",  #  line number (nerd font)
 };
 
 # Simple toggle indicators (single-width, more compatible)
@@ -134,7 +134,7 @@ use constant {
     BOX_SQUARE_BR       => "\x{2518}",  # ┘
 };
 
-# Character mappings: powerline => ascii fallback
+# Character mappings: nerd font => ascii fallback
 my %CHARS = (
     # Rounded pills (for clickable buttons)
     # ASCII fallback uses spaces to extend background as rectangles
@@ -220,7 +220,7 @@ my %CHARS = (
     vcs_del_upper       => [ VCS_DEL_UPPER,       VCS_DEL_UPPER ],  # ▝ (legacy)
     vcs_del_lower       => [ VCS_DEL_LOWER,       VCS_DEL_LOWER ],  # ▗ (legacy)
 
-    # Box drawing - corners (rounded when powerline, square when not)
+    # Box drawing - corners (rounded when nerd font, square when not)
     box_tl              => [ BOX_ROUND_TL,        BOX_SQUARE_TL ],
     box_tr              => [ BOX_ROUND_TR,        BOX_SQUARE_TR ],
     box_bl              => [ BOX_ROUND_BL,        BOX_SQUARE_BL ],
@@ -239,7 +239,7 @@ my %CHARS = (
     # Word wrap continuation indicator
     wrap_indicator      => [ "\x{21AA}",          '\\' ],  # ↪ / backslash fallback
 
-    # Tree structure (powerline → ascii)
+    # Tree structure (nerd font → ascii)
     tree_branch         => [ "\x{251c}",          '|' ],  # ├
     tree_last           => [ BOX_ROUND_BL,        '`' ],  # ╰
     tree_vertical       => [ BOX_VERTICAL,        '|' ],  # │
@@ -251,46 +251,46 @@ my %CHARS = (
 );
 
 # Module state
-my $_powerline_enabled = 1;  # Default ON
+my $_nerd_font_enabled = 1;  # Default ON
 
 # =============================================================================
 # Public API
 # =============================================================================
 
-# Enable powerline characters
+# Enable nerd font characters
 sub enable {
-    $_powerline_enabled = 1;
+    $_nerd_font_enabled = 1;
 }
 
-# Disable powerline characters (use ASCII fallbacks)
+# Disable nerd font characters (use ASCII fallbacks)
 sub disable {
-    $_powerline_enabled = 0;
+    $_nerd_font_enabled = 0;
 }
 
-# Toggle powerline on/off
+# Toggle nerd font on/off
 sub toggle {
-    $_powerline_enabled = !$_powerline_enabled;
-    return $_powerline_enabled;
+    $_nerd_font_enabled = !$_nerd_font_enabled;
+    return $_nerd_font_enabled;
 }
 
-# Check if powerline is enabled
+# Check if nerd font is enabled
 sub enabled {
-    return $_powerline_enabled;
+    return $_nerd_font_enabled;
 }
 
-# Set powerline state explicitly
+# Set nerd font state explicitly
 sub set_enabled {
     my ($class, $enabled) = @_;
     # Handle both class method and direct call
     if (ref($class) || $class !~ /::/) {
         $enabled = $class;
     }
-    $_powerline_enabled = $enabled ? 1 : 0;
-    return $_powerline_enabled;
+    $_nerd_font_enabled = $enabled ? 1 : 0;
+    return $_nerd_font_enabled;
 }
 
 # Get a character by name
-# Returns powerline char if enabled, ASCII fallback otherwise
+# Returns nerd font char if enabled, ASCII fallback otherwise
 sub get {
     my ($class, $name) = @_;
     # Handle both class method and direct call
@@ -301,7 +301,7 @@ sub get {
     my $entry = $CHARS{$name};
     return '' unless defined $entry;
 
-    return $_powerline_enabled ? $entry->[0] : $entry->[1];
+    return $_nerd_font_enabled ? $entry->[0] : $entry->[1];
 }
 
 # Get multiple characters as a hash
@@ -394,7 +394,7 @@ my %FILE_ICONS = (
 # Returns the appropriate nerd font icon or ASCII fallback
 sub file_icon {
     my ($class, $filename) = @_;
-    return $_powerline_enabled ? NF_FILE : "\x{2022}" unless defined $filename;
+    return $_nerd_font_enabled ? NF_FILE : "\x{2022}" unless defined $filename;
 
     # Extract extension
     my ($ext) = $filename =~ /\.([^.]+)$/;
@@ -402,11 +402,11 @@ sub file_icon {
 
     my $entry = $FILE_ICONS{$ext};
     if ($entry) {
-        return $_powerline_enabled ? $entry->[0] : $entry->[1];
+        return $_nerd_font_enabled ? $entry->[0] : $entry->[1];
     }
 
     # Default file icon
-    return $_powerline_enabled ? NF_FILE : "\x{2022}";
+    return $_nerd_font_enabled ? NF_FILE : "\x{2022}";
 }
 
 # Create a horizontal line of specified width

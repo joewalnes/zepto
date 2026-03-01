@@ -58,7 +58,7 @@ zepto myfile.txt
 | Ctrl+G | Go to line |
 | Ctrl+A | Select all |
 | Ctrl+T | Toggle theme |
-| Ctrl+P | Toggle Powerline glyphs |
+| Ctrl+P | Toggle Nerd Font glyphs |
 | Ctrl+Space | Command palette |
 | Ctrl+/ | Help |
 
@@ -177,12 +177,12 @@ make test     # Run tests
 - Switch via Ctrl+T or command palette
 - True-color (24-bit RGB)
 
-### Powerline Glyphs
+### Nerd Font Glyphs
 
-- Enhanced UI with Powerline/Nerd Font glyphs (rounded pills, icons)
-- Toggle with Ctrl+P or command palette
+- Enhanced UI with Nerd Font glyphs (rounded pills, icons)
+- Toggle with Alt+I or command palette
 - Automatically falls back to ASCII when disabled
-- Disable by default: `--no-powerline` flag or `ZEPTO_POWERLINE=0` env var
+- Disable by default: `--no-nerd-font` flag or `ZEPTO_NERD_FONT=0` env var
 
 ### Terminal Compatibility
 
