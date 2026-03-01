@@ -280,6 +280,13 @@
             .feature .screencap-feature { order: 2 !important; }
         }
     </style>
+
+    <!-- Privacy-friendly analytics by Plausible -->
+    <script async src="https://plausible.io/js/pa-O1ifK9ONKt2hGVp4xPHhs.js"></script>
+    <script>
+      window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+      plausible.init()
+    </script>
 </head>
 <body>
 
@@ -303,7 +310,7 @@
 
         <div class="hero-install">
             <p class="install-label">Install</p>
-            <pre>mkdir -p ~/.local/bin &amp;&amp; \
+            <pre id="install-cmd">mkdir -p ~/.local/bin &amp;&amp; \
   curl -fsSL \
     https://github.com/joewalnes/zepto/releases/download/latest/zepto \
     -o ~/.local/bin/zepto &amp;&amp; \
@@ -537,6 +544,19 @@
     </div>
 </footer>
 
+
+<script>
+  (function () {
+    var cmd = document.getElementById('install-cmd');
+    var fired = false;
+    cmd.addEventListener('copy', function () {
+      if (!fired) {
+        fired = true;
+        plausible('Install Command Copy');
+      }
+    });
+  })();
+</script>
 
 </body>
 </html>
