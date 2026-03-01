@@ -20,7 +20,7 @@ my @test_files = (
     'README.md',
     'lib/Editor.pm',
     'lib/Editor/Commands.pm',
-    'lib/Editor/Menu.pm',
+    'lib/Editor/Palette.pm',
     'lib/Document.pm',
     'tests/editor.t',
     'tests/document.t',

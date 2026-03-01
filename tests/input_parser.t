@@ -101,6 +101,17 @@ subtest 'Ctrl+letter' => sub {
     is($events[0]->{char}, 'z', 'Ctrl+Z');
 };
 
+subtest 'Ctrl+Space (0x00 NUL)' => sub {
+    my $parser = Zepto::InputParser->new();
+
+    # Ctrl+Space sends NUL (0x00) on most terminals
+    my @events = $parser->parse("\x00");
+    is(scalar @events, 1, 'One event from Ctrl+Space');
+    is($events[0]->{type}, 'char', 'Ctrl+Space type is char');
+    is($events[0]->{char}, ' ', 'Ctrl+Space char is space');
+    ok(Zepto::InputParser::has_modifier($events[0], 'ctrl'), 'Ctrl+Space has ctrl modifier');
+};
+
 subtest 'Ctrl+/ (0x1F)' => sub {
     my $parser = Zepto::InputParser->new();
 

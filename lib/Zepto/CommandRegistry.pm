@@ -1,0 +1,541 @@
+package Zepto::CommandRegistry;
+# =============================================================================
+# CommandRegistry: Single source of truth for all editor commands
+# =============================================================================
+#
+# Centralizes command definitions for the command palette, status bar pills,
+# and keyboard shortcut dispatch. Each command has an id, label, icon,
+# shortcut, section, type, priority, and method.
+#
+# Sections group commands in the palette: DOCUMENT, APP, NAVIGATE, TOGGLES
+# Types: action (one-shot), toggle (binary on/off), setting (multi-value)
+# Priority: 1 = always on status bar, 5 = only if wide terminal
+# =============================================================================
+
+use strict;
+use warnings;
+use utf8;
+
+# Modifier key display symbols
+use constant {
+    SYM_CTRL  => "\x{2303}",  # ⌃
+    SYM_ALT   => "\x{2325}",  # ⌥
+    SYM_SHIFT => "\x{21E7}",  # ⇧
+    SYM_SPACE => "\x{2423}",  # ␣
+    SYM_UP    => "\x{2191}",  # ↑
+    SYM_DOWN  => "\x{2193}",  # ↓
+};
+
+# Master command list — the single source of truth
+my @COMMANDS = (
+    # === DOCUMENT section ===
+    {
+        id       => 'save',
+        label    => 'Save',
+        icon     => 'save',
+        shortcut => SYM_CTRL . 'S',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,           # not on status bar
+        method   => 'cmd_save',
+    },
+    {
+        id       => 'close_tab',
+        label    => 'Close Tab',
+        icon     => 'times',
+        shortcut => SYM_CTRL . 'W',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_close_tab',
+    },
+    {
+        id       => 'undo',
+        label    => 'Undo',
+        icon     => 'undo',
+        shortcut => SYM_CTRL . 'Z',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_undo',
+    },
+    {
+        id       => 'redo',
+        label    => 'Redo',
+        icon     => 'redo',
+        shortcut => SYM_CTRL . 'Y',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_redo',
+    },
+    {
+        id       => 'cut',
+        label    => 'Cut',
+        icon     => 'cut',
+        shortcut => SYM_CTRL . 'X',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_cut',
+    },
+    {
+        id       => 'copy',
+        label    => 'Copy',
+        icon     => 'copy',
+        shortcut => SYM_CTRL . 'C',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_copy',
+    },
+    {
+        id       => 'paste',
+        label    => 'Paste',
+        icon     => 'paste',
+        shortcut => SYM_CTRL . 'V',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_paste',
+    },
+    {
+        id       => 'select_all',
+        label    => 'Select All',
+        icon     => 'select_all',
+        shortcut => SYM_CTRL . 'A',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_select_all',
+    },
+    {
+        id       => 'move_line_up',
+        label    => 'Move Line Up',
+        icon     => 'move_up',
+        shortcut => SYM_ALT . SYM_UP,
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'do_move_line_up',
+    },
+    {
+        id       => 'move_line_down',
+        label    => 'Move Line Down',
+        icon     => 'move_down',
+        shortcut => SYM_ALT . SYM_DOWN,
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'do_move_line_down',
+    },
+    {
+        id       => 'dup_line_up',
+        label    => 'Duplicate Up',
+        icon     => 'dup_up',
+        shortcut => SYM_CTRL . SYM_SHIFT . SYM_UP,
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'do_duplicate_line_up',
+    },
+    {
+        id       => 'dup_line_down',
+        label    => 'Duplicate Down',
+        icon     => 'dup_down',
+        shortcut => SYM_CTRL . SYM_SHIFT . SYM_DOWN,
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'do_duplicate_line_down',
+    },
+
+    # === APP section ===
+    {
+        id       => 'new_file',
+        label    => 'New File',
+        icon     => 'new_file',
+        shortcut => SYM_CTRL . 'N',
+        section  => 'APP',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_new_file',
+    },
+    {
+        id       => 'open_file',
+        label    => 'Open File',
+        icon     => 'folder_open',
+        shortcut => SYM_CTRL . 'O/' . SYM_CTRL . 'P',
+        section  => 'APP',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_open_file',
+    },
+    {
+        id       => 'quit',
+        label    => 'Quit',
+        icon     => 'quit',
+        shortcut => SYM_CTRL . 'Q',
+        section  => 'APP',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_quit',
+    },
+    {
+        id       => 'toggle_theme',
+        label    => 'Theme',
+        icon     => 'theme_dark',    # dynamic: theme_dark or theme_light
+        shortcut => SYM_CTRL . 'T',
+        section  => 'APP',
+        type     => 'toggle',
+        pref     => 'theme',
+        priority => 4,
+        method   => 'cmd_toggle_theme',
+    },
+    {
+        id       => 'toggle_powerline',
+        label    => 'Powerline',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'APP',
+        type     => 'toggle',
+        pref     => 'powerline',
+        priority => 0,               # not on status bar normally
+        method   => 'cmd_toggle_powerline',
+    },
+    {
+        id       => 'toggle_minimap',
+        label    => 'Minimap',
+        icon     => 'minimap',
+        shortcut => SYM_ALT . 'M',
+        section  => 'APP',
+        type     => 'toggle',
+        pref     => 'show_minimap',
+        priority => 0,
+        method   => 'cmd_toggle_minimap',
+    },
+    {
+        id       => 'toggle_tree',
+        label    => 'File Tree',
+        icon     => 'folder',
+        shortcut => SYM_CTRL . 'B',
+        section  => 'APP',
+        type     => 'toggle',
+        pref     => 'show_tree',
+        priority => 0,
+        method   => 'cmd_toggle_tree',
+    },
+
+    # === NAVIGATE section ===
+    {
+        id       => 'find',
+        label    => 'Find/Replace',
+        icon     => 'search',
+        shortcut => SYM_CTRL . 'F',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 3,
+        method   => 'cmd_find',
+    },
+    {
+        id       => 'goto_line',
+        label    => 'Go to Line',
+        icon     => 'goto',
+        shortcut => SYM_CTRL . 'G',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 3,
+        method   => 'cmd_goto_line',
+    },
+    {
+        id       => 'find_next',
+        label    => 'Find Next',
+        icon     => 'chevron_down',
+        shortcut => SYM_CTRL . 'J',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_find_next',
+    },
+    {
+        id       => 'find_prev',
+        label    => 'Find Prev',
+        icon     => 'chevron_up',
+        shortcut => SYM_CTRL . 'K',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_find_prev',
+    },
+    {
+        id       => 'next_change',
+        label    => 'Next Change',
+        icon     => 'next_change',
+        shortcut => SYM_ALT . 'N',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_next_change',
+    },
+    {
+        id       => 'prev_change',
+        label    => 'Prev Change',
+        icon     => 'prev_change',
+        shortcut => SYM_ALT . 'P',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_prev_change',
+    },
+    {
+        id       => 'next_tab',
+        label    => 'Next Tab',
+        icon     => 'chevron_down',
+        shortcut => SYM_ALT . '.',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_next_tab',
+    },
+    {
+        id       => 'prev_tab',
+        label    => 'Prev Tab',
+        icon     => 'chevron_up',
+        shortcut => SYM_ALT . ',',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_prev_tab',
+    },
+
+    # === TOGGLES section ===
+    {
+        id       => 'toggle_word_wrap',
+        label    => 'Word Wrap',
+        icon     => 'wrap',
+        shortcut => SYM_ALT . 'Z',
+        section  => 'TOGGLES',
+        type     => 'toggle',
+        pref     => 'word_wrap',
+        priority => 2,
+        method   => 'cmd_toggle_word_wrap',
+    },
+    {
+        id       => 'toggle_column_mode',
+        label    => 'Column Mode',
+        icon     => 'columns',
+        shortcut => SYM_ALT . 'C',
+        section  => 'TOGGLES',
+        type     => 'toggle',
+        pref     => undef,          # managed by view, not prefs
+        priority => 2,
+        method   => 'cmd_toggle_column_mode',
+    },
+    {
+        id       => 'toggle_diff',
+        label    => 'Diff View',
+        icon     => 'diff',
+        shortcut => SYM_ALT . 'D',
+        section  => 'TOGGLES',
+        type     => 'toggle',
+        pref     => undef,          # managed per-view
+        priority => 2,
+        method   => 'cmd_toggle_diff',
+    },
+);
+
+# Build lookup index by id
+my %BY_ID = map { $_->{id} => $_ } @COMMANDS;
+
+# Section ordering for palette display
+my @SECTION_ORDER = ('DOCUMENT', 'APP', 'NAVIGATE', 'TOGGLES');
+
+# =============================================================================
+# Public API
+# =============================================================================
+
+# Return all commands as a list of hashrefs
+sub all_commands {
+    return @COMMANDS;
+}
+
+# Return commands grouped by section (ordered)
+# Returns: ( { name => 'DOCUMENT', items => [...] }, { name => 'APP', ... }, ... )
+sub commands_by_section {
+    my @result;
+    for my $section (@SECTION_ORDER) {
+        my @items = grep { $_->{section} eq $section } @COMMANDS;
+        push @result, { name => $section, items => \@items } if @items;
+    }
+    return @result;
+}
+
+# Return commands suitable for the status bar at a given width
+# $context: 'document', 'file_tree', etc.
+# $width: terminal columns available
+# Returns list of commands sorted by priority, filtered to fit
+sub commands_for_status_bar {
+    my ($class, $context, $width, $editor) = @_;
+
+    # Only show status bar pills in document context for now
+    return () unless $context eq 'document';
+
+    # Collect commands with priority > 0
+    my @candidates = grep { $_->{priority} > 0 } @COMMANDS;
+
+    # Sort by priority (lower number = higher priority)
+    @candidates = sort { $a->{priority} <=> $b->{priority} } @candidates;
+
+    return @candidates;
+}
+
+# Find a command by id
+sub find_command {
+    my ($class, $id) = @_;
+    return $BY_ID{$id};
+}
+
+# Fuzzy filter commands by query string
+# Returns list of matching commands sorted by relevance score (descending)
+sub filter_commands {
+    my ($class, $query) = @_;
+
+    return @COMMANDS unless defined $query && length($query) > 0;
+
+    $query = lc($query);
+    my @results;
+
+    for my $cmd (@COMMANDS) {
+        my $score = _fuzzy_score($query, lc($cmd->{label}));
+        if ($score > 0) {
+            push @results, { command => $cmd, score => $score };
+        }
+    }
+
+    # Also match against shortcut display string
+    for my $cmd (@COMMANDS) {
+        next if grep { $_->{command}{id} eq $cmd->{id} } @results;
+        my $shortcut_lower = lc($cmd->{shortcut} // '');
+        if (index($shortcut_lower, $query) >= 0) {
+            push @results, { command => $cmd, score => 1 };
+        }
+    }
+
+    @results = sort { $b->{score} <=> $a->{score} } @results;
+    return map { $_->{command} } @results;
+}
+
+# Execute a command by id on an editor instance
+sub execute {
+    my ($class, $editor, $id) = @_;
+    my $cmd = $BY_ID{$id};
+    return unless $cmd;
+
+    my $method = $cmd->{method};
+    if ($editor->can($method)) {
+        $editor->$method();
+        return 1;
+    }
+    return 0;
+}
+
+# Get toggle state for a command (returns undef if not a toggle)
+sub get_toggle_state {
+    my ($class, $cmd, $editor) = @_;
+    return undef unless $cmd->{type} eq 'toggle';
+
+    my $pref = $cmd->{pref};
+
+    # Special cases: state managed by view, not preferences
+    if ($cmd->{id} eq 'toggle_column_mode') {
+        my $view = $editor->active_view();
+        return $view ? $view->column_select() : 0;
+    }
+    if ($cmd->{id} eq 'toggle_diff') {
+        return $editor->{diff_expanded} ? 1 : 0;
+    }
+    # Word wrap: effective state considers per-view override > filetype > global pref
+    if ($cmd->{id} eq 'toggle_word_wrap') {
+        return $editor->_effective_word_wrap() ? 1 : 0;
+    }
+
+    # Standard preference-based toggle
+    if ($pref) {
+        my $prefs = $editor->{prefs};
+        my $val = $prefs->get($pref);
+        # For theme, return the value itself (dark/light), not 0/1
+        if ($pref eq 'theme') {
+            return $val;
+        }
+        return $val ? 1 : 0;
+    }
+
+    return undef;
+}
+
+# Get display state string for a toggle command
+sub get_toggle_display {
+    my ($class, $cmd, $editor) = @_;
+    my $state = $class->get_toggle_state($cmd, $editor);
+    return '' unless defined $state;
+
+    if ($cmd->{pref} && $cmd->{pref} eq 'theme') {
+        return $state;  # 'dark' or 'light'
+    }
+    return $state ? 'on' : 'off';
+}
+
+# Return section order
+sub section_order {
+    return @SECTION_ORDER;
+}
+
+# =============================================================================
+# Internal: Fuzzy matching
+# =============================================================================
+
+# Score a query against a target string using subsequence matching
+# Returns 0 if no match, higher scores for better matches
+sub _fuzzy_score {
+    my ($query, $target) = @_;
+
+    my @qchars = split //, $query;
+    my @tchars = split //, $target;
+
+    my $qi = 0;  # query index
+    my $score = 0;
+    my $consecutive = 0;
+    my $first_match = -1;
+
+    for my $ti (0 .. $#tchars) {
+        last if $qi >= @qchars;
+        if ($tchars[$ti] eq $qchars[$qi]) {
+            $qi++;
+            $consecutive++;
+            # Bonus for consecutive matches
+            $score += $consecutive;
+            # Bonus for matching at word start
+            if ($ti == 0 || $tchars[$ti - 1] eq ' ' || $tchars[$ti - 1] eq '_') {
+                $score += 5;
+            }
+            $first_match = $ti if $first_match < 0;
+        } else {
+            $consecutive = 0;
+        }
+    }
+
+    # All query chars must match
+    return 0 unless $qi >= @qchars;
+
+    # Bonus for matching near the start
+    $score += 3 if $first_match == 0;
+
+    # Bonus for exact prefix match
+    if (substr($target, 0, length($query)) eq $query) {
+        $score += 10;
+    }
+
+    return $score;
+}
+
+1;

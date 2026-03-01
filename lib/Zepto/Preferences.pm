@@ -21,7 +21,6 @@ my %DEFAULTS = (
     theme            => 'dark',
     show_line_numbers => 1,
     show_status_bar  => 1,
-    show_menu_bar    => 1,
     powerline        => 1,            # Use Powerline/Nerd Font glyphs
     show_minimap     => 1,            # Show minimap/scrollbar
     show_tree        => 1,            # Show file tree panel

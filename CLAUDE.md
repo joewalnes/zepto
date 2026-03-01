@@ -156,12 +156,12 @@ subtest 'Dialog rows have consistent width' => sub {
 - Add `use utf8` to files containing Unicode literals
 - Test with actual Unicode content, not just ASCII
 
-### Menu Navigation
-**Problem**: Arrow keys could land on separator rows.
+### Command Palette Navigation
+**Problem**: Arrow keys could land on section header rows in the command palette.
 
 **Root Cause**: Navigation logic didn't account for non-selectable items.
 
-**Solution**: Navigation helpers that skip non-interactive elements.
+**Solution**: Filter returns only selectable items. Section headers are rendered but not in the navigation list.
 
 ## Architecture Notes
 
@@ -174,7 +174,9 @@ subtest 'Dialog rows have consistent width' => sub {
 | View | Cursor, selection, viewport | Stateful |
 | Renderer | State → ANSI escape sequences | Pure |
 | InputParser | Bytes → input events | Stateful (partial sequences) |
+| CommandRegistry | Command definitions, dispatch, fuzzy filter | Pure |
 | Editor | Orchestration, key bindings | Stateful |
+| Editor::Palette | Command palette state + event handling | Stateful (via Editor) |
 | Terminal | Raw I/O, terminal modes | Side effects |
 
 ### Adding New Features

@@ -147,6 +147,19 @@ sub dark_theme {
         status_pos_bg    => bg_rgb(86, 95, 137),    # Muted segment
         status_pos_edge  => fg_rgb(86, 95, 137),
         status_modified_fg => fg_rgb(224, 175, 104), # Yellow for modified
+        # Status bar pills
+        pill_toggle_on_fg   => fg_rgb(255, 255, 255),
+        pill_toggle_on_bg   => bg_rgb(52, 79, 138),    # Blue (same as file segment)
+        pill_toggle_on_edge => fg_rgb(52, 79, 138),
+        pill_toggle_off_fg  => fg_rgb(148, 155, 185),   # Readable but subdued
+        pill_toggle_off_bg  => bg_rgb(52, 59, 86),      # Slightly lighter for contrast
+        pill_toggle_off_edge => fg_rgb(52, 59, 86),
+        pill_action_fg      => fg_rgb(192, 202, 245),
+        pill_action_bg      => bg_rgb(52, 59, 86),      # Neutral
+        pill_action_edge    => fg_rgb(52, 59, 86),
+        pill_palette_fg     => fg_rgb(255, 255, 255),    # Bright white text
+        pill_palette_bg     => bg_rgb(86, 119, 252),    # Bold blue background
+        pill_palette_edge   => fg_rgb(86, 119, 252),
 
         # Dialog
         dialog_fg    => fg_rgb(192, 202, 245),
@@ -363,6 +376,19 @@ sub light_theme {
         status_pos_bg    => bg_rgb(156, 160, 176),  # Muted segment
         status_pos_edge  => fg_rgb(156, 160, 176),
         status_modified_fg => fg_rgb(223, 142, 29), # Yellow for modified
+        # Status bar pills
+        pill_toggle_on_fg   => fg_rgb(255, 255, 255),
+        pill_toggle_on_bg   => bg_rgb(114, 135, 253),  # Lavender (same as file segment)
+        pill_toggle_on_edge => fg_rgb(114, 135, 253),
+        pill_toggle_off_fg  => fg_rgb(108, 112, 134),   # Darker text for contrast
+        pill_toggle_off_bg  => bg_rgb(213, 217, 227),    # Slightly different bg
+        pill_toggle_off_edge => fg_rgb(213, 217, 227),
+        pill_action_fg      => fg_rgb(76, 79, 105),
+        pill_action_bg      => bg_rgb(206, 210, 218),    # Neutral
+        pill_action_edge    => fg_rgb(206, 210, 218),
+        pill_palette_fg     => fg_rgb(255, 255, 255),     # White text
+        pill_palette_bg     => bg_rgb(114, 135, 253),    # Lavender (matching file segment)
+        pill_palette_edge   => fg_rgb(114, 135, 253),
 
         # Dialog
         dialog_fg    => fg_rgb(76, 79, 105),

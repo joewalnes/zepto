@@ -1,0 +1,130 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use utf8;
+use Test::More;
+use lib 'lib';
+use Zepto::CommandRegistry;
+
+# =============================================================================
+# CommandRegistry unit tests
+# =============================================================================
+
+subtest 'All commands have unique IDs' => sub {
+    my @cmds = Zepto::CommandRegistry->all_commands();
+    my %seen;
+    for my $cmd (@cmds) {
+        ok(!$seen{$cmd->{id}}, "ID '$cmd->{id}' is unique");
+        $seen{$cmd->{id}} = 1;
+    }
+    ok(scalar @cmds > 20, 'At least 20 commands defined');
+};
+
+subtest 'All commands have required fields' => sub {
+    my @cmds = Zepto::CommandRegistry->all_commands();
+    for my $cmd (@cmds) {
+        ok(defined $cmd->{id},       "cmd '$cmd->{id}': has id");
+        ok(defined $cmd->{label},    "cmd '$cmd->{id}': has label");
+        ok(defined $cmd->{icon},     "cmd '$cmd->{id}': has icon");
+        ok(defined $cmd->{shortcut}, "cmd '$cmd->{id}': has shortcut");
+        ok(defined $cmd->{section},  "cmd '$cmd->{id}': has section");
+        ok(defined $cmd->{type},     "cmd '$cmd->{id}': has type");
+        ok(defined $cmd->{method},   "cmd '$cmd->{id}': has method");
+        like($cmd->{type}, qr/^(action|toggle|setting)$/, "cmd '$cmd->{id}': valid type");
+    }
+};
+
+subtest 'commands_by_section groups correctly' => sub {
+    my @sections = Zepto::CommandRegistry->commands_by_section();
+    ok(scalar @sections >= 4, 'At least 4 sections');
+
+    my %seen_sections;
+    for my $sec (@sections) {
+        ok(defined $sec->{name}, "Section has name: $sec->{name}");
+        ok(ref $sec->{items} eq 'ARRAY', "Section '$sec->{name}' has items array");
+        ok(scalar @{$sec->{items}} > 0, "Section '$sec->{name}' is not empty");
+        $seen_sections{$sec->{name}} = 1;
+    }
+
+    ok($seen_sections{'DOCUMENT'}, 'Has DOCUMENT section');
+    ok($seen_sections{'APP'}, 'Has APP section');
+    ok($seen_sections{'NAVIGATE'}, 'Has NAVIGATE section');
+    ok($seen_sections{'TOGGLES'}, 'Has TOGGLES section');
+};
+
+subtest 'find_command lookup' => sub {
+    my $cmd = Zepto::CommandRegistry->find_command('save');
+    ok(defined $cmd, 'Found save command');
+    is($cmd->{label}, 'Save', 'Correct label');
+    is($cmd->{method}, 'cmd_save', 'Correct method');
+
+    my $missing = Zepto::CommandRegistry->find_command('nonexistent');
+    is($missing, undef, 'Returns undef for missing command');
+};
+
+subtest 'filter_commands - basic' => sub {
+    my @results = Zepto::CommandRegistry->filter_commands('save');
+    ok(scalar @results > 0, 'Found results for "save"');
+    is($results[0]->{id}, 'save', 'Save is top result');
+};
+
+subtest 'filter_commands - fuzzy matching' => sub {
+    my @results = Zepto::CommandRegistry->filter_commands('wrp');
+    ok(scalar @results > 0, 'Found results for fuzzy "wrp"');
+    # Word Wrap should match w-r-p subsequence
+    my @wraps = grep { $_->{id} eq 'toggle_word_wrap' } @results;
+    ok(scalar @wraps > 0, 'Word Wrap matched fuzzy "wrp"');
+};
+
+subtest 'filter_commands - empty query returns all' => sub {
+    my @all = Zepto::CommandRegistry->all_commands();
+    my @results = Zepto::CommandRegistry->filter_commands('');
+    is(scalar @results, scalar @all, 'Empty query returns all commands');
+};
+
+subtest 'filter_commands - no match returns empty' => sub {
+    my @results = Zepto::CommandRegistry->filter_commands('xyzxyzxyz');
+    is(scalar @results, 0, 'Nonsense query returns empty');
+};
+
+subtest 'filter_commands - case insensitive' => sub {
+    my @lower = Zepto::CommandRegistry->filter_commands('save');
+    my @upper = Zepto::CommandRegistry->filter_commands('SAVE');
+    ok(scalar @lower > 0, 'Lowercase matches');
+    ok(scalar @upper > 0, 'Uppercase matches');
+};
+
+subtest 'commands_for_status_bar respects priority' => sub {
+    my @pills = Zepto::CommandRegistry->commands_for_status_bar(
+        'document', 120, undef);
+    ok(scalar @pills > 0, 'Got status bar commands');
+
+    # All returned commands should have priority > 0
+    for my $cmd (@pills) {
+        ok($cmd->{priority} > 0, "Command '$cmd->{id}' has positive priority");
+    }
+
+    # Should be sorted by priority
+    for my $i (1 .. $#pills) {
+        ok($pills[$i]->{priority} >= $pills[$i-1]->{priority},
+           "Commands sorted by priority: $pills[$i-1]->{id} <= $pills[$i]->{id}");
+    }
+};
+
+subtest 'toggle commands have correct type' => sub {
+    my @toggles = grep { $_->{type} eq 'toggle' } Zepto::CommandRegistry->all_commands();
+    ok(scalar @toggles >= 5, 'At least 5 toggle commands');
+    for my $cmd (@toggles) {
+        like($cmd->{id}, qr/toggle/, "Toggle '$cmd->{id}' has toggle in id");
+    }
+};
+
+subtest 'section order is consistent' => sub {
+    my @order = Zepto::CommandRegistry->section_order();
+    is($order[0], 'DOCUMENT', 'First section is DOCUMENT');
+    is($order[1], 'APP', 'Second section is APP');
+    is($order[2], 'NAVIGATE', 'Third section is NAVIGATE');
+    is($order[3], 'TOGGLES', 'Fourth section is TOGGLES');
+};
+
+done_testing();
