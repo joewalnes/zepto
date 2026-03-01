@@ -13,6 +13,22 @@ Scope: code review of the UI stack (`lib/Zepto/Editor.pm`, `lib/Zepto/Renderer.p
 7. Improve mouse parity by adding double-click word selection, triple-click line selection, and mouse-based cursor placement/selection inside find/replace inputs. Guidelines: `Mouse And Keyboard Behavior`, `Inputs And Text Editing`.
 8. Audit theme contrast and add non-color cues for state changes (VCS, selection, errors) to maintain readability in dark and light modes. Guidelines: `Colors And Readability`, `Visual Shape And Treatment`.
 
+## Status
+
+Items addressed by the command palette + context-aware status bar refactor:
+
+- **#3 (Discoverability)**: ✅ Addressed. The command palette (⌃Space) is the single discoverable entry point for all ~30 commands. Every command has an icon, shortcut label, and human-readable name. Toggle states display live in the palette.
+- **#5 (Responsive layout)**: ✅ Partially addressed. The status bar uses priority-based progressive disclosure — pills drop off at narrow widths (P1 at 25 cols through P5 at 80+ cols). The command palette always provides full access regardless of width.
+- **#6 (Key notation normalization)**: ✅ Addressed. All shortcuts now use consistent Unicode symbols (⌃ for Ctrl, ⌥ for Alt, ⇧ for Shift) in both the command palette and status bar pills.
+
+Items still open:
+
+- **#1 (Persistent messages)**: Not yet addressed.
+- **#2 (Unified input widget)**: Not yet addressed.
+- **#4 (Global navigation keys)**: Not yet addressed.
+- **#7 (Mouse parity)**: Not yet addressed.
+- **#8 (Theme contrast)**: Not yet addressed.
+
 ## Notes
 
 - These recommendations align with `docs/UI_GUIDELINES.md` and are meant to be applied incrementally.

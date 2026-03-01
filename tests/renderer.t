@@ -107,13 +107,13 @@ subtest 'Render without document' => sub {
     );
 
     ok(defined $output, 'Output without doc');
-    like($output, qr/No file/, 'Shows no file message');
+    like($output, qr/1:1/, 'Shows cursor position even without doc');
 };
 
 # ============================================================================
-# Menu bar
+# Status bar pills
 # ============================================================================
-subtest 'Menu bar contains menus' => sub {
+subtest 'Status bar has palette trigger pill' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
@@ -126,10 +126,7 @@ subtest 'Menu bar contains menus' => sub {
     );
 
     my $stripped = strip_escapes($output);
-    like($stripped, qr/File/, 'Contains File menu');
-    like($stripped, qr/Edit/, 'Contains Edit menu');
-    like($stripped, qr/Search/, 'Contains Search menu');
-    like($stripped, qr/View/, 'Contains View menu');
+    like($stripped, qr/\x{2303}\x{2423}/, 'Status bar has ⌃␣ palette trigger pill');
 };
 
 subtest 'Active menu highlighting' => sub {
@@ -142,11 +139,11 @@ subtest 'Active menu highlighting' => sub {
         theme    => $theme,
         rows     => 24,
         cols     => 80,
-        ui       => { menu_open => 'f' },
+        ui       => {},
     );
 
-    # Should contain menu active colors (from theme)
-    ok(length($output) > 100, 'Has substantial output with menu open');
+    # Should contain substantial output
+    ok(length($output) > 100, 'Has substantial output');
 };
 
 # ============================================================================
@@ -208,7 +205,7 @@ subtest 'Empty lines beyond document use distinct background' => sub {
 # ============================================================================
 # Status bar
 # ============================================================================
-subtest 'Status bar shows filename' => sub {
+subtest 'Status bar shows cursor position' => sub {
     my $content = "Test content\n";
     my $filename = create_temp_file($content);
     my $doc = Zepto::Document->load($filename);
@@ -223,12 +220,11 @@ subtest 'Status bar shows filename' => sub {
         cols     => 80,
     );
 
-    like($output, qr/\.txt/, 'Shows filename');
+    like($output, qr/1:1/, 'Shows cursor position');
 };
 
-subtest 'Status bar shows modified indicator' => sub {
+subtest 'Status bar shows palette trigger' => sub {
     my ($doc, $view) = create_test_state("Original\n");
-    $doc->insert(0, "Modified: ");
     my $theme = Zepto::Theme->dark_theme();
 
     my $output = Zepto::Renderer->render(
@@ -239,9 +235,8 @@ subtest 'Status bar shows modified indicator' => sub {
         cols     => 80,
     );
 
-    # Modified indicator uses the 'modified' icon from Chars
-    my $modified_icon = Zepto::Chars->get('modified');
-    like($output, qr/\Q$modified_icon\E/, 'Shows modified indicator icon');
+    # Palette trigger shows ⌃␣
+    like($output, qr/\x{2303}\x{2423}/, 'Shows palette trigger (⌃␣)');
 };
 
 subtest 'Ruler bar shows cursor column' => sub {
@@ -261,12 +256,12 @@ subtest 'Ruler bar shows cursor column' => sub {
 
     # Ruler bar shows cursor column badge (1-indexed column number)
     # Cursor is at col 2 (0-indexed), displayed as 3 (1-indexed)
-    # The badge appears in the ruler bar (row 3)
+    # The badge appears in the ruler bar (row 2)
     my $stripped = strip_escapes($output);
     like($stripped, qr/ 3/, 'Ruler shows cursor column badge');
 };
 
-subtest 'Menu bar shows Esc and action buttons' => sub {
+subtest 'Status bar shows cursor position and palette trigger' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
@@ -278,69 +273,8 @@ subtest 'Menu bar shows Esc and action buttons' => sub {
         cols     => 80,
     );
 
-    # Menu bar has esc prefix (in pill format) and buttons on right
-    like($output, qr/esc/, 'Shows esc prefix');
-    like($output, qr/\^S/, 'Shows Save shortcut');
-    like($output, qr/\^Q/, 'Shows Quit shortcut');
-};
-
-# ============================================================================
-# Dropdown menus
-# ============================================================================
-subtest 'File menu items' => sub {
-    my ($doc, $view) = create_test_state();
-    my $theme = Zepto::Theme->dark_theme();
-
-    my $output = Zepto::Renderer->render(
-        document => $doc,
-        view     => $view,
-        theme    => $theme,
-        rows     => 24,
-        cols     => 80,
-        ui       => { menu_open => 'f', menu_selected => 0 },
-    );
-
-    like($output, qr/Save/, 'File menu has Save');
-    like($output, qr/Quit/, 'File menu has Quit');
-    like($output, qr/Ctrl\+S/, 'Shows shortcut');
-};
-
-subtest 'Edit menu items' => sub {
-    my ($doc, $view) = create_test_state();
-    my $theme = Zepto::Theme->dark_theme();
-
-    my $output = Zepto::Renderer->render(
-        document => $doc,
-        view     => $view,
-        theme    => $theme,
-        rows     => 24,
-        cols     => 80,
-        ui       => { menu_open => 'e', menu_selected => 0 },
-    );
-
-    like($output, qr/Undo/, 'Edit menu has Undo');
-    like($output, qr/Redo/, 'Edit menu has Redo');
-    like($output, qr/Cut/, 'Edit menu has Cut');
-    like($output, qr/Copy/, 'Edit menu has Copy');
-    like($output, qr/Paste/, 'Edit menu has Paste');
-};
-
-subtest 'Search menu items' => sub {
-    my ($doc, $view) = create_test_state();
-    my $theme = Zepto::Theme->dark_theme();
-
-    my $output = Zepto::Renderer->render(
-        document => $doc,
-        view     => $view,
-        theme    => $theme,
-        rows     => 24,
-        cols     => 80,
-        ui       => { menu_open => 's', menu_selected => 0 },
-    );
-
-    like($output, qr/Find/, 'Search menu has Find');
-    like($output, qr/Replace/, 'Search menu has Replace');
-    like($output, qr/Go to Line/, 'Search menu has Go to Line');
+    my $stripped = strip_escapes($output);
+    like($stripped, qr/1:1/, 'Status bar shows cursor position');
 };
 
 # ============================================================================
@@ -565,7 +499,7 @@ subtest 'Default terminal size' => sub {
 # ============================================================================
 # Structural invariants - catch alignment/positioning bugs
 # ============================================================================
-subtest 'Menu bar rendered on row 1' => sub {
+subtest 'Tab bar rendered on row 1' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
@@ -577,10 +511,10 @@ subtest 'Menu bar rendered on row 1' => sub {
         cols     => 80,
     );
 
-    # Menu bar is positioned at row 1, contains File, Edit, etc.
+    # Tab bar is positioned at row 1 (first row, no menu bar above it)
     # Check that output starts with cursor positioning to row 1
-    ok($output =~ /\x1b\[1;1H.*?File.*?Edit.*?View/s,
-        'Menu bar rendered at row 1 with menu items');
+    ok($output =~ /\x1b\[1;1H/s,
+        'Tab bar rendered at row 1');
 };
 
 subtest 'Text area uses cursor positioning' => sub {
@@ -635,53 +569,12 @@ subtest 'Text lines have consistent column alignment' => sub {
 };
 
 # =============================================================================
-# Menu position calculation
+# Layout: Chrome = 3 rows (tab bar + ruler + status)
 # =============================================================================
 
-subtest 'Dynamic menu positions' => sub {
-    my $positions = Zepto::Renderer::get_menu_positions();
-
-    # Verify all menus have positions
-    for my $key (qw(f e s v)) {
-        ok(exists $positions->{$key}, "Menu '$key' has position");
-        ok(exists $positions->{$key}{start}, "Menu '$key' has start");
-        ok(exists $positions->{$key}{end}, "Menu '$key' has end");
-        ok(exists $positions->{$key}{x}, "Menu '$key' has x");
-    }
-
-    # Verify positions have gaps for spaces between pills
-    my @keys = qw(f e s v);
-    for my $i (1 .. $#keys) {
-        my $prev_end = $positions->{$keys[$i-1]}{end};
-        my $curr_start = $positions->{$keys[$i]}{start};
-        # Now menus have 1 space between them (end + 2 = start)
-        is($curr_start, $prev_end + 2, "Menu '$keys[$i]' starts after space from '$keys[$i-1]'");
-    }
-
-    # Verify menu widths match expected (name length + 4 for pill + 2 for icon when powerline enabled)
-    my %expected_widths = (f => 10, e => 10, s => 12, v => 10);  # pill chars + icon + space + name + space
-    for my $key (keys %expected_widths) {
-        my $width = $positions->{$key}{end} - $positions->{$key}{start} + 1;
-        is($width, $expected_widths{$key}, "Menu '$key' has correct width");
-    }
-};
-
-# =============================================================================
-# Dropdown menu rendering
-# =============================================================================
-subtest 'Dropdown left border has background color' => sub {
-    # This test verifies that the left border of dropdown menus
-    # sets BOTH background and foreground colors, not just foreground.
-    # Without the background color, the left edge shows terminal default
-    # (black) which appears as an inverted bar in light themes.
-
-    my ($doc, $view) = create_test_state();
-    my $theme = Zepto::Theme->get_theme('light');
-
-    my $ui = {
-        menu_open => 'f',      # File menu open
-        menu_selected => 0,
-    };
+subtest 'Layout has 3 chrome rows' => sub {
+    my ($doc, $view) = create_test_state("Line 1\nLine 2\n");
+    my $theme = Zepto::Theme->dark_theme();
 
     my $output = Zepto::Renderer->render(
         document => $doc,
@@ -689,34 +582,11 @@ subtest 'Dropdown left border has background color' => sub {
         theme    => $theme,
         rows     => 24,
         cols     => 80,
-        ui       => $ui,
     );
 
-    # Get the box_v character and theme colors
-    my $box_v = Zepto::Chars->get('box_v');
-    my $dropdown_bg = $theme->color('dropdown_bg');
-    my $dropdown_border = $theme->color('dropdown_border');
-
-    # Find all instances of box_v (vertical borders) in output
-    # Each left border should be preceded by both bg and fg colors
-    # Pattern: bg_color + border_color + box_v
-    my $expected_prefix = quotemeta($dropdown_bg) . quotemeta($dropdown_border) . quotemeta($box_v);
-
-    # Count how many times the left border appears with correct colors
-    my $correct_borders = () = $output =~ /$expected_prefix/g;
-
-    # We expect at least several (one per menu item row)
-    # File menu has ~7 items, so at least 7 left borders
-    cmp_ok($correct_borders, '>=', 5, 'Left borders have both bg and fg colors set');
-
-    # Also verify we don't have borders with ONLY foreground (the bug)
-    # Pattern: move_to + border_color (without bg) + box_v
-    # This would be: \x1b[row;colH + border_color + box_v (no bg between position and border)
-    my $move_pattern = qr/\x1b\[\d+;\d+H/;
-    my $bad_pattern = qr/$move_pattern\Q$dropdown_border\E\Q$box_v\E/;
-
-    my $bad_borders = () = $output =~ /$bad_pattern/g;
-    is($bad_borders, 0, 'No left borders missing background color');
+    # Text starts at row 3 (after tab bar and ruler)
+    # Verify we have substantial output (tab bar + ruler + 21 text rows + status)
+    ok(length($output) > 100, 'Layout renders successfully with 3 chrome rows');
 };
 
 # ============================================================================

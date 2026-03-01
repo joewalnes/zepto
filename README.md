@@ -22,7 +22,7 @@ Zepto is:
 
 - **One file** — Copy it anywhere. No installation, no dependencies, no config.
 - **Familiar** — Familiar keybindings (Ctrl+S, Ctrl+Z, Ctrl+C/V). Mouse enabled. No modes to learn.
-- **Discoverable** — Menu bar shows all features. No memorization required.
+- **Discoverable** — Command palette (⌃Space) shows all features. No memorization required.
 
 ## Features
 
@@ -59,9 +59,10 @@ zepto myfile.txt
 | Ctrl+A | Select all |
 | Ctrl+T | Toggle theme |
 | Ctrl+P | Toggle Powerline glyphs |
+| Ctrl+Space | Command palette |
 | Ctrl+/ | Help |
 
-All features are also accessible via keyboard shortcuts, menu bar, and mouse.
+All features are also accessible via the command palette (Ctrl+Space), keyboard shortcuts, and mouse.
 
 ## Requirements
 
@@ -140,14 +141,13 @@ make test     # Run tests
 
 ### User Interface
 
-- Menu bar with mouse support
-- Quick access buttons (Open, Save, Quit) in menu bar
-- Dropdown menus with keyboard navigation
+- Command palette (Ctrl+Space) — single entry point for all commands with type-to-filter
+- Context-aware status bar with interactive, clickable pills
+- Status bar pills adapt to terminal width via priority-based progressive disclosure
 - Line numbers in gutter
-- Status bar (filename, position, modified state)
 - Modal dialogs for search, replace, go-to-line
 - Footer prompts for simple inputs (Save As, confirmations)
-- Escape closes menus and dialogs
+- Escape dismisses overlays; final fallback opens command palette
 - Minimap / vertical scrollbar with braille text density (Alt+M to toggle)
 - Minimap shows viewport position and git change indicators
 - File explorer tree panel (Ctrl+B to toggle)
@@ -164,8 +164,8 @@ make test     # Run tests
 
 - Click to position cursor
 - Click and drag to select
-- Click on menus to open
-- Click on menu items to activate
+- Click on status bar pills to toggle/execute commands
+- Click on command palette items to execute
 - Scroll wheel for vertical scrolling
 - Click or drag minimap to scroll document
 - Click files in tree panel to open, drag border to resize
@@ -174,13 +174,13 @@ make test     # Run tests
 
 - Dark theme (default)
 - Light theme
-- Switch via View menu (Ctrl+T)
+- Switch via Ctrl+T or command palette
 - True-color (24-bit RGB)
 
 ### Powerline Glyphs
 
 - Enhanced UI with Powerline/Nerd Font glyphs (rounded pills, icons)
-- Toggle with Ctrl+P or View menu
+- Toggle with Ctrl+P or command palette
 - Automatically falls back to ASCII when disabled
 - Disable by default: `--no-powerline` flag or `ZEPTO_POWERLINE=0` env var
 

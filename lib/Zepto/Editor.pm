@@ -21,7 +21,7 @@ use Carp;
 use Time::HiRes qw(time);
 
 use Exporter 'import';
-our @EXPORT_OK = qw(STATE_EDITING STATE_MENU STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FIND STATE_QUIT);
+our @EXPORT_OK = qw(STATE_EDITING STATE_PALETTE STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FIND STATE_QUIT);
 
 # Version for crash reports
 our $VERSION = '0.1.0';
@@ -43,7 +43,7 @@ use Zepto::FileTree;
 # Editor states
 use constant {
     STATE_EDITING      => 'editing',
-    STATE_MENU         => 'menu',
+    STATE_PALETTE      => 'palette',
     STATE_DIALOG       => 'dialog',
     STATE_PROMPT       => 'prompt',        # Simple choice in status bar
     STATE_FOOTER_INPUT => 'footer_input',  # Text input in status bar
@@ -53,13 +53,13 @@ use constant {
 
 # Load command and menu modules (they add methods to this package)
 use Zepto::Editor::Commands;
-use Zepto::Editor::Menu;
+use Zepto::Editor::Palette;
 
 # Timing and UI settings
 use constant {
     INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
     MESSAGE_DISPLAY_SEC => 3,     # Seconds to show status messages
-    RESERVED_ROWS       => 4,     # Rows for menu bar + tab bar + ruler bar + status bar
+    RESERVED_ROWS       => 3,     # Rows for tab bar + ruler bar + status bar
 };
 
 sub new {
@@ -75,8 +75,6 @@ sub new {
 
         # UI state
         state        => STATE_EDITING,
-        menu_open    => undef,
-        menu_selected => 0,
         dialog       => undef,
         message      => '',
         message_time => 0,
@@ -127,6 +125,13 @@ sub new {
 
         # Title cache — avoids redundant terminal writes
         _last_title => '',
+
+        # Command palette state
+        palette_query    => '',
+        palette_cursor   => 0,
+        palette_scroll   => 0,
+        palette_filtered => [],
+        palette_visible_rows => 15,  # updated during render
     }, $class;
 
     # Initialize theme
@@ -486,8 +491,8 @@ sub handle_event {
     if ($self->{state} eq STATE_DIALOG) {
         $self->handle_dialog_event($event);
     }
-    elsif ($self->{state} eq STATE_MENU) {
-        $self->handle_menu_event($event);
+    elsif ($self->{state} eq STATE_PALETTE) {
+        $self->handle_palette_event($event);
     }
     elsif ($self->{state} eq STATE_PROMPT) {
         $self->handle_prompt_event($event);
@@ -518,7 +523,8 @@ sub handle_editing_event {
             # Global shortcuts that work regardless of focus
             if ($ch eq 'q' || $ch eq 's' || $ch eq 'n' ||
                 $ch eq 'o' || $ch eq 'w' || $ch eq 'f' ||
-                $ch eq 't' || $ch eq 'p' || $ch eq 'b') {
+                $ch eq 't' || $ch eq 'p' || $ch eq 'b' ||
+                $ch eq ' ') {
                 $self->handle_ctrl_char($ch);
                 return;
             }
@@ -588,12 +594,9 @@ sub handle_editing_event {
             else { $self->do_indent(); }
         }
 
-        # Escape - close menu, clear selection, or open menu bar
+        # Escape - cancel/dismiss or open command palette
         elsif ($key eq 'escape') {
-            if ($self->{menu_open}) {
-                $self->close_menu();
-            }
-            elsif ($view->column_select()) {
+            if ($view->column_select()) {
                 $view->exit_column_mode();
             }
             elsif ($view->has_selection()) {
@@ -602,10 +605,7 @@ sub handle_editing_event {
             elsif ($view->line_map() && $view->line_map()->has_expanded_hunks()) {
                 $view->line_map()->collapse_all();
             }
-            else {
-                # Nothing to cancel - open menu bar
-                $self->open_menu('f');
-            }
+            # else: nothing to cancel - Esc is a no-op
             $self->{quit_pending} = 0;
         }
 
@@ -659,8 +659,11 @@ sub handle_ctrl_char {
 
     # View
     elsif ($char eq 't') { $self->cmd_toggle_theme(); }
-    elsif ($char eq 'p') { $self->cmd_toggle_powerline(); }
+    elsif ($char eq 'p') { $self->cmd_open_file(); }
     elsif ($char eq 'b') { $self->cmd_toggle_tree(); }
+
+    # Command palette
+    elsif ($char eq ' ') { $self->cmd_open_palette(); }
 
     # Reset quit pending for any other command
     $self->{quit_pending} = 0 unless $char eq 'q';
@@ -717,18 +720,12 @@ sub handle_mouse_event {
         # Track mouse button state
         $self->{mouse_button_down} = 1;
 
-        # Check if click is in menu bar (row 1)
-        if ($y == 1) {
-            $self->handle_menu_click($x);
-            return;
-        }
-
-        # Check if click is in tab bar (row 2) — but not in tree panel area
+        # Check if click is in tab bar (row 1) — but not in tree panel area
         my $_tree_w = 0;
         if ($self->{file_tree} && $self->{prefs}->show_tree()) {
             $_tree_w = $self->{file_tree}->panel_width() + 1;
         }
-        if ($y == 2 && $x > $_tree_w) {
+        if ($y == 1 && $x > $_tree_w) {
             $self->handle_tab_bar_click($x);
             # Start tab drag if we clicked on a tab (not close/scroll buttons)
             my @buttons = Zepto::Renderer->get_tab_bar_buttons();
@@ -743,8 +740,8 @@ sub handle_mouse_event {
             return;
         }
 
-        # Ruler bar (row 3) - check for clickable buttons
-        if ($y == 3) {
+        # Ruler bar (row 2) - check for clickable buttons
+        if ($y == 2) {
             my @buttons = Zepto::Renderer::get_ruler_buttons();
             for my $btn (@buttons) {
                 if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
@@ -757,19 +754,23 @@ sub handle_mouse_event {
             return;
         }
 
-        # Check if click is on status bar (last row) in find mode
+        # Check if click is on status bar (last row)
         my ($rows, $cols) = $term->get_size();
-        if ($y == $rows && $self->{state} eq STATE_FIND) {
-            $self->handle_find_bar_click($x);
+        if ($y == $rows) {
+            if ($self->{state} eq STATE_FIND) {
+                $self->handle_find_bar_click($x);
+            } else {
+                $self->handle_status_bar_click($x);
+            }
             return;
         }
 
-        # Check tree panel region (columns 1..tree_width, rows 2+)
+        # Check tree panel region (columns 1..tree_width, rows 1+)
         my $tree_width = 0;
         if ($self->{file_tree} && $self->{prefs}->show_tree()) {
             $tree_width = $self->{file_tree}->panel_width() + 1;
         }
-        if ($tree_width > 0 && $x <= $tree_width && $y >= 2 && $y < $rows) {
+        if ($tree_width > 0 && $x <= $tree_width && $y >= 1 && $y < $rows) {
             if ($x == $tree_width) {
                 # Border column — start resize drag
                 $self->{tree_border_dragging} = 1;
@@ -777,7 +778,7 @@ sub handle_mouse_event {
             }
 
             my $tree = $self->{file_tree};
-            my $tree_row = $y - 2;
+            my $tree_row = $y - 1;
             my $stickies = $tree->sticky_headers();
             my $sticky_count = scalar @$stickies;
             my $search_bar_rows = 1;  # search bar always present
@@ -844,13 +845,13 @@ sub handle_mouse_event {
         }
 
         # Click in text area
-        my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
+        my $text_row = $y - 3;  # Adjust for tab bar (1) + ruler bar (2) = text starts at row 3
         my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
 
         # Check if click is in minimap region (right side)
         my ($rows_size, $cols_size) = $term->get_size();
-        my $text_height = $rows_size - 4;  # menu + tabs + ruler + status
+        my $text_height = $rows_size - RESERVED_ROWS;  # tab + ruler + status
         $text_height = 1 if $text_height < 1;
         my $minimap_width = Zepto::Renderer->get_minimap_width(
             $line_count, $text_height, $cols_size, $gutter_width, $self->{prefs}
@@ -1023,7 +1024,7 @@ sub handle_mouse_event {
         # Handle tree scrollbar drag
         if ($self->{tree_scrollbar_dragging} && $self->{file_tree}) {
             my $tree = $self->{file_tree};
-            my $tree_row = $y - 2;
+            my $tree_row = $y - 1;
             my $stickies = $tree->sticky_headers();
             my $sticky_count = scalar @$stickies;
             my $filter_rows = $tree->filter_active() ? 1 : 0;
@@ -1034,16 +1035,16 @@ sub handle_mouse_event {
 
         # Handle minimap drag (scrollbar behavior)
         if ($self->{minimap_dragging}) {
-            my $text_row = $y - 4;
+            my $text_row = $y - 3;
             my ($rows_size, $cols_size) = $term->get_size();
-            my $text_height = $rows_size - 4;
+            my $text_height = $rows_size - RESERVED_ROWS;
             $text_height = 1 if $text_height < 1;
             $self->_handle_minimap_click($text_row, $text_height);
             return;
         }
 
         # Handle drag for selection
-        my $text_row = $y - 4;  # Adjust for menu bar (1) + tab bar (2) + ruler bar (3)
+        my $text_row = $y - 3;  # Adjust for tab bar (1) + ruler bar (2) = text starts at row 3
         my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
         my $drag_tree_w = 0;
@@ -3205,9 +3206,15 @@ sub render {
         highlighter => $self->active_highlighter(),
         word_wrap_active => $word_wrap_active,
         ui          => {
-            menu_open => $self->{menu_open},
-            menu_selected => $self->{menu_selected},
+            editor => $self,
             dialog => $self->{dialog},
+            palette => ($self->{state} eq STATE_PALETTE) ? {
+                query    => $self->{palette_query},
+                cursor   => $self->{palette_cursor},
+                scroll   => $self->{palette_scroll},
+                filtered => $self->{palette_filtered},
+                editor   => $self,
+            } : undef,
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
             tabs => $self->{tab_manager}->tabs_for_render(),

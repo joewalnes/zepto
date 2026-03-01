@@ -35,7 +35,6 @@ subtest 'Default values' => sub {
     is($prefs->get('auto_indent'), 1, 'Default auto_indent');
     is($prefs->get('show_line_numbers'), 1, 'Default show_line_numbers');
     is($prefs->get('show_status_bar'), 1, 'Default show_status_bar');
-    is($prefs->get('show_menu_bar'), 1, 'Default show_menu_bar');
     is($prefs->get('search_case_sensitive'), 0, 'Default search_case_sensitive');
     is($prefs->get('search_regex'), 0, 'Default search_regex');
     is($prefs->get('search_wrap'), 1, 'Default search_wrap');

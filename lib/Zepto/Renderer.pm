@@ -20,6 +20,7 @@ use strict;
 use warnings;
 use utf8;
 use Zepto::Chars;
+use Zepto::CommandRegistry;
 use Zepto::FileTree;
 use Zepto::Minimap;
 
@@ -68,7 +69,6 @@ use constant {
     DEFAULT_COLS       => 80,
     MIN_GUTTER_WIDTH   => 4,
     MIN_TEXT_WIDTH     => 10,
-    MENU_DROPDOWN_WIDTH => 24,
     DIALOG_WIDTH       => 50,
     DIALOG_HEIGHT      => 5,
     MINIMAP_WIDTH      => 8,  # Must match Zepto::Minimap::MINIMAP_TOTAL_WIDTH
@@ -76,72 +76,6 @@ use constant {
     TREE_MAX_INDENT       => 16,  # Must match Zepto::FileTree::MAX_INDENT
 };
 
-# Menu definitions (single source of truth for menu names, order, and items)
-our @MENU_DEFS = (
-    { key => 'f', name => 'File',   icon => 'menu_file' },
-    { key => 'e', name => 'Edit',   icon => 'menu_edit' },
-    { key => 's', name => 'Search', icon => 'menu_search' },
-    { key => 'v', name => 'View',   icon => 'menu_view' },
-);
-
-# Full menu item definitions - single source of truth for both rendering and execution
-our %MENU_ITEMS = (
-    f => [
-        { label => 'New',         shortcut => 'Ctrl+N', action => 'new' },
-        { label => 'Open',        shortcut => 'Ctrl+O', action => 'open' },
-        { separator => 1 },
-        { label => 'Save',        shortcut => 'Ctrl+S', action => 'save' },
-        { label => 'Close Tab', shortcut => 'Ctrl+W', action => 'close_tab' },
-        { separator => 1 },
-        { label => 'Quit',        shortcut => 'Ctrl+Q', action => 'quit' },
-    ],
-    e => [
-        { label => 'Undo',         shortcut => 'Ctrl+Z', action => 'undo' },
-        { label => 'Redo',         shortcut => 'Ctrl+Y', action => 'redo' },
-        { separator => 1 },
-        { label => 'Cut',          shortcut => 'Ctrl+X', action => 'cut' },
-        { label => 'Copy',         shortcut => 'Ctrl+C', action => 'copy' },
-        { label => 'Paste',        shortcut => 'Ctrl+V', action => 'paste' },
-        { separator => 1 },
-        { label => "Move Up",      shortcut => "Alt+\x{2191}", action => 'move_line_up' },
-        { label => "Move Down",    shortcut => "Alt+\x{2193}", action => 'move_line_down' },
-        { label => "Dup Up",       shortcut => "Ctrl+\x{21E7}\x{2191}", action => 'dup_line_up' },
-        { label => "Dup Down",     shortcut => "Ctrl+\x{21E7}\x{2193}", action => 'dup_line_down' },
-        { separator => 1 },
-        { label => 'Select All',   shortcut => 'Ctrl+A', action => 'select_all' },
-        { label => 'Column Mode',  shortcut => 'Alt+C',  action => 'column_mode' },
-    ],
-    s => [
-        { label => 'Find/Replace', shortcut => 'Ctrl+F', action => 'find' },
-        { label => 'Go to Line',   shortcut => 'Ctrl+G', action => 'goto' },
-    ],
-    v => [
-        { label => 'Toggle Theme', shortcut => 'Ctrl+T', action => 'toggle_theme' },
-        { label => 'Powerline',    shortcut => 'Ctrl+P', action => 'toggle_powerline', toggle => 'powerline' },
-        { label => 'Minimap',      shortcut => 'Alt+M',  action => 'toggle_minimap', toggle => 'show_minimap' },
-        { label => 'File Tree',    shortcut => 'Ctrl+B', action => 'toggle_tree', toggle => 'show_tree' },
-        { label => 'Word Wrap',   shortcut => 'Alt+Z',  action => 'toggle_word_wrap', toggle => 'word_wrap' },
-        { separator => 1 },
-        { label => 'Next Tab',       shortcut => 'Alt+.',     action => 'next_tab' },
-        { label => 'Prev Tab',       shortcut => 'Alt+,',     action => 'prev_tab' },
-        { separator => 1 },
-        { label => 'Toggle Diff',    shortcut => 'Alt+D',   action => 'toggle_diff' },
-        { separator => 1 },
-        { label => "Next Change",    shortcut => "Alt+N",   action => 'next_change' },
-        { label => "Prev Change",    shortcut => "Alt+P",   action => 'prev_change' },
-    ],
-);
-
-# Get menu item actions for a menu key (used by Menu.pm)
-sub get_menu_actions {
-    my ($class, $menu_key) = @_;
-    my $items = $MENU_ITEMS{$menu_key} // [];
-    return [ map { $_->{separator} ? '-' : $_->{action} } @$items ];
-}
-
-# Menu bar prefix width (menu pill + space)
-# Format: ' ' + RL + ' ☰ esc ' + RR + ' ' = 11 chars
-use constant MENU_ESC_PREFIX_WIDTH => 11;
 
 # Tab width for visual rendering
 use constant TAB_WIDTH => 4;
@@ -287,45 +221,6 @@ sub visual_to_char_col {
     return $len + ($visual_col - $current_visual);
 }
 
-# Menu bar buttons on the right side
-our @MENU_BAR_BUTTONS = (
-    { label => 'Files', key => '^B', action => 'toggle_tree', icon => 'folder' },
-    { label => 'Open', key => '^O', action => 'open', icon => 'folder_open' },
-    { label => 'Save', key => '^S', action => 'save', icon => 'save' },
-    { label => 'Quit', key => '^Q', action => 'quit', icon => 'quit' },
-);
-
-# Calculate menu positions dynamically from menu definitions
-# Returns hash: { f => { start => 0, end => 5, x => 1 }, ... }
-sub get_menu_positions {
-    my %positions;
-    my $x = MENU_ESC_PREFIX_WIDTH;  # Account for menu icon prefix
-
-    for my $menu (@MENU_DEFS) {
-        # Pill format: RL + space + [icon + space] + Name + space + RR
-        my $width = length($menu->{name}) + 4;  # edges + padding
-        # Add icon width (always present - either powerline or bullet)
-        if ($menu->{icon}) {
-            $width += 2;  # icon (1 display char) + space
-        }
-        $positions{$menu->{key}} = {
-            start => $x,                  # Start of clickable region (0-indexed)
-            end   => $x + $width - 1,     # End of clickable region (0-indexed)
-            x     => $x + 1,              # X position for dropdown (1-indexed for terminal)
-        };
-        $x += $width + 1;  # +1 for space between pills
-    }
-
-    return \%positions;
-}
-
-# Store and retrieve menu bar button positions for click handling
-{
-    my $_menu_bar_buttons = [];
-    sub _set_menu_bar_buttons { shift; $_menu_bar_buttons = shift; }
-    sub get_menu_bar_buttons { return @{$_menu_bar_buttons}; }
-}
-
 # Store and retrieve tab bar button positions for click handling
 # Each entry: { start => $x, end => $x, index => $tab_idx, type => 'tab'|'close' }
 {
@@ -393,12 +288,11 @@ sub render {
     # Move to top-left
     $output .= CURSOR_HOME;
 
-    # Calculate layout
-    my $menu_height = 1;
+    # Calculate layout (no menu bar — tab bar + ruler + text + status)
     my $tab_height = 1;
     my $ruler_height = 1;
     my $status_height = 1;
-    my $text_height = $rows - $menu_height - $tab_height - $ruler_height - $status_height;
+    my $text_height = $rows - $tab_height - $ruler_height - $status_height;
     $text_height = 1 if $text_height < 1;
 
     # Calculate gutter width based on line count
@@ -430,28 +324,24 @@ sub render {
     my $text_width = $cols - $tree_width - $gutter_width - $minimap_width;
     $text_width = MIN_TEXT_WIDTH if $text_width < MIN_TEXT_WIDTH;
 
-    # Render menu bar (row 1)
-    $output .= _move_to(1, 1);
-    $output .= $class->_render_menu_bar($theme, $cols, $ui);
-
-    # Render tree panel (rows 2..N-1, left columns)
-    # Tree starts at row 2 so it spans the full height below the menu bar
-    if ($tree_width > 0) {
-        my $tree_height = $text_height + 2;  # +2 for tab bar and ruler rows
+    # Render tree panel (left side, from row 1 to row N-1)
+    if ($tree_width > 0 && $tree) {
         $output .= $class->_render_tree_panel(
-            $tree, $tree_height, $theme, $tree_width, $ui
+            $tree, $rows - $status_height, $theme, $tree_width, $ui
         );
     }
 
-    # Render tab bar (row 2, right of tree)
-    $output .= _move_to(2, $tree_width + 1);
+    # Render tab bar (row 1)
+    $output .= _move_to(1, $tree_width + 1);
     $output .= $class->_render_tab_bar($theme, $cols, $ui, $tree_width);
 
-    # Render ruler bar (row 3, right of tree)
-    $output .= _move_to(3, $tree_width + 1);
-    $output .= $class->_render_ruler_bar($theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui);
+    # Render ruler (row 2)
+    $output .= _move_to(2, $tree_width + 1);
+    $output .= $class->_render_ruler_bar(
+        $theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui
+    );
 
-    # Render text area with line numbers (rows 4 to 4+text_height-1)
+    # Render text area (rows 3 to N-1)
     $output .= $class->_render_text_area(
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width, $highlighter,
@@ -473,64 +363,8 @@ sub render {
             $theme, $ui->{footer_input}, $cols
         );
     } else {
-        # Compute contextual hint for status bar
-        my ($status_hint, $hint_color);
-        if ($tree && $tree->focused()) {
-            # Tree focused: show tree-specific hints
-            my $node = $tree->cursor_node();
-            my $node_path = $node ? $node->{path} : '';
-            $status_hint = "\x{2191}\x{2193} nav  \x{2190}\x{2192} fold  Enter open  { } resize  / filter  Esc back";
-            $output .= $class->_render_status_bar(
-                $doc, $view, $theme, $cols, $node_path, $status_hint, undef
-            );
-        } else {
-            if ($doc && $view && !$message) {
-                if ($view->column_select()) {
-                    $status_hint = "COL MODE: Shift+Arrows resize  Alt+Click/Drag add  Ctrl+C/X/V column  Del/BS  Esc";
-                    $hint_color = $theme->color('column_indicator_fg');
-                } else {
-                    my $cl = $view->cursor_line();
-
-                    # Check line overflow first (higher priority, makes word wrap discoverable)
-                    my $line_overflows = 0;
-                    if (!$word_wrap_active) {
-                        my $cursor_content = $doc->get_line_content($cl);
-                        my ($exp_line) = _expand_tabs($cursor_content);
-                        $line_overflows = 1 if length($exp_line) > $text_width;
-                    }
-
-                    if ($line_overflows) {
-                        $status_hint = "Line extends beyond screen \x{00B7} Alt+Z toggle word wrap";
-                    } else {
-                        my $hunk_idx = $doc->vcs_hunk_at_line($cl);
-                        if (defined $hunk_idx) {
-                            my $hunks = $doc->vcs_hunks();
-                            my $h = $hunks->[$hunk_idx];
-                            my $type = $h->{type} // 'modified';
-                            if ($type eq 'added') {
-                                $hint_color = $theme->color('vcs_added');
-                            } elsif ($type eq 'deleted') {
-                                $hint_color = $theme->color('vcs_deleted');
-                            } else {
-                                $hint_color = $theme->color('vcs_modified');
-                            }
-                            $status_hint = "Alt+D expand diff \x{00B7} Alt+N/P next/prev";
-                        } else {
-                            $status_hint = "Alt+Shift+Arrows column select  Alt+Click/Drag  Alt+C column mode";
-                        }
-                    }
-                }
-            }
-            $output .= $class->_render_status_bar(
-                $doc, $view, $theme, $cols, $message, $status_hint, $hint_color
-            );
-        }
-    }
-
-    # Render dropdown menu if open
-    if ($ui->{menu_open}) {
-        $output .= $class->_render_dropdown(
-            $theme, $ui, $cols, $prefs
+        $output .= $class->_render_context_status_bar(
+            $doc, $view, $theme, $cols, $message, $ui, $word_wrap_active
         );
     }
 
@@ -541,8 +375,30 @@ sub render {
         );
     }
 
+    # Render command palette if open
+    if ($ui->{palette}) {
+        $output .= $class->_render_command_palette(
+            $theme, $ui->{palette}, $rows, $cols
+        );
+    }
+
+
     # Position cursor
-    if ($ui->{dialog}) {
+    if ($ui->{palette}) {
+        # Position cursor in palette filter input
+        my $palette = $ui->{palette};
+        my $pal_width = $cols - 4;
+        $pal_width = 60 if $pal_width > 60;
+        $pal_width = 30 if $pal_width < 30;
+        my $pal_x = int(($cols - $pal_width) / 2);
+        $pal_x = 1 if $pal_x < 1;
+        my $query_len = length($palette->{query} // '');
+        # Filter input is on row 2 of palette (y_start + 1), starting at x + 5 (box + space + icon + space)
+        my $pal_y = int(($rows - 20) / 2);
+        $pal_y = 2 if $pal_y < 2;
+        $output .= _move_to($pal_y + 1, $pal_x + 5 + $query_len);
+        $output .= SHOW_CURSOR;
+    } elsif ($ui->{dialog}) {
         # Dialogs position cursor themselves
         $output .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
@@ -620,9 +476,6 @@ sub render {
             $output .= _move_to($rows, $label_len + $cursor_in_field + 1);
         }
         $output .= SHOW_CURSOR;
-    } elsif ($ui->{menu_open}) {
-        # Hide cursor when menu is open so it doesn't shine through
-        $output .= HIDE_CURSOR;
     } elsif ($ui->{prompt}) {
         # Hide cursor during prompt - no text input
         $output .= HIDE_CURSOR;
@@ -630,7 +483,7 @@ sub render {
         # Tree is focused — show cursor in search bar (always row 2, above stickies)
         if ($ui->{file_tree}->filter_active()) {
             my $filter_len = length($ui->{file_tree}->filter_query() // '');
-            $output .= _move_to(2, 4 + $filter_len);  # search bar at row 2, " {icon} " = 3 chars prefix
+            $output .= _move_to(1, 4 + $filter_len);  # search bar at row 1, " {icon} " = 3 chars prefix
             $output .= SHOW_CURSOR;
         } else {
             $output .= HIDE_CURSOR;
@@ -638,123 +491,11 @@ sub render {
     } elsif ($view && $doc) {
         # Position terminal cursor for editing
         my ($cursor_row, $cursor_col) = $class->_cursor_screen_pos(
-            $view, $gutter_width, $menu_height, $doc, $tree_width
+            $view, $gutter_width, $doc, $tree_width
         );
         $output .= _move_to($cursor_row, $cursor_col);
         $output .= SHOW_CURSOR;
     }
-
-    return $output;
-}
-
-# Render the menu bar
-sub _render_menu_bar {
-    my ($class, $theme, $cols, $ui) = @_;
-
-    my $output = '';
-    $output .= $theme->color('menu_bg') . $theme->color('menu_fg');
-
-    # Left side: Menu icon as a subtle pill
-    my $menu_icon = Zepto::Chars->get('menu');
-    my $rl = Zepto::Chars->get('round_left');
-    my $rr = Zepto::Chars->get('round_right');
-
-    # Menu indicator pill
-    $output .= ' ';
-    $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-    $output .= $rl;
-    $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
-    $output .= " $menu_icon esc ";
-    $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-    $output .= $rr;
-    $output .= $theme->color('menu_fg') . ' ';
-
-    my $x = MENU_ESC_PREFIX_WIDTH;
-
-    # Menu names as rounded pills with icons
-    # Reset colors before starting menu pills to ensure clean state
-    $output .= RESET . $theme->color('menu_bg') . $theme->color('menu_fg');
-
-    for my $menu (@MENU_DEFS) {
-        my $is_active = ($ui->{menu_open} // '') eq $menu->{key};
-        my $icon = $menu->{icon} ? Zepto::Chars->get($menu->{icon}) : '';
-        my $icon_str = $icon ? "$icon " : '';
-        my $content = " $icon_str$menu->{name} ";
-
-        if ($is_active) {
-            # Active menu: colored pill
-            # Both edges: bg=menu bar, fg=pill interior (powerline chars fill with fg)
-            $output .= $theme->color('menu_bg') . $theme->color('menu_active_edge');
-            $output .= $rl;
-            $output .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
-            $output .= $content;
-            $output .= $theme->color('menu_bg') . $theme->color('menu_active_edge');
-            $output .= $rr;
-            $output .= $theme->color('menu_fg');
-        } else {
-            # Inactive menu: subtle pill
-            $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-            $output .= $rl;
-            $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
-            $output .= $content;
-            $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-            $output .= $rr;
-            $output .= $theme->color('menu_fg');
-        }
-
-        $output .= ' ';  # Space between pills
-        # Width: pill chars (2) + space + [icon + space if present] + name + space + trailing space
-        my $pill_width = length($menu->{name}) + 4;  # 2 edges + 2 spaces around name
-        $pill_width += 2 if $icon;  # icon (1 display char) + space (always, not just powerline)
-        $x += $pill_width + 1;  # +1 for space between pills
-    }
-
-    # Right side: Action buttons as rounded pills with icons + labels
-    my @buttons_copy;
-    my $buttons_width = 0;
-    for my $btn (@MENU_BAR_BUTTONS) {
-        # Get icon for button (always present, either powerline or bullet)
-        my $icon = $btn->{icon} ? Zepto::Chars->get($btn->{icon}) : '';
-        # Inner content: " icon label key " (3 template spaces + icon_str)
-        my $icon_str = $icon ? "$icon " : '';
-        my $btn_inner = " $icon_str$btn->{label} $btn->{key} ";
-        # Display width: 3 (spaces in template) + label + key + icon(2 if present)
-        my $inner_width = length($btn->{label}) + length($btn->{key}) + 3;
-        $inner_width += 2 if $icon;  # icon (1) + space (1)
-        # Total: rl(1) + inner + rr(1) + trailing_space(1)
-        my $btn_width = $inner_width + 3;
-        push @buttons_copy, {
-            %$btn,
-            inner => $btn_inner,
-            width => $btn_width,
-        };
-        $buttons_width += $btn_width;
-    }
-
-    # Fill middle with spaces
-    my $remaining = $cols - $x - $buttons_width;
-    $output .= ' ' x $remaining if $remaining > 0;
-
-    # Track button positions and render as pills
-    my $btn_x = $cols - $buttons_width;
-    for my $btn (@buttons_copy) {
-        $btn->{x_start} = $btn_x;
-        $btn->{x_end} = $btn_x + $btn->{width} - 2;  # -1 for trailing space
-        $btn_x += $btn->{width};
-
-        # Render button as pill (both edges: bg=menu, fg=pill interior)
-        $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-        $output .= $rl;
-        $output .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
-        $output .= $btn->{inner};
-        $output .= $theme->color('menu_bg') . $theme->color('menu_pill_edge');
-        $output .= $rr;
-        $output .= $theme->color('menu_fg') . ' ';
-    }
-    $class->_set_menu_bar_buttons(\@buttons_copy);
-
-    $output .= RESET;
-    $output .= CLEAR_LINE;
 
     return $output;
 }
@@ -1216,7 +957,7 @@ sub _render_ruler_bar {
         my $label_width = length($label);
         if ($label_width < $cols) {
             my $col_start = $cols - $label_width + 1;
-            $output .= _move_to(3, $col_start);
+            $output .= _move_to(2, $col_start);
             $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
             $output .= $label;
             push @ruler_buttons, {
@@ -1414,8 +1155,8 @@ sub _render_text_area {
     for my $screen_row (0 .. $height - 1) {
         my $entry = $entries[$screen_row];
 
-        # Position cursor at start of this row (row 4 is first text row, after menu, tabs, and ruler)
-        $output .= _move_to($screen_row + 4, $tree_width + 1);
+        # Position cursor at start of this row (row 3 is first text row, after tabs and ruler)
+        $output .= _move_to($screen_row + 3, $tree_width + 1);
 
         # Handle old-line entries (expanded hunk base content)
         if ($entry && $entry->{type} eq 'old') {
@@ -1926,7 +1667,7 @@ sub _render_tree_panel {
 
     # Always render search bar first (above stickies)
     if ($row_idx < $height) {
-        my $screen_row = $row_idx + 2;
+        my $screen_row = $row_idx + 1;
         $output .= _move_to($screen_row, 1);
         $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
         my $query = $tree->filter_query() // '';
@@ -1970,7 +1711,7 @@ sub _render_tree_panel {
     # Render sticky headers below search bar
     for my $sticky (@$stickies) {
         last if $row_idx >= $height;
-        my $screen_row = $row_idx + 2;  # tree starts at row 2
+        my $screen_row = $row_idx + 1;  # tree starts at row 1
 
         $output .= _move_to($screen_row, 1);
         $output .= $class->_render_tree_node_content(
@@ -1989,7 +1730,7 @@ sub _render_tree_panel {
     for my $i (0 .. $available - 1) {
         last if $row_idx >= $height;
         my $flat_idx = $scroll + $i;
-        my $screen_row = $row_idx + 2;
+        my $screen_row = $row_idx + 1;
 
         $output .= _move_to($screen_row, 1);
 
@@ -2906,99 +2647,324 @@ sub get_status_buttons { return @{$_status_buttons}; }
     sub get_ruler_buttons { return @{$_ruler_buttons}; }
 }
 
-# Render dropdown menu
-sub _render_dropdown {
-    my ($class, $theme, $ui, $total_cols, $prefs) = @_;
+# Store and retrieve palette button positions for click handling
+{
+    my $_palette_buttons = [];
+    sub _set_palette_buttons { shift; $_palette_buttons = shift; }
+    sub get_palette_buttons { return @{$_palette_buttons}; }
+}
+
+# =============================================================================
+# Context-Aware Status Bar with Pills
+# =============================================================================
+
+# Render a single pill and return (output_string, display_width)
+sub _render_pill {
+    my ($class, $theme, $icon, $label, $shortcut, $fg_key, $bg_key, $edge_key, $prev_bg_key) = @_;
 
     my $output = '';
+    my $rl = Zepto::Chars->get('round_left');
+    my $rr = Zepto::Chars->get('round_right');
+    my $powerline = Zepto::Chars->enabled();
 
-    my $menu_key = $ui->{menu_open};
-    my $selected = $ui->{menu_selected} // 0;
+    my $text = '';
+    $text .= "$icon " if $icon;
+    $text .= $label if $label;
+    $text .= " $shortcut" if $shortcut;
 
-    # Use shared menu definitions
-    my $items = $MENU_ITEMS{$menu_key} // [];
-    return $output unless @$items;
+    my $width;
 
-    # Calculate menu position and size (dynamically from menu definitions)
-    my $positions = get_menu_positions();
-    my $menu_x = $positions->{$menu_key}{x} // 1;
-
-    my $menu_width = MENU_DROPDOWN_WIDTH;
-    my $menu_height = scalar @$items + 2;  # +2 for top/bottom borders
-
-    # Get box drawing characters
-    my $box_tl = Zepto::Chars->get('box_tl');
-    my $box_tr = Zepto::Chars->get('box_tr');
-    my $box_bl = Zepto::Chars->get('box_bl');
-    my $box_br = Zepto::Chars->get('box_br');
-    my $box_h = Zepto::Chars->get('box_h');
-    my $box_v = Zepto::Chars->get('box_v');
-    my $arrow_r = Zepto::Chars->get('arrow_right');
-
-    # Top border (row 2, overlays tab bar — directly below menu bar)
-    $output .= _move_to(2, $menu_x);
-    $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
-    $output .= $box_tl . ($box_h x ($menu_width - 2)) . $box_tr;
-
-    # Menu items
-    for my $i (0 .. scalar(@$items) - 1) {
-        my $item = $items->[$i];
-        my $row = 3 + $i;  # Start below top border (row 2)
-
-        $output .= _move_to($row, $menu_x);
-        $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
-        $output .= $box_v;
-
-        if ($item->{separator}) {
-            $output .= $theme->color('dropdown_bg');
-            $output .= $theme->color('dropdown_border');
-            $output .= $box_h x ($menu_width - 2);
-        }
-        else {
-            my $is_selected = ($i == $selected);
-
-            if ($is_selected) {
-                $output .= $theme->color('dropdown_selected_bg');
-                $output .= $theme->color('dropdown_selected_fg');
-            }
-            else {
-                $output .= $theme->color('dropdown_bg');
-                $output .= $theme->color('dropdown_fg');
-            }
-
-            # Selection indicator: arrow when selected, spaces otherwise
-            my $prefix = $is_selected ? ($arrow_r . ' ') : '  ';
-            $output .= $prefix;
-
-            my $label = $item->{label} // '';
-            my $shortcut = $item->{shortcut} // '';
-
-            # Fixed prefix width of 2 (arrow or spaces)
-            my $label_space = $menu_width - 3 - 2 - length($shortcut);
-            if (length($label) > $label_space) {
-                $label = substr($label, 0, $label_space);
-            }
-
-            $output .= $label;
-            $output .= ' ' x ($label_space - length($label));
-
-            if ($shortcut && !$is_selected) {
-                $output .= $theme->color('dropdown_shortcut');
-            }
-            $output .= $shortcut;
-            $output .= ' ';
-        }
-
-        $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
-        $output .= $box_v;
-        $output .= RESET;
+    if ($powerline) {
+        # Powerline pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
+        $output .= $theme->color($bg_key) . $theme->color($fg_key);
+        $output .= " $text ";
+        $width = length($text) + 2;  # spaces
+    } else {
+        $output .= $theme->color($bg_key) . $theme->color($fg_key);
+        $output .= " $text ";
+        $width = length($text) + 2;
     }
 
-    # Bottom border
-    $output .= _move_to(3 + scalar(@$items), $menu_x);
-    $output .= $theme->color('dropdown_bg') . $theme->color('dropdown_border');
-    $output .= $box_bl . ($box_h x ($menu_width - 2)) . $box_br;
-    $output .= RESET;
+    return ($output, $width);
+}
+
+sub _render_context_status_bar {
+    my ($class, $doc, $view, $theme, $cols, $message, $ui, $word_wrap_active) = @_;
+
+    my $output = '';
+    my @buttons;
+    my $ar = Zepto::Chars->get('arrow_right');
+    my $powerline = Zepto::Chars->enabled();
+
+    # If there's a message, show it simply (same as before)
+    if ($message) {
+        $output .= $theme->color('status_bg') . $theme->color('warning_fg');
+        $output .= ' ' . $message;
+        my $padding = $cols - length($message) - 1;
+        $output .= ' ' x $padding if $padding > 0;
+        $output .= RESET . CLEAR_LINE;
+        $class->_set_status_buttons([]);
+        return $output;
+    }
+
+    # Tree-focused: show simplified hint bar
+    my $tree = $ui->{file_tree};
+    if ($tree && $tree->focused()) {
+        my $cursor_icon = Zepto::Chars->get('cursor_pos');
+        my $node = $tree->cursor_node();
+        my $node_path = $node ? $node->{path} : '';
+
+        $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
+        my $left_text = " $cursor_icon $node_path ";
+        $output .= $left_text;
+        my $left_width = length($left_text);
+
+        if ($powerline) {
+            my $tree_round_r = Zepto::Chars->get('round_right');
+            $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
+            $output .= $tree_round_r;
+            $left_width += 1;
+        }
+
+        # Right: palette trigger pill
+        my $palette_icon = Zepto::Chars->get('palette');
+        my $palette_text = " $palette_icon \x{2303}\x{2423} ";  # ⌃␣
+        my $palette_width = length($palette_text) + ($powerline ? 2 : 0);
+
+        # Middle fill
+        my $hint = "\x{2191}\x{2193} nav  \x{2190}\x{2192} fold  Enter open  / filter  Esc back";
+        my $middle = $cols - $left_width - $palette_width;
+        if ($middle > length($hint) + 2) {
+            $output .= $theme->color('status_bg') . $theme->color('status_dim');
+            $output .= ' ' . $hint;
+            my $remaining = $middle - length($hint) - 1;
+            $output .= ' ' x $remaining if $remaining > 0;
+        } else {
+            $output .= $theme->color('status_bg');
+            $output .= ' ' x $middle if $middle > 0;
+        }
+
+        # Palette trigger with rounded caps
+        if ($powerline) {
+            my $tree_round_l = Zepto::Chars->get('round_left');
+            my $tree_round_r2 = Zepto::Chars->get('round_right');
+            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            $output .= $tree_round_l;
+            $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+            $output .= $palette_text;
+            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            $output .= $tree_round_r2;
+        } else {
+            $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+            $output .= $palette_text;
+        }
+        push @buttons, {
+            x_start    => $cols - $palette_width + 1,
+            x_end      => $cols,
+            command_id => 'open_palette',
+        };
+
+        $output .= RESET . CLEAR_LINE;
+        $class->_set_status_buttons(\@buttons);
+        return $output;
+    }
+
+    # === Document context: build pill-based status bar ===
+
+    # 1. LEFT: Cursor position pill (always visible)
+    my $cursor_icon = Zepto::Chars->get('cursor_pos');
+    my $cursor_text;
+    if ($doc && $view) {
+        my $line = $view->cursor_line() + 1;
+        my $col = $view->cursor_col() + 1;
+        $cursor_text = "$cursor_icon $line:$col";
+    } else {
+        $cursor_text = "$cursor_icon 1:1";
+    }
+
+    $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
+    $output .= " $cursor_text ";
+    my $left_width = length($cursor_text) + 2;
+
+    # Column mode indicator (inline, if active)
+    if ($view && $view->column_select()) {
+        my $col_text;
+        if ($view->has_selection()) {
+            my ($top, $left, $bottom, $right) = $view->column_selection();
+            my $lines = $bottom - $top + 1;
+            my $rect_cols = $right - $left;
+            $col_text = $rect_cols > 0 ? "COL ${lines}\x{00D7}${rect_cols}" : "COL ${lines}";
+        } else {
+            $col_text = "COL";
+        }
+        $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+        $output .= " $col_text ";
+        $left_width += length($col_text) + 2;
+    }
+
+    my $round_l = Zepto::Chars->get('round_left');
+    my $round_r = Zepto::Chars->get('round_right');
+
+    if ($powerline) {
+        $output .= $theme->color('status_bg') . $theme->color('status_pos_edge');
+        $output .= $round_r;
+        $left_width += 1;
+    }
+
+    # 2. RIGHT: Palette trigger pill (always visible, rightmost)
+    my $palette_icon = Zepto::Chars->get('palette');
+    my $palette_text = " $palette_icon \x{2303}\x{2423} ";
+    my $palette_text_width = length($palette_text);
+    # Total palette width includes the round caps (left + right)
+    my $palette_total_width = $palette_text_width + ($powerline ? 2 : 0);
+
+    # 3. CENTER: Priority-based pills
+    my $editor = $ui->{editor};
+    # No trailing transition cost — each pill is self-contained with its own caps
+    my $available = $cols - $left_width - $palette_total_width;
+    $available = 0 if $available < 0;
+
+    # Collect pills sorted by priority
+    my @candidates;
+    if ($editor) {
+        my @cmds = Zepto::CommandRegistry->commands_for_status_bar('document', $cols, $editor);
+        for my $cmd (@cmds) {
+            my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+            my $shortcut = $cmd->{shortcut} // '';
+            my ($fg, $bg, $edge);
+
+            if ($cmd->{type} eq 'toggle') {
+                my $state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor);
+                my $state_display = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
+
+                # Determine effective on/off (handle theme specially)
+                my $is_on = $state ? 1 : 0;
+                if ($cmd->{pref} && $cmd->{pref} eq 'theme') {
+                    $is_on = 1;  # Theme is always "active"
+                }
+
+                if ($is_on) {
+                    $fg = 'pill_toggle_on_fg';
+                    $bg = 'pill_toggle_on_bg';
+                    $edge = 'pill_toggle_on_edge';
+                } else {
+                    $fg = 'pill_toggle_off_fg';
+                    $bg = 'pill_toggle_off_bg';
+                    $edge = 'pill_toggle_off_edge';
+                }
+
+                my $label = $cmd->{label};
+                if ($state_display ne '' && $state_display ne 'on' && $state_display ne 'off') {
+                    $label .= ":$state_display";
+                }
+
+                my $text = "$icon $label $shortcut";
+                my $pill_width = length($text) + 2;
+
+                push @candidates, {
+                    cmd      => $cmd,
+                    text     => $text,
+                    icon     => $icon,
+                    label    => $label,
+                    shortcut => $shortcut,
+                    fg       => $fg,
+                    bg       => $bg,
+                    edge     => $edge,
+                    width    => $pill_width,
+                    priority => $cmd->{priority},
+                    is_on    => $is_on,
+                };
+            }
+            elsif ($cmd->{type} eq 'action') {
+                my $label = $cmd->{label};
+                my $text = "$icon $label $shortcut";
+                my $pill_width = length($text) + 2;
+
+                push @candidates, {
+                    cmd      => $cmd,
+                    text     => $text,
+                    icon     => $icon,
+                    label    => $label,
+                    shortcut => $shortcut,
+                    fg       => 'pill_action_fg',
+                    bg       => 'pill_action_bg',
+                    edge     => 'pill_action_edge',
+                    width    => $pill_width,
+                    priority => $cmd->{priority},
+                };
+            }
+        }
+    }
+
+    # Greedily fit pills into available space
+    my @pills_to_render;
+    my $used = 0;
+    for my $pill (@candidates) {
+        # Each pill costs: content + caps (2 if powerline) + 1 space gap
+        my $pw = $pill->{width} + ($powerline ? 3 : 1);
+        last if $used + $pw > $available;
+        push @pills_to_render, $pill;
+        $used += $pw;
+    }
+
+    # Render center pills with rounded caps
+    my $center_col = $left_width + 1;
+    for my $i (0 .. $#pills_to_render) {
+        my $pill = $pills_to_render[$i];
+
+        if ($powerline) {
+            # Left round cap
+            $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
+            $output .= $round_l;
+            $center_col += 1;
+        }
+
+        $output .= $theme->color($pill->{bg}) . $theme->color($pill->{fg});
+        $output .= " $pill->{text} ";
+        push @buttons, {
+            x_start    => $center_col,
+            x_end      => $center_col + $pill->{width} - 1,
+            command_id => $pill->{cmd}{id},
+        };
+        $center_col += $pill->{width};
+
+        if ($powerline) {
+            # Right round cap
+            $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
+            $output .= $round_r;
+            $center_col += 1;
+        }
+
+        # Gap between pills
+        $output .= $theme->color('status_bg') . ' ';
+        $center_col += 1;
+    }
+
+    # Middle fill
+    my $remaining = $cols - $center_col - $palette_total_width + 1;
+    $remaining = 0 if $remaining < 0;
+    $output .= $theme->color('status_bg');
+    $output .= ' ' x $remaining if $remaining > 0;
+
+    # Palette trigger pill (rightmost) with rounded caps
+    if ($powerline) {
+        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        $output .= $round_l;
+    }
+    $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+    $output .= $palette_text;
+    if ($powerline) {
+        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        $output .= $round_r;
+    }
+    push @buttons, {
+        x_start    => $cols - $palette_total_width + 1,
+        x_end      => $cols,
+        command_id => 'open_palette',
+    };
+
+    $output .= RESET . CLEAR_LINE;
+    $class->_set_status_buttons(\@buttons);
 
     return $output;
 }
@@ -3101,7 +3067,7 @@ sub _render_dialog {
 
 # Calculate screen position for cursor
 sub _cursor_screen_pos {
-    my ($class, $view, $gutter_width, $menu_height, $doc, $tree_width) = @_;
+    my ($class, $view, $gutter_width, $doc, $tree_width) = @_;
     $tree_width //= 0;
 
     my $cursor_line = $view->cursor_line();
@@ -3115,12 +3081,15 @@ sub _cursor_screen_pos {
         : '';
     my $visual_cursor_col = _char_to_visual_col($cursor_line_content, $cursor_col);
 
+    # Text starts at row 3 (after tab bar at 1, ruler at 2)
+    my $row_offset = 3;
+
     # Account for word wrap via WrapMap
     my $wm = $view->wrap_map();
     if ($wm) {
         my ($vrow, $vcol) = $wm->doc_to_visual($cursor_line, $cursor_col, $view->cursor_affinity());
         my $scroll_vrow = $view->scroll_visual_row();
-        my $screen_row = $vrow - $scroll_vrow + $menu_height + 3;
+        my $screen_row = $vrow - $scroll_vrow + $row_offset;
         my $screen_col = $vcol + $tree_width + $gutter_width + 1;
         return ($screen_row, $screen_col);
     }
@@ -3131,10 +3100,9 @@ sub _cursor_screen_pos {
     if ($lm && $lm->has_expanded_hunks()) {
         my $cursor_display = $lm->doc_line_to_display($cursor_line);
         my $scroll_display = $lm->scroll_display_start($scroll_line);
-        $screen_row = $cursor_display - $scroll_display + $menu_height + 3;
+        $screen_row = $cursor_display - $scroll_display + $row_offset;
     } else {
-        # +3 for menu bar, tab bar, and ruler bar
-        $screen_row = $cursor_line - $scroll_line + $menu_height + 3;
+        $screen_row = $cursor_line - $scroll_line + $row_offset;
     }
     my $screen_col = $visual_cursor_col - $scroll_col + $tree_width + $gutter_width + 1;  # +1 for 1-indexed
 
@@ -3681,5 +3649,243 @@ sub _render_prompt {
 # =============================================================================
 # File Picker Rendering
 # =============================================================================
+
+# =============================================================================
+# Command Palette Rendering
+# =============================================================================
+
+sub _render_command_palette {
+    my ($class, $theme, $palette, $total_rows, $total_cols) = @_;
+
+    my $output = '';
+
+    my $query    = $palette->{query} // '';
+    my $cursor   = $palette->{cursor} // 0;
+    my $scroll   = $palette->{scroll} // 0;
+    my $filtered = $palette->{filtered} // [];
+    my $editor   = $palette->{editor};
+
+    # Palette dimensions
+    my $pal_width = $total_cols - 4;
+    $pal_width = 60 if $pal_width > 60;
+    $pal_width = 30 if $pal_width < 30;
+
+    my $max_items = $total_rows - 6;
+    $max_items = 5 if $max_items < 5;
+    $max_items = 30 if $max_items > 30;
+
+    my $item_count = scalar @$filtered;
+    # Fixed height: always use max_items so palette doesn't resize when filtering
+    my $visible_items = $max_items;
+
+    # Palette height: border(1) + filter(1) + separator(1) + items + border(1)
+    my $pal_height = 3 + $visible_items + 1;
+
+    # Center palette
+    my $x = int(($total_cols - $pal_width) / 2);
+    my $y = int(($total_rows - $pal_height) / 2);
+    $x = 1 if $x < 1;
+    $y = 2 if $y < 2;
+
+    # Update visible rows for scroll management (write back to editor via palette hash)
+    if ($editor) {
+        $editor->{palette_visible_rows} = $visible_items;
+    }
+
+    # Get box drawing characters
+    my $box_tl = Zepto::Chars->get('box_tl');
+    my $box_tr = Zepto::Chars->get('box_tr');
+    my $box_bl = Zepto::Chars->get('box_bl');
+    my $box_br = Zepto::Chars->get('box_br');
+    my $box_h  = Zepto::Chars->get('box_h');
+    my $box_v  = Zepto::Chars->get('box_v');
+    my $ar     = Zepto::Chars->get('arrow_right');
+
+    # Colors - reuse dropdown palette which is already themed
+    my $bg        = $theme->color('dropdown_bg');
+    my $fg        = $theme->color('dropdown_fg');
+    my $sel_bg    = $theme->color('dropdown_selected_bg');
+    my $sel_fg    = $theme->color('dropdown_selected_fg');
+    my $border_fg = $theme->color('dropdown_border');
+    my $shortcut_fg = $theme->color('dropdown_shortcut');
+
+    # === Top border with title ===
+    my $title = " \x{2303}\x{2423} Commands ";  # ⌃␣ Commands
+    my $title_len = length($title);
+    my $border_left = int(($pal_width - 2 - $title_len) / 2);
+    $border_left = 0 if $border_left < 0;
+    my $border_right = $pal_width - 2 - $border_left - $title_len;
+    $border_right = 0 if $border_right < 0;
+
+    $output .= _move_to($y, $x);
+    $output .= $bg . $border_fg;
+    $output .= $box_tl;
+    $output .= $box_h x $border_left;
+    $output .= $fg . $title;
+    $output .= $border_fg;
+    $output .= $box_h x $border_right;
+    $output .= $box_tr;
+
+    # === Filter input row ===
+    $output .= _move_to($y + 1, $x);
+    $output .= $bg . $border_fg . $box_v;
+
+    my $filter_icon = Zepto::Chars->get('filter');
+    my $inner_width = $pal_width - 2;  # inside the box borders
+
+    # Input area: icon + space + query + padding
+    $output .= $bg . $fg;
+    $output .= " $filter_icon ";
+    my $input_area = $inner_width - 4;  # -4 for " icon space" + trailing space
+    my $display_query = $query;
+    if (length($display_query) > $input_area) {
+        $display_query = substr($display_query, length($display_query) - $input_area);
+    }
+    $output .= $theme->color('dialog_input_fg');
+    $output .= $display_query;
+    $output .= $fg;
+    my $qpad = $input_area - length($display_query);
+    $output .= ' ' x $qpad if $qpad > 0;
+    $output .= ' ';
+
+    $output .= $border_fg . $box_v;
+
+    # === Separator row ===
+    $output .= _move_to($y + 2, $x);
+    $output .= $bg . $border_fg;
+    $output .= "\x{251C}";  # ├
+    $output .= $box_h x ($pal_width - 2);
+    $output .= "\x{2524}";  # ┤
+
+    # === Item rows ===
+    my @buttons;
+    my $current_section = '';
+
+    for my $vi (0 .. $visible_items - 1) {
+        my $item_idx = $scroll + $vi;
+        my $row_y = $y + 3 + $vi;
+
+        $output .= _move_to($row_y, $x);
+        $output .= $bg . $border_fg . $box_v;
+
+        if ($item_idx < $item_count) {
+            my $cmd = $filtered->[$item_idx];
+            my $is_selected = ($item_idx == $cursor);
+
+            # Section header (inline label when section changes)
+            my $section_label = '';
+            if ($cmd->{section} ne $current_section && length($query) == 0) {
+                $current_section = $cmd->{section};
+                # We'll show section as a faint prefix on the first item of that section
+            }
+
+            # Row background
+            if ($is_selected) {
+                $output .= $sel_bg . $sel_fg;
+            } else {
+                $output .= $bg . $fg;
+            }
+
+            # Selection indicator
+            my $prefix = $is_selected ? ($ar . ' ') : '  ';
+            $output .= $prefix;
+
+            # Icon
+            my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+            $output .= "$icon ";
+
+            # Shortcut
+            my $shortcut = $cmd->{shortcut} // '';
+            my $shortcut_display = $shortcut;
+            my $shortcut_width = length($shortcut_display);
+
+            # Toggle state (right-aligned)
+            my $toggle_text = '';
+            if ($cmd->{type} eq 'toggle' && $editor) {
+                my $state = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
+                $toggle_text = "[$state]" if $state ne '';
+            }
+            my $toggle_width = length($toggle_text);
+
+            # Label - fill remaining space
+            my $label = $cmd->{label} // '';
+            # Available: inner_width - 2(prefix) - 2(icon+space) - shortcut - toggle - spaces
+            my $label_space = $inner_width - 2 - 2 - $shortcut_width - 1 - $toggle_width - 2;
+            $label_space = 4 if $label_space < 4;
+
+            if (length($label) > $label_space) {
+                $label = substr($label, 0, $label_space - 1) . "\x{2026}";  # …
+            }
+
+            $output .= $label;
+            my $label_pad = $label_space - length($label);
+            $output .= ' ' x $label_pad if $label_pad > 0;
+            $output .= ' ';
+
+            # Shortcut (dimmed unless selected)
+            if (!$is_selected) {
+                $output .= $shortcut_fg;
+            }
+            $output .= $shortcut_display;
+
+            # Toggle state
+            if ($toggle_width > 0) {
+                $output .= ' ';
+                if ($is_selected) {
+                    $output .= $toggle_text;
+                } else {
+                    $output .= $shortcut_fg . $toggle_text;
+                }
+            }
+
+            # Pad to fill row
+            my $content_len = 2 + 2 + length($label) + $label_pad + 1 + $shortcut_width + ($toggle_width > 0 ? 1 + $toggle_width : 0);
+            my $row_pad = $inner_width - $content_len;
+            if ($is_selected) {
+                $output .= $sel_bg;
+            } else {
+                $output .= $bg;
+            }
+            $output .= ' ' x $row_pad if $row_pad > 0;
+
+            # Store button region for click handling
+            push @buttons, {
+                y       => $row_y,
+                x_start => $x + 1,
+                x_end   => $x + $pal_width - 2,
+                index   => $item_idx,
+            };
+        } else {
+            # Empty row (fixed-height palette may have unfilled rows)
+            $output .= $bg . (' ' x $inner_width);
+        }
+
+        $output .= $border_fg . $box_v;
+        $output .= RESET;
+    }
+
+    # === Bottom border ===
+    my $bottom_y = $y + 3 + $visible_items;
+    $output .= _move_to($bottom_y, $x);
+    $output .= $bg . $border_fg;
+    $output .= $box_bl;
+
+    # Bottom border content: item count hint
+    my $count_text = " $item_count commands ";
+    my $bottom_border_left = int(($pal_width - 2 - length($count_text)) / 2);
+    $bottom_border_left = 0 if $bottom_border_left < 0;
+    my $bottom_border_right = $pal_width - 2 - $bottom_border_left - length($count_text);
+    $bottom_border_right = 0 if $bottom_border_right < 0;
+    $output .= $box_h x $bottom_border_left;
+    $output .= $fg . $count_text;
+    $output .= $border_fg;
+    $output .= $box_h x $bottom_border_right;
+    $output .= $box_br;
+    $output .= RESET;
+
+    $class->_set_palette_buttons(\@buttons);
+
+    return $output;
+}
 
 1;

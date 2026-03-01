@@ -71,6 +71,33 @@ use constant {
     NF_CLOSE            => "\x{f00d}",  #  (same as NF_TIMES)
 };
 
+# Nerd Font icons for status bar and command palette
+use constant {
+    NF_UNDO             => "\x{f0e2}",  #  undo
+    NF_REDO             => "\x{f01e}",  #  redo
+    NF_CUT              => "\x{f0c4}",  #  scissors
+    NF_COPY             => "\x{f0c5}",  #  copy
+    NF_PASTE            => "\x{f0ea}",  #  paste
+    NF_WRAP             => "\x{f0ea}",  #  wrap (reusing paste icon - visually similar to wrap)
+    NF_COLUMNS          => "\x{f0db}",  #  columns
+    NF_DIFF             => "\x{f121}",  #  code/diff
+    NF_GOTO             => "\x{f0dc}",  #  sort/goto
+    NF_SUN              => "\x{f185}",  #  sun (light theme)
+    NF_MOON             => "\x{f186}",  #  moon (dark theme)
+    NF_PLUS             => "\x{f067}",  #  plus (new file)
+    NF_MAP              => "\x{f279}",  #  map (minimap)
+    NF_INDENT           => "\x{f03c}",  #  indent
+    NF_SELECT_ALL       => "\x{f245}",  #  select all / cursor
+    NF_ARROW_UP         => "\x{f062}",  #  arrow up
+    NF_ARROW_DOWN       => "\x{f063}",  #  arrow down
+    NF_PALETTE          => "\x{f0c9}",  #  palette trigger (hamburger)
+    NF_CHEVRON_UP       => "\x{f077}",  #  chevron up
+    NF_CHEVRON_DOWN     => "\x{f078}",  #  chevron down
+    NF_FILTER           => "\x{f0b0}",  #  filter/funnel
+    NF_KEYBOARD         => "\x{f11c}",  #  keyboard
+    NF_LINE_NUM_ICON    => "\x{e0a1}",  #  line number (powerline)
+};
+
 # Simple toggle indicators (single-width, more compatible)
 use constant {
     TOGGLE_ON           => "\x{25cf}",  # ● (filled circle)
@@ -155,6 +182,35 @@ my %CHARS = (
     check               => [ NF_CHECK,            "\x{2713}"  ],  # ✓
     times               => [ NF_TIMES,            "\x{2717}"  ],  # ✗
     modified            => [ NF_MODIFIED,         "\x{2022}"  ],
+
+    # Status bar / palette icons
+    undo                => [ NF_UNDO,           "\x{2022}"  ],
+    redo                => [ NF_REDO,           "\x{2022}"  ],
+    cut                 => [ NF_CUT,            "\x{2022}"  ],
+    copy                => [ NF_COPY,           "\x{2022}"  ],
+    paste               => [ NF_PASTE,          "\x{2022}"  ],
+    wrap                => [ NF_WRAP,           'W'         ],
+    columns             => [ NF_COLUMNS,        'C'         ],
+    diff                => [ NF_DIFF,           'D'         ],
+    goto                => [ NF_GOTO,           '#'         ],
+    theme_light         => [ NF_SUN,            '*'         ],
+    theme_dark          => [ NF_MOON,           '*'         ],
+    new_file            => [ NF_PLUS,           '+'         ],
+    minimap             => [ NF_MAP,            'M'         ],
+    indent              => [ NF_INDENT,         '>'         ],
+    select_all          => [ NF_SELECT_ALL,     '*'         ],
+    move_up             => [ NF_ARROW_UP,       '^'         ],
+    move_down           => [ NF_ARROW_DOWN,     'v'         ],
+    palette             => [ NF_PALETTE,        '='         ],
+    chevron_up          => [ NF_CHEVRON_UP,     '^'         ],
+    chevron_down        => [ NF_CHEVRON_DOWN,   'v'         ],
+    filter              => [ NF_FILTER,         '>'         ],
+    keyboard            => [ NF_KEYBOARD,       'K'         ],
+    cursor_pos          => [ NF_LINE_NUM_ICON,  ':'         ],
+    dup_up              => [ NF_CHEVRON_UP,     '^'         ],
+    dup_down            => [ NF_CHEVRON_DOWN,   'v'         ],
+    next_change         => [ NF_CHEVRON_DOWN,   'v'         ],
+    prev_change         => [ NF_CHEVRON_UP,     '^'         ],
 
     # VCS gutter indicators (same in both modes)
     vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐

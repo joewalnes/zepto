@@ -41,6 +41,8 @@ my %priority = (
     'lib/Zepto/Highlighter.pm' => 100,
     # Renderer needs Highlighter
     'lib/Zepto/Renderer.pm'    => 110,
+    # CommandRegistry must come before Editor (Palette references its constants)
+    'lib/Zepto/CommandRegistry.pm' => 115,
     # Editor needs everything above
     'lib/Zepto/Editor.pm'      => 120,
 );

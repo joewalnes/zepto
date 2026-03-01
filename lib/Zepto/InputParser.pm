@@ -349,6 +349,11 @@ sub _parse_control {
     if ($ord == 13) { return { type => EVT_KEY, key => KEY_ENTER, modifiers => [] }; }  # CR only
     if ($ord == 8)  { return { type => EVT_KEY, key => KEY_BACKSPACE, modifiers => [] }; }
 
+    # Ctrl+Space sends NUL (0x00)
+    if ($ord == 0) {
+        return $self->_make_char_event(' ', ['ctrl']);
+    }
+
     # Ctrl+letter (1-26 = Ctrl+A through Ctrl+Z)
     if ($ord >= 1 && $ord <= 26) {
         my $char = chr(ord('a') + $ord - 1);

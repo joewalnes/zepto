@@ -81,7 +81,7 @@ subtest 'Construction with preferences' => sub {
 # ============================================================================
 subtest 'State constants' => sub {
     is(Zepto::Editor::STATE_EDITING, 'editing', 'STATE_EDITING');
-    is(Zepto::Editor::STATE_MENU, 'menu', 'STATE_MENU');
+    is(Zepto::Editor::STATE_PALETTE, 'palette', 'STATE_PALETTE');
     is(Zepto::Editor::STATE_DIALOG, 'dialog', 'STATE_DIALOG');
     is(Zepto::Editor::STATE_PROMPT, 'prompt', 'STATE_PROMPT');
     is(Zepto::Editor::STATE_FOOTER_INPUT, 'footer_input', 'STATE_FOOTER_INPUT');
@@ -90,93 +90,37 @@ subtest 'State constants' => sub {
 };
 
 # ============================================================================
-# Menu operations
+# Command palette operations
 # ============================================================================
-subtest 'Open menu' => sub {
+subtest 'Open command palette' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_menu('f');
-    is($editor->{state}, 'menu', 'State is menu');
-    is($editor->{menu_open}, 'f', 'File menu open');
-    is($editor->{menu_selected}, 0, 'First item selected');
+    $editor->cmd_open_palette();
+    is($editor->{state}, 'palette', 'State is palette');
+    is($editor->{palette_query}, '', 'Query starts empty');
+    is($editor->{palette_cursor}, 0, 'Cursor starts at 0');
 };
 
-subtest 'Close menu' => sub {
+subtest 'Close command palette' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_menu('e');
-    $editor->close_menu();
+    $editor->cmd_open_palette();
+    $editor->close_palette();
     is($editor->{state}, 'editing', 'State is editing');
-    is($editor->{menu_open}, undef, 'Menu closed');
+    is($editor->{palette_query}, '', 'Query cleared');
 };
 
-subtest 'Navigate menus' => sub {
+subtest 'Palette escape closes' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_menu('f');
-    $editor->next_menu();
-    is($editor->{menu_open}, 'e', 'Next menu is Edit');
+    $editor->cmd_open_palette();
+    is($editor->{state}, 'palette', 'Palette open');
 
-    $editor->next_menu();
-    is($editor->{menu_open}, 's', 'Next menu is Search');
-
-    $editor->prev_menu();
-    is($editor->{menu_open}, 'e', 'Prev menu is Edit');
-};
-
-subtest 'Click on menu item' => sub {
-    use Zepto::Renderer;
-
-    my $term = mock_terminal();
-    my $filename = create_temp_file("test content\n");
-    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    setup_editor_doc($editor, $filename);
-
-    # Open the Edit menu
-    $editor->open_menu('e');
-    is($editor->{state}, 'menu', 'Menu is open');
-
-    # Get the position of the Edit menu dropdown
-    my $positions = Zepto::Renderer::get_menu_positions();
-    my $menu_x = $positions->{e}{x};
-
-    # Simulate clicking outside dropdown area - y=2 is tab bar, not in dropdown
-    my $event = {
-        type => 'mouse',
-        action => 'press',
-        x => $menu_x + 2,  # Inside the dropdown
-        y => 2,            # First item row
-    };
-    $editor->handle_menu_event($event);
-
-    # Menu should have closed after executing item
-    is($editor->{state}, 'editing', 'Menu closed after clicking item');
-};
-
-subtest 'Click outside menu closes it' => sub {
-    my $term = mock_terminal();
-    my $filename = create_temp_file("test content\n");
-    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    setup_editor_doc($editor, $filename);
-
-    # Open the File menu
-    $editor->open_menu('f');
-    is($editor->{state}, 'menu', 'Menu is open');
-
-    # Simulate clicking outside the menu dropdown (far right)
-    my $event = {
-        type => 'mouse',
-        action => 'press',
-        x => 70,  # Far outside menu
-        y => 5,   # Below menu items
-    };
-    $editor->handle_menu_event($event);
-
-    # Menu should have closed
-    is($editor->{state}, 'editing', 'Menu closed after clicking outside');
+    $editor->handle_palette_event({ type => 'key', key => 'escape' });
+    is($editor->{state}, 'editing', 'Palette closed after escape');
 };
 
 # ============================================================================
@@ -919,10 +863,10 @@ subtest 'Editor does not quit on escape sequences' => sub {
     $editor->handle_input("\x1b[<0;10;5M");  # Mouse press
     is($editor->{state}, 'editing', 'Still editing after mouse event');
 
-    # Lone escape opens menu (new behavior)
+    # Lone escape with nothing to cancel is a no-op (stays in editing)
     $editor->handle_input("\x1b");
     $editor->flush_pending_input();
-    is($editor->{state}, 'menu', 'Lone escape opens menu');
+    is($editor->{state}, 'editing', 'Lone escape is no-op when nothing to cancel');
 };
 
 subtest 'Only quit commands trigger quit' => sub {
@@ -1298,33 +1242,25 @@ subtest 'Footer input escape cancels' => sub {
 };
 
 # ============================================================================
-# Menu bar Open button
+# Palette type-to-filter
 # ============================================================================
-subtest 'Click Open button in menu bar' => sub {
-    use Zepto::Renderer;
-
+subtest 'Palette type-to-filter' => sub {
     my $term = mock_terminal();
-    my $filename = create_temp_file("Content\n");
-    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
-    setup_editor_doc($editor, $filename);
+    my $editor = Zepto::Editor->new(terminal => $term);
 
-    # Render once to set up button positions
-    # We need to manually trigger the rendering to populate button positions
-    my $cols = 80;
-    Zepto::Renderer->_render_menu_bar($editor->{theme}, $cols, {});
+    $editor->cmd_open_palette();
+    my $initial_count = scalar @{$editor->{palette_filtered}};
+    ok($initial_count > 0, 'Palette has commands when opened');
 
-    my @buttons = Zepto::Renderer::get_menu_bar_buttons();
-    ok(scalar(@buttons) >= 3, 'At least 3 buttons (Open, Save, Quit)');
+    # Type a filter query
+    $editor->handle_palette_event({ type => 'char', char => 's', modifiers => [] });
+    $editor->handle_palette_event({ type => 'char', char => 'a', modifiers => [] });
+    $editor->handle_palette_event({ type => 'char', char => 'v', modifiers => [] });
+    is($editor->{palette_query}, 'sav', 'Query is "sav"');
 
-    # Find the Open button
-    my ($open_btn) = grep { $_->{action} eq 'open' } @buttons;
-    ok($open_btn, 'Open button exists');
-
-    # Click on it
-    my $x = int(($open_btn->{x_start} + $open_btn->{x_end}) / 2);
-    $editor->handle_menu_click($x);
-
-    ok($editor->{file_tree} && $editor->{file_tree}->focused(), 'Clicking Open button focuses tree with filter');
+    my $filtered_count = scalar @{$editor->{palette_filtered}};
+    ok($filtered_count <= $initial_count, 'Filtered list is smaller or equal');
+    ok($filtered_count > 0, 'At least one match for "sav"');
 };
 
 # ============================================================================

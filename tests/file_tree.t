@@ -19,7 +19,7 @@ my $tmpdir = tempdir(CLEANUP => 1);
 #   lib/
 #     Editor/
 #       Commands.pm
-#       Menu.pm
+#       Palette.pm
 #     Document.pm
 #     Editor.pm
 #   src/
@@ -35,7 +35,7 @@ my $tmpdir = tempdir(CLEANUP => 1);
 
 my @test_files = (
     'lib/Editor/Commands.pm',
-    'lib/Editor/Menu.pm',
+    'lib/Editor/Palette.pm',
     'lib/Document.pm',
     'lib/Editor.pm',
     'src/utils/helpers/format.js',
