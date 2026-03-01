@@ -545,13 +545,11 @@ sub handle_editing_event {
         # Navigation / Line movement
         if ($key eq 'up') {
             if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_up(); }
-            elsif ($ctrl && $shift) { $self->do_duplicate_line_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
             else { $view->move_up($shift); }
         }
         elsif ($key eq 'down') {
             if (($alt && $shift) || ($alt && $ctrl)) { $self->do_column_select_down(); }
-            elsif ($ctrl && $shift) { $self->do_duplicate_line_down(); }
             elsif ($alt) { $self->do_move_line_down(); }
             else { $view->move_down($shift); }
         }
@@ -652,6 +650,8 @@ sub handle_ctrl_char {
     elsif ($char eq 'c') { $self->cmd_copy(); }
     elsif ($char eq 'v') { $self->cmd_paste(); }
     elsif ($char eq 'a') { $self->cmd_select_all(); }
+    elsif ($char eq 'u') { $self->do_duplicate_line_up(); }
+    elsif ($char eq 'd') { $self->do_duplicate_line_down(); }
 
     # Search operations
     elsif ($char eq 'f') { $self->cmd_find(); }
@@ -691,6 +691,9 @@ sub handle_alt_char {
 
     # Word wrap toggle
     elsif ($char eq 'z') { $self->cmd_toggle_word_wrap(); }
+
+    # Powerline/Nerd Font toggle
+    elsif ($char eq 'i') { $self->cmd_toggle_powerline(); }
 
     # Change navigation
     elsif ($char eq 'n') { $self->cmd_next_change(); }
@@ -856,7 +859,7 @@ sub handle_mouse_event {
         my $text_height = $rows_size - RESERVED_ROWS;  # tab + ruler + status
         $text_height = 1 if $text_height < 1;
         my $minimap_width = Zepto::Renderer->get_minimap_width(
-            $line_count, $text_height, $cols_size, $gutter_width, $self->{prefs}
+            $line_count, $text_height, $cols_size, $gutter_width, $self->{prefs}, $tree_width
         );
         if ($minimap_width > 0 && $x > $cols_size - $minimap_width) {
             $self->{minimap_dragging} = 1;
@@ -999,11 +1002,12 @@ sub handle_mouse_event {
             return;
         }
 
+        # Scroll viewport without moving cursor for smooth desktop-like feel
         if ($event->{button} eq 'up') {
-            $view->move_up() for (1..3);
+            $view->scroll_up(3);
         }
         else {
-            $view->move_down() for (1..3);
+            $view->scroll_down(3);
         }
     }
     elsif ($action eq 'drag') {
@@ -3187,17 +3191,17 @@ sub render {
             # Disable wrap while diff hunks are expanded
             $self->active_view()->set_wrap_map(undef);
         } else {
-            # Compute actual text content width (accounting for tree, minimap)
-            my $minimap_width = 0;
-            if ($self->{prefs}->show_minimap() && $self->active_doc()->line_count() > ($rows - RESERVED_ROWS)) {
-                my $tentative = $cols - $gutter_width - Zepto::Renderer::MINIMAP_WIDTH;
-                $minimap_width = Zepto::Renderer::MINIMAP_WIDTH if $tentative >= Zepto::Renderer::MIN_TEXT_WIDTH;
-            }
+            # Compute actual text content width (tree has priority over minimap)
             my $tree_width = 0;
             if ($self->{file_tree} && $self->{prefs}->show_tree() && $self->{file_tree}->panel_width() > 0) {
                 my $tw = $self->{file_tree}->panel_width() + 1;
-                my $remaining = $cols - $tw - $gutter_width - $minimap_width;
+                my $remaining = $cols - $tw - $gutter_width;
                 $tree_width = $tw if $remaining >= Zepto::Renderer::MIN_TEXT_WIDTH;
+            }
+            my $minimap_width = 0;
+            if ($self->{prefs}->show_minimap() && $self->active_doc()->line_count() > ($rows - RESERVED_ROWS)) {
+                my $tentative = $cols - $tree_width - $gutter_width - Zepto::Renderer::MINIMAP_WIDTH;
+                $minimap_width = Zepto::Renderer::MINIMAP_WIDTH if $tentative >= Zepto::Renderer::MIN_TEXT_WIDTH;
             }
             my $wrap_width = $cols - $tree_width - $gutter_width - $minimap_width;
             $wrap_width = Zepto::Renderer::MIN_TEXT_WIDTH if $wrap_width < Zepto::Renderer::MIN_TEXT_WIDTH;

@@ -46,7 +46,8 @@ subtest 'cmd_open_palette sets STATE_PALETTE' => sub {
     $editor->cmd_open_palette();
     is($editor->{state}, STATE_PALETTE, 'State is palette after open');
     is($editor->{palette_query}, '', 'Query starts empty');
-    is($editor->{palette_cursor}, 0, 'Cursor starts at 0');
+    # Cursor starts on first command (skipping section header at index 0)
+    is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
     ok(scalar @{$editor->{palette_filtered}} > 0, 'Filtered list populated');
 };
 
@@ -139,8 +140,11 @@ subtest 'Backspace removes characters from query' => sub {
 
     $editor->handle_event({ type => 'key', key => 'backspace', modifiers => [] });
     is($editor->{palette_query}, '', 'Backspace cleared query');
-    is(scalar @{$editor->{palette_filtered}}, scalar(Zepto::CommandRegistry->all_commands()),
-       'Empty query shows all commands');
+    # Empty query shows all commands + section headers (4 sections)
+    my $cmd_count = scalar(Zepto::CommandRegistry->all_commands());
+    my $section_count = scalar(Zepto::CommandRegistry->section_order());
+    is(scalar @{$editor->{palette_filtered}}, $cmd_count + $section_count,
+       'Empty query shows all commands plus section headers');
 };
 
 # =============================================================================
@@ -150,25 +154,26 @@ subtest 'Backspace removes characters from query' => sub {
 subtest 'Arrow keys move cursor' => sub {
     my $editor = make_editor();
     $editor->cmd_open_palette();
-    is($editor->{palette_cursor}, 0, 'Cursor starts at 0');
-
-    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
-    is($editor->{palette_cursor}, 1, 'Down moves to 1');
+    # Cursor starts at 1 (first command, after DOCUMENT header at 0)
+    is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (first command)');
 
     $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
     is($editor->{palette_cursor}, 2, 'Down moves to 2');
 
+    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
+    is($editor->{palette_cursor}, 3, 'Down moves to 3');
+
     $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
-    is($editor->{palette_cursor}, 1, 'Up moves back to 1');
+    is($editor->{palette_cursor}, 2, 'Up moves back to 2');
 };
 
 subtest 'Cursor clamps at boundaries' => sub {
     my $editor = make_editor();
     $editor->cmd_open_palette();
 
-    # Move up from 0 - should stay at 0
+    # Move up from first command - should stay at first command (skip header)
     $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
-    is($editor->{palette_cursor}, 0, 'Up from 0 stays at 0');
+    is($editor->{palette_cursor}, 1, 'Up from first command stays at first command (skips header)');
 
     # Move to last item
     my $max = scalar @{$editor->{palette_filtered}} - 1;
@@ -281,15 +286,25 @@ subtest 'Mouse click outside palette closes it' => sub {
 # Palette filtered list integrity
 # =============================================================================
 
-subtest 'Filtered list contains valid commands' => sub {
+subtest 'Filtered list contains valid commands and section headers' => sub {
     my $editor = make_editor();
     $editor->cmd_open_palette();
 
-    for my $cmd (@{$editor->{palette_filtered}}) {
-        ok(defined $cmd->{id}, "Command has id: $cmd->{id}");
-        ok(defined $cmd->{label}, "Command has label: $cmd->{label}");
-        ok(defined $cmd->{method}, "Command has method: $cmd->{method}");
+    my $header_count = 0;
+    my $cmd_count = 0;
+    for my $item (@{$editor->{palette_filtered}}) {
+        if ($item->{_is_header}) {
+            ok(defined $item->{label}, "Header has label: $item->{label}");
+            $header_count++;
+        } else {
+            ok(defined $item->{id}, "Command has id: $item->{id}");
+            ok(defined $item->{label}, "Command has label: $item->{label}");
+            ok(defined $item->{method}, "Command has method: $item->{method}");
+            $cmd_count++;
+        }
     }
+    is($header_count, scalar(Zepto::CommandRegistry->section_order()), 'Has expected section headers');
+    is($cmd_count, scalar(Zepto::CommandRegistry->all_commands()), 'Has all commands');
 };
 
 subtest 'Nonsense query returns empty filtered list' => sub {

@@ -1018,6 +1018,17 @@ subtest 'get_minimap_width returns 0 for narrow terminal' => sub {
     is($width, 0, 'Minimap hidden for narrow terminal');
 };
 
+subtest 'get_minimap_width accounts for tree_width' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+    # cols=40, gutter=5, tree=20, minimap=8 => text=40-20-5-8=7 < MIN_TEXT_WIDTH
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 40, 5, $prefs, 20);
+    is($width, 0, 'Minimap drops off when tree takes space');
+
+    # Without tree: cols=40, gutter=5, minimap=8 => text=27 >= MIN_TEXT_WIDTH
+    my $width2 = Zepto::Renderer->get_minimap_width(100, 20, 40, 5, $prefs, 0);
+    is($width2, 8, 'Minimap shows when tree is not present');
+};
+
 # =============================================================================
 # Display width helpers for wide character handling
 # =============================================================================

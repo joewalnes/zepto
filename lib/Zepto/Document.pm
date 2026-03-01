@@ -519,6 +519,14 @@ sub _compute_vcs_diff {
     my ($self) = @_;
     return unless $self->{_vcs_provider};
 
+    # No base content means file is untracked/new — no diff markers to show
+    if (!defined $self->{_vcs_base} || $self->{_vcs_base} eq '') {
+        $self->{_vcs_diff} = undef;
+        $self->{_vcs_dirty} = 0;
+        $self->{_vcs_last_diff} = time();
+        return;
+    }
+
     my $current_text = $self->{buffer}->text();
     $self->{_vcs_diff} = Zepto::Diff->diff($self->{_vcs_base}, $current_text);
     $self->{_vcs_dirty} = 0;

@@ -252,10 +252,11 @@ sub get_gutter_width {
 # Calculate the minimap width for given parameters.
 # Returns 0 if minimap should be hidden.
 sub get_minimap_width {
-    my ($class, $line_count, $text_height, $cols, $gutter_width, $prefs) = @_;
+    my ($class, $line_count, $text_height, $cols, $gutter_width, $prefs, $tree_width) = @_;
+    $tree_width //= 0;
     return 0 unless $prefs && $prefs->show_minimap();
     return 0 unless $line_count > $text_height;
-    my $tentative_text = $cols - $gutter_width - MINIMAP_WIDTH;
+    my $tentative_text = $cols - $tree_width - $gutter_width - MINIMAP_WIDTH;
     return $tentative_text >= MIN_TEXT_WIDTH ? MINIMAP_WIDTH : 0;
 }
 
@@ -299,25 +300,24 @@ sub render {
     my $line_count = $doc ? $doc->line_count() : 1;
     my $gutter_width = $class->get_gutter_width($line_count);
 
-    # Determine minimap width
-    my $show_minimap = $prefs && $prefs->show_minimap();
-    my $minimap_width = 0;
-    if ($show_minimap && $doc && $line_count > $text_height) {
-        # Show minimap when document is taller than viewport
-        my $tentative_text = $cols - $gutter_width - MINIMAP_WIDTH;
-        if ($tentative_text >= MIN_TEXT_WIDTH) {
-            $minimap_width = MINIMAP_WIDTH;
-        }
-    }
-
-    # Calculate tree panel width (panel + border column)
+    # Calculate tree panel width first (tree has higher priority than minimap)
     my $tree = $ui->{file_tree};
     my $tree_width = 0;
     if ($tree && $tree->panel_width() > 0) {
         my $tw = $tree->panel_width() + 1;  # +1 for border column
-        my $remaining = $cols - $tw - $gutter_width - $minimap_width;
+        my $remaining = $cols - $tw - $gutter_width;
         if ($remaining >= MIN_TEXT_WIDTH) {
             $tree_width = $tw;
+        }
+    }
+
+    # Determine minimap width (drops before file tree at narrow widths)
+    my $show_minimap = $prefs && $prefs->show_minimap();
+    my $minimap_width = 0;
+    if ($show_minimap && $doc && $line_count > $text_height) {
+        my $tentative_text = $cols - $tree_width - $gutter_width - MINIMAP_WIDTH;
+        if ($tentative_text >= MIN_TEXT_WIDTH) {
+            $minimap_width = MINIMAP_WIDTH;
         }
     }
 
@@ -1698,7 +1698,7 @@ sub _render_tree_panel {
             my $unit = $match_count == 1 ? 'file' : 'files';
             $suffix = " $match_count $unit ";
         } elsif (!$filter_active) {
-            $suffix = " ^O ";
+            $suffix = " " . Zepto::CommandRegistry::SYM_CTRL() . "O ";
         }
 
         my $display = $prefix . $query;
@@ -2745,34 +2745,63 @@ sub _render_context_status_bar {
             $left_width += 1;
         }
 
+        my $round_l = Zepto::Chars->get('round_left');
+        my $round_r = Zepto::Chars->get('round_right');
+
         # Right: palette trigger pill
         my $palette_icon = Zepto::Chars->get('palette');
         my $palette_text = " $palette_icon \x{2303}\x{2423} ";  # ⌃␣
         my $palette_width = length($palette_text) + ($powerline ? 2 : 0);
 
-        # Middle fill
-        my $hint = "\x{2191}\x{2193} nav  \x{2190}\x{2192} fold  Enter open  / filter  Esc back";
-        my $middle = $cols - $left_width - $palette_width;
-        if ($middle > length($hint) + 2) {
-            $output .= $theme->color('status_bg') . $theme->color('status_dim');
-            $output .= ' ' . $hint;
-            my $remaining = $middle - length($hint) - 1;
-            $output .= ' ' x $remaining if $remaining > 0;
-        } else {
-            $output .= $theme->color('status_bg');
-            $output .= ' ' x $middle if $middle > 0;
+        # Middle: tree-context hint pills
+        my $nav_icon = Zepto::Chars->get('cursor_pos');
+        my @tree_pills = (
+            { text => "$nav_icon \x{2191}\x{2193}", fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { text => "\x{2190}\x{2192} fold",      fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { text => "\x{21B5} open",               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { text => "/ filter",                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { text => "Esc back",                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+        );
+
+        my $available = $cols - $left_width - $palette_width;
+        $available = 0 if $available < 0;
+        my $center_col = $left_width + 1;
+
+        for my $pill (@tree_pills) {
+            my $pw = length($pill->{text}) + 2 + ($powerline ? 3 : 1);
+            last if ($center_col - $left_width) + $pw > $available;
+
+            if ($powerline) {
+                $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
+                $output .= $round_l;
+                $center_col += 1;
+            }
+            $output .= $theme->color($pill->{bg}) . $theme->color($pill->{fg});
+            $output .= " $pill->{text} ";
+            $center_col += length($pill->{text}) + 2;
+            if ($powerline) {
+                $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
+                $output .= $round_r;
+                $center_col += 1;
+            }
+            $output .= $theme->color('status_bg') . ' ';
+            $center_col += 1;
         }
+
+        # Fill remaining space
+        my $remaining = $cols - $center_col - $palette_width + 1;
+        $remaining = 0 if $remaining < 0;
+        $output .= $theme->color('status_bg');
+        $output .= ' ' x $remaining if $remaining > 0;
 
         # Palette trigger with rounded caps
         if ($powerline) {
-            my $tree_round_l = Zepto::Chars->get('round_left');
-            my $tree_round_r2 = Zepto::Chars->get('round_right');
             $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $tree_round_l;
+            $output .= $round_l;
             $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
             $output .= $palette_text;
             $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $tree_round_r2;
+            $output .= $round_r;
         } else {
             $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
             $output .= $palette_text;
@@ -3484,7 +3513,7 @@ sub _render_find_bar {
         $content .= $rl;
         $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
         $content .= ' .* ';
-        $content .= $theme->color('status_dim') . '^R';
+        $content .= $theme->color('status_dim') . Zepto::CommandRegistry::SYM_CTRL() . 'R';
         $content .= $theme->color('menu_active_text') . ' ';
         $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
         $content .= $rr;
@@ -3493,7 +3522,7 @@ sub _render_find_bar {
         $content .= $rl;
         $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
         $content .= ' .* ';
-        $content .= $theme->color('status_dim') . '^R';
+        $content .= $theme->color('status_dim') . Zepto::CommandRegistry::SYM_CTRL() . 'R';
         $content .= $theme->color('menu_pill_text') . ' ';
         $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
         $content .= $rr;
@@ -3511,7 +3540,7 @@ sub _render_find_bar {
         $content .= $rl;
         $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
         $content .= ' Aa ';
-        $content .= $theme->color('status_dim') . '^C';
+        $content .= $theme->color('status_dim') . Zepto::CommandRegistry::SYM_CTRL() . 'C';
         $content .= $theme->color('menu_active_text') . ' ';
         $content .= $theme->color('status_bg') . $theme->color('menu_active_edge');
         $content .= $rr;
@@ -3520,7 +3549,7 @@ sub _render_find_bar {
         $content .= $rl;
         $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
         $content .= ' Aa ';
-        $content .= $theme->color('status_dim') . '^C';
+        $content .= $theme->color('status_dim') . Zepto::CommandRegistry::SYM_CTRL() . 'C';
         $content .= $theme->color('menu_pill_text') . ' ';
         $content .= $theme->color('status_bg') . $theme->color('menu_pill_edge');
         $content .= $rr;
@@ -3789,14 +3818,22 @@ sub _render_command_palette {
 
         if ($item_idx < $item_count) {
             my $cmd = $filtered->[$item_idx];
-            my $is_selected = ($item_idx == $cursor);
 
-            # Section header (inline label when section changes)
-            my $section_label = '';
-            if ($cmd->{section} ne $current_section && length($query) == 0) {
-                $current_section = $cmd->{section};
-                # We'll show section as a faint prefix on the first item of that section
+            # Section header row
+            if ($cmd->{_is_header}) {
+                $output .= $bg . $shortcut_fg;
+                my $header_label = "  \x{2500}\x{2500} " . $cmd->{label} . " ";
+                my $header_pad = $inner_width - length($header_label);
+                $header_pad = 0 if $header_pad < 0;
+                $output .= $header_label;
+                # Fill remaining space with light horizontal line
+                $output .= "\x{2500}" x $header_pad if $header_pad > 0;
+                $output .= $border_fg . $box_v;
+                $output .= RESET;
+                next;
             }
+
+            my $is_selected = ($item_idx == $cursor);
 
             # Row background
             if ($is_selected) {

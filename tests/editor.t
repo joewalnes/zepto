@@ -99,7 +99,7 @@ subtest 'Open command palette' => sub {
     $editor->cmd_open_palette();
     is($editor->{state}, 'palette', 'State is palette');
     is($editor->{palette_query}, '', 'Query starts empty');
-    is($editor->{palette_cursor}, 0, 'Cursor starts at 0');
+    is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
 };
 
 subtest 'Close command palette' => sub {
