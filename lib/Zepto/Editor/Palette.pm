@@ -120,12 +120,30 @@ sub handle_palette_event {
 sub _palette_update_filtered {
     my ($self) = @_;
     my @filtered = Zepto::CommandRegistry->filter_commands($self->{palette_query});
+
+    # When no query, insert section headers before each group
+    if (length($self->{palette_query}) == 0) {
+        my @with_headers;
+        my $current_section = '';
+        for my $cmd (@filtered) {
+            if (($cmd->{section} // '') ne $current_section) {
+                $current_section = $cmd->{section};
+                push @with_headers, { _is_header => 1, label => $current_section };
+            }
+            push @with_headers, $cmd;
+        }
+        @filtered = @with_headers;
+    }
+
     $self->{palette_filtered} = \@filtered;
 
     # Clamp cursor to valid range
     my $max = scalar(@filtered) - 1;
     $max = 0 if $max < 0;
     $self->{palette_cursor} = $max if $self->{palette_cursor} > $max;
+
+    # Ensure cursor is not on a section header
+    $self->_palette_skip_headers(1);
 }
 
 sub _palette_move_cursor {
@@ -138,8 +156,39 @@ sub _palette_move_cursor {
     $new_pos = $count - 1 if $new_pos >= $count;
     $self->{palette_cursor} = $new_pos;
 
+    # Skip section headers in the direction of movement
+    $self->_palette_skip_headers($delta > 0 ? 1 : -1);
+
     # Ensure cursor is visible within scroll window
     $self->_palette_ensure_visible();
+}
+
+sub _palette_skip_headers {
+    my ($self, $direction) = @_;
+    my $filtered = $self->{palette_filtered};
+    my $count = scalar @$filtered;
+    return unless $count > 0;
+
+    $direction = 1 unless defined $direction;
+    my $cursor = $self->{palette_cursor};
+
+    # Move past headers in the given direction
+    while ($cursor >= 0 && $cursor < $count && $filtered->[$cursor]{_is_header}) {
+        $cursor += $direction;
+    }
+
+    # If we went off the end, try the other direction
+    if ($cursor < 0 || $cursor >= $count) {
+        $cursor = $self->{palette_cursor};
+        $direction = -$direction;
+        while ($cursor >= 0 && $cursor < $count && $filtered->[$cursor]{_is_header}) {
+            $cursor += $direction;
+        }
+    }
+
+    $cursor = 0 if $cursor < 0;
+    $cursor = $count - 1 if $cursor >= $count;
+    $self->{palette_cursor} = $cursor;
 }
 
 sub _palette_ensure_visible {
@@ -167,6 +216,7 @@ sub _palette_execute_selected {
 
     my $cmd = $filtered->[$self->{palette_cursor}];
     return unless $cmd;
+    return if $cmd->{_is_header};  # Section headers are not executable
 
     if ($cmd->{type} eq 'toggle') {
         # Toggle commands: execute and stay open (update state live)
