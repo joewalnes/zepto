@@ -1110,6 +1110,19 @@ sub handle_mouse_event {
 sub handle_tab_bar_click {
     my ($self, $x) = @_;
 
+    # Clicking the tab bar always returns focus from file tree to editor
+    if ($self->{file_tree} && $self->{file_tree}->focused()) {
+        my $tree = $self->{file_tree};
+        # Close transient preview tab created by tree navigation
+        if ($tree->{preview_active} && !$tree->{_preview_is_existing_tab}) {
+            $self->_close_preview_tab();
+        }
+        $tree->{preview_active} = 0;
+        $tree->{preview_path} = undef;
+        $tree->{pre_preview_tab_index} = undef;
+        $tree->set_focused(0);
+    }
+
     my @buttons = Zepto::Renderer->get_tab_bar_buttons();
 
     # Check scroll arrows first
@@ -2163,6 +2176,9 @@ sub do_enter {
 
     $doc->insert($offset, "\n" . $indent);
 
+    # Invalidate wrap map so move_down() sees the updated line count
+    $view->invalidate_wrap_map();
+
     # Move to start of new line (after indent)
     $view->move_down();
     $view->move_to_line_start();
@@ -2961,7 +2977,9 @@ sub _tree_preview_current {
     return if $tree->{preview_path} && $tree->{preview_path} eq $path;
 
     # Skip preview for large files to avoid UI freeze
-    my $file_size = -s $path;
+    # Use absolute path for stat since tree paths may be relative
+    my $abs_path = File::Spec->rel2abs($path, $tree->root_path());
+    my $file_size = -s $abs_path;
     if (defined $file_size && $file_size > PREVIEW_MAX_FILE_SIZE) {
         # Cancel any active preview and show nothing
         if ($tree->{preview_active}) {

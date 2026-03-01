@@ -10,17 +10,25 @@ Priority scale:
 
 ## Existing bugs
 
-### P0: New file Enter key puts cursor at beginning of current line instead of next line
+### ~~P0: New file Enter key puts cursor at beginning of current line instead of next line~~ FIXED
 Create new doc, type a line of text on the last line (which for a new doc is also the first line), press Enter. Cursor jumps to beginning of current line, not next line.
 
-### P0: File tree click on tab should unfocus tree and focus document
+**Fix:** Invalidate WrapMap after inserting newline so `move_down()` sees the updated line count. Root cause was stale WrapMap state when word wrap is active.
+
+### ~~P0: File tree click on tab should unfocus tree and focus document~~ FIXED
 When file explorer or file fuzzy find is focused, clicking on a document/tab should unfocus the tree and focus on the document.
 
-### P0: File tree preview hides for certain files
+**Fix:** Added tree unfocus + preview cleanup at the start of `handle_tab_bar_click()`. Any click on the tab bar area now returns focus to the editor.
+
+### ~~P0: File tree preview hides for certain files~~ FIXED
 When exploring files in the zepto src dir, moving cursor over `lib/Zepto/Editor.pm` and `Renderer.pm` hides the preview. Other files seem fine.
 
-### P0: Saving one new file also saves another new file
+**Fix:** Used `File::Spec->rel2abs()` with the tree's root_path when checking file size for the preview limit. The `-s` operator was failing on relative paths. **Note:** Large files (>100KB) are intentionally skipped for preview — Editor.pm (111KB) and Renderer.pm (147KB) will now correctly show "no preview" instead of glitching. Manual test: navigate to these files in the tree and verify they don't cause the preview to disappear entirely.
+
+### ~~P0: Saving one new file also saves another new file~~ FIXED
 Open editor, create new file, create another new file. Save the second file with a name. The first file also seems to be saved.
+
+**Fix:** After Save As, update the tab's `file_path` and clear `untitled_name` so the tab manager correctly tracks which file belongs to which tab. Root cause was Document getting a path but the Tab staying as untitled. **Manual test:** Create two untitled tabs, save tab 2 as "test.txt", verify tab 1 still shows as [untitled].
 
 ### P0: Editor does not detect or reload externally changed files
 When a file open in zepto is modified outside the editor (e.g. by `git checkout`, another editor, a build script, or `save` from a second zepto instance), the buffer keeps the stale content with no indication that the disk version has changed. This leads to silent data loss: the user overwrites the newer external changes on the next save.
