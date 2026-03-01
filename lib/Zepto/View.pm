@@ -540,6 +540,7 @@ sub clear_selection {
     my ($self) = @_;
     $self->{selection_anchor_line} = undef;
     $self->{selection_anchor_col} = undef;
+    $self->{column_select} = 0;
 }
 
 # Get selection as (start_line, start_col, end_line, end_col)
