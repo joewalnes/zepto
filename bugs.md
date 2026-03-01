@@ -152,6 +152,30 @@ At 160 columns the palette remains single-column with the same width as at 100 c
 
 ## Open bugs
 
+### P2: Unified input widget missing
+
+Find bar, Go To Line, Save As prompt, and command palette filter are separate input implementations with inconsistent editing semantics. They should share a common input widget supporting: left/right, word left/right, home/end, select all, selection with Shift, cut/copy/paste, mouse click to place cursor.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Inputs And Text Editing.
+
+### P2: Global navigation keys not audited across all UI states
+
+Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prompts, find mode, file tree, palette). An audit is needed to verify each one works from every surface.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Navigation And Focus: "Core global shortcuts work in every UI state."
+
+### P3: Mouse parity incomplete
+
+Double-click word selection, triple-click line selection, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
+
+### P3: Theme contrast not verified
+
+Dark and light themes have not been formally audited for readability or contrast. Non-color cues (icons, text) for state changes (VCS markers, selection, errors) should be verified in both modes.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Colors And Readability.
+
 ### ~~P1: Shift+Alt+Left/Right should select by word, not column select~~ FIXED
 Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is word movement with selection (standard across most editors). Instead, it triggers column selection mode. Column selection needs an alternative keybinding.
 
