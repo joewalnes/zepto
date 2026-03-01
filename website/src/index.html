@@ -173,11 +173,18 @@
             margin-top: 0.25rem;
         }
 
-        /* ---- Screencap placeholders ---- */
+        /* ---- Screencaps ---- */
         .screencap {
+            border-radius: 6px;
+            max-width: 100%;
+        }
+        img.screencap {
+            display: block;
+            height: auto;
+        }
+        div.screencap {
             background: var(--bg-deep);
             border: 1px dashed var(--border);
-            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -291,7 +298,7 @@
                  highlighting. Menu bar visible at top, line numbers in gutter,
                  colorful syntax-highlighted code in the buffer, status bar at bottom.
                  Dark theme. Shows that this is a real, modern-looking terminal editor. -->
-            <div class="screencap screencap-hero hero-screencap">screencap: editor overview with syntax highlighting</div>
+            <img class="screencap screencap-hero hero-screencap" src="screencaps/hero.gif" alt="Zepto editor with syntax highlighting">
 
             <div class="hero-text">
                 <h1><span class="hero-title"><span class="typewriter"><span class="prompt">$</span><span>z</span><span>e</span><span>p</span><span>t</span><span>o</span></span><span class="hero-cursor"></span></span></h1>

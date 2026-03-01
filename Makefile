@@ -1,4 +1,4 @@
-.PHONY: all test test-verbose clean build install check loc website website-clean
+.PHONY: all test test-verbose clean build install check loc website website-screencaps website-clean
 
 PREFIX ?= $(HOME)/.local
 
@@ -21,11 +21,20 @@ test-one:
 test-timing:
 	@time prove -l tests/*.t
 
-# Build website (copy src to out)
-website:
+# Build website (render screencaps, copy src to out)
+website: website-screencaps
 	@mkdir -p website/out
 	@cp -r website/src/* website/out
 	@echo "Website built: website/out/"
+
+# Render screencaps from .tape files (requires vhs, ffmpeg, ttyd)
+website-screencaps:
+	@mkdir -p website/out/screencaps
+	@for tape in website/tapes/*.tape; do \
+		echo "Recording $$tape..."; \
+		vhs "$$tape" || exit 1; \
+	done
+	@echo "Screencaps rendered: website/out/screencaps/"
 
 # Clean temporary files
 clean:
