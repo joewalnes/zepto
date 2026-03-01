@@ -30,7 +30,7 @@ Open editor, create new file, create another new file. Save the second file with
 
 **Fix:** After Save As, update the tab's `file_path` and clear `untitled_name` so the tab manager correctly tracks which file belongs to which tab. Root cause was Document getting a path but the Tab staying as untitled. **Manual test:** Create two untitled tabs, save tab 2 as "test.txt", verify tab 1 still shows as [untitled].
 
-### P0: Editor does not detect or reload externally changed files
+### ~~P0: Editor does not detect or reload externally changed files~~ FIXED
 When a file open in zepto is modified outside the editor (e.g. by `git checkout`, another editor, a build script, or `save` from a second zepto instance), the buffer keeps the stale content with no indication that the disk version has changed. This leads to silent data loss: the user overwrites the newer external changes on the next save.
 
 **Expected behavior — no local modifications (clean buffer):**
@@ -46,6 +46,8 @@ Show a persistent status bar message (not time-based) such as:
 The warning should reappear on every subsequent focus until the user chooses an action. It must not auto-dismiss.
 
 **Detection:** Poll `stat()` mtime on each render cycle or input event (cheap). Compare against the mtime recorded at last load/save. No filesystem watchers needed for a minimal editor.
+
+**Fix:** Added mtime tracking to Document (captured at load and save). On each render cycle, check if the file's mtime has changed. Clean buffers are silently reloaded with cursor restored. Dirty buffers show a prompt: `[R]eload [K]eep local`. Undo/redo stacks are cleared on reload. **Decisions:** Skipped `[D]iff` option from the original spec to keep the prompt simple — can add later. **Manual test:** Open a file, modify it externally (e.g. `echo "new" > file`), press any key in zepto — should reload silently if clean, or prompt if dirty.
 
 ### P1: Diff gutter markers should extend across wrapped continuation lines
 When word wrap is enabled, diff gutter markers only appear on the first display row of a wrapped line. They should extend across all continuation lines.

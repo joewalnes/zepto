@@ -3135,6 +3135,11 @@ sub render {
     # Update VCS diff if needed (debounced)
     $self->active_doc()->update_vcs_diff();
 
+    # Check for external file changes (only in editing state, not during prompts)
+    if ($self->{state} eq STATE_EDITING) {
+        $self->_check_external_file_changes();
+    }
+
     # If we have a LineMap, keep it in sync with current hunks/doc count
     if ($self->active_view()->line_map()) {
         my $lm = $self->active_view()->line_map();
@@ -3273,6 +3278,76 @@ sub show_message {
     my ($self, $msg) = @_;
     $self->{message} = $msg;
     $self->{message_time} = time();
+}
+
+# =============================================================================
+# External file change detection
+# =============================================================================
+
+sub _check_external_file_changes {
+    my ($self) = @_;
+    my $doc = $self->active_doc();
+    return unless $doc && defined $doc->path();
+
+    return unless $doc->check_external_changes();
+
+    if ($doc->is_dirty()) {
+        # Buffer has local modifications — ask the user
+        my $name = $doc->filename() // $doc->path();
+        $self->open_prompt(
+            text => "File '$name' changed on disk.",
+            options => [
+                { key => 'r', label => 'Reload' },
+                { key => 'k', label => 'Keep local' },
+            ],
+            on_select => sub {
+                my ($choice) = @_;
+                if ($choice eq 'r') {
+                    my $view = $self->active_view();
+                    my $old_line = $view->cursor_line();
+                    my $old_col = $view->cursor_col();
+                    eval { $doc->reload_from_disk(); };
+                    if ($@) {
+                        $self->show_message("Reload error: $@");
+                        return;
+                    }
+                    # Restore cursor (clamped to valid range)
+                    my $max_line = $doc->line_count() - 1;
+                    $max_line = 0 if $max_line < 0;
+                    my $new_line = $old_line > $max_line ? $max_line : $old_line;
+                    my $max_col = $doc->line_length($new_line);
+                    my $new_col = $old_col > $max_col ? $max_col : $old_col;
+                    $view->set_cursor($new_line, $new_col);
+                    $view->invalidate_wrap_map();
+                    $self->show_message("Reloaded: $name");
+                }
+                elsif ($choice eq 'k') {
+                    # User chose to keep local — update mtime so we don't re-prompt
+                    $doc->_capture_file_mtime();
+                    $self->show_message("Keeping local changes");
+                }
+            },
+        );
+    }
+    else {
+        # No local modifications — silently reload
+        my $view = $self->active_view();
+        my $old_line = $view->cursor_line();
+        my $old_col = $view->cursor_col();
+        eval { $doc->reload_from_disk(); };
+        if ($@) {
+            $self->show_message("Reload error: $@");
+            return;
+        }
+        # Restore cursor (clamped to valid range)
+        my $max_line = $doc->line_count() - 1;
+        $max_line = 0 if $max_line < 0;
+        my $new_line = $old_line > $max_line ? $max_line : $old_line;
+        my $max_col = $doc->line_length($new_line);
+        my $new_col = $old_col > $max_col ? $max_col : $old_col;
+        $view->set_cursor($new_line, $new_col);
+        $view->invalidate_wrap_map();
+    }
 }
 
 1;
