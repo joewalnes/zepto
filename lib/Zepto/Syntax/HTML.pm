@@ -18,10 +18,73 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+# Zepto::Syntax::CSS and Zepto::Syntax::TypeScript are used for embedded
+# highlighting. They're not loaded here because in the single-file bundle
+# all packages are already available. They're instantiated lazily below.
+
 # Multi-line states
 use constant STATE_COMMENT     => 20;  # Inside <!-- -->
-use constant STATE_SCRIPT      => 21;  # Inside <script>
-use constant STATE_STYLE       => 22;  # Inside <style>
+
+# Embedded language states: base + sub-grammar state
+# Script states (base 30)
+use constant STATE_SCRIPT_BASE => 30;
+# Style states (base 40)
+use constant STATE_STYLE_BASE  => 40;
+
+# For backwards compat, keep old names pointing to base states
+use constant STATE_SCRIPT      => 30;
+use constant STATE_STYLE       => 40;
+
+sub _css_grammar {
+    my ($self) = @_;
+    unless ($self->{_css_grammar}) {
+        eval "require Zepto::Syntax::CSS" unless Zepto::Syntax::CSS->can('new');
+        $self->{_css_grammar} = Zepto::Syntax::CSS->new();
+    }
+    $self->{_css_grammar};
+}
+
+sub _js_grammar {
+    my ($self) = @_;
+    unless ($self->{_js_grammar}) {
+        eval "require Zepto::Syntax::TypeScript" unless Zepto::Syntax::TypeScript->can('new');
+        $self->{_js_grammar} = Zepto::Syntax::TypeScript->new();
+    }
+    $self->{_js_grammar};
+}
+
+# Delegate tokenization to an embedded grammar.
+# Returns ($tokens_ref, $new_pos, $new_html_state)
+sub _delegate_embedded {
+    my ($self, $line, $pos, $close_re, $grammar, $state_base, $sub_state) = @_;
+    my @tokens;
+    my $rest = substr($line, $pos);
+
+    if ($rest =~ /$close_re/) {
+        my $tag_start = $-[0];
+        my $tag_end = $+[0];
+        # Tokenize content before closing tag with sub-grammar
+        if ($tag_start > 0) {
+            my $content = substr($rest, 0, $tag_start);
+            my ($sub_tokens) = $grammar->tokenize($content, $sub_state);
+            # Offset token positions
+            for my $tok (@$sub_tokens) {
+                push @tokens, _token($pos + $tok->{start}, $pos + $tok->{end}, $tok->{type});
+            }
+        }
+        # The closing tag
+        push @tokens, _token($pos + $tag_start, $pos + $tag_end, TOKEN_TAG);
+        return (\@tokens, $pos + $tag_end, STATE_NORMAL);
+    } else {
+        # Entire line is embedded content
+        my $content = substr($line, $pos);
+        my ($sub_tokens, $new_sub_state) = $grammar->tokenize($content, $sub_state);
+        for my $tok (@$sub_tokens) {
+            push @tokens, _token($pos + $tok->{start}, $pos + $tok->{end}, $tok->{type});
+        }
+        return (\@tokens, length($line), $state_base + $new_sub_state);
+    }
+}
 
 sub tokenize {
     my ($self, $line, $state) = @_;
@@ -29,7 +92,7 @@ sub tokenize {
     my $pos = 0;
     my $len = length($line);
 
-    return ([], STATE_NORMAL) if $len == 0;
+    return ([], $state // STATE_NORMAL) if $len == 0;
 
     # Handle multi-line comment state
     if ($state == STATE_COMMENT) {
@@ -44,41 +107,31 @@ sub tokenize {
         }
     }
 
-    # Handle multi-line script state (treat as plain text for now)
-    if ($state == STATE_SCRIPT) {
-        if ($line =~ /<\/script\s*>/i) {
-            my $tag_start = $-[0];
-            my $tag_end = $+[0];
-            # Text before closing tag
-            if ($tag_start > 0) {
-                push @tokens, _token(0, $tag_start, TOKEN_FUNCTION);
-            }
-            # The closing tag
-            push @tokens, _token($tag_start, $tag_end, TOKEN_TAG);
-            $pos = $tag_end;
-            $state = STATE_NORMAL;
-        } else {
-            push @tokens, _token(0, $len, TOKEN_FUNCTION);
-            return (\@tokens, STATE_SCRIPT);
+    # Handle multi-line script state - delegate to JS grammar
+    if ($state >= STATE_SCRIPT_BASE && $state < STATE_STYLE_BASE) {
+        my $sub_state = $state - STATE_SCRIPT_BASE;
+        my ($sub_tokens, $new_pos, $new_state) =
+            $self->_delegate_embedded($line, 0, qr/<\/script\s*>/i,
+                                       $self->_js_grammar, STATE_SCRIPT_BASE, $sub_state);
+        push @tokens, @$sub_tokens;
+        $pos = $new_pos;
+        $state = $new_state;
+        if ($state >= STATE_SCRIPT_BASE) {
+            return (\@tokens, $state);
         }
     }
 
-    # Handle multi-line style state
-    if ($state == STATE_STYLE) {
-        if ($line =~ /<\/style\s*>/i) {
-            my $tag_start = $-[0];
-            my $tag_end = $+[0];
-            # Text before closing tag
-            if ($tag_start > 0) {
-                push @tokens, _token(0, $tag_start, TOKEN_FUNCTION);
-            }
-            # The closing tag
-            push @tokens, _token($tag_start, $tag_end, TOKEN_TAG);
-            $pos = $tag_end;
-            $state = STATE_NORMAL;
-        } else {
-            push @tokens, _token(0, $len, TOKEN_FUNCTION);
-            return (\@tokens, STATE_STYLE);
+    # Handle multi-line style state - delegate to CSS grammar
+    if ($state >= STATE_STYLE_BASE) {
+        my $sub_state = $state - STATE_STYLE_BASE;
+        my ($sub_tokens, $new_pos, $new_state) =
+            $self->_delegate_embedded($line, 0, qr/<\/style\s*>/i,
+                                       $self->_css_grammar, STATE_STYLE_BASE, $sub_state);
+        push @tokens, @$sub_tokens;
+        $pos = $new_pos;
+        $state = $new_state;
+        if ($state >= STATE_STYLE_BASE) {
+            return (\@tokens, $state);
         }
     }
 
@@ -125,19 +178,15 @@ sub tokenize {
             if ($rest =~ /^<script[^>]*\/>/) {
                 next;
             }
-            # Check if closing tag is on same line
-            my $after_open = substr($line, $pos);
-            if ($after_open =~ /<\/script\s*>/i) {
-                # Script content and closing tag on same line
-                my $close_start = $-[0];
-                my $close_end = $+[0];
-                if ($close_start > 0) {
-                    push @tokens, _token($pos, $pos + $close_start, TOKEN_FUNCTION);
-                }
-                push @tokens, _token($pos + $close_start, $pos + $close_end, TOKEN_TAG);
-                $pos += $close_end;
-            } else {
-                $state = STATE_SCRIPT;
+            # Delegate remaining content to JS grammar
+            my ($sub_tokens, $new_pos, $new_state) =
+                $self->_delegate_embedded($line, $pos, qr/<\/script\s*>/i,
+                                           $self->_js_grammar, STATE_SCRIPT_BASE, STATE_NORMAL);
+            push @tokens, @$sub_tokens;
+            $pos = $new_pos;
+            $state = $new_state;
+            if ($state >= STATE_SCRIPT_BASE) {
+                return (\@tokens, $state);
             }
             next;
         }
@@ -151,18 +200,15 @@ sub tokenize {
             if ($rest =~ /^<style[^>]*\/>/) {
                 next;
             }
-            # Check if closing tag is on same line
-            my $after_open = substr($line, $pos);
-            if ($after_open =~ /<\/style\s*>/i) {
-                my $close_start = $-[0];
-                my $close_end = $+[0];
-                if ($close_start > 0) {
-                    push @tokens, _token($pos, $pos + $close_start, TOKEN_FUNCTION);
-                }
-                push @tokens, _token($pos + $close_start, $pos + $close_end, TOKEN_TAG);
-                $pos += $close_end;
-            } else {
-                $state = STATE_STYLE;
+            # Delegate remaining content to CSS grammar
+            my ($sub_tokens, $new_pos, $new_state) =
+                $self->_delegate_embedded($line, $pos, qr/<\/style\s*>/i,
+                                           $self->_css_grammar, STATE_STYLE_BASE, STATE_NORMAL);
+            push @tokens, @$sub_tokens;
+            $pos = $new_pos;
+            $state = $new_state;
+            if ($state >= STATE_STYLE_BASE) {
+                return (\@tokens, $state);
             }
             next;
         }

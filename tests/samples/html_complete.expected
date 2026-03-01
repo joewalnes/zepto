@@ -13,15 +13,15 @@
     <TAG>&lt;link</TAG> <ATTRIBUTE>rel</ATTRIBUTE>=<STRING>"icon"</STRING> <ATTRIBUTE>type</ATTRIBUTE>=<STRING>"image/x-icon"</STRING> <ATTRIBUTE>href</ATTRIBUTE>=<STRING>"/favicon.ico"</STRING><TAG>&gt;</TAG>
     <TAG>&lt;script</TAG> <ATTRIBUTE>src</ATTRIBUTE>=<STRING>"app.js"</STRING> <ATTRIBUTE>defer</ATTRIBUTE><TAG>&gt;</TAG><TAG>&lt;/script&gt;</TAG>
     <TAG>&lt;style</TAG><TAG>&gt;</TAG>
-<FUNCTION>        /* Embedded CSS */</FUNCTION>
-<FUNCTION>        body {</FUNCTION>
-<FUNCTION>            font-family: sans-serif;</FUNCTION>
-<FUNCTION>            margin: 0;</FUNCTION>
-<FUNCTION>        }</FUNCTION>
-<FUNCTION>        .container {</FUNCTION>
-<FUNCTION>            max-width: 1200px;</FUNCTION>
-<FUNCTION>        }</FUNCTION>
-<FUNCTION>    </FUNCTION><TAG>&lt;/style&gt;</TAG>
+        <COMMENT>/* Embedded CSS */</COMMENT>
+        body <PUNCTUATION>{</PUNCTUATION>
+            <VARIABLE>font-family</VARIABLE><PUNCTUATION>:</PUNCTUATION> sans-serif<PUNCTUATION>;</PUNCTUATION>
+            <VARIABLE>margin</VARIABLE><PUNCTUATION>:</PUNCTUATION> <NUMBER>0</NUMBER><PUNCTUATION>;</PUNCTUATION>
+        <PUNCTUATION>}</PUNCTUATION>
+        <TYPE>.container</TYPE> <PUNCTUATION>{</PUNCTUATION>
+            <VARIABLE>max-width</VARIABLE><PUNCTUATION>:</PUNCTUATION> <NUMBER>1200</NUMBER><KEYWORD>px</KEYWORD><PUNCTUATION>;</PUNCTUATION>
+        <PUNCTUATION>}</PUNCTUATION>
+    <TAG>&lt;/style&gt;</TAG>
 <TAG>&lt;/head&gt;</TAG>
 <TAG>&lt;body</TAG><TAG>&gt;</TAG>
     <COMMENT>&lt;!-- Navigation header --&gt;</COMMENT>
@@ -188,10 +188,10 @@
     <TAG>&lt;/footer&gt;</TAG>
 
     <TAG>&lt;script</TAG><TAG>&gt;</TAG>
-<FUNCTION>        // Embedded JavaScript</FUNCTION>
-<FUNCTION>        document.addEventListener('DOMContentLoaded', () =&gt; {</FUNCTION>
-<FUNCTION>            console.log('Page loaded');</FUNCTION>
-<FUNCTION>        });</FUNCTION>
-<FUNCTION>    </FUNCTION><TAG>&lt;/script&gt;</TAG>
+        <COMMENT>// Embedded JavaScript</COMMENT>
+        <TYPE>document</TYPE>.<FUNCTION>addEventListener</FUNCTION>(<STRING>'DOMContentLoaded'</STRING>, () <OPERATOR>=&gt;</OPERATOR> {
+            <TYPE>console</TYPE>.<FUNCTION>log</FUNCTION>(<STRING>'Page loaded'</STRING>);
+        });
+    <TAG>&lt;/script&gt;</TAG>
 <TAG>&lt;/body&gt;</TAG>
 <TAG>&lt;/html&gt;</TAG>

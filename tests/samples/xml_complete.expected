@@ -28,14 +28,14 @@
     <TAG>&lt;/metadata&gt;</TAG>
 
     <COMMENT>&lt;!-- CDATA section --&gt;</COMMENT>
-    <TAG>&lt;script</TAG><TAG>&gt;</TAG>&lt;![CDATA[
-<FUNCTION>        function process(data) {</FUNCTION>
-<FUNCTION>            if (data &lt; 10 &amp;&amp; data &gt; 0) {</FUNCTION>
-<FUNCTION>                return data * 2;</FUNCTION>
-<FUNCTION>            }</FUNCTION>
-<FUNCTION>            return data;</FUNCTION>
-<FUNCTION>        }</FUNCTION>
-<FUNCTION>    ]]&gt;</FUNCTION><TAG>&lt;/script&gt;</TAG>
+    <TAG>&lt;script</TAG><TAG>&gt;</TAG><OPERATOR>&lt;</OPERATOR><OPERATOR>!</OPERATOR>[<CONSTANT>CDATA</CONSTANT>[
+        <KEYWORD>function</KEYWORD> <FUNCTION>process</FUNCTION>(data) {
+            <KEYWORD>if</KEYWORD> (<FUNCTION>data</FUNCTION> <OPERATOR>&lt;</OPERATOR> <NUMBER>10</NUMBER> <OPERATOR>&amp;&amp;</OPERATOR> data <OPERATOR>&gt;</OPERATOR> <NUMBER>0</NUMBER>) {
+                <KEYWORD>return</KEYWORD> data <OPERATOR>*</OPERATOR> <NUMBER>2</NUMBER>;
+            }
+            <KEYWORD>return</KEYWORD> data;
+        }
+    ]]<OPERATOR>&gt;</OPERATOR><TAG>&lt;/script&gt;</TAG>
 
     <COMMENT>&lt;!-- Products list --&gt;</COMMENT>
     <TAG>&lt;products</TAG> <ATTRIBUTE>count</ATTRIBUTE>=<STRING>"3"</STRING><TAG>&gt;</TAG>

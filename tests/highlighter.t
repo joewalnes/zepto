@@ -886,4 +886,101 @@ subtest 'Performance' => sub {
     ok($elapsed < 5, "1000 lines tokenized in < 5 seconds (took ${elapsed}s)");
 };
 
+# =============================================================================
+# HTML: Embedded CSS/JS Highlighting
+# =============================================================================
+
+subtest 'HTML embedded CSS in <style> tag' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.html');
+    my ($tokens, $state);
+
+    # Open <style> tag
+    ($tokens, $state) = $hl->tokenize_line('<style>', 0);
+    ok(has_token($tokens, 'tag', 0), 'style opening tag');
+    isnt($state, 0, 'enters style state after <style>');
+
+    # CSS content line: property names should be highlighted
+    ($tokens, $state) = $hl->tokenize_line('    body { color: red; }', 1);
+    ok(tokens_of_type($tokens, 'variable'), 'CSS property name highlighted in <style>');
+
+    # CSS content: numbers with units
+    ($tokens, $state) = $hl->tokenize_line('    margin: 10px;', 2);
+    ok(tokens_of_type($tokens, 'number'), 'CSS number highlighted in <style>');
+
+    # Closing </style> tag
+    ($tokens, $state) = $hl->tokenize_line('</style>', 3);
+    ok(has_token($tokens, 'tag', 0), 'style closing tag');
+    is($state, 0, 'returns to normal state after </style>');
+};
+
+subtest 'HTML embedded JS in <script> tag' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.html');
+    my ($tokens, $state);
+
+    # Open <script> tag
+    ($tokens, $state) = $hl->tokenize_line('<script>', 0);
+    ok(has_token($tokens, 'tag', 0), 'script opening tag');
+    isnt($state, 0, 'enters script state after <script>');
+
+    # JS content: keywords
+    ($tokens, $state) = $hl->tokenize_line('    var x = function() {', 1);
+    ok(tokens_of_type($tokens, 'keyword'), 'JS keyword highlighted in <script>');
+
+    # JS content: strings
+    ($tokens, $state) = $hl->tokenize_line('    var s = "hello";', 2);
+    ok(tokens_of_type($tokens, 'string'), 'JS string highlighted in <script>');
+
+    # Closing </script> tag
+    ($tokens, $state) = $hl->tokenize_line('</script>', 3);
+    ok(has_token($tokens, 'tag', 0), 'script closing tag');
+    is($state, 0, 'returns to normal state after </script>');
+};
+
+subtest 'HTML embedded CSS multi-line block comment' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.html');
+    my ($tokens, $state);
+
+    ($tokens, $state) = $hl->tokenize_line('<style>', 0);
+
+    # Start a block comment
+    ($tokens, $state) = $hl->tokenize_line('    /* this is a', 1);
+    ok(tokens_of_type($tokens, 'comment'), 'CSS block comment start highlighted');
+
+    # Comment continues
+    ($tokens, $state) = $hl->tokenize_line('       multi-line comment */', 2);
+    ok(tokens_of_type($tokens, 'comment'), 'CSS block comment end highlighted');
+
+    # Normal CSS after comment
+    ($tokens, $state) = $hl->tokenize_line('    body { color: blue; }', 3);
+    ok(tokens_of_type($tokens, 'variable'), 'CSS property after block comment');
+
+    ($tokens, $state) = $hl->tokenize_line('</style>', 4);
+    is($state, 0, 'returns to normal after </style>');
+};
+
+subtest 'HTML same-line <style>...</style>' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.html');
+    my ($tokens, $state);
+
+    ($tokens, $state) = $hl->tokenize_line('<style>body { color: red; }</style>', 0);
+    ok(has_token($tokens, 'tag', 0), 'opening style tag');
+    ok(tokens_of_type($tokens, 'variable'), 'CSS property in same-line style');
+    is($state, 0, 'returns to normal for same-line style');
+};
+
+subtest 'HTML same-line <script>...</script>' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.html');
+    my ($tokens, $state);
+
+    ($tokens, $state) = $hl->tokenize_line('<script>var x = 42;</script>', 0);
+    ok(has_token($tokens, 'tag', 0), 'opening script tag');
+    ok(tokens_of_type($tokens, 'keyword'), 'JS keyword in same-line script');
+    is($state, 0, 'returns to normal for same-line script');
+};
+
 done_testing();
