@@ -4,213 +4,538 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Zepto - A modern, intuitive terminal text editor</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%231a1b26'/><text x='50' y='76' text-anchor='middle' font-family='monospace' font-weight='bold' font-size='80' fill='%237aa2f7'>Z</text></svg>">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:          #08090e;
+            --bg-surface:  #121420;
+            --bg-deep:     #050609;
+            --border:      #3d425b;
+            --text:        #e2e8fc;
+            --text-muted:  #c8d0ea;
+            --text-dim:    #8890ad;
+            --accent:      #7aa2f7;
+            --cyan:        #7dcfff;
+            --purple:      #bb9af7;
+            --green:       #9ece6a;
+            --yellow:      #e0af68;
+            --pink:        #f7768e;
+            --glow:        rgba(122, 162, 247, 0.35);
+        }
+
+        html { font-size: 16px; }
+
+        body {
+            font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(122, 162, 247, 0.03) 2px,
+                    rgba(122, 162, 247, 0.03) 4px
+                ),
+                radial-gradient(ellipse at 25% 0%, #0e0f18 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 100%, #0e0f18 0%, transparent 50%),
+                var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ---- Hero ---- */
+        header {
+            padding: 5rem 0 3rem;
+        }
+        .hero-top {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 3rem;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+        .hero-text {
+            text-align: left;
+        }
+        .hero-install {
+            text-align: center;
+        }
+        header h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            white-space: nowrap;
+            color: var(--accent);
+            letter-spacing: -0.03em;
+            line-height: 1;
+            position: relative;
+        }
+        header h1::after {
+            content: '';
+            position: absolute;
+            inset: -40% -30%;
+            background: radial-gradient(ellipse, rgba(122, 162, 247, 0.2) 0%, transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        /* Typing cursor - thin bar like an editor */
+        .hero-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 0.95em;
+            background: var(--accent);
+            position: relative;
+            top: 0.15em;
+            margin-left: 0.05em;
+            opacity: 0;
+            animation: cursorAppear 0.01s 0.80s forwards, blink 1s 0.80s step-end infinite;
+        }
+        @keyframes cursorAppear {
+            to { opacity: 1; }
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        /* Typewriter reveal - cursor follows text */
+        .hero-title {
+            display: inline-flex;
+            align-items: baseline;
+        }
+        .typewriter span {
+            display: inline-block;
+            opacity: 0;
+            animation: letterAppear 0.01s forwards;
+        }
+        .typewriter span:nth-child(1) { animation-delay: 0s; }
+        .typewriter span:nth-child(2) { animation-delay: 0.4s; }
+        .typewriter span:nth-child(3) { animation-delay: 0.50s; }
+        .typewriter span:nth-child(4) { animation-delay: 0.60s; }
+        .typewriter span:nth-child(5) { animation-delay: 0.70s; }
+        .typewriter span:nth-child(6) { animation-delay: 0.80s; }
+        .typewriter .prompt {
+            font-weight: 400;
+            color: var(--text-dim);
+            margin-right: 0.15em;
+        }
+        @keyframes letterAppear {
+            to { opacity: 1; }
+        }
+        .tagline {
+            font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+            color: var(--text-muted);
+            margin: 1rem 0 2rem;
+            text-wrap: balance;
+        }
+        .install-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+        pre {
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-size: 0.8rem;
+            color: var(--cyan);
+            line-height: 1.5;
+            text-align: left;
+        }
+        header .after-install {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+        }
+        header .after-install code {
+            color: var(--cyan);
+            background: var(--bg-deep);
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+        header .after-install-note {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-top: 0.25rem;
+        }
+
+        /* ---- Screencap placeholders ---- */
+        .screencap {
+            background: var(--bg-deep);
+            border: 1px dashed var(--border);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+        .screencap-hero {
+            aspect-ratio: 16 / 10;
+        }
+        .screencap-feature {
+            aspect-ratio: 16 / 10;
+        }
+
+        /* ---- Sections ---- */
+        section {
+            padding: 4rem 0;
+            border-top: 1px solid var(--border);
+        }
+        section h2 {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: var(--accent);
+            margin-bottom: 2rem;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+        section h2::after {
+            content: '';
+            position: absolute;
+            inset: -60% -20%;
+            background: radial-gradient(ellipse, rgba(122, 162, 247, 0.15) 0%, transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        section h3 {
+            font-size: 1rem;
+            color: var(--purple);
+            margin: 2rem 0 0.5rem;
+        }
+        section h3:first-of-type { margin-top: 0; }
+        section p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ---- Features layout ---- */
+        .feature {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr;
+            gap: 2rem;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+        /* Even features: screencap on left (larger), text on right */
+        .feature:nth-child(even) {
+            grid-template-columns: 1.4fr 1fr;
+        }
+        .feature:nth-child(even) .feature-text { order: 2; }
+        .feature:nth-child(even) .screencap-feature { order: 1; }
+        .feature-text h3 { margin-top: 0; }
+        .feature-text p { margin-top: 0.5rem; }
+
+
+        /* ---- FAQ ---- */
+        .faq h3 { color: var(--text); }
+        .faq p { margin-bottom: 1.5rem; }
+
+        /* ---- Links ---- */
+        a { color: var(--cyan); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ---- Footer ---- */
+        footer {
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+        footer p { margin-bottom: 0.5rem; }
+        footer p:last-child { margin-bottom: 0; }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 700px) {
+            header { padding: 3rem 0 2rem; }
+            .hero-top {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            .hero-text { text-align: center; order: -1; }
+            .hero-install { margin-top: 0.5rem; }
+            pre { font-size: 0.7rem; padding: 0.75rem; }
+            section { padding: 2.5rem 0; }
+            .feature,
+            .feature:nth-child(even) {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+            .feature .feature-text { order: 1 !important; }
+            .feature .screencap-feature { order: 2 !important; }
+        }
+    </style>
 </head>
 <body>
 
 <!-- ==================== HERO ==================== -->
 <header>
-    <h1>Zepto</h1>
-    <p>A modern, intuitive, fast text editor for people who just need to edit text.</p>
+    <div class="wrap">
+        <div class="hero-top">
+            <!-- SCREENCAP: Full editor window showing a source file open with syntax
+                 highlighting. Menu bar visible at top, line numbers in gutter,
+                 colorful syntax-highlighted code in the buffer, status bar at bottom.
+                 Dark theme. Shows that this is a real, modern-looking terminal editor. -->
+            <div class="screencap screencap-hero hero-screencap">screencap: editor overview with syntax highlighting</div>
 
-    <!-- SCREENCAP: Full editor window showing a source file open with syntax
-         highlighting. Menu bar visible at top, line numbers in gutter,
-         colorful syntax-highlighted code in the buffer, status bar at bottom.
-         Dark theme. Shows that this is a real, modern-looking terminal editor. -->
-    <div>[screencap: editor overview with syntax highlighting]</div>
+            <div class="hero-text">
+                <h1><span class="hero-title"><span class="typewriter"><span class="prompt">$</span><span>z</span><span>e</span><span>p</span><span>t</span><span>o</span></span><span class="hero-cursor"></span></span></h1>
+                <p class="tagline">A modern, intuitive, fast text editor.</p>
+            </div>
+        </div>
 
-    <h3>Install</h3>
-    <pre>curl -fsSL https://github.com/joewalnes/zepto/releases/download/latest/zepto -o ~/.local/bin/zepto &amp;&amp; chmod +x ~/.local/bin/zepto</pre>
-    <p>Then: <code>zepto myfile.txt</code></p>
-    <p>That's it. One file. No dependencies. No config.</p>
+        <div class="hero-install">
+            <p class="install-label">Install</p>
+            <pre>mkdir -p ~/.local/bin &amp;&amp; \
+  curl -fsSL \
+    https://github.com/joewalnes/zepto/releases/download/latest/zepto \
+    -o ~/.local/bin/zepto &amp;&amp; \
+  chmod +x ~/.local/bin/zepto</pre>
+            <p class="after-install">Then: <code>zepto myfile.txt</code></p>
+            <p class="after-install-note">That's it. One file. No dependencies. No config.</p>
+        </div>
+    </div>
 </header>
 
 <!-- ==================== WHY ZEPTO ==================== -->
 <section>
-    <h2>Why Zepto?</h2>
+    <div class="wrap">
+        <h2>Why Zepto?</h2>
 
-    <h3>Feels like a desktop editor, runs in a terminal</h3>
-    <p>
-        Mouse support, menus, dialogs, true-color themes, a minimap, a file
-        explorer. Zepto brings the comforts of a GUI editor to your terminal
-        without pretending to be an IDE.
-    </p>
+        <h3>Feels like a desktop editor, runs in a terminal</h3>
+        <p>
+            Mouse support, menus, dialogs, true-color themes, a minimap, a file
+            explorer. Zepto brings the comforts of a GUI editor to your terminal
+            without pretending to be an IDE.
+        </p>
 
-    <h3>Nothing to learn</h3>
-    <p>
-        Ctrl+S saves. Ctrl+Z undoes. Ctrl+C copies. Click where you want the
-        cursor. Drag tabs to reorder them. Everything works the way you'd
-        expect. No modes, no manuals, no tutorials. If you've used any text
-        editor made in the last 30 years, you already know how to use Zepto.
-    </p>
+        <h3>Nothing to learn</h3>
+        <p>
+            Click where you want the cursor. Drag tabs to reorder them.
+            Everything works the way you'd expect. No modes, no manuals, no
+            tutorials. If you've used any text editor made in the last 30 years,
+            you already know how to use Zepto.
+        </p>
 
-    <h3>Batteries included, not bloat included</h3>
-    <p>
-        Syntax highlighting, find and replace, fuzzy file opener, undo/redo,
-        block selection, themes &mdash; it's all built in. No plugins to
-        install, no config files to write. Open it and start working.
-    </p>
+        <h3>Batteries included, not bloat included</h3>
+        <p>
+            Syntax highlighting, find and replace, fuzzy file opener, undo/redo,
+            block selection, themes - it's all built in. No plugins to
+            install, no config files to write. Open it and start working.
+        </p>
 
-    <h3>Wicked fast</h3>
-    <p>
-        Loads instantly. No splash screen, no indexing, no startup lag. The
-        UI stays snappy even with large files and deep directory trees.
-        Zepto launches faster than your terminal finishes redrawing.
-    </p>
+        <h3>Wicked fast</h3>
+        <p>
+            Loads instantly. No splash screen, no indexing, no startup lag. The
+            UI stays snappy even with large files and deep directory trees.
+            Zepto launches faster than your terminal finishes redrawing.
+        </p>
 
-    <h3>Runs anywhere in seconds</h3>
-    <p>
-        Zepto is a single Perl script. Copy it onto a server, a Docker
-        container, a Raspberry Pi &mdash; anywhere with Perl (which is
-        everywhere). No root access, no package manager, no compiler, no
-        internet connection required.
-    </p>
+        <h3>Runs anywhere in seconds</h3>
+        <p>
+            Zepto is a single Perl script. Copy it onto a server, a Docker
+            container, a Raspberry Pi - anywhere with Perl (which is
+            everywhere, including macOS and Linux). No root access, no package
+            manager, no compiler required.
+        </p>
+    </div>
 </section>
 
 <!-- ==================== FEATURES ==================== -->
 <section>
-    <h2>Features</h2>
+    <div class="wrap">
+        <h2>Features</h2>
 
-    <h3>A crafted terminal UI</h3>
-    <p>
-        Menus, dialogs, buttons, and panels &mdash; all rendered in the terminal
-        with true-color and optional Nerd Font glyphs for a polished look.
-        Every feature is accessible by mouse, by keyboard shortcut, or from
-        the menu bar. Use it however feels natural.
-    </p>
-    <!-- SCREENCAP: A dropdown menu open (e.g. Edit menu) with Nerd Font
-         icons, showing menu items with keyboard shortcuts on the right.
-         Demonstrates the polished, desktop-like UI in the terminal. -->
-    <div>[screencap: menu bar with Nerd Font glyphs]</div>
+        <!-- SCREENCAP: A dropdown menu open (e.g. Edit menu) with Nerd Font
+             icons. Demonstrates the polished, desktop-like UI in the terminal. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>A crafted terminal UI</h3>
+                <p>
+                    Menus, dialogs, buttons, and panels - all rendered in the terminal
+                    with true-color and Nerd Font glyphs for a polished look.
+                    Every feature and keyboard shortcut is discoverable on screen.
+                    Use it however feels natural.
+                </p>
+            </div>
+            <div class="screencap screencap-feature">screencap: menu bar with Nerd Font glyphs</div>
+        </div>
 
-    <h3>Syntax highlighting</h3>
-    <p>
-        Built-in highlighting for dozens of languages. Colors adapt to your
-        theme. No configuration or plugins required.
-    </p>
-    <!-- SCREENCAP: A source file (e.g. Python or Rust) with syntax
-         highlighting showing keywords, strings, comments, and functions
-         in distinct colors. -->
-    <div>[screencap: syntax highlighted code]</div>
+        <!-- SCREENCAP: A source file (e.g. Python or Rust) with syntax
+             highlighting showing keywords, strings, comments, and functions
+             in distinct colors. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Syntax highlighting</h3>
+                <p>
+                    Built-in highlighting for dozens of languages. Colors adapt to your
+                    theme. No configuration or plugins required.
+                </p>
+            </div>
+            <div class="screencap screencap-feature">screencap: syntax highlighted code</div>
+        </div>
 
-    <h3>Fuzzy file finder</h3>
-    <p>Ctrl+O to quickly open files by typing partial names. No need to remember exact paths.</p>
-    <!-- SCREENCAP: Fuzzy finder dialog open, with a partial query typed
-         and a filtered list of matching filenames below it. -->
-    <div>[screencap: fuzzy file finder]</div>
+        <!-- SCREENCAP: Editor with file explorer panel open on the left and
+             fuzzy finder dialog open over it. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>File explorer and fuzzy finder</h3>
+                <p>A tree panel with directory browsing, git status colors, and file preview. Or jump straight to any file by typing partial names - no need to remember exact paths.</p>
+            </div>
+            <div class="screencap screencap-feature">screencap: file explorer and fuzzy finder</div>
+        </div>
 
-    <h3>Full mouse support</h3>
-    <p>
-        Click to place cursor. Drag to select. Scroll wheel works. Click
-        menus to open them. Drag tabs to reorder. Resize panels by dragging
-        borders. It just works.
-    </p>
-    <!-- SCREENCAP: Editor with a text selection visible (highlighted region),
-         showing click-and-drag selection in action. -->
-    <div>[screencap: mouse selection]</div>
+        <!-- SCREENCAP: Editor with a text selection visible (highlighted region),
+             showing click-and-drag selection in action. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Full mouse support</h3>
+                <p>
+                    Click to place cursor. Drag to select. Scroll wheel works. Click
+                    menus to open them. Drag tabs to reorder. Resize panels by dragging
+                    borders. It just works.
+                </p>
+            </div>
+            <div class="screencap screencap-feature">screencap: mouse selection</div>
+        </div>
 
-    <h3>Find and replace</h3>
-    <p>
-        Ctrl+F to find, Ctrl+R to replace. Matches highlight live as you
-        type. Step through results one at a time or replace all at once.
-        Regex supported with interactive inline previews &mdash; see exactly
-        what each replacement will do before you commit.
-    </p>
-    <!-- SCREENCAP: Find/replace dialog open with a regex pattern, showing
-         inline replacement previews in the document &mdash; original text
-         highlighted with the replacement text shown alongside or overlaid. -->
-    <div>[screencap: find and replace with inline preview]</div>
+        <!-- SCREENCAP: Find/replace dialog open with a regex pattern, showing
+             inline replacement previews in the document. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Fast interactive find and replace</h3>
+                <p>
+                    Matches highlight live as you type. Step through results one
+                    at a time or replace all at once. Regex supported with
+                    interactive inline previews - see exactly what each
+                    replacement will do before you commit.
+                </p>
+            </div>
+            <div class="screencap screencap-feature">screencap: find and replace with inline preview</div>
+        </div>
 
-    <h3>Column (block) selection</h3>
-    <p>Alt+Shift+arrows or Alt+drag for rectangular selections. Type to insert on all lines at once.</p>
-    <!-- SCREENCAP: A rectangular/columnar selection highlighted in purple
-         across several lines, showing the block selection feature. -->
-    <div>[screencap: column selection]</div>
+        <!-- SCREENCAP: A rectangular/columnar selection highlighted in purple
+             across several lines, showing the block selection feature. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Column (block) selection</h3>
+                <p>Rectangular selections across lines. Type to insert on all lines at once.</p>
+            </div>
+            <div class="screencap screencap-feature">screencap: column selection</div>
+        </div>
 
-    <h3>File explorer</h3>
-    <p>Ctrl+B to toggle a tree panel. Directory browsing, fuzzy filter, git status colors, and file preview.</p>
-    <!-- SCREENCAP: Editor with the file explorer panel open on the left side,
-         showing a directory tree with some files/folders expanded. -->
-    <div>[screencap: file explorer panel]</div>
+        <!-- SCREENCAP: Right edge of the editor showing the minimap/scrollbar
+             with tiny braille-rendered text density and a viewport indicator. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Minimap</h3>
+                <p>A braille-character scrollbar that shows your position in the file and highlights git changes.</p>
+            </div>
+            <div class="screencap screencap-feature">screencap: minimap</div>
+        </div>
 
-    <h3>Minimap</h3>
-    <p>A braille-character scrollbar that shows your position in the file and highlights git changes.</p>
-    <!-- SCREENCAP: Right edge of the editor showing the minimap/scrollbar
-         with tiny braille-rendered text density and a viewport indicator. -->
-    <div>[screencap: minimap]</div>
+        <!-- SCREENCAP: Side-by-side or two shots showing the same file in dark
+             theme and light theme. -->
+        <div class="feature">
+            <div class="feature-text">
+                <h3>Dark and light themes</h3>
+                <p>True-color (24-bit) themes. Switch instantly from the menu.</p>
+            </div>
+            <div class="screencap screencap-feature">screencap: dark and light themes</div>
+        </div>
 
-    <h3>Dark and light themes</h3>
-    <p>True-color (24-bit) themes. Switch instantly with Ctrl+T.</p>
-    <!-- SCREENCAP: Side-by-side or two shots showing the same file in dark
-         theme and light theme. -->
-    <div>[screencap: dark and light themes]</div>
 
-    <h3>Undo, redo, and clipboard</h3>
-    <p>Ctrl+Z, Ctrl+Y, Ctrl+X/C/V. System clipboard integration. All the editing basics, done right.</p>
+    </div>
 </section>
 
 <!-- ==================== FAQ ==================== -->
-<section>
-    <h2>FAQ</h2>
+<section class="faq">
+    <div class="wrap">
+        <h2>FAQ</h2>
 
-    <h3>What about Vim / Emacs / Nano / Helix?</h3>
-    <p>
-        Those are great editors. Vim, Emacs, and Helix are powerful but have
-        steep learning curves and modal editing. Nano is simple but limited.
-        Zepto aims for a sweet spot: the features you actually need with zero
-        learning curve.
-    </p>
+        <h3>What about Vim / Emacs / Nano / Helix?</h3>
+        <p>
+            Those are great editors. Vim, Emacs, and Helix are powerful but have
+            steep learning curves. Nano is simple but limited. Zepto aims for a
+            sweet spot: the features you actually need with zero learning curve.
+        </p>
 
-    <h3>What about VS Code / Sublime Text / Zed?</h3>
-    <p>
-        Also great editors &mdash; and a big inspiration for Zepto's
-        usability. But they're GUI apps. Zepto brings that same intuitive,
-        discoverable experience to the terminal, where you need it most:
-        SSH sessions, Docker containers, headless servers.
-    </p>
+        <h3>What about VS Code / Sublime Text / Zed?</h3>
+        <p>
+            Also great editors - and a big inspiration for Zepto's
+            usability. But they're GUI apps. Zepto brings that same intuitive,
+            discoverable experience to the terminal, where you need it most:
+            SSH sessions, Docker containers, headless servers.
+        </p>
 
-    <h3>Why Perl?</h3>
-    <p>
-        Perl is pre-installed on virtually every Unix system, including
-        minimal Docker images and locked-down servers where you can't
-        install software. A single Perl script can run anywhere without a
-        build step, a runtime download, or root access. That's the whole
-        point.
-    </p>
+        <h3>Is it fast?</h3>
+        <p>
+            Yes. Zepto launches instantly and stays responsive even with large
+            files. Performance comes from architectural decisions -
+            efficient data structures, minimal redraws, lazy computation -
+            not from the choice of language. A well-architected script will
+            outperform a poorly-architected compiled binary every time.
+        </p>
 
-    <h3>Can I configure it?</h3>
-    <p>
-        Zepto is deliberately config-free. There are a few runtime
-        toggles (theme, powerline glyphs) but no config files to manage.
-        This is a feature, not a limitation.
-    </p>
+        <h3>Why Perl?</h3>
+        <p>
+            Perl is pre-installed on virtually every Unix system - Linux
+            servers, macOS desktops, minimal Docker images, locked-down
+            environments where you can't install software. A single Perl script
+            can run anywhere without a build step, a runtime download, or root
+            access. That's the whole point.
+        </p>
 
-    <h3>Has AI been used to create this?</h3>
-    <p>
-        Yes. Every line of code has been written by
-        <a href="https://claude.ai/code">Claude Code</a>. None of it has
-        been hand-written in an editor (ironically). Requirements, system
-        design and architecture, UX guidelines, testing approaches, and core
-        abstractions were defined by a human.
-    </p>
+        <h3>Can I configure it?</h3>
+        <p>
+            Zepto is deliberately config-free. There are a few runtime
+            toggles (theme, powerline glyphs) but no config files to manage.
+            This is a feature, not a limitation.
+        </p>
 
-    <h3>How big is it?</h3>
-    <p>
-        One file. Under 10,000 lines of Perl. No external dependencies
-        beyond the Perl standard library.
-    </p>
+        <h3>Has AI been used to create this?</h3>
+        <p>
+            Yes. Every line of code has been written by
+            <a href="https://claude.ai/code">Claude Code</a>. None of it has
+            been hand-written in an editor (ironically). Requirements, system
+            design and architecture, UX guidelines, testing approaches, and core
+            abstractions were defined by a human.
+        </p>
+
+        <h3>How big is it?</h3>
+        <p>
+            One file. Under 10,000 lines of Perl. No external dependencies
+            beyond the Perl standard library.
+        </p>
+    </div>
 </section>
 
 <!-- ==================== FOOTER ==================== -->
 <footer>
-    <p>
-        Built by <a href="https://github.com/joewalnes">Joe Walnes</a>
-        and <a href="https://claude.ai">Claude</a>.
-    </p>
-    <p>
-        <a href="https://github.com/joewalnes/zepto">GitHub</a>
-        &middot; MIT License
-    </p>
+    <div class="wrap">
+        <p>
+            Built by <a href="https://github.com/joewalnes">Joe Walnes</a>
+            and <a href="https://claude.ai">Claude</a>.
+        </p>
+        <p>
+            <a href="https://github.com/joewalnes/zepto">GitHub</a>
+            &middot; MIT License
+            &middot; 2026
+        </p>
+    </div>
 </footer>
+
 
 </body>
 </html>
