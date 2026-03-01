@@ -308,7 +308,7 @@
                  highlighting. Menu bar visible at top, line numbers in gutter,
                  colorful syntax-highlighted code in the buffer, status bar at bottom.
                  Dark theme. Shows that this is a real, modern-looking terminal editor. -->
-            <video class="screencap screencap-hero hero-screencap" autoplay loop muted playsinline>
+            <video class="screencap screencap-hero hero-screencap" autoplay loop muted playsinline preload="auto">
                 <source src="screencaps/hero.mp4" type="video/mp4">
             </video>
 
@@ -564,6 +564,18 @@
         fired = true;
         plausible('Install Command Copy');
       }
+    });
+  })();
+
+  // iOS autoplay fallback
+  (function () {
+    var v = document.querySelector('.hero-screencap');
+    if (!v) return;
+    v.play().catch(function () {
+      document.addEventListener('touchstart', function once() {
+        v.play();
+        document.removeEventListener('touchstart', once);
+      });
     });
   })();
 </script>
