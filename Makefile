@@ -21,10 +21,11 @@ test-one:
 test-timing:
 	@time prove -l tests/*.t
 
-# Build website (render screencaps, copy src to out)
-website: website-screencaps
-	@mkdir -p website/out
+# Build website (copy src and pre-built assets to out)
+website:
+	@mkdir -p website/out/screencaps
 	@cp -r website/src/* website/out
+	@cp website/assets/screencaps/* website/out/screencaps/
 	@echo "Website built: website/out/"
 
 # Render screencaps from .tape files (requires vhs, ffmpeg, ttyd)

@@ -1,4 +1,4 @@
-Output website/out/screencaps/hero.gif
+Output website/out/screencaps/hero.mp4
 Set Width 960
 Set Height 600
 Set FontSize 14
