@@ -49,8 +49,10 @@ The warning should reappear on every subsequent focus until the user chooses an 
 
 **Fix:** Added mtime tracking to Document (captured at load and save). On each render cycle, check if the file's mtime has changed. Clean buffers are silently reloaded with cursor restored. Dirty buffers show a prompt: `[R]eload [K]eep local`. Undo/redo stacks are cleared on reload. **Decisions:** Skipped `[D]iff` option from the original spec to keep the prompt simple — can add later. **Manual test:** Open a file, modify it externally (e.g. `echo "new" > file`), press any key in zepto — should reload silently if clean, or prompt if dirty.
 
-### P1: Diff gutter markers should extend across wrapped continuation lines
+### ~~P1: Diff gutter markers should extend across wrapped continuation lines~~ FIXED
 When word wrap is enabled, diff gutter markers only appear on the first display row of a wrapped line. They should extend across all continuation lines.
+
+**Fix:** Updated wrap_cont gutter rendering in Renderer.pm to check VCS change status for the underlying doc line and apply the same diff markers (added/modified/modified_whitespace). **Manual test:** Open a git-tracked file, make changes, enable word wrap — diff markers should now extend across all wrapped rows of changed lines.
 
 ### P2: Mouse scroll in editor is janky compared to file tree
 When using mouse scroll wheel (macOS touchpad) in file tree it's buttery smooth, but in the editor it seems janky and skips lines, often gets caught in a loop.
@@ -70,7 +72,7 @@ When word wrap and column selection are both enabled, column selection should sk
 
 Bugs found by auditing the running UI against `docs/UI_GUIDELINES.md`.
 
-### P1: Time-based temporary messages violate "no time-based messages" rule
+### ~~P1: Time-based temporary messages violate "no time-based messages" rule~~ FIXED
 **Guideline**: "No time-based temporary messages. Messages persist until user dismisses them or they are replaced by a newer message."
 
 Multiple status bar messages disappear after ~3 seconds with no user interaction:
@@ -80,10 +82,14 @@ Multiple status bar messages disappear after ~3 seconds with no user interaction
 
 These should persist until dismissed by the user or replaced by a newer message.
 
-### P1: Esc does not open command palette as final fallback
+**Fix:** Removed MESSAGE_DISPLAY_SEC timer. Messages now persist until the next user input clears them or a new message replaces them. **Decision:** Messages clear on any user input (keystroke or mouse) so the status bar returns to normal once the user takes any action.
+
+### ~~P1: Esc does not open command palette as final fallback~~ FIXED
 **Guideline**: "Esc priority: close palette, exit column mode, clear selection, collapse diff, open command palette (final fallback when nothing to cancel)."
 
 When nothing is open (no palette, no selection, no column mode, no diff), pressing Esc does nothing. It should open the command palette as the documented last-resort fallback.
+
+**Fix:** Added `cmd_open_palette()` call as the else-branch in the Escape key handler. Esc priority is now: exit column mode → clear selection → collapse diff → open command palette.
 
 ### P2: Inconsistent shortcut notation — `^O`/`^R`/`^C` vs `⌃O`/`⌃R`/`⌃C`
 **Guideline**: "Use compact, single-glyph modifiers in UI labels: `⌃` for Ctrl, `⌥` for Alt, `⇧` for Shift, `␣` for Space. Use the same label format everywhere."

@@ -1191,19 +1191,38 @@ sub _render_text_area {
         my $is_wrap_cont = $entry && ($entry->{type} // '') eq 'wrap_cont';
 
         # Wrap continuation gutter: blank line number, ↪ placed before first content char
+        # Diff gutter markers extend across all continuation lines
         if ($is_wrap_cont) {
+            # Check VCS status for the underlying doc line
+            my $chg_status = $doc->vcs_change_status($doc_line);
+            my $vcs_char = ' ';
+            my $vcs_color = $theme->color('gutter_fg');
+            if ($chg_status) {
+                if ($chg_status eq 'added') {
+                    $vcs_char = Zepto::Chars->get('vcs_added');
+                    $vcs_color = $theme->color('vcs_added');
+                } elsif ($chg_status eq 'modified') {
+                    $vcs_char = Zepto::Chars->get('vcs_modified');
+                    $vcs_color = $theme->color('vcs_modified');
+                } elsif ($chg_status eq 'modified_whitespace') {
+                    $vcs_char = Zepto::Chars->get('vcs_modified');
+                    $vcs_color = $theme->color('vcs_modified_whitespace');
+                }
+            }
             my $gutter_bg = $theme->color('gutter_bg');
             my $indent_w = $entry->{indent_width} // 0;
             if ($indent_w == 0) {
-                # No hanging indent: ↪ goes in last gutter column (under line number)
-                $output .= $gutter_bg . $theme->color('gutter_fg');
-                $output .= ' ' x ($gutter_width - 1);
+                # No hanging indent: VCS marker + padding + wrap indicator
+                $output .= $gutter_bg . $vcs_color . $vcs_char;
+                $output .= $theme->color('gutter_fg');
+                $output .= ' ' x ($gutter_width - 2);
                 $output .= $theme->color('wrap_indicator_fg');
                 $output .= Zepto::Chars->get('wrap_indicator');
             } else {
-                # Has hanging indent: gutter is fully blank, ↪ goes in content indent area
-                $output .= $gutter_bg . $theme->color('gutter_fg');
-                $output .= ' ' x $gutter_width;
+                # Has hanging indent: VCS marker + padding, ↪ goes in content indent area
+                $output .= $gutter_bg . $vcs_color . $vcs_char;
+                $output .= $theme->color('gutter_fg');
+                $output .= ' ' x ($gutter_width - 1);
             }
         }
         # Line number gutter with VCS indicator (single column)

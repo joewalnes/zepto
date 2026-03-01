@@ -175,7 +175,6 @@ subtest 'Show message' => sub {
 
     $editor->show_message('Test message');
     is($editor->{message}, 'Test message', 'Message set');
-    ok($editor->{message_time} > 0, 'Message time set');
 };
 
 # ============================================================================
@@ -863,10 +862,10 @@ subtest 'Editor does not quit on escape sequences' => sub {
     $editor->handle_input("\x1b[<0;10;5M");  # Mouse press
     is($editor->{state}, 'editing', 'Still editing after mouse event');
 
-    # Lone escape with nothing to cancel is a no-op (stays in editing)
+    # Lone escape with nothing to cancel opens command palette (final fallback)
     $editor->handle_input("\x1b");
     $editor->flush_pending_input();
-    is($editor->{state}, 'editing', 'Lone escape is no-op when nothing to cancel');
+    is($editor->{state}, 'palette', 'Lone escape opens command palette as fallback');
 };
 
 subtest 'Only quit commands trigger quit' => sub {
