@@ -20,13 +20,13 @@ These guidelines define the user interface standards for Zepto. They are used to
 
 ## Command Palette
 
-- `⌃Space` opens the command palette from any context (except active input prompts).
+- `⌃Space` opens the command palette from any context except active input prompts. Active input prompts are: Find/Replace fields, Go to Line input, Save As input, and any other footer prompt that accepts typed text. The palette filter itself is not an input prompt — `⌃Space` is consumed by the palette when it is already open.
 - The command palette is the single discoverable entry point for all commands.
 - Every command has: a Nerd Font icon, a shortcut label, and a human-readable label.
 - Supports type-to-filter with fuzzy matching on labels.
 - All items are mouse-clickable; clicking outside the palette dismisses it.
 - Toggle commands update state live and keep the palette open; action commands close it.
-- `Esc` always closes the palette (consistent with cancel semantics).
+- `Esc` in the palette: if the filter has text, first `Esc` clears the filter; second `Esc` closes the palette. If the filter is empty, one `Esc` closes the palette.
 - The palette adapts its layout (multi-column vs single-column) based on terminal width.
 
 ## Context-Aware Status Bar
@@ -77,6 +77,8 @@ These guidelines define the user interface standards for Zepto. They are used to
 - Focus is always visible and unambiguous across panes (editor, file tree, dialogs, prompts).
 - A single primary focus exists at a time and is reflected in the status bar.
 - Any focusable area that is visible on screen must show a visible keyboard shortcut label next to it so users can jump to it quickly.
+- `⌃B` is context-dependent: when the file tree is hidden it shows the tree and focuses it; when the tree is visible it toggles focus between the tree and the editor. The tree is dismissed by pressing `Esc` while it is focused (which returns focus to the editor) or by toggling it off via the command palette.
+- File tree arrow navigation previews files: moving the highlight with `↑`/`↓` immediately opens (or switches to) the highlighted file in the editor pane. This is a preview behavior — the file is opened in a tab but the tree retains focus until the user presses `Enter` or `Esc`.
 
 ## Modifier Policy And Chord Limits
 
@@ -132,6 +134,14 @@ These guidelines define the user interface standards for Zepto. They are used to
 - No time-based temporary messages. Messages persist until user dismisses them or they are replaced by a newer message.
 - Errors and warnings should include a clear next action and use consistent styling.
 - Context hints are minimal, actionable, and use the same visual style as shortcut badges.
+
+## Tab Bar
+
+- The tab bar is the topmost chrome row.
+- Each tab shows: a Nerd Font file-type icon, the file name (or `[untitled]`), an `⌥N` shortcut label for direct access, and a `×` close button.
+- A `●` indicator appears in the tab title when the buffer has unsaved modifications. It is added on first edit and removed on save.
+- Tab names truncate with an ellipsis (`…`) when the terminal is too narrow to fit the full name.
+- When closing a tab with unsaved changes, a confirmation prompt appears in the status bar: `Save changes to <name>?  [Y]es  [N]o  [C]ancel`. `Y` saves and closes, `N` discards and closes, `C` (or `Esc`) cancels the close.
 
 ## Layout And Window Sizing
 
