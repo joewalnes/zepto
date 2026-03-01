@@ -13,6 +13,42 @@ This document captures working principles, coding standards, and lessons learned
 - Made a mistake worth remembering → Document it so we don't repeat it
 - Code review feedback → Capture the principle
 
+## MOST IMPORTANT RULE: Interactive TUI Testing
+
+**Every change must be tested interactively in the running editor.** This is the highest-priority rule and overrides everything else. Unit tests alone are not sufficient for a TUI editor — you must see it working with your own eyes.
+
+### The Standard Testing Workflow
+
+```bash
+make build
+tmux new-session -d -s test -x 200 -y 50
+tmux send-keys -t test "./zepto testfile.txt" Enter
+sleep 2
+tmux capture-pane -t test -p   # view what's on screen
+```
+
+Then interact by sending keys and capturing the result:
+```bash
+tmux send-keys -t test "some text"          # type text
+tmux send-keys -t test "C-s"               # Ctrl+S (save)
+tmux send-keys -t test "C-q"               # Ctrl+Q (quit)
+tmux capture-pane -t test -p               # see current screen state
+```
+
+After quitting, verify file contents:
+```bash
+cat testfile.txt
+```
+
+### Rules for Interactive Testing
+
+- **Always run `make build` first** before testing any change
+- **Always use a fresh tmux session** (`tmux new-session -d`) for each test run
+- **Capture the pane** after each interaction to see what happened
+- **Clean up test files** after testing (don't leave scratch files in the repo)
+- **Do not infer behavior from code** — observe it directly in the running TUI
+- Any feature that affects the UI *must* be tested this way, not just with unit tests
+
 ## Core Development Philosophy
 
 ### Test-Driven Development (TDD)
