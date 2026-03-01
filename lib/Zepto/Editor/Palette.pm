@@ -25,12 +25,12 @@ sub cmd_open_palette {
     my ($self) = @_;
 
     # Don't open palette during input-focused states
-    return if $self->{state} eq STATE_FOOTER_INPUT;
-    return if $self->{state} eq STATE_PROMPT;
-    return if $self->{state} eq STATE_FIND;
-    return if $self->{state} eq STATE_DIALOG;
+    return if $self->{state} eq 'footer_input';
+    return if $self->{state} eq 'prompt';
+    return if $self->{state} eq 'find';
+    return if $self->{state} eq 'dialog';
 
-    $self->{state} = STATE_PALETTE;
+    $self->{state} = 'palette';
     $self->{palette_query} = '';
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
@@ -39,7 +39,7 @@ sub cmd_open_palette {
 
 sub close_palette {
     my ($self) = @_;
-    $self->{state} = STATE_EDITING;
+    $self->{state} = 'editing';
     $self->{palette_query} = '';
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
