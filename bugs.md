@@ -157,8 +157,10 @@ Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is 
 
 **Fix:** Changed arrow key dispatch in Editor.pm so `Shift+Alt+Arrow` passes through to the `Alt` branch (word movement for Left/Right, line movement for Up/Down) with `$shift` propagated for selection extension. Column selection via arrows now requires `Ctrl+Alt+Arrow` only (the `$alt && $shift` condition was removed from the column-select guard). Toggle via `⌥C` is unchanged. **Decision:** Chose `Ctrl+Alt+Arrow` over inventing a new shortcut because it's already one of the two original triggers and is a reasonable power-user combo. **Manual test:** Press `Shift+Alt+Right` — should select word-by-word. Press `Shift+Alt+Left` — should deselect/shrink by word. Column mode should NOT activate. `Ctrl+Alt+Down` should still start column selection.
 
-### P3: Add Shift+Ctrl+D for duplicate line up
+### ~~P3: Add Shift+Ctrl+D for duplicate line up~~ WON'T FIX
 Ctrl+D duplicates the current line down. Shift+Ctrl+D should duplicate the line up — easy to remember since Shift is the "reverse direction" modifier.
+
+**Resolution:** Terminals cannot distinguish `Ctrl+D` from `Ctrl+Shift+D` — both send byte `0x04`. This is documented in `docs/UI_GUIDELINES.md`: "Do not depend on `Shift+letter` or `Ctrl+Shift+letter`." Duplicate-up already exists as `⌃U` (mnemonic: U=up) paired with `⌃D` (D=down). Both are visible in the command palette under DOCUMENT section.
 
 ---
 
