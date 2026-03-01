@@ -543,23 +543,27 @@ sub handle_editing_event {
         my $alt = Zepto::InputParser::has_modifier($event, 'alt');
 
         # Navigation / Line movement
+        # When column mode is active (toggled via ⌥C), arrows extend the
+        # column selection rectangle instead of normal cursor movement.
+        my $col_mode = $view->column_select();
+
         if ($key eq 'up') {
-            if ($alt && $ctrl) { $self->do_column_select_up(); }
+            if ($col_mode) { $self->do_column_select_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
             else { $view->move_up($shift); }
         }
         elsif ($key eq 'down') {
-            if ($alt && $ctrl) { $self->do_column_select_down(); }
+            if ($col_mode) { $self->do_column_select_down(); }
             elsif ($alt) { $self->do_move_line_down(); }
             else { $view->move_down($shift); }
         }
         elsif ($key eq 'left')  {
-            if ($alt && $ctrl) { $self->do_column_select_left(); }
+            if ($col_mode) { $self->do_column_select_left(); }
             elsif ($alt) { $view->move_word_left($shift); }
             else { $view->move_left($shift); }
         }
         elsif ($key eq 'right') {
-            if ($alt && $ctrl) { $self->do_column_select_right(); }
+            if ($col_mode) { $self->do_column_select_right(); }
             elsif ($alt) { $view->move_word_right($shift); }
             else { $view->move_right($shift); }
         }
@@ -2417,7 +2421,7 @@ sub do_column_select_up {
     my $view = $self->active_view();
     return if $view->cursor_line() <= 0;
 
-    $view->start_column_selection() unless $view->column_select();
+    $view->start_column_selection() unless $view->has_selection();
     # Move by document line (skip continuation lines when word wrap is active)
     my $new_line = $view->cursor_line() - 1;
     $view->set_cursor($new_line, $view->cursor_col(), 1);
@@ -2430,7 +2434,7 @@ sub do_column_select_down {
     my $doc = $self->active_doc();
     return if $view->cursor_line() >= $doc->line_count() - 1;
 
-    $view->start_column_selection() unless $view->column_select();
+    $view->start_column_selection() unless $view->has_selection();
     # Move by document line (skip continuation lines when word wrap is active)
     my $new_line = $view->cursor_line() + 1;
     $view->set_cursor($new_line, $view->cursor_col(), 1);
@@ -2442,7 +2446,7 @@ sub do_column_select_left {
     my $view = $self->active_view();
     return if $view->cursor_col() <= 0;
 
-    $view->start_column_selection() unless $view->column_select();
+    $view->start_column_selection() unless $view->has_selection();
     $view->move_left(1);  # extend_selection = true
 }
 
@@ -2450,7 +2454,7 @@ sub do_column_select_right {
     my ($self) = @_;
     my $view = $self->active_view();
 
-    $view->start_column_selection() unless $view->column_select();
+    $view->start_column_selection() unless $view->has_selection();
     $view->move_right(1);  # extend_selection = true
 }
 

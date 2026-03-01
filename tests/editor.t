@@ -1493,19 +1493,53 @@ subtest 'Shift+Alt+Left selects by word backwards' => sub {
     ok(!$view->column_select(), 'Column mode is NOT active');
 };
 
-subtest 'Ctrl+Alt+Right triggers column select (not word select)' => sub {
+subtest 'Column mode toggle then arrows extend column selection' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
     my $filename = create_temp_file("hello world\ntest  line\n");
     my ($doc, $view) = setup_editor_doc($editor, $filename);
     $view->set_cursor(0, 0);
 
-    # Send Ctrl+Alt+Right key event
-    my $event = { type => 'key', key => 'right', modifiers => ['ctrl', 'alt'] };
-    $editor->handle_event($event);
+    # Toggle column mode on (⌥C)
+    $editor->cmd_toggle_column_mode();
+    ok($view->column_select(), 'Column mode active after toggle');
 
-    # Should have entered column select mode
-    ok($view->column_select(), 'Column mode IS active with Ctrl+Alt');
+    # Now plain Right arrow should extend column selection
+    my $event = { type => 'key', key => 'right', modifiers => [] };
+    $editor->handle_event($event);
+    is($view->cursor_col(), 1, 'Arrow right moved cursor in column mode');
+    ok($view->column_select(), 'Still in column mode');
+
+    # Down arrow should extend column selection vertically
+    $event = { type => 'key', key => 'down', modifiers => [] };
+    $editor->handle_event($event);
+    is($view->cursor_line(), 1, 'Arrow down moved cursor in column mode');
+    ok($view->column_select(), 'Still in column mode');
+
+    my ($top, $left, $bottom, $right) = $view->column_selection();
+    is($top, 0, 'Column rect top');
+    is($left, 0, 'Column rect left');
+    is($bottom, 1, 'Column rect bottom');
+    is($right, 1, 'Column rect right');
+};
+
+subtest 'Arrows do NOT enter column mode on their own' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hello world\ntest  line\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 0);
+
+    # Plain arrow without column mode toggled — should NOT activate column mode
+    my $event = { type => 'key', key => 'right', modifiers => [] };
+    $editor->handle_event($event);
+    ok(!$view->column_select(), 'Column mode NOT active from plain arrow');
+
+    # Ctrl+Alt+Arrow should also NOT activate column mode (no modifier combos)
+    $view->set_cursor(0, 0);
+    $event = { type => 'key', key => 'right', modifiers => ['ctrl', 'alt'] };
+    $editor->handle_event($event);
+    ok(!$view->column_select(), 'Column mode NOT active from Ctrl+Alt+Arrow');
 };
 
 done_testing();

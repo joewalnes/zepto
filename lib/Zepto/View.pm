@@ -936,8 +936,8 @@ sub column_select { $_[0]->{column_select} }
 # Enter column mode without forcing a selection
 sub enter_column_mode {
     my ($self) = @_;
-    $self->{column_select} = 1;
     $self->clear_selection();
+    $self->{column_select} = 1;  # Must be after clear_selection which resets it
 }
 
 # Exit column mode and clear any selection
