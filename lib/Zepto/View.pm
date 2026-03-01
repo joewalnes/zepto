@@ -181,8 +181,8 @@ sub move_left {
     if ($self->{cursor_col} > 0) {
         $self->set_cursor($self->{cursor_line}, $self->{cursor_col} - 1, $extend_selection);
     }
-    elsif ($self->{cursor_line} > 0) {
-        # Move to end of previous line
+    elsif (!$self->{column_select} && $self->{cursor_line} > 0) {
+        # Wrap to end of previous line (disabled in column mode)
         my $prev_line = $self->{cursor_line} - 1;
         my $end_col = $self->{document}->line_length($prev_line);
         $self->set_cursor($prev_line, $end_col, $extend_selection);
@@ -194,11 +194,15 @@ sub move_right {
 
     my $line_len = $self->{document}->line_length($self->{cursor_line});
 
-    if ($self->{cursor_col} < $line_len) {
+    if ($self->{column_select}) {
+        # In column mode, allow cursor past end of line (virtual space)
+        $self->set_cursor($self->{cursor_line}, $self->{cursor_col} + 1, $extend_selection);
+    }
+    elsif ($self->{cursor_col} < $line_len) {
         $self->set_cursor($self->{cursor_line}, $self->{cursor_col} + 1, $extend_selection);
     }
     elsif ($self->{cursor_line} < $self->{document}->line_count() - 1) {
-        # Move to start of next line
+        # Wrap to start of next line
         $self->set_cursor($self->{cursor_line} + 1, 0, $extend_selection);
     }
 }

@@ -1542,4 +1542,55 @@ subtest 'Arrows do NOT enter column mode on their own' => sub {
     ok(!$view->column_select(), 'Column mode NOT active from Ctrl+Alt+Arrow');
 };
 
+subtest 'Column mode: right arrow moves past end of line (virtual space)' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hi\nworld\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 0);  # line "hi" (length 2)
+
+    # Toggle column mode
+    $editor->cmd_toggle_column_mode();
+    ok($view->column_select(), 'Column mode on');
+
+    # Move right 5 times — past end of "hi" (len 2) into virtual space
+    for (1..5) {
+        my $event = { type => 'key', key => 'right', modifiers => [] };
+        $editor->handle_event($event);
+    }
+    is($view->cursor_col(), 5, 'Cursor at col 5 past EOL in column mode');
+    is($view->cursor_line(), 0, 'Still on line 0 (no wrapping)');
+};
+
+subtest 'Column mode: left arrow does not wrap to previous line' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hello\nworld\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(1, 0);  # start of "world"
+
+    # Toggle column mode
+    $editor->cmd_toggle_column_mode();
+
+    # Left arrow at col 0 — should NOT wrap to end of previous line
+    my $event = { type => 'key', key => 'left', modifiers => [] };
+    $editor->handle_event($event);
+    is($view->cursor_line(), 1, 'Still on line 1 (no wrapping)');
+    is($view->cursor_col(), 0, 'Still at col 0');
+};
+
+subtest 'Normal mode: right arrow still wraps at EOL' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("hi\nworld\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 2);  # end of "hi"
+
+    # Not in column mode — right should wrap to next line
+    ok(!$view->column_select(), 'Not in column mode');
+    $view->move_right(0);
+    is($view->cursor_line(), 1, 'Wrapped to next line');
+    is($view->cursor_col(), 0, 'At col 0 of next line');
+};
+
 done_testing();
