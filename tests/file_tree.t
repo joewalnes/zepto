@@ -74,7 +74,7 @@ subtest 'Construction' => sub {
     isa_ok($tree, 'Zepto::FileTree');
 
     is($tree->root_path(), $tmpdir, 'root_path set correctly');
-    is($tree->panel_width(), 42, 'default panel width');
+    is($tree->panel_width(), 23, 'default panel width');
     is($tree->focused(), 0, 'not focused by default');
     is($tree->filter_active(), 0, 'filter not active by default');
     ok($tree->visible_count() > 0, 'flat_list has entries');
@@ -312,13 +312,13 @@ subtest 'expand_to_path nonexistent' => sub {
 subtest 'Resize' => sub {
     my $tree = Zepto::FileTree->new(root_path => $tmpdir);
 
-    is($tree->panel_width(), 42, 'default width');
+    is($tree->panel_width(), 23, 'default width');
 
     $tree->grow(5);
-    is($tree->panel_width(), 47, 'grow increases width');
+    is($tree->panel_width(), 28, 'grow increases width');
 
     $tree->shrink(10);
-    is($tree->panel_width(), 37, 'shrink decreases width');
+    is($tree->panel_width(), 18, 'shrink decreases width');
 
     # Clamp to min
     $tree->shrink(100);
