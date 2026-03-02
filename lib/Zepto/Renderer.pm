@@ -71,9 +71,9 @@ use constant {
     MIN_TEXT_WIDTH     => 10,
     DIALOG_WIDTH       => 50,
     DIALOG_HEIGHT      => 5,
-    MINIMAP_WIDTH      => 8,  # Must match Zepto::Minimap::MINIMAP_TOTAL_WIDTH
-    TREE_INDENT_PER_LEVEL => 2,   # Must match Zepto::FileTree::INDENT_PER_LEVEL
-    TREE_MAX_INDENT       => 16,  # Must match Zepto::FileTree::MAX_INDENT
+    MINIMAP_WIDTH         => Zepto::Minimap::MINIMAP_TOTAL_WIDTH,
+    TREE_INDENT_PER_LEVEL => Zepto::FileTree::INDENT_PER_LEVEL,
+    TREE_MAX_INDENT       => Zepto::FileTree::MAX_INDENT,
 };
 
 
@@ -2297,6 +2297,7 @@ sub _render_old_line_row {
     my $last_fg = '';
     for my $i (0 .. $len - 1) {
         my $char = substr($expanded_content, $i, 1);
+        next if ord($char) < 0x20;  # Strip control chars — never pass file content to terminal unescaped
         my $char_fg = $syntax_fg[$i] // $fg;
         my $bg = ($i >= $vis_hl_start && $i < $vis_hl_end) ? $hl_bg : $line_bg;
         if ($bg ne $last_bg || $char_fg ne $last_fg) {
@@ -2473,6 +2474,7 @@ sub _render_line_with_highlights {
     my $last_style = '';
     for (my $i = 0; $i < $len; $i++) {
         my $char = substr($content, $i, 1);
+        next if ord($char) < 0x20;  # Strip control chars — never pass file content to terminal unescaped
         my ($char_bg, $char_fg, $style_key);
 
         # Check if in a find match (highest priority for visibility)
