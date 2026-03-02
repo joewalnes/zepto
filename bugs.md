@@ -160,11 +160,13 @@ Find bar, Go To Line, Save As prompt, and command palette filter are separate in
 
 **Fix:** Created `Zepto::InputWidget` — a shared text input widget with full editing semantics. All three input surfaces (footer input / Go To Line / Save As, Find/Replace bar, command palette filter) now delegate to this widget. New features added to all inputs: Alt+Left/Right word movement, Shift+arrow/home/end selection, Ctrl+A select all, Ctrl+X cut, Ctrl+V paste (find bar keeps Ctrl+C as "toggle case" per its context-specific shortcut). Visual selection highlight is functional at the state level; selection-aware editing (replace-on-type, backspace/delete selection) works in all inputs. **Decision:** Mouse click cursor placement within input fields left as a P3 item (tracked separately). **Manual test:** Open find bar (⌃F), type "hello world", press Alt+Left — cursor should jump to "world". Press Ctrl+A — selects all. Open Go to Line (⌃G), type text, use Home/End/word movement — all consistent.
 
-### P2: Global navigation keys not audited across all UI states
+### ~~P2: Global navigation keys not audited across all UI states~~ FIXED
 
 Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prompts, find mode, file tree, palette). An audit is needed to verify each one works from every surface.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Navigation And Focus: "Core global shortcuts work in every UI state."
+
+**Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
 
 ### P3: Mouse parity incomplete
 
