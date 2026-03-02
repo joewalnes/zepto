@@ -93,9 +93,15 @@ Run through this before committing any change that touches file I/O, shell execu
 
 | Priority | Item | Location |
 |----------|------|----------|
-| P2 | Audit Terminal.pm clipboard command construction for injection edge cases | `lib/Zepto/Terminal.pm` |
-| P2 | Verify control character stripping in Renderer for file content | `lib/Zepto/Renderer.pm` |
 | P3 | Review symlink behavior in FileTree and FilePicker — confirm no unintended traversal | `lib/Zepto/FileTree.pm`, `lib/Zepto/FilePicker.pm` |
-| P3 | Verify git path quoting is complete for all commands in VCS/Git.pm | `lib/Zepto/VCS/Git.pm` |
+
+## Resolved Security Items
+
+| Priority | Item | Resolution |
+|----------|------|------------|
+| P2 | Control character stripping in Renderer for file content | Fixed: `next if ord($char) < 0x20` in both render loops in `Renderer.pm` |
+| P2 | Terminal title OSC injection via file names with ESC | Fixed: `$title =~ s/[\x00-\x1f]//g` in `set_title()` in `Terminal.pm` |
+| P2 | Clipboard command construction in Terminal.pm | Audited: clipboard commands are hardcoded constants, never user-supplied; no injection path |
+| P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths go through `_shell_quote()` using correct single-quote escaping; no gaps |
 
 When an item above is investigated and resolved, document the finding and remove it from this list (or move to bugs.md if it becomes a tracked bug).

@@ -537,6 +537,7 @@ sub has_system_clipboard {
 
 sub set_title {
     my ($self, $title) = @_;
+    $title =~ s/[\x00-\x1f]//g;  # Strip control chars — prevent OSC sequence injection via file names
     $self->write(TITLE_SET . $title . TITLE_END);
     $self->flush();
 }
