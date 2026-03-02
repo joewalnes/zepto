@@ -4033,7 +4033,7 @@ sub _render_command_palette {
             $output .= $bg . (' ' x $inner_width);
         }
 
-        $output .= $border_fg . $box_v;
+        $output .= $bg . $border_fg . $box_v;
         $output .= RESET;
     }
 

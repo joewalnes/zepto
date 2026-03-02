@@ -84,8 +84,10 @@ Organize by:
 - etc.
 Where should find/replace go
 
-### P2: Command palette rendering
+### ~~P2: Command palette rendering~~ FIXED
 Highlighted row in command palette extends too far on right, overlapping border.
+
+**Fix:** Reset background to `$bg` before rendering the right border `$box_v` on each item row. The selection highlight (`$sel_bg`) was bleeding into the border character because only `$border_fg` (foreground) was set.
 
 ### P3: Nerd icon overhaul
 Re-evaluate current icon selection. Many duplicates. Pick familiar feeling icons for actions.
