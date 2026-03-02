@@ -58,8 +58,9 @@ use Zepto::Editor::Palette;
 
 # Timing and UI settings
 use constant {
-    INPUT_TIMEOUT_SEC   => 0.5,   # Seconds to wait for input
-    RESERVED_ROWS       => 3,     # Rows for tab bar + ruler bar + status bar
+    INPUT_TIMEOUT_SEC           => 0.5,   # Seconds to wait for input
+    RESERVED_ROWS               => 3,     # Rows for tab bar + ruler bar + status bar
+    EXTERNAL_CHECK_INTERVAL_SEC => 1.0,   # How often to stat() for external file changes
 };
 
 sub new {
@@ -3245,8 +3246,9 @@ sub render {
                 );
                 $self->active_view()->set_wrap_map($wm);
             }
-            # Always invalidate and rebuild — content may have changed
-            $wm->invalidate();
+            # WrapMap is invalidated by View::invalidate_wrap_map() when
+            # content actually changes (insert, delete, undo, redo, reload).
+            # No need to invalidate unconditionally on every render.
         }
     } else {
         $self->active_view()->set_wrap_map(undef) if $self->active_view()->wrap_map();
@@ -3327,6 +3329,12 @@ sub _check_external_file_changes {
     my ($self) = @_;
     my $doc = $self->active_doc();
     return unless $doc && defined $doc->path();
+
+    # Debounce — stat() on every render is wasteful
+    my $now = time();
+    $self->{_last_external_check} //= 0;
+    return if ($now - $self->{_last_external_check}) < EXTERNAL_CHECK_INTERVAL_SEC;
+    $self->{_last_external_check} = $now;
 
     return unless $doc->check_external_changes();
 

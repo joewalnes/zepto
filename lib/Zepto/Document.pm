@@ -16,6 +16,9 @@ use constant UNDO_GROUP_TIMEOUT => 1.0;
 # VCS diff debounce delay in seconds
 use constant VCS_DIFF_DEBOUNCE => 0.3;
 
+# How often to check if git HEAD has changed (file I/O), in seconds
+use constant VCS_HEAD_CHECK_INTERVAL => 2.0;
+
 sub new {
     my ($class, %opts) = @_;
 
@@ -38,6 +41,8 @@ sub new {
         _vcs_diff       => undef,  # { added => [], modified => [], deleted => [] }
         _vcs_dirty      => 0,      # Buffer changed since last diff
         _vcs_last_diff  => 0,      # Timestamp of last diff computation
+        _vcs_last_head_check => 0, # Timestamp of last HEAD change check
+        _content_version => 0,     # Incremented on every content mutation
         # External file change detection
         _file_mtime     => undef,  # mtime at last load/save
     }, $class;
@@ -182,6 +187,7 @@ sub reload_from_disk {
     # Replace buffer content
     $self->{buffer} = Zepto::Buffer->new($content);
     $self->{dirty} = 0;
+    $self->{_content_version}++;
     $self->{undo_stack} = [];
     $self->{redo_stack} = [];
     $self->_capture_file_mtime();
@@ -209,6 +215,7 @@ sub set_path { $_[0]->{path} = $_[1] }
 sub line_ending { $_[0]->{line_ending} }
 sub set_line_ending { $_[0]->{line_ending} = $_[1] }
 sub is_dirty { $_[0]->{dirty} }
+sub content_version { $_[0]->{_content_version} }
 
 # Display name for UI
 sub display_name {
@@ -290,6 +297,7 @@ sub _push_undo {
     $self->{_last_edit_type} = $action->{type};
     $self->{_last_edit_pos} = $action->{pos};
     $self->{dirty} = 1;
+    $self->{_content_version}++;
     $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 }
 
@@ -347,6 +355,7 @@ sub replace {
 
     $self->{redo_stack} = [];
     $self->{dirty} = 1;
+    $self->{_content_version}++;
     $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     return $deleted;
@@ -372,6 +381,7 @@ sub undo {
 
     # Mark clean if we've undone everything
     $self->{dirty} = @{$self->{undo_stack}} > 0;
+    $self->{_content_version}++;
     $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     # Break grouping
@@ -398,6 +408,7 @@ sub redo {
 
     push @{$self->{undo_stack}}, $action;
     $self->{dirty} = 1;
+    $self->{_content_version}++;
     $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
 
     # Break grouping
@@ -540,16 +551,21 @@ sub update_vcs_diff {
     return unless $self->{_vcs_provider};
 
     # Check if HEAD changed (e.g., commit in another window)
-    if ($self->{_vcs_provider}->head_changed()) {
-        $self->{_vcs_provider}->invalidate_cache($self->{path});
-        $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
-        $self->{_vcs_base_lines} = undef;
-        $self->{_vcs_dirty} = 1;  # Force recompute
+    # Debounced — head_changed() does file I/O on every call
+    my $now = time();
+    if ($now - $self->{_vcs_last_head_check} >= VCS_HEAD_CHECK_INTERVAL) {
+        $self->{_vcs_last_head_check} = $now;
+        if ($self->{_vcs_provider}->head_changed()) {
+            $self->{_vcs_provider}->invalidate_cache($self->{path});
+            $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
+            $self->{_vcs_base_lines} = undef;
+            $self->{_vcs_dirty} = 1;  # Force recompute
+        }
     }
 
     return unless $self->{_vcs_dirty};
 
-    my $now = time();
+    $now = time();
     if ($now - $self->{_vcs_last_diff} >= VCS_DIFF_DEBOUNCE) {
         $self->_compute_vcs_diff();
     }

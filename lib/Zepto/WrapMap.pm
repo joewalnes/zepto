@@ -41,6 +41,7 @@ sub new {
         _doc_to_vrow => {},    # doc_line => first visual row index
         _total       => 0,     # total visual row count
         _dirty       => 1,
+        _last_content_version => -1,  # Track document changes
     }, $class;
 }
 
@@ -50,12 +51,19 @@ sub invalidate {
     $self->{_dirty} = 1;
 }
 
-# Rebuild the full map if dirty
+# Rebuild the full map if dirty or document content has changed
 sub _ensure_built {
     my ($self) = @_;
+
+    # Auto-detect content changes via Document's version counter
+    my $doc = $self->{document};
+    if ($doc && $doc->content_version() != $self->{_last_content_version}) {
+        $self->{_dirty} = 1;
+        $self->{_last_content_version} = $doc->content_version();
+    }
+
     return unless $self->{_dirty};
 
-    my $doc = $self->{document};
     my $width = $self->{width};
 
     $self->{_segments} = {};

@@ -10,8 +10,13 @@ Priority scale:
 
 ## Existing bugs
 
-### P0: Reports of sluggishness
+### P2: "More" home/end
+Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
+
+### ~~P0: Reports of sluggishness~~ FIXED
 Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
+
+**Fix:** Found three per-render bottlenecks: (1) WrapMap was unconditionally invalidated and rebuilt from scratch on every render, even when content hadn't changed — added `_content_version` counter to Document so WrapMap auto-detects changes and only rebuilds when needed. (2) `head_changed()` did file I/O (open + read + stat on `.git/HEAD`) on every render — debounced to every 2 seconds. (3) `check_external_changes()` did `stat()` on the active file every render — debounced to every 1 second.
 
 ### P3: Lightmode glitches
 In lightmode. On short docs, the space beyond the final line is grey and looks out of place. 
@@ -239,10 +244,6 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 **Guideline**: `docs/UI_GUIDELINES.md` → Navigation And Focus: "Core global shortcuts work in every UI state."
 
 **Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
-
-### P2: Typing long string in file fuzzy finder overflows side panel
-
-When a long search string is typed into the file fuzzy finder input, the text overflows outside the side panel boundary instead of being clipped or scrolled within the panel.
 
 ### P3: Mouse parity incomplete
 
