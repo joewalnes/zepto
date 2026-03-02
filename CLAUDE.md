@@ -23,6 +23,7 @@ Every feature must be discoverable through the UI without reading help, docs, or
 
 - All features must be accessible via command palette (`⌃Space`) and/or status bar pills
 - This **must** be verified interactively — run the program and check with your own eyes
+- "It's just a bug fix" does **not** exempt you from interactive testing. Any change to key handling, commands, or rendering is a UI change.
 - Full UI standards: `docs/UI_GUIDELINES.md`
 
 ### 3. Tests and lint pass, with no noise
@@ -74,6 +75,8 @@ When you find a bug (even while working on something else), add it to `bugs.md` 
 
 **Every UI change must be tested interactively.** Unit tests alone are not sufficient for a TUI.
 
+**Do this BEFORE `make test`, not after.** Running unit tests first creates a false sense of completion that makes it easy to skip the interactive step. The order is: build → interact → then run tests.
+
 ```bash
 make build
 tmux new-session -d -s test -x 200 -y 50
@@ -113,7 +116,7 @@ Before every commit, verify each rule in order:
 | # | Rule | How to verify |
 |---|------|---------------|
 | 1 | Build integrity | `make check && make build` — must succeed cleanly |
-| 2 | UI discoverability | If any UI changed: run interactively in tmux and confirm feature is reachable via command palette or status bar |
+| 2 | UI discoverability | **Run interactively in tmux** (see Testing Workflow above). Do this before `make test`. Any change to key handling, commands, or rendering counts. "It's just a bug fix" is not an exemption. |
 | 3 | Tests pass, no noise | `make test` — must pass (or pre-existing failures explicitly acknowledged and user-approved) |
 | 4 | Security | If file I/O, shell exec, or rendering changed: flag it and confirm it was reviewed against `docs/SECURITY.md` |
 | 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
