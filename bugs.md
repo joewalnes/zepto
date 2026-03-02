@@ -66,8 +66,10 @@ When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls it
 ### P3: Diff view does not preserve line wrap
 If word wrap enabled, and diffing a hunk with long line, the word wrap is disabled in the diff, which is jarring. Preserve word wrap settings.
 
-### P2: Find/replace pills should be clickable
+### ~~P2: Find/replace pills should be clickable~~ FIXED
 Regex, case sensitivie, ok, cancel: mouse clicks should activate.
+
+**Fix:** Already implemented — `handle_find_bar_click()` in Editor.pm computes click regions matching the renderer layout and handles clicks on all four pills: regex toggle, case toggle, cancel (Esc), and OK (Enter). Click regions are calculated from the same layout formula as the renderer to stay in sync.
 
 ### P3: Column mode mouse selection
 After activating col selection mode, dragging with mouse should select col based selection, but it defaults to line.
@@ -77,8 +79,10 @@ The left pill constantly resizes as moving across lines due to empty lines (e.g.
 
 **Fix:** Added minimum width padding to the cursor position pill so it doesn't shrink below a reasonable size. The pill text is right-padded with spaces to keep surrounding pills stable.
 
-### P2: More prominent ctrl-space hint
+### ~~P2: More prominent ctrl-space hint~~ FIXED
 This is the most important key to know about, but it's hidden in corner, with no real clue as to what it means. How to make this obvious for first time users?
+
+**Fix:** Added "Commands" label to the palette pill in the status bar. Previously showed only `{icon} ⌃␣` — now shows `{icon} Commands ⌃␣`. Updated in both document-context and tree-context status bars. The pill already uses a distinctive blue background that differentiates it from other pills.
 
 ### P3: Command palette too wide.
 Doesn't need to be as wide and ends up with shortcut keys too far from respective action. Pick a reasonable max width.

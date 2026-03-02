@@ -2790,7 +2790,7 @@ sub _render_context_status_bar {
 
         # Right: palette trigger pill
         my $palette_icon = Zepto::Chars->get('palette');
-        my $palette_text = " $palette_icon \x{2303}\x{2423} ";  # ⌃␣
+        my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";  # ⌃␣
         my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
 
         # Middle: tree-context hint pills
@@ -2911,7 +2911,7 @@ sub _render_context_status_bar {
 
     # 2. RIGHT: Palette trigger pill (always visible, rightmost)
     my $palette_icon = Zepto::Chars->get('palette');
-    my $palette_text = " $palette_icon \x{2303}\x{2423} ";
+    my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
     my $palette_text_width = length($palette_text);
     # Total palette width includes the round caps (left + right)
     my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
