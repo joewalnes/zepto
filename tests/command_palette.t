@@ -45,7 +45,7 @@ subtest 'cmd_open_palette sets STATE_PALETTE' => sub {
     is($editor->{state}, STATE_EDITING, 'Starts in editing state');
     $editor->cmd_open_palette();
     is($editor->{state}, STATE_PALETTE, 'State is palette after open');
-    is($editor->{palette_query}, '', 'Query starts empty');
+    is($editor->{palette_widget}->value(), '', 'Query starts empty');
     # Cursor starts on first command (skipping section header at index 0)
     is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
     ok(scalar @{$editor->{palette_filtered}} > 0, 'Filtered list populated');
@@ -57,7 +57,7 @@ subtest 'close_palette returns to STATE_EDITING' => sub {
     is($editor->{state}, STATE_PALETTE, 'Palette is open');
     $editor->close_palette();
     is($editor->{state}, STATE_EDITING, 'Returns to editing');
-    is($editor->{palette_query}, '', 'Query cleared');
+    ok(!defined $editor->{palette_widget}, 'Widget cleared (palette closed)');
     is(scalar @{$editor->{palette_filtered}}, 0, 'Filtered list cleared');
 };
 
@@ -112,7 +112,7 @@ subtest 'Typing narrows filtered list' => sub {
 
     # Type 's'
     $editor->handle_event({ type => 'char', char => 's', modifiers => [] });
-    is($editor->{palette_query}, 's', 'Query updated to "s"');
+    is($editor->{palette_widget}->value(), 's', 'Query updated to "s"');
     my $s_count = scalar @{$editor->{palette_filtered}};
     ok($s_count < $all_count, "Filtered list narrowed: $s_count < $all_count");
     ok($s_count > 0, 'Still has results');
@@ -121,7 +121,7 @@ subtest 'Typing narrows filtered list' => sub {
     $editor->handle_event({ type => 'char', char => 'a', modifiers => [] });
     $editor->handle_event({ type => 'char', char => 'v', modifiers => [] });
     $editor->handle_event({ type => 'char', char => 'e', modifiers => [] });
-    is($editor->{palette_query}, 'save', 'Query is "save"');
+    is($editor->{palette_widget}->value(), 'save', 'Query is "save"');
     my $save_count = scalar @{$editor->{palette_filtered}};
     ok($save_count >= 1, 'Save command found');
     is($editor->{palette_filtered}[0]{id}, 'save', 'Save is top result');
@@ -133,13 +133,13 @@ subtest 'Backspace removes characters from query' => sub {
 
     $editor->handle_event({ type => 'char', char => 'a', modifiers => [] });
     $editor->handle_event({ type => 'char', char => 'b', modifiers => [] });
-    is($editor->{palette_query}, 'ab', 'Query is "ab"');
+    is($editor->{palette_widget}->value(), 'ab', 'Query is "ab"');
 
     $editor->handle_event({ type => 'key', key => 'backspace', modifiers => [] });
-    is($editor->{palette_query}, 'a', 'Backspace removed last char');
+    is($editor->{palette_widget}->value(), 'a', 'Backspace removed last char');
 
     $editor->handle_event({ type => 'key', key => 'backspace', modifiers => [] });
-    is($editor->{palette_query}, '', 'Backspace cleared query');
+    is($editor->{palette_widget}->value(), '', 'Backspace cleared query');
     # Empty query shows all commands + section headers (4 sections)
     my $cmd_count = scalar(Zepto::CommandRegistry->all_commands());
     my $section_count = scalar(Zepto::CommandRegistry->section_order());
@@ -251,7 +251,7 @@ subtest 'handle_event routes to palette handler' => sub {
 
     # Type a character - should go through handle_event → handle_palette_event
     $editor->handle_event({ type => 'char', char => 'x', modifiers => [] });
-    is($editor->{palette_query}, 'x', 'Event routed to palette handler');
+    is($editor->{palette_widget}->value(), 'x', 'Event routed to palette handler');
 };
 
 subtest 'Typing resets cursor to 0' => sub {

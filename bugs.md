@@ -152,11 +152,13 @@ At 160 columns the palette remains single-column with the same width as at 100 c
 
 ## Open bugs
 
-### P2: Unified input widget missing
+### ~~P2: Unified input widget missing~~ FIXED
 
 Find bar, Go To Line, Save As prompt, and command palette filter are separate input implementations with inconsistent editing semantics. They should share a common input widget supporting: left/right, word left/right, home/end, select all, selection with Shift, cut/copy/paste, mouse click to place cursor.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Inputs And Text Editing.
+
+**Fix:** Created `Zepto::InputWidget` — a shared text input widget with full editing semantics. All three input surfaces (footer input / Go To Line / Save As, Find/Replace bar, command palette filter) now delegate to this widget. New features added to all inputs: Alt+Left/Right word movement, Shift+arrow/home/end selection, Ctrl+A select all, Ctrl+X cut, Ctrl+V paste (find bar keeps Ctrl+C as "toggle case" per its context-specific shortcut). Visual selection highlight is functional at the state level; selection-aware editing (replace-on-type, backspace/delete selection) works in all inputs. **Decision:** Mouse click cursor placement within input fields left as a P3 item (tracked separately). **Manual test:** Open find bar (⌃F), type "hello world", press Alt+Left — cursor should jump to "world". Press Ctrl+A — selects all. Open Go to Line (⌃G), type text, use Home/End/word movement — all consistent.
 
 ### P2: Global navigation keys not audited across all UI states
 

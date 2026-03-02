@@ -392,21 +392,34 @@ sub render {
         $pal_width = 30 if $pal_width < 30;
         my $pal_x = int(($cols - $pal_width) / 2);
         $pal_x = 1 if $pal_x < 1;
-        my $query_len = length($palette->{query} // '');
+        my $query_cursor_in_view;
+        if (my $w = $palette->{palette_widget}) {
+            my $input_area = $pal_width - 6;  # same formula as _render_command_palette
+            my $vp = $w->viewport($input_area);
+            $query_cursor_in_view = $vp->{cursor_in_view};
+        } else {
+            $query_cursor_in_view = $palette->{query_cursor} // length($palette->{query} // '');
+        }
         # Filter input is on row 2 of palette (y_start + 1), starting at x + 5 (box + space + icon + space)
         my $pal_y = int(($rows - 20) / 2);
         $pal_y = 2 if $pal_y < 2;
-        $output .= _move_to($pal_y + 1, $pal_x + 5 + $query_len);
+        $output .= _move_to($pal_y + 1, $pal_x + 5 + $query_cursor_in_view);
         $output .= SHOW_CURSOR;
     } elsif ($ui->{dialog}) {
         # Dialogs position cursor themselves
         $output .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
-        my $input = $ui->{footer_input};
+        my $input      = $ui->{footer_input};
         my $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
-        my $cursor_pos = $input->{cursor} // 0;
-        $output .= _move_to($rows, $prompt_len + $cursor_pos + 1);
+        my $cursor_in_view;
+        if ($input->{widget}) {
+            my $vp = $input->{widget}->viewport(12);  # same width as _render_footer_input
+            $cursor_in_view = $vp->{cursor_in_view};
+        } else {
+            $cursor_in_view = $input->{cursor} // 0;
+        }
+        $output .= _move_to($rows, $prompt_len + $cursor_in_view + 1);
         $output .= SHOW_CURSOR;
     } elsif ($ui->{find_mode}) {
         # Position cursor in find or replace input field based on focus
@@ -449,30 +462,36 @@ sub render {
         $input_width = 40 if $input_width > 40;
 
         if ($focus eq 'replace') {
-            # Replace cursor position - handle text longer than field
-            my $cursor_pos = $find->{replace_cursor} // 0;
-            my $display_offset = 0;
-            if (length($replace_value) > $input_width) {
-                $display_offset = length($replace_value) - $input_width;
+            my $cursor_in_field;
+            if (my $w = $find->{replace_widget}) {
+                my $vp = $w->viewport($input_width);
+                $cursor_in_field = $vp->{cursor_in_view};
+            } else {
+                my $cursor_pos    = $find->{replace_cursor} // 0;
+                my $display_offset = length($replace_value) > $input_width
+                    ? length($replace_value) - $input_width : 0;
+                $cursor_in_field  = $cursor_pos - $display_offset;
+                $cursor_in_field  = 0           if $cursor_in_field < 0;
+                $cursor_in_field  = $input_width if $cursor_in_field > $input_width;
             }
-            my $cursor_in_field = $cursor_pos - $display_offset;
-            $cursor_in_field = 0 if $cursor_in_field < 0;
-            $cursor_in_field = $input_width if $cursor_in_field > $input_width;
             # Replace field position: " Find:" (6) + input_width + " Replace:" (9)
             my $replace_start = 1 + 5 + $input_width + 1 + 8;
             $output .= _move_to($rows, $replace_start + $cursor_in_field + 1);
         } else {
-            # Find cursor position - handle text longer than field
-            my $cursor_pos = $find->{cursor} // 0;
-            my $display_offset = 0;
-            if (length($value) > $input_width) {
-                $display_offset = length($value) - $input_width;
+            my $cursor_in_field;
+            if (my $w = $find->{find_widget}) {
+                my $vp = $w->viewport($input_width);
+                $cursor_in_field = $vp->{cursor_in_view};
+            } else {
+                my $cursor_pos    = $find->{cursor} // 0;
+                my $display_offset = length($value) > $input_width
+                    ? length($value) - $input_width : 0;
+                $cursor_in_field  = $cursor_pos - $display_offset;
+                $cursor_in_field  = 0           if $cursor_in_field < 0;
+                $cursor_in_field  = $input_width if $cursor_in_field > $input_width;
             }
-            my $cursor_in_field = $cursor_pos - $display_offset;
-            $cursor_in_field = 0 if $cursor_in_field < 0;
-            $cursor_in_field = $input_width if $cursor_in_field > $input_width;
             # Find field starts at column 7 (" Find:")
-            my $label_len = 6;  # "Find:"
+            my $label_len = 6;  # " Find:"
             $output .= _move_to($rows, $label_len + $cursor_in_field + 1);
         }
         $output .= SHOW_CURSOR;
@@ -3181,8 +3200,8 @@ sub _render_footer_input {
     $output .= $theme->color('status_bg') . $theme->color('status_fg');
 
     my $prompt = $input->{prompt} // '';
-    my $value = $input->{value} // '';
-    my $hint = $input->{hint} // '';
+    my $widget = $input->{widget};
+    my $hint   = $input->{hint} // '';
 
     # Render: " Prompt: [input value          ] (hint) "
     my $prompt_str = ' ' . $prompt . ' ';
@@ -3198,12 +3217,30 @@ sub _render_footer_input {
     my $hint_len = length($hint_str);
     my $input_width = 12;  # Fixed narrow width for input
 
-    # Display value (truncate from left if too long)
-    my $display_value = $value;
-    if (length($display_value) > $input_width) {
-        $display_value = substr($display_value, length($display_value) - $input_width);
+    # Get viewport (handles overflow scrolling)
+    my $vp = $widget ? $widget->viewport($input_width) : { display_text => ($input->{value} // ''), sel_start_in_view => undef, sel_end_in_view => undef };
+    my $display_value = $vp->{display_text};
+
+    # Render with selection highlight
+    my $sel_s = $vp->{sel_start_in_view};
+    my $sel_e = $vp->{sel_end_in_view};
+    if (defined $sel_s) {
+        my $input_bg = $theme->color('dialog_input_bg');
+        my $input_fg = $theme->color('dialog_input_fg');
+        my $sel_bg   = $theme->color('selection_bg');
+        my $sel_fg   = $theme->color('selection_fg');
+        if ($sel_s > 0) {
+            $output .= substr($display_value, 0, $sel_s);
+        }
+        $output .= $sel_bg . $sel_fg;
+        $output .= substr($display_value, $sel_s, $sel_e - $sel_s);
+        $output .= $input_bg . $input_fg;
+        if ($sel_e < length($display_value)) {
+            $output .= substr($display_value, $sel_e);
+        }
+    } else {
+        $output .= $display_value;
     }
-    $output .= $display_value;
 
     # Fill remaining input area
     my $fill = $input_width - length($display_value);
@@ -3456,11 +3493,29 @@ sub _render_find_bar {
     my $find_fg_color = ($focus eq 'find')
         ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
     $content .= $find_bg_color . $find_fg_color;
-    my $display_value = $value;
-    if (length($display_value) > $input_width) {
-        $display_value = substr($display_value, length($display_value) - $input_width);
+    my ($display_value, $find_sel_s, $find_sel_e);
+    if (my $w = $find->{find_widget}) {
+        my $vp = $w->viewport($input_width);
+        $display_value = $vp->{display_text};
+        $find_sel_s    = $vp->{sel_start_in_view};
+        $find_sel_e    = $vp->{sel_end_in_view};
+    } else {
+        $display_value = $value;
+        if (length($display_value) > $input_width) {
+            $display_value = substr($display_value, length($display_value) - $input_width);
+        }
+        $find_sel_s = undef;
+        $find_sel_e = undef;
     }
-    if ($regex_on && $capture_count > 0) {
+    if (defined $find_sel_s) {
+        my $sel_bg = $theme->color('selection_bg');
+        my $sel_fg = $theme->color('selection_fg');
+        $content .= substr($display_value, 0, $find_sel_s) if $find_sel_s > 0;
+        $content .= $sel_bg . $sel_fg;
+        $content .= substr($display_value, $find_sel_s, $find_sel_e - $find_sel_s);
+        $content .= $find_bg_color . $find_fg_color;
+        $content .= substr($display_value, $find_sel_e) if $find_sel_e < length($display_value);
+    } elsif ($regex_on && $capture_count > 0) {
         # Color capture groups in the find input
         $content .= $class->_colorize_find_input(
             $theme, $display_value, $find_fg_color);
@@ -3486,11 +3541,29 @@ sub _render_find_bar {
     my $replace_fg_color = ($focus eq 'replace')
         ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
     $content .= $replace_bg_color . $replace_fg_color;
-    my $replace_display = $replace_value;
-    if (length($replace_display) > $input_width) {
-        $replace_display = substr($replace_display, length($replace_display) - $input_width);
+    my ($replace_display, $rep_sel_s, $rep_sel_e);
+    if (my $w = $find->{replace_widget}) {
+        my $vp = $w->viewport($input_width);
+        $replace_display = $vp->{display_text};
+        $rep_sel_s       = $vp->{sel_start_in_view};
+        $rep_sel_e       = $vp->{sel_end_in_view};
+    } else {
+        $replace_display = $replace_value;
+        if (length($replace_display) > $input_width) {
+            $replace_display = substr($replace_display, length($replace_display) - $input_width);
+        }
+        $rep_sel_s = undef;
+        $rep_sel_e = undef;
     }
-    if ($regex_on && $capture_count > 0) {
+    if (defined $rep_sel_s) {
+        my $sel_bg = $theme->color('selection_bg');
+        my $sel_fg = $theme->color('selection_fg');
+        $content .= substr($replace_display, 0, $rep_sel_s) if $rep_sel_s > 0;
+        $content .= $sel_bg . $sel_fg;
+        $content .= substr($replace_display, $rep_sel_s, $rep_sel_e - $rep_sel_s);
+        $content .= $replace_bg_color . $replace_fg_color;
+        $content .= substr($replace_display, $rep_sel_e) if $rep_sel_e < length($replace_display);
+    } elsif ($regex_on && $capture_count > 0) {
         # Color $N tokens in the replace input
         $content .= $class->_colorize_replace_input(
             $theme, $replace_display, $replace_fg_color, $capture_count);
@@ -3794,13 +3867,36 @@ sub _render_command_palette {
     $output .= $bg . $fg;
     $output .= " $filter_icon ";
     my $input_area = $inner_width - 4;  # -4 for " icon space" + trailing space
-    my $display_query = $query;
-    if (length($display_query) > $input_area) {
-        $display_query = substr($display_query, length($display_query) - $input_area);
+    my ($display_query, $pal_sel_s, $pal_sel_e);
+    if (my $w = $palette->{palette_widget}) {
+        my $vp = $w->viewport($input_area);
+        $display_query = $vp->{display_text};
+        $pal_sel_s     = $vp->{sel_start_in_view};
+        $pal_sel_e     = $vp->{sel_end_in_view};
+    } else {
+        $display_query = $query;
+        if (length($display_query) > $input_area) {
+            $display_query = substr($display_query, length($display_query) - $input_area);
+        }
+        $pal_sel_s = undef;
+        $pal_sel_e = undef;
     }
-    $output .= $theme->color('dialog_input_fg');
-    $output .= $display_query;
-    $output .= $fg;
+    my $input_fg = $theme->color('dialog_input_fg');
+    if (defined $pal_sel_s) {
+        my $sel_bg = $theme->color('selection_bg');
+        my $sel_fg = $theme->color('selection_fg');
+        $output .= $input_fg;
+        $output .= substr($display_query, 0, $pal_sel_s) if $pal_sel_s > 0;
+        $output .= $sel_bg . $sel_fg;
+        $output .= substr($display_query, $pal_sel_s, $pal_sel_e - $pal_sel_s);
+        $output .= $bg . $input_fg;
+        $output .= substr($display_query, $pal_sel_e) if $pal_sel_e < length($display_query);
+        $output .= $fg;
+    } else {
+        $output .= $input_fg;
+        $output .= $display_query;
+        $output .= $fg;
+    }
     my $qpad = $input_area - length($display_query);
     $output .= ' ' x $qpad if $qpad > 0;
     $output .= ' ';

@@ -49,8 +49,8 @@ subtest 'Enter find mode' => sub {
     $editor->enter_find_mode();
 
     is($editor->{state}, Zepto::Editor::STATE_FIND, 'State is find');
-    is($editor->{find_input}, '', 'Find input is empty initially');
-    is($editor->{find_input_cursor}, 0, 'Cursor at start');
+    is($editor->{find_widget}->value(), '', 'Find input is empty initially');
+    is($editor->{find_widget}->cursor(), 0, 'Cursor at start');
     is(scalar @{$editor->{find_matches}}, 0, 'No matches initially');
 };
 
@@ -60,14 +60,14 @@ subtest 'Enter find mode with previous search term' => sub {
 
     $editor->enter_find_mode();
 
-    is($editor->{find_input}, 'World', 'Pre-filled with previous search');
-    is($editor->{find_input_cursor}, 5, 'Cursor at end of term');
+    is($editor->{find_widget}->value(), 'World', 'Pre-filled with previous search');
+    is($editor->{find_widget}->cursor(), 5, 'Cursor at end of term');
 };
 
 subtest 'Exit find mode saves search term' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'Hello';
+    $editor->{find_widget}->set_value('Hello');
 
     $editor->exit_find_mode(1);
 
@@ -82,7 +82,7 @@ subtest 'Exit find mode saves search term' => sub {
 subtest 'Literal search - single match' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'World';
+    $editor->{find_widget}->set_value('World');
 
     $editor->_update_find_matches();
 
@@ -95,7 +95,7 @@ subtest 'Literal search - single match' => sub {
 subtest 'Literal search - multiple matches' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
 
     $editor->_update_find_matches();
 
@@ -108,7 +108,7 @@ subtest 'Literal search - multiple matches' => sub {
 subtest 'Literal search - no matches' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'xyz';
+    $editor->{find_widget}->set_value('xyz');
 
     $editor->_update_find_matches();
 
@@ -118,7 +118,7 @@ subtest 'Literal search - no matches' => sub {
 subtest 'Literal search - empty search' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = '';
+    $editor->{find_widget}->set_value('');
 
     $editor->_update_find_matches();
 
@@ -131,7 +131,7 @@ subtest 'Literal search - empty search' => sub {
 subtest 'Case-insensitive search (default)' => sub {
     my $editor = create_editor_with_content("Hello HELLO hello\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'hello';
+    $editor->{find_widget}->set_value('hello');
     $editor->{find_case} = 0;  # Case-insensitive
 
     $editor->_update_find_matches();
@@ -142,7 +142,7 @@ subtest 'Case-insensitive search (default)' => sub {
 subtest 'Case-sensitive search' => sub {
     my $editor = create_editor_with_content("Hello HELLO hello\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'hello';
+    $editor->{find_widget}->set_value('hello');
     $editor->{find_case} = 1;  # Case-sensitive
 
     $editor->_update_find_matches();
@@ -157,7 +157,7 @@ subtest 'Case-sensitive search' => sub {
 subtest 'Regex search' => sub {
     my $editor = create_editor_with_content("foo123 bar456 foo789\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo\d+';
+    $editor->{find_widget}->set_value('foo\d+');
     $editor->{find_regex} = 1;
 
     $editor->_update_find_matches();
@@ -171,7 +171,7 @@ subtest 'Regex search' => sub {
 subtest 'Regex search - case insensitive' => sub {
     my $editor = create_editor_with_content("FOO123 foo456\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo\d+';
+    $editor->{find_widget}->set_value('foo\d+');
     $editor->{find_regex} = 1;
     $editor->{find_case} = 0;
 
@@ -183,7 +183,7 @@ subtest 'Regex search - case insensitive' => sub {
 subtest 'Regex search - invalid regex' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = '[invalid';
+    $editor->{find_widget}->set_value('[invalid');
     $editor->{find_regex} = 1;
 
     # Should not die
@@ -198,7 +198,7 @@ subtest 'Regex search - invalid regex' => sub {
 subtest 'Navigate to next match' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->_update_find_matches();
 
     # Start at first match (nearest to cursor at 0)
@@ -214,7 +214,7 @@ subtest 'Navigate to next match' => sub {
 subtest 'Navigate wraps at end' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->_update_find_matches();
 
     $editor->{find_current} = 2;  # Last match
@@ -226,7 +226,7 @@ subtest 'Navigate wraps at end' => sub {
 subtest 'Navigate wraps at start' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->_update_find_matches();
 
     $editor->{find_current} = 0;  # First match
@@ -238,7 +238,7 @@ subtest 'Navigate wraps at start' => sub {
 subtest 'Navigate with no matches' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'xyz';
+    $editor->{find_widget}->set_value('xyz');
     $editor->_update_find_matches();
 
     # Should not die
@@ -253,7 +253,7 @@ subtest 'Find nearest match to cursor' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->active_view()->set_cursor(0, 10);  # Position near second "foo"
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->_update_find_matches();
 
     # Should select the match at or after cursor position
@@ -295,15 +295,15 @@ subtest 'Enter find mode loads previous replace' => sub {
     $editor->enter_find_mode();
 
     is($editor->{find_replace_active}, 1, 'Replace is always active (unified find/replace)');
-    is($editor->{find_replace_input}, 'Universe', 'Pre-filled with previous replace');
+    is($editor->{find_replace_widget}->value(), 'Universe', 'Pre-filled with previous replace');
     is($editor->{find_focus}, 'find', 'Focus starts on find field');
 };
 
 subtest 'Replace current match' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'foo';
-    $editor->{find_replace_input} = 'XXX';
+    $editor->{find_widget}->set_value('foo');
+    $editor->{find_replace_widget}->set_value('XXX');
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 3, 'Found three matches');
@@ -318,8 +318,8 @@ subtest 'Replace current match' => sub {
 subtest 'Replace all matches' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'foo';
-    $editor->{find_replace_input} = 'YYY';
+    $editor->{find_widget}->set_value('foo');
+    $editor->{find_replace_widget}->set_value('YYY');
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 3, 'Found three matches');
@@ -334,8 +334,8 @@ subtest 'Replace all matches' => sub {
 subtest 'Replace with empty string' => sub {
     my $editor = create_editor_with_content("foo bar foo\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'foo';
-    $editor->{find_replace_input} = '';
+    $editor->{find_widget}->set_value('foo');
+    $editor->{find_replace_widget}->set_value('');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -347,8 +347,8 @@ subtest 'Replace with empty string' => sub {
 subtest 'Replace preserves case with regex' => sub {
     my $editor = create_editor_with_content("The cat sat on the mat.\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'at';
-    $editor->{find_replace_input} = 'og';
+    $editor->{find_widget}->set_value('at');
+    $editor->{find_replace_widget}->set_value('og');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -360,7 +360,7 @@ subtest 'Replace preserves case with regex' => sub {
 subtest 'Tab toggles focus in combined find/replace' => sub {
     my $editor = create_editor_with_content("test\n");
     $editor->enter_find_mode();
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
 
     # Replace is always active now (unified find/replace)
     is($editor->{find_replace_active}, 1, 'Replace always active');
@@ -393,7 +393,7 @@ subtest 'Find searches new document after loading different file' => sub {
 
     # Verify initial content works
     $editor->enter_find_mode();
-    $editor->{find_input} = 'apple';
+    $editor->{find_widget}->set_value('apple');
     $editor->_update_find_matches();
     is(scalar @{$editor->{find_matches}}, 1, 'Found "apple" in initial file');
     $editor->exit_find_mode(0);
@@ -408,13 +408,13 @@ subtest 'Find searches new document after loading different file' => sub {
 
     # Search for content that's only in the NEW file
     $editor->enter_find_mode();
-    $editor->{find_input} = 'elephant';
+    $editor->{find_widget}->set_value('elephant');
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 1, 'Found "elephant" in new file');
 
     # Search for content that was only in the OLD file
-    $editor->{find_input} = 'apple';
+    $editor->{find_widget}->set_value('apple');
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 0, 'No "apple" in new file (old content gone)');
@@ -525,9 +525,9 @@ subtest 'Expand replacement with capture references' => sub {
 subtest 'Replace current with capture groups' => sub {
     my $editor = create_editor_with_content("John Smith\nJane Doe\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = '(\w+) (\w+)';
+    $editor->{find_widget}->set_value('(\w+) (\w+)');
     $editor->{find_regex} = 1;
-    $editor->{find_replace_input} = '$2, $1';
+    $editor->{find_replace_widget}->set_value('$2, $1');
     $editor->_update_find_matches();
 
     is(scalar @{$editor->{find_matches}}, 2, 'Found two matches');
@@ -542,9 +542,9 @@ subtest 'Replace current with capture groups' => sub {
 subtest 'Replace all with capture groups' => sub {
     my $editor = create_editor_with_content("John Smith\nJane Doe\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = '(\w+) (\w+)';
+    $editor->{find_widget}->set_value('(\w+) (\w+)');
     $editor->{find_regex} = 1;
-    $editor->{find_replace_input} = '$2, $1';
+    $editor->{find_replace_widget}->set_value('$2, $1');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -556,9 +556,9 @@ subtest 'Replace all with capture groups' => sub {
 subtest 'Replace with $0 (full match reference)' => sub {
     my $editor = create_editor_with_content("foo bar baz\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = '\w+';
+    $editor->{find_widget}->set_value('\w+');
     $editor->{find_regex} = 1;
-    $editor->{find_replace_input} = '[$0]';
+    $editor->{find_replace_widget}->set_value('[$0]');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -570,9 +570,9 @@ subtest 'Replace with $0 (full match reference)' => sub {
 subtest 'Literal mode ignores capture references' => sub {
     my $editor = create_editor_with_content("foo bar foo\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->{find_regex} = 0;  # Literal mode
-    $editor->{find_replace_input} = '$1';
+    $editor->{find_replace_widget}->set_value('$1');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -584,9 +584,9 @@ subtest 'Literal mode ignores capture references' => sub {
 subtest 'Dollar sign escape in replacement' => sub {
     my $editor = create_editor_with_content("foo\n");
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'foo';
+    $editor->{find_widget}->set_value('foo');
     $editor->{find_regex} = 1;
-    $editor->{find_replace_input} = '$$100';
+    $editor->{find_replace_widget}->set_value('$$100');
     $editor->_update_find_matches();
 
     $editor->_replace_all();
@@ -617,9 +617,9 @@ subtest 'Replace all with captures on many matches' => sub {
     my $content = join("\n", map { "item_$_" } 1..5) . "\n";
     my $editor = create_editor_with_content($content);
     $editor->enter_find_mode(1);
-    $editor->{find_input} = 'item_(\d+)';
+    $editor->{find_widget}->set_value('item_(\d+)');
     $editor->{find_regex} = 1;
-    $editor->{find_replace_input} = 'thing[$1]';
+    $editor->{find_replace_widget}->set_value('thing[$1]');
     $editor->_update_find_matches();
 
     $editor->_replace_all();

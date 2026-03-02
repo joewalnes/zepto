@@ -39,6 +39,7 @@ use Zepto::LineMap;
 use Zepto::WrapMap;
 use Zepto::Editor::TabManager;
 use Zepto::FileTree;
+use Zepto::InputWidget;
 
 # Editor states
 use constant {
@@ -84,15 +85,13 @@ sub new {
         last_search_pos => 0,
 
         # Incremental find state
-        find_input        => '',      # Current search input
-        find_input_cursor => 0,       # Cursor position in input
+        find_widget       => undef,   # InputWidget for search field
         find_current      => 0,       # Index of current match (0-based)
         find_regex        => 1,       # Regex mode enabled (on by default)
         find_case         => 0,       # Case-sensitive enabled
 
         # Replace state (extension of find)
-        find_replace_input  => '',      # Replacement text
-        find_replace_cursor => 0,       # Cursor position in replace input
+        find_replace_widget => undef,   # InputWidget for replace field
         find_replace_active => 0,       # Is replace field visible?
         find_focus          => 'find',  # Which field has focus: 'find' or 'replace'
         find_replace_all    => 1,       # Replace all mode (vs replace one)
@@ -126,10 +125,10 @@ sub new {
         _last_title => '',
 
         # Command palette state
-        palette_query    => '',
-        palette_cursor   => 0,
-        palette_scroll   => 0,
-        palette_filtered => [],
+        palette_widget       => undef,  # InputWidget for filter query
+        palette_cursor       => 0,
+        palette_scroll       => 0,
+        palette_filtered     => [],
         palette_visible_rows => 15,  # updated during render
     }, $class;
 
@@ -768,6 +767,8 @@ sub handle_mouse_event {
         if ($y == $rows) {
             if ($self->{state} eq STATE_FIND) {
                 $self->handle_find_bar_click($x);
+            } elsif ($self->{state} eq STATE_FOOTER_INPUT) {
+                $self->_handle_footer_input_click($x);
             } else {
                 $self->handle_status_bar_click($x);
             }
@@ -980,6 +981,12 @@ sub handle_mouse_event {
         $self->{tree_border_dragging} = 0;
         $self->{tree_scrollbar_dragging} = 0;
         $self->{tab_dragging} = undef;
+        # End any input widget drag
+        $self->{find_widget}->handle_mouse_drag_end()         if $self->{find_widget};
+        $self->{find_replace_widget}->handle_mouse_drag_end() if $self->{find_replace_widget};
+        if ($self->{footer_input} && $self->{footer_input}{widget}) {
+            $self->{footer_input}{widget}->handle_mouse_drag_end();
+        }
     }
     elsif ($action eq 'scroll') {
         # Scroll on tab bar — cycle through tabs
@@ -1018,6 +1025,18 @@ sub handle_mouse_event {
         # Only handle drag if mouse button is actually down
         # (some terminals send spurious motion events)
         return unless $self->{mouse_button_down};
+
+        # Drag in status-bar input widgets (find bar / footer input)
+        my ($rows_d, $cols_d) = $term->get_size();
+        if ($y == $rows_d) {
+            if ($self->{state} eq STATE_FIND) {
+                $self->_handle_find_bar_drag($x);
+                return;
+            } elsif ($self->{state} eq STATE_FOOTER_INPUT) {
+                $self->_handle_footer_input_drag($x);
+                return;
+            }
+        }
 
         # Handle tab drag reorder
         if (defined $self->{tab_dragging}) {
@@ -1388,8 +1407,7 @@ sub open_footer_input {
     $self->{state} = STATE_FOOTER_INPUT;
     $self->{footer_input} = {
         prompt    => $opts{prompt} // '',
-        value     => $opts{value} // '',
-        cursor    => length($opts{value} // ''),
+        widget    => Zepto::InputWidget->new(value => $opts{value} // ''),
         hint      => $opts{hint},
         on_submit => $opts{on_submit},
         on_cancel => $opts{on_cancel},
@@ -1405,14 +1423,14 @@ sub close_footer_input {
 sub handle_footer_input_event {
     my ($self, $event) = @_;
 
-    my $input = $self->{footer_input};
-    my $type = $event->{type};
+    my $input  = $self->{footer_input};
+    my $widget = $input->{widget};
+    my $type   = $event->{type};
 
     if ($type eq 'key') {
         my $key = $event->{key};
-
         if ($key eq 'enter') {
-            my $value = $input->{value};
+            my $value    = $widget->value();
             my $callback = $input->{on_submit};
             $self->close_footer_input();
             $callback->($value) if $callback;
@@ -1422,42 +1440,12 @@ sub handle_footer_input_event {
             $self->close_footer_input();
             $callback->() if $callback;
         }
-        elsif ($key eq 'backspace') {
-            if ($input->{cursor} > 0) {
-                my $val = $input->{value};
-                my $pos = $input->{cursor};
-                $input->{value} = substr($val, 0, $pos - 1) . substr($val, $pos);
-                $input->{cursor}--;
-            }
-        }
-        elsif ($key eq 'delete') {
-            if ($input->{cursor} < length($input->{value})) {
-                my $val = $input->{value};
-                my $pos = $input->{cursor};
-                $input->{value} = substr($val, 0, $pos) . substr($val, $pos + 1);
-            }
-        }
-        elsif ($key eq 'left') {
-            $input->{cursor}-- if $input->{cursor} > 0;
-        }
-        elsif ($key eq 'right') {
-            $input->{cursor}++ if $input->{cursor} < length($input->{value});
-        }
-        elsif ($key eq 'home') {
-            $input->{cursor} = 0;
-        }
-        elsif ($key eq 'end') {
-            $input->{cursor} = length($input->{value});
+        else {
+            $widget->handle_event($event, \$self->{clipboard});
         }
     }
     elsif ($type eq 'char') {
-        my $char = $event->{char};
-        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
-            my $val = $input->{value};
-            my $pos = $input->{cursor};
-            $input->{value} = substr($val, 0, $pos) . $char . substr($val, $pos);
-            $input->{cursor}++;
-        }
+        $widget->handle_event($event, \$self->{clipboard});
     }
 }
 
@@ -1473,10 +1461,8 @@ sub enter_find_mode {
         $view->clear_selection();
     }
     $self->{state} = STATE_FIND;
-    $self->{find_input} = $self->{search_term};  # Pre-fill with last search
-    $self->{find_input_cursor} = length($self->{find_input});
-    $self->{find_replace_input} = $self->{search_replace};  # Pre-fill replace too
-    $self->{find_replace_cursor} = length($self->{find_replace_input});
+    $self->{find_widget}         = Zepto::InputWidget->new(value => $self->{search_term});
+    $self->{find_replace_widget} = Zepto::InputWidget->new(value => $self->{search_replace});
     $self->{find_replace_active} = 1;  # Always show replace field
     $self->{find_focus} = 'find';
     $self->{find_replace_preview} = undef;  # Virtual preview data
@@ -1504,8 +1490,8 @@ sub exit_find_mode {
     # Abort any background search
     $engine->abort() if $engine;
 
-    $self->{search_term} = $self->{find_input};  # Save for next time
-    $self->{search_replace} = $self->{find_replace_input};  # Save replace too
+    $self->{search_term}    = $self->{find_widget}->value();         # Save for next time
+    $self->{search_replace} = $self->{find_replace_widget}->value(); # Save replace too
     $self->{find_matches} = [];  # Clear highlights
     $self->{find_replaced} = [];  # Clear replaced highlights
     $self->{find_replace_preview} = undef;  # Clear virtual preview
@@ -1518,14 +1504,12 @@ sub handle_find_event {
 
     my $type = $event->{type};
 
-    # Determine which input field has focus
+    # Determine which widget has focus
     my $in_replace = $self->{find_replace_active} && $self->{find_focus} eq 'replace';
-    my ($val_ref, $cursor_ref) = $in_replace
-        ? (\$self->{find_replace_input}, \$self->{find_replace_cursor})
-        : (\$self->{find_input}, \$self->{find_input_cursor});
+    my $widget = $in_replace ? $self->{find_replace_widget} : $self->{find_widget};
 
     if ($type eq 'key') {
-        my $key = $event->{key};
+        my $key   = $event->{key};
         my $shift = Zepto::InputParser::has_modifier($event, 'shift');
 
         if ($key eq 'enter') {
@@ -1553,45 +1537,6 @@ sub handle_find_event {
         elsif ($key eq 'down') {
             # Navigate to next match
             $self->_find_navigate(1);
-        }
-        elsif ($key eq 'backspace') {
-            if ($$cursor_ref > 0) {
-                my $val = $$val_ref;
-                my $pos = $$cursor_ref;
-                $$val_ref = substr($val, 0, $pos - 1) . substr($val, $pos);
-                $$cursor_ref--;
-                if ($in_replace) {
-                    $self->_apply_replace_preview() if $self->{find_replace_all};
-                } else {
-                    $self->_reset_replace_preview();  # Find term changed, reset preview
-                    $self->_update_find_matches(1);  # Skip jump while typing
-                }
-            }
-        }
-        elsif ($key eq 'delete') {
-            if ($$cursor_ref < length($$val_ref)) {
-                my $val = $$val_ref;
-                my $pos = $$cursor_ref;
-                $$val_ref = substr($val, 0, $pos) . substr($val, $pos + 1);
-                if ($in_replace) {
-                    $self->_apply_replace_preview() if $self->{find_replace_all};
-                } else {
-                    $self->_reset_replace_preview();  # Find term changed, reset preview
-                    $self->_update_find_matches(1);  # Skip jump while typing
-                }
-            }
-        }
-        elsif ($key eq 'left') {
-            $$cursor_ref-- if $$cursor_ref > 0;
-        }
-        elsif ($key eq 'right') {
-            $$cursor_ref++ if $$cursor_ref < length($$val_ref);
-        }
-        elsif ($key eq 'home') {
-            $$cursor_ref = 0;
-        }
-        elsif ($key eq 'end') {
-            $$cursor_ref = length($$val_ref);
         }
         elsif ($key eq 'tab') {
             if ($shift) {
@@ -1628,8 +1573,7 @@ sub handle_find_event {
                     # Show replace field, prepopulate with find string
                     $self->{find_replace_active} = 1;
                     $self->{find_focus} = 'replace';
-                    $self->{find_replace_input} = $self->{find_input};
-                    $self->{find_replace_cursor} = length($self->{find_replace_input});
+                    $self->{find_replace_widget}->set_value($self->{find_widget}->value());
                 } elsif ($self->{find_focus} eq 'find') {
                     $self->{find_focus} = 'replace';
                 } else {
@@ -1637,34 +1581,51 @@ sub handle_find_event {
                 }
             }
         }
+        else {
+            # Delegate cursor/editing keys to widget; trigger side effects on value change
+            my $old_find    = $self->{find_widget}->value();
+            my $old_replace = $self->{find_replace_widget}->value();
+            $widget->handle_event($event, \$self->{clipboard});
+            $self->_find_value_changed($in_replace, $old_find, $old_replace);
+        }
     }
     elsif ($type eq 'char') {
         my $char = $event->{char};
         my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
 
         if ($ctrl && lc($char) eq 'r') {
-            # Ctrl+R: Toggle regex mode
+            # Ctrl+R: Toggle regex mode (find-specific, not standard editing)
             $self->{find_regex} = !$self->{find_regex};
             $self->_reset_replace_preview();
             $self->_update_find_matches(1);
         }
         elsif ($ctrl && lc($char) eq 'c') {
-            # Ctrl+C: Toggle case-sensitive mode
+            # Ctrl+C: Toggle case-sensitive mode (find-specific, overrides copy)
             $self->{find_case} = !$self->{find_case};
             $self->_reset_replace_preview();
             $self->_update_find_matches(1);
         }
-        elsif (!$ctrl) {
-            my $val = $$val_ref;
-            my $pos = $$cursor_ref;
-            $$val_ref = substr($val, 0, $pos) . $char . substr($val, $pos);
-            $$cursor_ref++;
-            if ($in_replace) {
-                $self->_apply_replace_preview() if $self->{find_replace_all};
-            } else {
-                $self->_reset_replace_preview();  # Find term changed, reset preview
-                $self->_update_find_matches(1);  # Skip jump while typing
-            }
+        else {
+            # Delegate all other chars to widget (including ctrl+a, ctrl+x, ctrl+v)
+            my $old_find    = $self->{find_widget}->value();
+            my $old_replace = $self->{find_replace_widget}->value();
+            $widget->handle_event($event, \$self->{clipboard});
+            $self->_find_value_changed($in_replace, $old_find, $old_replace);
+        }
+    }
+}
+
+# Trigger find/replace side effects after widget edits.
+sub _find_value_changed {
+    my ($self, $in_replace, $old_find, $old_replace) = @_;
+    if ($in_replace) {
+        if ($self->{find_replace_widget}->value() ne $old_replace) {
+            $self->_apply_replace_preview() if $self->{find_replace_all};
+        }
+    } else {
+        if ($self->{find_widget}->value() ne $old_find) {
+            $self->_reset_replace_preview();
+            $self->_update_find_matches(1);
         }
     }
 }
@@ -1680,7 +1641,7 @@ sub handle_find_bar_click {
     my $match_count = $self->active_find_engine() ? $self->active_find_engine()->match_count() : 0;
     my $current = $self->{find_current} // 0;
     my $match_text = $match_count == 0
-        ? (length($self->{find_input}) ? 'No matches' : '')
+        ? (length($self->{find_widget}->value()) ? 'No matches' : '')
         : (($current + 1) . ' of ' . $match_count);
     my $match_text_len = length($match_text);
 
@@ -1704,9 +1665,13 @@ sub handle_find_bar_click {
     # Check which region was clicked
     if ($x >= $find_start && $x <= $find_end) {
         $self->{find_focus} = 'find';
+        my $char_offset = $x - $find_start;
+        $self->{find_widget}->handle_mouse_click($char_offset);
     }
     elsif ($x >= $replace_start && $x <= $replace_end) {
         $self->{find_focus} = 'replace';
+        my $char_offset = $x - $replace_start;
+        $self->{find_replace_widget}->handle_mouse_click($char_offset);
     }
     else {
         # For buttons on the right side, scan from the right
@@ -1745,6 +1710,56 @@ sub handle_find_bar_click {
     }
 }
 
+# Drag within find bar: extend selection on the focused widget.
+sub _handle_find_bar_drag {
+    my ($self, $x) = @_;
+    my ($rows, $cols) = $self->{terminal}->get_size();
+
+    # Recompute field positions (same as handle_find_bar_click)
+    my $match_count = $self->active_find_engine() ? $self->active_find_engine()->match_count() : 0;
+    my $match_text  = $match_count == 0
+        ? (length($self->{find_widget}->value()) ? 'No matches' : '')
+        : (($self->{find_current} // 0) + 1) . ' of ' . $match_count;
+    my $right_side_width = 45 + length($match_text);
+    my $available   = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
+    my $input_width = int($available / 2);
+    $input_width = 8  if $input_width < 8;
+    $input_width = 40 if $input_width > 40;
+
+    my $find_start    = 7;  # " " + " Find:" = 7
+    my $find_end      = $find_start + $input_width - 1;
+    my $replace_start = $find_end + 1 + 1 + 8;
+    my $replace_end   = $replace_start + $input_width - 1;
+
+    my $in_replace = $self->{find_replace_active} && $self->{find_focus} eq 'replace';
+    if ($in_replace && $x >= $replace_start && $x <= $replace_end) {
+        $self->{find_replace_widget}->handle_mouse_drag_update($x - $replace_start);
+    } elsif (!$in_replace && $x >= $find_start && $x <= $find_end) {
+        $self->{find_widget}->handle_mouse_drag_update($x - $find_start);
+    }
+}
+
+# Click within footer input field: place cursor.
+sub _handle_footer_input_click {
+    my ($self, $x) = @_;
+    my $input = $self->{footer_input};
+    return unless $input && $input->{widget};
+    # Field starts right after " Prompt: " — prompt_len includes the two surrounding spaces
+    my $prompt_len = length($input->{prompt} // '') + 2;
+    my $char_offset = $x - $prompt_len - 1;  # -1: terminal columns are 1-indexed
+    $input->{widget}->handle_mouse_click($char_offset);
+}
+
+# Drag within footer input field: extend selection.
+sub _handle_footer_input_drag {
+    my ($self, $x) = @_;
+    my $input = $self->{footer_input};
+    return unless $input && $input->{widget};
+    my $prompt_len  = length($input->{prompt} // '') + 2;
+    my $char_offset = $x - $prompt_len - 1;
+    $input->{widget}->handle_mouse_drag_update($char_offset);
+}
+
 # Reset replace preview state when find term changes
 sub _reset_replace_preview {
     my ($self) = @_;
@@ -1758,7 +1773,7 @@ sub _reset_replace_preview {
 sub _update_find_matches {
     my ($self, $skip_jump) = @_;
     my $doc = $self->active_doc();
-    my $term = $self->{find_input};
+    my $term = $self->{find_widget}->value();
     my $view = $self->active_view();
     my $engine = $self->active_find_engine();
 
@@ -1901,7 +1916,7 @@ sub _replace_current {
 
     my $match = $matches->[$idx];
     my $doc = $self->active_doc();
-    my $replacement = $self->{find_replace_input};
+    my $replacement = $self->{find_replace_widget}->value();
 
     # Expand capture references ($0, $1, ...) if in regex mode
     my $engine = $self->active_find_engine();
@@ -1931,7 +1946,7 @@ sub _replace_all {
     return unless @$matches;
 
     my $doc = $self->active_doc();
-    my $replacement = $self->{find_replace_input};
+    my $replacement = $self->{find_replace_widget}->value();
     my $total = scalar @$matches;
 
     # For small numbers of matches, do it synchronously
@@ -1971,7 +1986,7 @@ sub _replace_all {
     # Build new string by concatenating: non-match regions + replacements
     # This is O(n) vs O(n*k) for in-place substr modifications
     my $engine = $self->active_find_engine();
-    my $re = $engine->_build_regex($self->{find_input});
+    my $re = $engine->_build_regex($self->{find_widget}->value());
     my $has_captures = $self->{find_regex} && $replacement =~ /\$/;
 
     my $result = '';
@@ -2014,7 +2029,7 @@ sub _replace_all_sync {
     return unless @$matches;
 
     my $doc = $self->active_doc();
-    my $replacement = $self->{find_replace_input};
+    my $replacement = $self->{find_replace_widget}->value();
 
     # Sort by line/col descending to preserve offsets
     my @sorted = sort {
@@ -2042,7 +2057,7 @@ sub _apply_replace_preview {
 
     my $view = $self->active_view();
     my $engine = $self->active_find_engine();
-    my $replacement = $self->{find_replace_input};
+    my $replacement = $self->{find_replace_widget}->value();
 
     # Get viewport bounds
     my $viewport_start = $view->scroll_line();
@@ -3247,12 +3262,14 @@ sub render {
         ui          => {
             editor => $self,
             dialog => $self->{dialog},
-            palette => ($self->{state} eq STATE_PALETTE) ? {
-                query    => $self->{palette_query},
-                cursor   => $self->{palette_cursor},
-                scroll   => $self->{palette_scroll},
-                filtered => $self->{palette_filtered},
-                editor   => $self,
+            palette => ($self->{state} eq STATE_PALETTE && $self->{palette_widget}) ? {
+                query          => $self->{palette_widget}->value(),
+                query_cursor   => $self->{palette_widget}->cursor(),
+                palette_widget => $self->{palette_widget},
+                cursor         => $self->{palette_cursor},
+                scroll         => $self->{palette_scroll},
+                filtered       => $self->{palette_filtered},
+                editor         => $self,
             } : undef,
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
@@ -3261,16 +3278,18 @@ sub render {
             tab_manager => $self->{tab_manager},
             file_tree => ($self->{prefs}->show_tree() && $self->{file_tree}) ? $self->{file_tree} : undef,
             find_mode => ($self->{state} eq STATE_FIND) ? {
-                value          => $self->{find_input},
-                cursor         => $self->{find_input_cursor},
+                value          => $self->{find_widget}->value(),
+                cursor         => $self->{find_widget}->cursor(),
+                find_widget    => $self->{find_widget},
                 matches        => $self->{find_matches},
                 replaced       => $self->{find_replaced},
                 replace_preview => $self->{find_replace_preview},  # Virtual preview data
                 current        => $self->{find_current},
                 regex          => $self->{find_regex},
                 case           => $self->{find_case},
-                replace_value  => $self->{find_replace_input},
-                replace_cursor => $self->{find_replace_cursor},
+                replace_value  => $self->{find_replace_widget}->value(),
+                replace_cursor => $self->{find_replace_widget}->cursor(),
+                replace_widget => $self->{find_replace_widget},
                 replace_active => $self->{find_replace_active},
                 replace_all    => $self->{find_replace_all},
                 focus          => $self->{find_focus},

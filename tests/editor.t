@@ -98,7 +98,7 @@ subtest 'Open command palette' => sub {
 
     $editor->cmd_open_palette();
     is($editor->{state}, 'palette', 'State is palette');
-    is($editor->{palette_query}, '', 'Query starts empty');
+    is($editor->{palette_widget}->value(), '', 'Query starts empty');
     is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
 };
 
@@ -109,7 +109,7 @@ subtest 'Close command palette' => sub {
     $editor->cmd_open_palette();
     $editor->close_palette();
     is($editor->{state}, 'editing', 'State is editing');
-    is($editor->{palette_query}, '', 'Query cleared');
+    ok(!defined $editor->{palette_widget}, 'Widget cleared (palette closed)');
 };
 
 subtest 'Palette escape closes' => sub {
@@ -1173,7 +1173,7 @@ subtest 'Footer input opens and closes' => sub {
 
     is($editor->{state}, 'footer_input', 'State is footer_input');
     is($editor->{footer_input}{prompt}, 'Test:', 'Prompt set');
-    is($editor->{footer_input}{value}, 'initial', 'Initial value set');
+    is($editor->{footer_input}{widget}->value(), 'initial', 'Initial value set');
 
     $editor->close_footer_input();
     is($editor->{state}, 'editing', 'Back to editing');
@@ -1187,18 +1187,18 @@ subtest 'Footer input handles typing' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->open_footer_input(prompt => 'Name:');
-    is($editor->{footer_input}{value}, '', 'Value initially empty');
+    is($editor->{footer_input}{widget}->value(), '', 'Value initially empty');
 
     # Type characters
     $editor->handle_input('a');
-    is($editor->{footer_input}{value}, 'a', 'Char added');
+    is($editor->{footer_input}{widget}->value(), 'a', 'Char added');
 
     $editor->handle_input('bc');
-    is($editor->{footer_input}{value}, 'abc', 'More chars added');
+    is($editor->{footer_input}{widget}->value(), 'abc', 'More chars added');
 
     # Backspace
     $editor->handle_input("\x7f");  # DEL/backspace
-    is($editor->{footer_input}{value}, 'ab', 'Backspace works');
+    is($editor->{footer_input}{widget}->value(), 'ab', 'Backspace works');
 };
 
 subtest 'Footer input submit calls callback' => sub {
@@ -1255,7 +1255,7 @@ subtest 'Palette type-to-filter' => sub {
     $editor->handle_palette_event({ type => 'char', char => 's', modifiers => [] });
     $editor->handle_palette_event({ type => 'char', char => 'a', modifiers => [] });
     $editor->handle_palette_event({ type => 'char', char => 'v', modifiers => [] });
-    is($editor->{palette_query}, 'sav', 'Query is "sav"');
+    is($editor->{palette_widget}->value(), 'sav', 'Query is "sav"');
 
     my $filtered_count = scalar @{$editor->{palette_filtered}};
     ok($filtered_count <= $initial_count, 'Filtered list is smaller or equal');

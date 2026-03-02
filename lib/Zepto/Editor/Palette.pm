@@ -16,6 +16,7 @@ use utf8;
 package Zepto::Editor;
 
 use Zepto::CommandRegistry;
+use Zepto::InputWidget;
 
 # =============================================================================
 # Palette State
@@ -31,7 +32,7 @@ sub cmd_open_palette {
     return if $self->{state} eq 'dialog';
 
     $self->{state} = 'palette';
-    $self->{palette_query} = '';
+    $self->{palette_widget} = Zepto::InputWidget->new();
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
     $self->_palette_update_filtered();
@@ -40,7 +41,7 @@ sub cmd_open_palette {
 sub close_palette {
     my ($self) = @_;
     $self->{state} = 'editing';
-    $self->{palette_query} = '';
+    $self->{palette_widget} = undef;
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
     $self->{palette_filtered} = [];
@@ -53,7 +54,8 @@ sub close_palette {
 sub handle_palette_event {
     my ($self, $event) = @_;
 
-    my $type = $event->{type};
+    my $type   = $event->{type};
+    my $widget = $self->{palette_widget};
 
     if ($type eq 'key') {
         my $key = $event->{key};
@@ -70,9 +72,11 @@ sub handle_palette_event {
         elsif ($key eq 'down') {
             $self->_palette_move_cursor(1);
         }
-        elsif ($key eq 'backspace') {
-            if (length($self->{palette_query}) > 0) {
-                $self->{palette_query} = substr($self->{palette_query}, 0, -1);
+        else {
+            # Delegate cursor/editing keys to widget
+            my $old_query = $widget->value();
+            $widget->handle_event($event, \$self->{clipboard});
+            if ($widget->value() ne $old_query) {
                 $self->{palette_cursor} = 0;
                 $self->{palette_scroll} = 0;
                 $self->_palette_update_filtered();
@@ -82,7 +86,7 @@ sub handle_palette_event {
     elsif ($type eq 'char') {
         my $char = $event->{char};
         my $ctrl = Zepto::InputParser::has_modifier($event, 'ctrl');
-        my $alt = Zepto::InputParser::has_modifier($event, 'alt');
+        my $alt  = Zepto::InputParser::has_modifier($event, 'alt');
 
         if ($ctrl) {
             # Check if ctrl+char matches a command shortcut — execute directly
@@ -94,6 +98,15 @@ sub handle_palette_event {
                 $self->close_palette();
                 return;
             }
+
+            # Delegate Ctrl+A / other editing to widget
+            my $old_query = $widget->value();
+            $widget->handle_event($event);
+            if ($widget->value() ne $old_query) {
+                $self->{palette_cursor} = 0;
+                $self->{palette_scroll} = 0;
+                $self->_palette_update_filtered();
+            }
         }
         elsif ($alt) {
             # Check if alt+char matches a command shortcut
@@ -101,11 +114,14 @@ sub handle_palette_event {
             return if $matched;
         }
         else {
-            # Printable character — append to query
-            $self->{palette_query} .= $char;
-            $self->{palette_cursor} = 0;
-            $self->{palette_scroll} = 0;
-            $self->_palette_update_filtered();
+            # Printable character — append to query via widget
+            my $old_query = $widget->value();
+            $widget->handle_event($event);
+            if ($widget->value() ne $old_query) {
+                $self->{palette_cursor} = 0;
+                $self->{palette_scroll} = 0;
+                $self->_palette_update_filtered();
+            }
         }
     }
     elsif ($type eq 'mouse') {
@@ -119,10 +135,11 @@ sub handle_palette_event {
 
 sub _palette_update_filtered {
     my ($self) = @_;
-    my @filtered = Zepto::CommandRegistry->filter_commands($self->{palette_query});
+    my $query   = $self->{palette_widget} ? $self->{palette_widget}->value() : '';
+    my @filtered = Zepto::CommandRegistry->filter_commands($query);
 
     # When no query, insert section headers before each group
-    if (length($self->{palette_query}) == 0) {
+    if (length($query) == 0) {
         my @with_headers;
         my $current_section = '';
         for my $cmd (@filtered) {
