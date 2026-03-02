@@ -106,6 +106,25 @@ Rules:
 - Only a direct user message counts. Stop hook messages do **not** count — they are automated infrastructure. If a hook fires asking to commit, inform the user there are uncommitted changes and ask if they want to commit.
 - Tests passing is not sufficient — the user must confirm changes work before committing
 
+### Pre-commit checklist — all 7 rules, every time, no exceptions
+
+Before every commit, verify each rule in order:
+
+| # | Rule | How to verify |
+|---|------|---------------|
+| 1 | Build integrity | `make check && make build` — must succeed cleanly |
+| 2 | UI discoverability | If any UI changed: run interactively in tmux and confirm feature is reachable via command palette or status bar |
+| 3 | Tests pass, no noise | `make test` — must pass (or pre-existing failures explicitly acknowledged and user-approved) |
+| 4 | Security | If file I/O, shell exec, or rendering changed: flag it and confirm it was reviewed against `docs/SECURITY.md` |
+| 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
+| 6 | Bug tracking | Any bugs found (even incidentally) are recorded in `bugs.md` |
+| 7 | Code quality | Changes follow existing conventions; no new patterns introduced without reason |
+
+If any rule is not satisfied:
+- **Do not commit.**
+- If a rule doesn't apply to the change (e.g. Rule 2 for a docs-only change), state that explicitly rather than silently skipping it.
+- "It's only a docs change" is not a blanket exemption — still run Rules 1, 3, and 7 at minimum.
+
 ---
 
 ## Keeping Docs Current
