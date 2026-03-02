@@ -104,10 +104,10 @@ use constant {
     TOGGLE_OFF          => "\x{25cb}",  # ○ (empty circle)
 };
 
-# VCS gutter indicators (single column - color differentiates type)
+# VCS gutter indicators (single column - shape AND color differentiate type)
 use constant {
     VCS_ADDED           => "\x{2590}",  # ▐ Right half block (added line)
-    VCS_MODIFIED        => "\x{2590}",  # ▐ Right half block (modified line)
+    VCS_MODIFIED        => "\x{258e}",  # ▎ Left one-quarter block (modified - thinner than added)
     VCS_DELETED         => "\x{2590}",  # ▐ Right half block (deletion marker - red color)
     # Full block for expanded hunk indicator
     VCS_EXPANDED        => "\x{2588}",  # █ Full block (hunk is expanded)
@@ -213,9 +213,9 @@ my %CHARS = (
     prev_change         => [ NF_CHEVRON_UP,     '^'         ],
 
     # VCS gutter indicators (same in both modes)
-    vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐
-    vcs_modified        => [ VCS_MODIFIED,        VCS_MODIFIED  ],  # ▐
-    vcs_deleted         => [ VCS_DELETED,         VCS_DELETED   ],  # ▐ (red)
+    vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐ added
+    vcs_modified        => [ VCS_MODIFIED,        VCS_MODIFIED  ],  # ▎ modified (thinner = changed, not new)
+    vcs_deleted         => [ VCS_DELETED,         VCS_DELETED   ],  # ▐ deleted (red)
     vcs_expanded        => [ VCS_EXPANDED,        VCS_EXPANDED  ],  # █ (expanded hunk)
     vcs_del_upper       => [ VCS_DEL_UPPER,       VCS_DEL_UPPER ],  # ▝ (legacy)
     vcs_del_lower       => [ VCS_DEL_LOWER,       VCS_DEL_LOWER ],  # ▗ (legacy)

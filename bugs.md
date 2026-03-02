@@ -168,9 +168,11 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 
 **Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
 
-### P2: Typing long string in file fuzzy finder overflows side panel
+### ~~P2: Typing long string in file fuzzy finder overflows side panel~~ FIXED
 
 When a long search string is typed into the file fuzzy finder input, the text overflows outside the side panel boundary instead of being clipped or scrolled within the panel.
+
+**Fix:** `_render_tree_panel` now shows the TAIL of the query (`substr($query, -$max_query_width)`) when it exceeds the available space, so the cursor position (end of input) is always visible. The terminal cursor is also capped at `panel_width` so it can never escape into the text area. **Manual test:** Open tree (⌃O), type a long search string — the search bar scrolls to show the most recently typed characters and the border stays in place.
 
 ### ~~P3: Mouse parity incomplete~~ FIXED
 
@@ -186,11 +188,13 @@ Double-click word selection, triple-click line selection, and mouse cursor place
 
 **Fix:** Changed to `fg_rgb(30, 102, 245)`. Added a regression test to `tests/theme.t` asserting that `status_accent` produces a foreground escape sequence (`ESC[38;2;...`) in the light theme.
 
-### P3: Theme contrast not verified
+### ~~P3: Theme contrast not verified~~ FIXED
 
 Dark and light themes have not been formally audited for readability or contrast. Non-color cues (icons, text) for state changes (VCS markers, selection, errors) should be verified in both modes.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Colors And Readability.
+
+**Fix:** Audited both themes. Primary text colors pass contrast in both modes. Gutter and dim colors are intentionally de-emphasized (acceptable for secondary information per convention). The key accessibility violation was that `vcs_added` and `vcs_modified` both used the identical character `▐`, relying on color alone (green vs orange). Fixed by giving `vcs_modified` a distinct shape: `▎` (left one-quarter block, U+258E) — thinner than the half-block used for added lines. Deletions already used distinct characters (`▝`/`▗`). All three states now differ in both shape and color. File tree VCS state is communicated via both color AND the file icon (file-type icon is always present regardless of VCS state). **Manual test:** Open a git repo, edit and add lines — modified lines show `▎` (thin bar), added lines show `▐` (half-block), deletions show quadrant glyphs. Both dark and light themes tested interactively.
 
 ### ~~P1: Shift+Alt+Left/Right should select by word, not column select~~ FIXED
 Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is word movement with selection (standard across most editors). Instead, it triggers column selection mode. Column selection needs an alternative keybinding.

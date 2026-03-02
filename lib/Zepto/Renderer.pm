@@ -502,7 +502,11 @@ sub render {
         # Tree is focused — show cursor in search bar (always row 2, above stickies)
         if ($ui->{file_tree}->filter_active()) {
             my $filter_len = length($ui->{file_tree}->filter_query() // '');
-            $output .= _move_to(1, 4 + $filter_len);  # search bar at row 1, " {icon} " = 3 chars prefix
+            my $panel_w    = $ui->{file_tree}->panel_width();
+            # Cap cursor at panel width so it never escapes into the text area
+            my $cursor_col = 4 + $filter_len;  # " {icon} " prefix = 3 chars (1-indexed → +1)
+            $cursor_col    = $panel_w if $cursor_col > $panel_w;
+            $output .= _move_to(1, $cursor_col);
             $output .= SHOW_CURSOR;
         } else {
             $output .= HIDE_CURSOR;
@@ -1720,12 +1724,14 @@ sub _render_tree_panel {
             $suffix = " " . Zepto::CommandRegistry::SYM_CTRL() . "O ";
         }
 
-        my $display = $prefix . $query;
         my $suffix_space = length($suffix);
         my $max_query_width = $content_width - length($prefix) - $suffix_space;
-        if (length($query) > $max_query_width && $max_query_width > 0) {
-            $display = $prefix . substr($query, 0, $max_query_width);
+        my $display_query = $query;
+        if ($max_query_width > 0 && length($query) > $max_query_width) {
+            # Show the tail so the cursor (end of input) is always visible
+            $display_query = substr($query, -$max_query_width);
         }
+        my $display = $prefix . $display_query;
 
         $output .= $display;
 
