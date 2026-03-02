@@ -572,7 +572,7 @@ sub handle_event {
     # Global shortcuts that work in every UI state
     if ($event->{type} eq 'char' && Zepto::InputParser::has_modifier($event, 'ctrl')) {
         my $ch = lc($event->{char});
-        if ($ch eq 'q' || $ch eq 's') {
+        if ($ch eq 'q' || $ch eq 's' || $ch eq 't') {
             $self->handle_ctrl_char($ch);
             return;
         }

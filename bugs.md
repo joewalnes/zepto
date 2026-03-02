@@ -69,8 +69,10 @@ string should become editable. Initially the entire text should be selected, all
 
 **Fix:** Merged the separate "Go to Line" pill into the cursor position pill. The pill now shows `⌃G` shortcut and is clickable. Pressing ⌃G or clicking the pill opens an inline input pre-filled with the current `line:col` (all selected, so typing replaces). Hint text shows "line, line:col, or :col" format guide. Input is 10 chars wide (enough for 9999:999 with scrolling for larger). The "Go to Line" command remains in the command palette for discoverability.
 
-### P3: Theme ^T should be global shortcut
+### ~~P3: Theme ^T should be global shortcut~~ FIXED
 For example, should work when in find dialog.
+
+**Fix:** Added `⌃T` to the top-level global shortcuts in `handle_event()`, alongside `⌃Q` and `⌃S`. Theme toggle now works from any UI state: find bar, command palette, footer input, dialog, and prompt.
 
 ### ~~P2: Comment/uncomment line~~ FIXED
 Ctrl+/ should comment or uncomment the current line. If no text selected, current line. If text selected, all lines this selection spans. Language specific comments, e.g. # or // or <!-- .. -->. For languages that support multiline comment blocks, dont use this, only single lines (e.g. yes on //, no on /* .. */). Handle cases for mixed language documents (e.g. HTML with embedded CSS or JS).
