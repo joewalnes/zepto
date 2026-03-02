@@ -149,6 +149,16 @@ my @COMMANDS = (
         priority => 0,
         method   => 'do_duplicate_line_down',
     },
+    {
+        id       => 'toggle_comment',
+        label    => 'Toggle Comment',
+        icon     => 'comment',
+        shortcut => SYM_CTRL . '/',
+        section  => 'DOCUMENT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_toggle_comment',
+    },
 
     # === APP section ===
     {

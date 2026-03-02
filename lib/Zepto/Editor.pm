@@ -673,6 +673,9 @@ sub handle_ctrl_char {
     elsif ($char eq 'p') { $self->cmd_open_file(); }
     elsif ($char eq 'b') { $self->cmd_toggle_tree(); }
 
+    # Comment toggle
+    elsif ($char eq '/') { $self->cmd_toggle_comment(); }
+
     # Command palette
     elsif ($char eq ' ') { $self->cmd_open_palette(); }
 

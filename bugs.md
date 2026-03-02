@@ -48,8 +48,10 @@ string should become editable. Initially the entire text should be selected, all
 ### P3: Theme ^T should be global shortcut
 For example, should work when in find dialog.
 
-### P2: Comment/uncomment line
+### ~~P2: Comment/uncomment line~~ FIXED
 Ctrl+/ should comment or uncomment the current line. If no text selected, current line. If text selected, all lines this selection spans. Language specific comments, e.g. # or // or <!-- .. -->. For languages that support multiline comment blocks, dont use this, only single lines (e.g. yes on //, no on /* .. */). Handle cases for mixed language documents (e.g. HTML with embedded CSS or JS).
+
+**Fix:** Added `line_comment_prefix()` to `Zepto::Syntax::Base` with a lookup table covering all 42 syntax languages. `cmd_toggle_comment` in Commands.pm detects the language from the active highlighter's grammar, determines the line range (single line or selection), checks if all non-blank lines are already commented, and toggles accordingly. Comments are aligned at the minimum indentation of the selected lines. Wired to `⌃/` (Ctrl+/) and registered in CommandRegistry under DOCUMENT section.
 
 ### P3: Close empty start tab when opening first file.
 A common scenario is: open zepto (which shows an untitled empty tab), then navigate to a file to edit. In this case, if the initial empty tab has not been edited, automatically close it to reduce clutter.

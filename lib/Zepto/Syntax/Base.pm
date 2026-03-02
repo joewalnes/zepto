@@ -259,6 +259,64 @@ sub _token {
 }
 
 # =============================================================================
+# Line Comment Prefix
+# =============================================================================
+# Returns the line comment prefix for this language (e.g. "//", "#", "--").
+# Used by the toggle-comment command. Returns undef if the language has no
+# single-line comment syntax.
+
+my %COMMENT_PREFIX = (
+    'Zepto::Syntax::C'               => '//',
+    'Zepto::Syntax::Clojure'         => ';;',
+    'Zepto::Syntax::CMake'           => '#',
+    'Zepto::Syntax::Cpp'             => '//',
+    'Zepto::Syntax::Crontab'         => '#',
+    'Zepto::Syntax::CSharp'          => '//',
+    'Zepto::Syntax::CSS'             => '//',
+    'Zepto::Syntax::Dockerfile'      => '#',
+    'Zepto::Syntax::Fish'            => '#',
+    'Zepto::Syntax::Go'              => '//',
+    'Zepto::Syntax::GraphQL'         => '#',
+    'Zepto::Syntax::Groovy'          => '//',
+    'Zepto::Syntax::INI'             => ';',
+    'Zepto::Syntax::Java'            => '//',
+    'Zepto::Syntax::JavaScript'      => '//',
+    'Zepto::Syntax::Kotlin'          => '//',
+    'Zepto::Syntax::LaTeX'           => '%',
+    'Zepto::Syntax::Lua'             => '--',
+    'Zepto::Syntax::Makefile'        => '#',
+    'Zepto::Syntax::Nginx'           => '#',
+    'Zepto::Syntax::Nix'             => '#',
+    'Zepto::Syntax::ObjectiveC'      => '//',
+    'Zepto::Syntax::Perl'            => '#',
+    'Zepto::Syntax::PHP'             => '//',
+    'Zepto::Syntax::Properties'      => '#',
+    'Zepto::Syntax::Protobuf'        => '//',
+    'Zepto::Syntax::Python'          => '#',
+    'Zepto::Syntax::R'               => '#',
+    'Zepto::Syntax::Ruby'            => '#',
+    'Zepto::Syntax::Rust'            => '//',
+    'Zepto::Syntax::Scala'           => '//',
+    'Zepto::Syntax::SCSS'            => '//',
+    'Zepto::Syntax::Shell'           => '#',
+    'Zepto::Syntax::SQL'             => '--',
+    'Zepto::Syntax::SSHConfig'       => '#',
+    'Zepto::Syntax::Swift'           => '//',
+    'Zepto::Syntax::Systemd'         => '#',
+    'Zepto::Syntax::Terraform'       => '#',
+    'Zepto::Syntax::Thrift'          => '//',
+    'Zepto::Syntax::TOML'            => '#',
+    'Zepto::Syntax::TypeScript'      => '//',
+    'Zepto::Syntax::YAML'            => '#',
+    'Zepto::Syntax::Zig'             => '//',
+);
+
+sub line_comment_prefix {
+    my ($self) = @_;
+    return $COMMENT_PREFIX{ref($self)};
+}
+
+# =============================================================================
 # Common Patterns (for reference - copy into your grammar)
 # =============================================================================
 #

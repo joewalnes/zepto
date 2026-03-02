@@ -96,6 +96,7 @@ use constant {
     NF_FILTER           => "\x{f0b0}",  #  filter/funnel
     NF_KEYBOARD         => "\x{f11c}",  #  keyboard
     NF_LINE_NUM_ICON    => "\x{e0a1}",  #  line number (nerd font)
+    NF_COMMENT          => "\x{f075}",  #  comment
 };
 
 # Simple toggle indicators (single-width, more compatible)
@@ -193,6 +194,7 @@ my %CHARS = (
     columns             => [ NF_COLUMNS,        'C'         ],
     diff                => [ NF_DIFF,           'D'         ],
     goto                => [ NF_GOTO,           '#'         ],
+    comment             => [ NF_COMMENT,        '#'         ],
     theme_light         => [ NF_SUN,            '*'         ],
     theme_dark          => [ NF_MOON,           '*'         ],
     new_file            => [ NF_PLUS,           '+'         ],

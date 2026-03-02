@@ -629,6 +629,89 @@ sub cmd_goto_line {
 }
 
 # =============================================================================
+# Toggle Line Comment
+# =============================================================================
+
+sub cmd_toggle_comment {
+    my ($self) = @_;
+
+    my $doc  = $self->active_doc();
+    my $view = $self->active_view();
+    my $hl   = $self->active_highlighter();
+
+    # Get comment prefix from the language grammar
+    my $prefix;
+    if ($hl && $hl->{grammar}) {
+        $prefix = $hl->{grammar}->line_comment_prefix();
+    }
+    return unless defined $prefix;  # No comment syntax for this language
+
+    # Determine line range
+    my ($start_line, $end_line);
+    if ($view->has_selection()) {
+        my ($sl, $sc, $el, $ec) = $view->selection();
+        $start_line = $sl;
+        $end_line   = $el;
+        # If selection ends at col 0 of a line, don't include that line
+        $end_line = $el - 1 if $ec == 0 && $el > $sl;
+    } else {
+        $start_line = $view->cursor_line();
+        $end_line   = $start_line;
+    }
+
+    # Check if ALL lines in range are commented (to decide: uncomment or comment)
+    my $all_commented = 1;
+    my $prefix_re = quotemeta($prefix);
+    for my $ln ($start_line .. $end_line) {
+        my $content = $doc->get_line_content($ln);
+        # Skip blank lines when checking (they don't affect the decision)
+        next if $content =~ /^\s*$/;
+        unless ($content =~ /^\s*$prefix_re/) {
+            $all_commented = 0;
+            last;
+        }
+    }
+
+    # Find the minimum indentation across non-blank lines (for aligned commenting)
+    my $min_indent = undef;
+    if (!$all_commented) {
+        for my $ln ($start_line .. $end_line) {
+            my $content = $doc->get_line_content($ln);
+            next if $content =~ /^\s*$/;  # skip blank
+            if ($content =~ /^(\s*)/) {
+                my $indent_len = length($1);
+                $min_indent = $indent_len if !defined($min_indent) || $indent_len < $min_indent;
+            }
+        }
+        $min_indent //= 0;
+    }
+
+    # Apply: process lines from bottom to top so offsets don't shift
+    for my $ln (reverse $start_line .. $end_line) {
+        my $content = $doc->get_line_content($ln);
+        my $line_start = $doc->line_start_offset($ln);
+
+        if ($all_commented) {
+            # Uncomment: remove first occurrence of prefix (and optional trailing space)
+            if ($content =~ /^(\s*)$prefix_re ?/) {
+                my $indent_len = length($1);
+                my $match_len = length($&) - $indent_len;
+                my $replace_start = $line_start + $indent_len;
+                $doc->replace($replace_start, $replace_start + $match_len, '');
+            }
+        } else {
+            # Comment: insert prefix at min_indent position
+            next if $content =~ /^\s*$/;  # skip blank lines
+            my $insert_pos = $line_start + $min_indent;
+            $doc->replace($insert_pos, $insert_pos, "$prefix ");
+        }
+    }
+
+    # Invalidate wrap map
+    $view->invalidate_wrap_map();
+}
+
+# =============================================================================
 # View Commands
 # =============================================================================
 
