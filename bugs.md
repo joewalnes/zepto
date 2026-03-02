@@ -10,6 +10,9 @@ Priority scale:
 
 ## Existing bugs
 
+### P2: Scroll wheel cannot scroll more than a page
+When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
+
 ### ~~P2: "More" home/end~~ FIXED
 Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
 
@@ -35,10 +38,12 @@ The ruler, minimap, and bottom status bar all stop one char short of the end of 
 ### P3: Status bar spacing
 No space between the Line number pill (first in status bar) and word wrap, whereas all others have spaces.
 
-### P2: Go-to-line new UI
+### ~~P2: Go-to-line new UI~~ FIXED
 The status bar starts with a line number pill, and also has a go to line pill. Collapse these into a single element.
 The line number pill (first), should also sho the ^G shortcut. When pressing this key, or clicking the pill, the line:col
 string should become editable. Initially the entire text should be selected, allowing user to start typing and replace selection, or to move the cursor and edit existing. User may end XX, XX:YY, or :YY to move line, line and col, or just col (on same line) respectively - there should be text hints displayed to explain this. Use standard text input component used elsewhere. Ensure this box is wide enough to support docs of at least 9999:999. Beyond that, ok to scroll.
+
+**Fix:** Merged the separate "Go to Line" pill into the cursor position pill. The pill now shows `⌃G` shortcut and is clickable. Pressing ⌃G or clicking the pill opens an inline input pre-filled with the current `line:col` (all selected, so typing replaces). Hint text shows "line, line:col, or :col" format guide. Input is 10 chars wide (enough for 9999:999 with scrolling for larger). The "Go to Line" command remains in the command palette for discoverability.
 
 ### P3: Theme ^T should be global shortcut
 For example, should work when in find dialog.

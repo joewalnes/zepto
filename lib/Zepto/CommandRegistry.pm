@@ -244,7 +244,7 @@ my @COMMANDS = (
         shortcut => SYM_CTRL . 'G',
         section  => 'NAVIGATE',
         type     => 'action',
-        priority => 3,
+        priority => 0,  # Merged into cursor position pill (not a separate status bar pill)
         method   => 'cmd_goto_line',
     },
     {

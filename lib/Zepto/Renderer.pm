@@ -411,10 +411,20 @@ sub render {
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
         my $input      = $ui->{footer_input};
-        my $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
+        my $input_id   = $input->{id} // '';
+        my $prompt_len;
+        my $input_width;
+        if ($input_id eq 'goto_line') {
+            my $cursor_icon = Zepto::Chars->get('cursor_pos');
+            $prompt_len = length(" $cursor_icon ");
+            $input_width = 10;
+        } else {
+            $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
+            $input_width = 12;
+        }
         my $cursor_in_view;
         if ($input->{widget}) {
-            my $vp = $input->{widget}->viewport(12);  # same width as _render_footer_input
+            my $vp = $input->{widget}->viewport($input_width);
             $cursor_in_view = $vp->{cursor_in_view};
         } else {
             $cursor_in_view = $input->{cursor} // 0;
@@ -2849,24 +2859,30 @@ sub _render_context_status_bar {
 
     # === Document context: build pill-based status bar ===
 
-    # 1. LEFT: Cursor position pill (always visible, fixed width to prevent jiggle)
+    # 1. LEFT: Cursor position pill with ⌃G shortcut (always visible, fixed width)
     my $cursor_icon = Zepto::Chars->get('cursor_pos');
+    my $goto_shortcut = "\x{2303}G";
     my $cursor_text;
     if ($doc && $view) {
         my $line = $view->cursor_line() + 1;
         my $col = $view->cursor_col() + 1;
-        $cursor_text = "$cursor_icon $line:$col";
+        $cursor_text = "$cursor_icon $line:$col $goto_shortcut";
     } else {
-        $cursor_text = "$cursor_icon 1:1";
+        $cursor_text = "$cursor_icon 1:1 $goto_shortcut";
     }
     # Pad to minimum width so pill doesn't resize as cursor moves
-    my $min_cursor_width = length($cursor_icon) + 6;  # e.g. " 999:99"
+    my $min_cursor_width = length($cursor_icon) + length($goto_shortcut) + 8;  # e.g. " 999:99 ⌃G"
     my $pad_needed = $min_cursor_width - length($cursor_text);
     $cursor_text .= ' ' x $pad_needed if $pad_needed > 0;
 
     $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
     $output .= " $cursor_text ";
     my $left_width = length($cursor_text) + 2;
+    push @buttons, {
+        x_start    => 1,
+        x_end      => $left_width,
+        command_id => 'goto_line',
+    };
 
     # Column mode indicator (inline, if active)
     if ($view && $view->column_select()) {
@@ -3214,20 +3230,28 @@ sub _render_footer_input {
     my $prompt = $input->{prompt} // '';
     my $widget = $input->{widget};
     my $hint   = $input->{hint} // '';
+    my $input_id = $input->{id} // '';
 
-    # Render: " Prompt: [input value          ] (hint) "
-    my $prompt_str = ' ' . $prompt . ' ';
+    # For goto_line: render as pill-style input with cursor icon
+    my $prompt_str;
+    if ($input_id eq 'goto_line') {
+        my $cursor_icon = Zepto::Chars->get('cursor_pos');
+        $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
+        $prompt_str = " $cursor_icon ";
+    } else {
+        $prompt_str = ' ' . $prompt . ' ';
+    }
     $output .= $prompt_str;
 
     # Input field with distinct background
     $output .= $theme->color('dialog_input_bg');
     $output .= $theme->color('dialog_input_fg');
 
-    # Calculate width for input field (fixed width, not stretched)
+    # Calculate width for input field
     my $prompt_len = length($prompt_str);
-    my $hint_str = $hint ? " ($hint)" : '';
+    my $hint_str = $hint ? ($input_id eq 'goto_line' ? "  $hint" : " ($hint)") : '';
     my $hint_len = length($hint_str);
-    my $input_width = 12;  # Fixed narrow width for input
+    my $input_width = ($input_id eq 'goto_line') ? 10 : 12;
 
     # Get viewport (handles overflow scrolling)
     my $vp = $widget ? $widget->viewport($input_width) : { display_text => ($input->{value} // ''), sel_start_in_view => undef, sel_end_in_view => undef };

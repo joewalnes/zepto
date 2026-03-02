@@ -1411,9 +1411,15 @@ sub handle_prompt_event {
 sub open_footer_input {
     my ($self, %opts) = @_;
     $self->{state} = STATE_FOOTER_INPUT;
+    my $widget = Zepto::InputWidget->new(value => $opts{value} // '');
+    if ($opts{select_all} && length($opts{value} // '')) {
+        $widget->{sel_start} = 0;
+        $widget->{sel_end}   = length($opts{value});
+    }
     $self->{footer_input} = {
+        id        => $opts{id},
         prompt    => $opts{prompt} // '',
-        widget    => Zepto::InputWidget->new(value => $opts{value} // ''),
+        widget    => $widget,
         hint      => $opts{hint},
         on_submit => $opts{on_submit},
         on_cancel => $opts{on_cancel},

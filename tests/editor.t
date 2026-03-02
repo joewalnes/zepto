@@ -695,7 +695,7 @@ subtest 'Goto line uses footer input' => sub {
 
     is($editor->{state}, 'footer_input', 'Goto line uses footer input, not dialog');
     ok($editor->{footer_input}, 'Footer input is set');
-    like($editor->{footer_input}{prompt}, qr/Go to/i, 'Prompt mentions go to');
+    is($editor->{footer_input}{id}, 'goto_line', 'Footer input has goto_line id');
     ok($editor->{footer_input}{hint}, 'Footer input has hint');
     like($editor->{footer_input}{hint}, qr/line.*:col/i, 'Hint mentions line:col syntax');
 };

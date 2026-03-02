@@ -577,11 +577,17 @@ sub do_find_prev {
 sub cmd_goto_line {
     my ($self) = @_;
 
-    my $current_line = $self->active_view()->cursor_line();
+    my $view = $self->active_view();
+    my $current_line = $view->cursor_line();
+    my $current_col  = $view->cursor_col();
+    my $prefill = ($current_line + 1) . ':' . ($current_col + 1);
 
     $self->open_footer_input(
-        prompt => 'Go to:',
-        hint => 'line or line:col or :col',
+        prompt => '',
+        value  => $prefill,
+        select_all => 1,
+        hint => 'line, line:col, or :col',
+        id   => 'goto_line',
         on_submit => sub {
             my ($input) = @_;
             return unless defined $input && $input =~ /\S/;
