@@ -444,6 +444,11 @@ sub preview_viewport {
 sub _build_regex {
     my ($self, $term) = @_;
 
+    # Cap pattern length to limit exposure to regex engine overflow CVEs
+    # (CVE-2023-47038, CVE-2020-10543, etc.) on older Perl versions.
+    # 1000 chars is generous for any realistic find pattern.
+    return undef if length($term) > 1000;
+
     my $flags = $self->{case_sensitive} ? '' : 'i';
     my $pattern = $self->{use_regex} ? $term : quotemeta($term);
 

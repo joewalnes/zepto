@@ -249,8 +249,8 @@ sub get_size {
 
     # Method 2: Environment variables
     if (!$rows || !$cols) {
-        $cols = $ENV{COLUMNS} if $ENV{COLUMNS};
-        $rows = $ENV{LINES} if $ENV{LINES};
+        $cols = $ENV{COLUMNS} if $ENV{COLUMNS} && $ENV{COLUMNS} =~ /^\d+$/;
+        $rows = $ENV{LINES} if $ENV{LINES} && $ENV{LINES} =~ /^\d+$/;
     }
 
     # Method 3: stty

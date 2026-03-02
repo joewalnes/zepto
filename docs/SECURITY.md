@@ -105,3 +105,36 @@ Run through this before committing any change that touches file I/O, shell execu
 | P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths go through `_shell_quote()` using correct single-quote escaping; no gaps |
 
 When an item above is investigated and resolved, document the finding and remove it from this list (or move to bugs.md if it becomes a tracked bug).
+
+---
+
+## Perl CVE Assessment (5.34+)
+
+Users may run any Perl version shipped with their OS. We cannot require upgrades — instead we avoid dangerous patterns and minimize exposure.
+
+**Last reviewed:** 2026-03-02
+
+### Relevant CVEs
+
+| CVE | Fixed In | Feature | Zepto Risk | Notes |
+|-----|----------|---------|-----------|-------|
+| **CVE-2023-47038** | 5.40 | `qr//` with illegal Unicode property | Medium | Heap overflow during regex compilation. Reachable via find engine when user enables regex mode — but user is crafting the pattern themselves, so this is self-inflicted. |
+| **CVE-2024-56406** | 5.42 | `tr//` with non-ASCII LHS bytes | Low | Heap overflow in transliteration. Zepto only uses `tr//` with hardcoded literal patterns, so not reachable in practice. |
+| **CVE-2025-40909** | 5.42 | Thread cloning race | None | Zepto is single-threaded. |
+| **CVE-2023-47039** | 5.40 | Windows cmd.exe hijack | None | Windows-only. |
+
+### Rules to Limit Exposure
+
+1. **Never construct `qr//` or `tr//` from file content.** User-typed find patterns are acceptable (self-inflicted risk). But never programmatically compile regexes or transliterations derived from an opened file — that turns a "user opens untrusted file" scenario into a code execution vector.
+2. **Keep all `tr//` patterns as string literals.** No dynamic construction.
+3. **Never use string `eval` with file-derived content.** The `eval "require $class"` in `Highlighter.pm` is acceptable only because `$class` comes from a hardcoded mapping.
+4. **Treat file content as higher risk than keyboard input.** A user typing a crafted regex is attacking themselves. A file silently triggering an overflow on open is an actual exploit. Design accordingly — file content should never reach regex compilation, `tr//`, or `eval`.
+
+### Assessing Future Perl CVEs
+
+1. **What Perl feature is affected?** (regex, `tr//`, IO layers, specific module, etc.)
+2. **Does Zepto use it?** `grep -rn 'pattern' lib/ build.pl`
+3. **Can file content reach it?** File content reaching the vulnerable path = real risk. User keyboard input reaching it = low risk (self-inflicted). Hardcoded literals reaching it = no risk.
+4. **Add to the table above** with the risk assessment. Add defensive rules if needed.
+
+**Where to check:** Perl release deltas (`perldoc.perl.org`), CPANSec (`security.metacpan.org`), NVD (`nvd.nist.gov`).
