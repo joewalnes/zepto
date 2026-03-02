@@ -170,6 +170,12 @@ Double-click word selection, triple-click line selection, and mouse cursor place
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
 
+### ~~P3: Light theme `status_accent` used `bg_rgb` instead of `fg_rgb`~~ FIXED
+
+`status_accent` in the light theme was defined with `bg_rgb(30, 102, 245)` — a background color escape sequence — when it is semantically a foreground accent color (consistent with the dark theme's `fg_rgb(125, 207, 255)`). Any future use of this color for text rendering would have produced an invisible or incorrectly styled result.
+
+**Fix:** Changed to `fg_rgb(30, 102, 245)`. Added a regression test to `tests/theme.t` asserting that `status_accent` produces a foreground escape sequence (`ESC[38;2;...`) in the light theme.
+
 ### P3: Theme contrast not verified
 
 Dark and light themes have not been formally audited for readability or contrast. Non-color cues (icons, text) for state changes (VCS markers, selection, errors) should be verified in both modes.
