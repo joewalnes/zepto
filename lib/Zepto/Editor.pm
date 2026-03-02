@@ -485,6 +485,15 @@ sub handle_event {
 
     return unless $event;
 
+    # Global shortcuts that work in every UI state
+    if ($event->{type} eq 'char' && Zepto::InputParser::has_modifier($event, 'ctrl')) {
+        my $ch = lc($event->{char});
+        if ($ch eq 'q' || $ch eq 's') {
+            $self->handle_ctrl_char($ch);
+            return;
+        }
+    }
+
     # Route to appropriate handler based on state
     if ($self->{state} eq STATE_DIALOG) {
         $self->handle_dialog_event($event);
@@ -594,7 +603,7 @@ sub handle_editing_event {
             else { $self->do_indent(); }
         }
 
-        # Escape - cancel/dismiss or open command palette
+        # Escape - cancel/dismiss active mode
         elsif ($key eq 'escape') {
             if ($view->column_select()) {
                 $view->exit_column_mode();
@@ -604,10 +613,6 @@ sub handle_editing_event {
             }
             elsif ($view->line_map() && $view->line_map()->has_expanded_hunks()) {
                 $view->line_map()->collapse_all();
-            }
-            else {
-                # Nothing to cancel — open command palette as final fallback
-                $self->cmd_open_palette();
             }
             $self->{quit_pending} = 0;
         }

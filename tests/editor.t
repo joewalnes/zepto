@@ -862,10 +862,10 @@ subtest 'Editor does not quit on escape sequences' => sub {
     $editor->handle_input("\x1b[<0;10;5M");  # Mouse press
     is($editor->{state}, 'editing', 'Still editing after mouse event');
 
-    # Lone escape with nothing to cancel opens command palette (final fallback)
+    # Lone escape with nothing to cancel stays in editing state (no palette fallback)
     $editor->handle_input("\x1b");
     $editor->flush_pending_input();
-    is($editor->{state}, 'palette', 'Lone escape opens command palette as fallback');
+    is($editor->{state}, 'editing', 'Lone escape stays in editing state');
 };
 
 subtest 'Only quit commands trigger quit' => sub {
