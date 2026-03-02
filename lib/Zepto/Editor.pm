@@ -106,6 +106,12 @@ sub new {
         # Mouse button state for reliable drag detection
         mouse_button_down => 0,
 
+        # Multi-click detection (double-click → word select, triple-click → line select)
+        _click_count      => 0,
+        _last_click_time  => 0,
+        _last_click_x     => -1,
+        _last_click_y     => -1,
+
         # Initial file paths from command line (supports both 'file' and 'files')
         initial_file  => $opts{file},  # backward compat for tests
         initial_files => $opts{files} // ($opts{file} ? [$opts{file}] : []),
@@ -975,7 +981,30 @@ sub handle_mouse_event {
                 # Shift+Click with column mode: extend column selection
                 $view->set_cursor($doc_line, $doc_col, 1);
             } else {
-                $view->set_cursor($doc_line, $doc_col, $shift);
+                # Detect multi-click: same position within 400ms increments click count
+                my $now = time();
+                if ($x == $self->{_last_click_x} && $y == $self->{_last_click_y}
+                        && ($now - $self->{_last_click_time}) < 0.4) {
+                    $self->{_click_count}++;
+                } else {
+                    $self->{_click_count} = 1;
+                }
+                $self->{_last_click_time} = $now;
+                $self->{_last_click_x}    = $x;
+                $self->{_last_click_y}    = $y;
+
+                if ($self->{_click_count} == 2) {
+                    # Double-click: place cursor then select word under it
+                    $view->set_cursor($doc_line, $doc_col, 0);
+                    $view->select_word();
+                } elsif ($self->{_click_count} >= 3) {
+                    # Triple-click (or more): select entire line
+                    $view->set_cursor($doc_line, $doc_col, 0);
+                    $view->select_line();
+                    $self->{_click_count} = 3;  # cap so it doesn't grow unbounded
+                } else {
+                    $view->set_cursor($doc_line, $doc_col, $shift);
+                }
             }
         }
     }

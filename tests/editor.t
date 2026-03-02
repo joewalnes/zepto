@@ -1377,6 +1377,66 @@ subtest 'Mouse click in middle of tab jumps to tab position' => sub {
     is($editor->active_view()->cursor_col(), 1, 'Clicking in tab space positions cursor at tab character');
 };
 
+subtest 'Double-click selects word under cursor' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world foo\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
+
+    # "world" starts at doc col 6; x = gutter + 6 + 1
+    # y=3: text_row = 3-3 = 0, first text line (doc line 0)
+    my $x = $gutter_width + 6 + 1;
+
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    $editor->handle_mouse_event($press);
+    $editor->handle_mouse_event($press);  # second click = double-click
+
+    my $view = $editor->active_view();
+    ok($view->has_selection(), 'Double-click creates a selection');
+
+    my ($al, $ac, $cl, $cc) = ($view->{selection_anchor_line}, $view->{selection_anchor_col},
+                                $view->{cursor_line}, $view->{cursor_col});
+    is($al, 0, 'Selection anchor on line 0');
+    is($ac, 6, 'Selection starts at col 6 (start of "world")');
+    is($cl, 0, 'Selection cursor on line 0');
+    is($cc, 11, 'Selection ends at col 11 (end of "world")');
+};
+
+subtest 'Triple-click selects entire line' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world foo\nline two\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
+
+    # Click somewhere in the middle of the first line
+    # y=3: text_row = 3-3 = 0, first text line (doc line 0)
+    my $x = $gutter_width + 3 + 1;
+
+    my $press = { type => 'mouse', action => 'press', x => $x, y => 3, modifiers => [] };
+    $editor->handle_mouse_event($press);
+    $editor->handle_mouse_event($press);  # double
+    $editor->handle_mouse_event($press);  # triple
+
+    my $view = $editor->active_view();
+    ok($view->has_selection(), 'Triple-click creates a selection');
+
+    my ($al, $ac, $cl, $cc) = ($view->{selection_anchor_line}, $view->{selection_anchor_col},
+                                $view->{cursor_line}, $view->{cursor_col});
+    is($al, 0, 'Selection anchor on line 0');
+    is($ac, 0, 'Selection starts at col 0');
+    # select_line moves cursor to start of next line
+    is($cl, 1, 'Selection cursor on line 1 (next line)');
+    is($cc, 0, 'Selection cursor at col 0 of next line');
+};
+
 # ============================================================================
 # Enter key / newline insertion
 # ============================================================================

@@ -172,11 +172,13 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 
 When a long search string is typed into the file fuzzy finder input, the text overflows outside the side panel boundary instead of being clipped or scrolled within the panel.
 
-### P3: Mouse parity incomplete
+### ~~P3: Mouse parity incomplete~~ FIXED
 
 Double-click word selection, triple-click line selection, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
+
+**Fix:** Added multi-click detection (`_click_count`, `_last_click_x/y/time`) in the text-area press handler. Double-click calls `select_word()`, triple-click calls `select_line()`, both within a 400 ms window. Mouse click cursor placement in find/replace and footer inputs was already wired up via `handle_find_bar_click` / `_handle_footer_input_click` → `InputWidget::handle_mouse_click`. **Manual test:** Double-click on a word — word is selected (ruler highlights span). Triple-click — entire line is selected.
 
 ### ~~P3: Light theme `status_accent` used `bg_rgb` instead of `fg_rgb`~~ FIXED
 
