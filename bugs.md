@@ -80,8 +80,10 @@ Highlighted row in command palette extends too far on right, overlapping border.
 ### P3: Nerd icon overhaul
 Re-evaluate current icon selection. Many duplicates. Pick familiar feeling icons for actions.
 
-### P2: Fuzzy find text overflow
+### ~~P2: Fuzzy find text overflow~~ FIXED
 Open fuzzy find with ^O and type long string - it overflows out of tree into main doc. Ensure its constrained to text box.
+
+**Fix:** Two changes in Renderer.pm: (1) When query exceeds available width, show the tail of the string (`substr($query, -$max_query_width)`) so the cursor stays visible. (2) Cap cursor position to panel width so it doesn't escape beyond the border.
 
 ### P2: Save changes prompt: more prominent
 Often when closign a tab, the save changes prompt appears at bottom, but it's hard to notice. Make this harder to miss, e.g. with
