@@ -3750,63 +3750,70 @@ sub _render_prompt {
     my ($class, $theme, $prompt, $cols, $rows) = @_;
 
     my $output = '';
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    my $bg = $theme->color('prompt_bg');
+    my $fg = $theme->color('prompt_fg');
+    $output .= $bg . $fg;
 
     my $text = $prompt->{text} // '';
     my @options = @{$prompt->{options} // []};
 
-    # Build prompt string: "Unsaved changes. [S]ave [D]iscard [C]ancel"
-    my $prompt_str = ' ' . $text . ' ';
+    my $rl = Zepto::Chars->get('round_left');
+    my $rr = Zepto::Chars->get('round_right');
+    my $nerd_font = Zepto::Chars->enabled();
+
+    # Warning icon + prompt text
+    my $warn_icon = Zepto::Chars->get('warning');
+    $output .= " $warn_icon $text ";
+    my $x = 3 + length($text) + 1;  # icon(2) + space + text + space
 
     # Track button positions for click handling
     my @buttons;
-    my $x_pos = length($prompt_str) + 1;  # +1 for 1-indexed columns
 
+    # Render each option as a pill
     for my $opt (@options) {
         my $key = uc($opt->{key});
         my $label = $opt->{label};
+        my $icon = $opt->{icon} // '';
 
-        # Format: [K]eyLabel with K highlighted
-        my $btn_start = length($prompt_str);
-        $prompt_str .= ' [';
-        $prompt_str .= $key;
-        $prompt_str .= ']';
-        $prompt_str .= substr($label, 1) if length($label) > 1;  # Rest of label after first char
-        $prompt_str .= ' ';
-        my $btn_end = length($prompt_str);
+        # Build pill interior: " icon Label KEY "
+        my $pill_text = $icon ? " $icon $label " : " $label ";
+        $pill_text .= "$key ";
+        my $pill_width = length($pill_text) + ($nerd_font ? 2 : 0);
+
+        my $btn_start = $x;
+
+        if ($nerd_font) {
+            $output .= $bg . $theme->color('prompt_pill_edge') . $rl;
+            $x++;
+        }
+        $output .= $theme->color('prompt_pill_bg') . $theme->color('prompt_pill_fg');
+        # Render label then dimmed key
+        if ($icon) {
+            $output .= " $icon $label ";
+        } else {
+            $output .= " $label ";
+        }
+        $output .= $fg . $key . $theme->color('prompt_pill_fg') . ' ';
+        if ($nerd_font) {
+            $output .= $bg . $theme->color('prompt_pill_edge') . $rr;
+            $x++;
+        }
+        $x += length($pill_text);
 
         push @buttons, {
             key => lc($opt->{key}),
             x_start => $btn_start + 1,
-            x_end => $btn_end,
+            x_end => $x,
             y => $rows,
         };
+
+        $output .= $bg . $fg . ' ';
+        $x++;
     }
-
-    # Render with highlighted keys
-    my $rendered = ' ' . $text . ' ';
-    for my $opt (@options) {
-        my $key = uc($opt->{key});
-        my $label = $opt->{label};
-        my $rest = length($label) > 1 ? substr($label, 1) : '';
-
-        $rendered .= ' [';
-        $output .= $rendered;
-        $rendered = '';
-
-        # Highlighted key
-        $output .= $theme->color('menu_hotkey');
-        $output .= $key;
-        $output .= $theme->color('status_fg');
-
-        $rendered = ']' . $rest . ' ';
-    }
-    $output .= $rendered;
 
     # Pad to fill status bar
-    my $display_len = length($prompt_str);
-    my $padding = $cols - $display_len;
-    $output .= ' ' x $padding if $padding > 0;
+    my $padding = $cols - $x;
+    $output .= $bg . ' ' x $padding if $padding > 0;
 
     $output .= RESET;
     $output .= CLEAR_LINE;

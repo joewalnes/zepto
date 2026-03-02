@@ -179,6 +179,13 @@ sub dark_theme {
         warning_fg   => fg_rgb(224, 175, 104),
         info_fg      => fg_rgb(125, 207, 255),
 
+        # Prompt bar (unsaved changes, confirmations)
+        prompt_bg    => bg_rgb(140, 80, 20),     # Warm amber — attention
+        prompt_fg    => fg_rgb(255, 240, 210),   # Warm white
+        prompt_pill_bg   => bg_rgb(180, 110, 30),
+        prompt_pill_fg   => fg_rgb(255, 255, 255),
+        prompt_pill_edge => fg_rgb(180, 110, 30),
+
         # Ruler bar
         ruler_fg     => fg_rgb(86, 95, 137),     # Muted, like line numbers
         ruler_bg     => bg_rgb(30, 32, 44),      # Slightly darker than menu
@@ -407,6 +414,13 @@ sub light_theme {
         error_fg     => fg_rgb(210, 15, 57),    # Red
         warning_fg   => fg_rgb(223, 142, 29),   # Yellow
         info_fg      => fg_rgb(30, 102, 245),   # Blue
+
+        # Prompt bar (unsaved changes, confirmations)
+        prompt_bg    => bg_rgb(200, 140, 40),    # Warm amber — attention
+        prompt_fg    => fg_rgb(50, 30, 10),      # Dark text
+        prompt_pill_bg   => bg_rgb(160, 100, 20),
+        prompt_pill_fg   => fg_rgb(255, 255, 255),
+        prompt_pill_edge => fg_rgb(160, 100, 20),
 
         # Ruler bar
         ruler_fg     => fg_rgb(156, 160, 176),  # Muted, like line numbers

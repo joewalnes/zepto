@@ -70,11 +70,13 @@ sub cmd_close_tab {
         my $name = $self->active_tab()->{untitled_name}
                 || $doc->filename()
                 || '[untitled]';
+        my $save_icon = Zepto::Chars->get('save');
+        my $times_icon = Zepto::Chars->get('times');
         $self->open_prompt(
             text => "Save changes to $name?",
             options => [
-                { key => 'y', label => 'Yes' },
-                { key => 'n', label => 'No' },
+                { key => 'y', label => 'Save', icon => $save_icon },
+                { key => 'n', label => 'Discard', icon => $times_icon },
                 { key => 'c', label => 'Cancel' },
             ],
             on_select => sub {
@@ -159,11 +161,13 @@ sub _prompt_close_dirty_tabs {
             || ($tab->{document} ? $tab->{document}->filename() : undef)
             || '[untitled]';
 
+    my $save_icon = Zepto::Chars->get('save');
+    my $times_icon = Zepto::Chars->get('times');
     $self->open_prompt(
         text => "Save changes to $name?",
         options => [
-            { key => 'y', label => 'Yes' },
-            { key => 'n', label => 'No' },
+            { key => 'y', label => 'Save', icon => $save_icon },
+            { key => 'n', label => 'Discard', icon => $times_icon },
             { key => 'c', label => 'Cancel' },
         ],
         on_select => sub {

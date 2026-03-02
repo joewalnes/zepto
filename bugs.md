@@ -116,9 +116,11 @@ Open fuzzy find with ^O and type long string - it overflows out of tree into mai
 
 **Fix:** Two changes in Renderer.pm: (1) When query exceeds available width, show the tail of the string (`substr($query, -$max_query_width)`) so the cursor stays visible. (2) Cap cursor position to panel width so it doesn't escape beyond the border.
 
-### P2: Save changes prompt: more prominent
+### ~~P2: Save changes prompt: more prominent~~ FIXED
 Often when closign a tab, the save changes prompt appears at bottom, but it's hard to notice. Make this harder to miss, e.g. with
 a intense background color. Also make yes/no/cancel into pill buttons with icons.
+
+**Fix:** Replaced plain-text prompt with pill-style buttons on an amber/warning background. Added prompt-specific theme colors (`prompt_bg`, `prompt_fg`, `prompt_pill_*`) for both dark and light themes. Buttons now show icons: Save (floppy), Discard (✗), Cancel. Added warning icon (⚠) to Chars.pm. Updated all three prompt call sites (close tab, quit with dirty tabs, file changed on disk).
 
 ### ~~P0: New file Enter key puts cursor at beginning of current line instead of next line~~ FIXED
 Create new doc, type a line of text on the last line (which for a new doc is also the first line), press Enter. Cursor jumps to beginning of current line, not next line.

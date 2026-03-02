@@ -48,6 +48,7 @@ use constant {
     NF_MODIFIED         => "\x{f111}",  #  (circle)
     NF_CARET_RIGHT      => "\x{f0da}",  #  (solid right triangle)
     NF_CARET_DOWN       => "\x{f0d7}",  #  (solid down triangle)
+    NF_WARNING          => "\x{f071}",  #  (warning triangle)
 };
 
 # Nerd Font devicons (file type icons)
@@ -213,6 +214,7 @@ my %CHARS = (
     dup_down            => [ NF_CHEVRON_DOWN,   'v'         ],
     next_change         => [ NF_CHEVRON_DOWN,   'v'         ],
     prev_change         => [ NF_CHEVRON_UP,     '^'         ],
+    warning             => [ NF_WARNING,        '!'         ],
 
     # VCS gutter indicators (same in both modes)
     vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐

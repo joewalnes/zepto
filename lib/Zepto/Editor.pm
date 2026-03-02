@@ -3349,10 +3349,11 @@ sub _check_external_file_changes {
     if ($doc->is_dirty()) {
         # Buffer has local modifications — ask the user
         my $name = $doc->filename() // $doc->path();
+        my $redo_icon = Zepto::Chars->get('redo');
         $self->open_prompt(
             text => "File '$name' changed on disk.",
             options => [
-                { key => 'r', label => 'Reload' },
+                { key => 'r', label => 'Reload', icon => $redo_icon },
                 { key => 'k', label => 'Keep local' },
             ],
             on_select => sub {
