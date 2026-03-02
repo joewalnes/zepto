@@ -89,6 +89,10 @@ subtest 'Light theme' => sub {
     ok($theme->color('bg'), 'Has bg');
     ok($theme->color('gutter_fg'), 'Has gutter_fg');
     ok($theme->color('selection_bg'), 'Has selection_bg');
+
+    # Regression: status_accent must be a foreground color (fg_rgb -> ESC[38;2;...)
+    # Bug: was set to bg_rgb() which produces ESC[48;2;...] — wrong for a text accent
+    like($theme->color('status_accent'), qr/^\x1b\[38;/, 'status_accent is a foreground color');
 };
 
 subtest 'Get theme by name' => sub {

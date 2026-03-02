@@ -366,7 +366,7 @@ sub light_theme {
         status_fg    => fg_rgb(76, 79, 105),
         status_bg    => bg_rgb(220, 224, 232),
         status_bg_fg => fg_rgb(220, 224, 232),  # Status bg as foreground
-        status_accent => bg_rgb(30, 102, 245),
+        status_accent => fg_rgb(30, 102, 245),   # Blue accent
         status_dim    => fg_rgb(156, 160, 176), # Dimmed text for unfocused input
         # Status bar segments
         status_file_fg   => fg_rgb(255, 255, 255),
