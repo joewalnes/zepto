@@ -16,8 +16,8 @@ Pressing home once on line should jump to first non-whitespace char (e.g. where 
 ### P3: Move forward/back
 Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.
 
-### P3: Open recent
-
+### P2: Recent files
+Like ^O open, but list of recently visited files. Sorted by most recent first.
 
 ### ~~P0: Reports of sluggishness~~ FIXED
 Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
@@ -61,8 +61,10 @@ Regex, case sensitivie, ok, cancel: mouse clicks should activate.
 ### P3: Column mode mouse selection
 After activating col selection mode, dragging with mouse should select col based selection, but it defaults to line.
 
-### P2: Line number indicator resizing
+### ~~P2: Line number indicator resizing~~ FIXED
 The left pill constantly resizes as moving across lines due to empty lines (e.g. :60 -> :1). This makes the whole bar jiggle.
+
+**Fix:** Added minimum width padding to the cursor position pill so it doesn't shrink below a reasonable size. The pill text is right-padded with spaces to keep surrounding pills stable.
 
 ### P2: More prominent ctrl-space hint
 This is the most important key to know about, but it's hidden in corner, with no real clue as to what it means. How to make this obvious for first time users?

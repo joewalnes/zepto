@@ -2849,7 +2849,7 @@ sub _render_context_status_bar {
 
     # === Document context: build pill-based status bar ===
 
-    # 1. LEFT: Cursor position pill (always visible)
+    # 1. LEFT: Cursor position pill (always visible, fixed width to prevent jiggle)
     my $cursor_icon = Zepto::Chars->get('cursor_pos');
     my $cursor_text;
     if ($doc && $view) {
@@ -2859,6 +2859,10 @@ sub _render_context_status_bar {
     } else {
         $cursor_text = "$cursor_icon 1:1";
     }
+    # Pad to minimum width so pill doesn't resize as cursor moves
+    my $min_cursor_width = length($cursor_icon) + 6;  # e.g. " 999:99"
+    my $pad_needed = $min_cursor_width - length($cursor_text);
+    $cursor_text .= ' ' x $pad_needed if $pad_needed > 0;
 
     $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
     $output .= " $cursor_text ";
