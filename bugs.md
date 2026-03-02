@@ -87,8 +87,10 @@ This is the most important key to know about, but it's hidden in corner, with no
 ### P3: Command palette too wide.
 Doesn't need to be as wide and ends up with shortcut keys too far from respective action. Pick a reasonable max width.
 
-### P2: Non-obvious tab keys
+### ~~P2: Non-obvious tab keys~~ FIXED
 Close tab, next tab, prev tab are common actions. Succinctly display these hints somewhere, maybe in tab bar.
+
+**Fix:** Added right-aligned tab navigation hints in the tab bar's remaining space: `⌃W × ⌥, ← ⌥. →` showing close tab, previous tab, and next tab shortcuts. Hints only appear when there's enough room, using the same dim shortcut color as the per-tab ⌥N hints.
 
 ### P2: Command palette re-org
 Organize by:

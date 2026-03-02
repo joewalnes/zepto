@@ -754,9 +754,19 @@ sub _render_tab_bar {
         };
     }
 
-    # Fill remaining space with bar bg (underlined)
+    # Fill remaining space, with right-aligned tab hints if room
     my $remaining = $tab_cols - $x;
-    if ($remaining > 0) {
+    my $hint_close = "\x{2303}W \x{00d7}";  # ⌃W ×
+    my $hint_nav   = "\x{2325}, \x{2190}  \x{2325}. \x{2192}";  # ⌥, ←  ⌥. →
+    my $hint_full  = "$hint_close  $hint_nav";
+    my $hint_width = length($hint_full) + 2;  # +2 for surrounding spaces
+
+    if ($remaining >= $hint_width) {
+        my $fill = $remaining - $hint_width;
+        $output .= $bar_bg;
+        $output .= ' ' x $fill if $fill > 0;
+        $output .= ' ' . $theme->color('tab_shortcut_fg') . $hint_full . ' ';
+    } elsif ($remaining > 0) {
         $output .= $bar_bg;
         $output .= ' ' x $remaining;
     }
