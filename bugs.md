@@ -168,6 +168,10 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 
 **Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
 
+### P2: Typing long string in file fuzzy finder overflows side panel
+
+When a long search string is typed into the file fuzzy finder input, the text overflows outside the side panel boundary instead of being clipped or scrolled within the panel.
+
 ### P3: Mouse parity incomplete
 
 Double-click word selection, triple-click line selection, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
