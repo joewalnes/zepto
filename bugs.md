@@ -10,7 +10,21 @@ Priority scale:
 
 ## Existing bugs
 
-### ~~P2: Scroll wheel cannot scroll more than a page~~ FIXED
+### ~~P1: Incorrect cursor placement in command palette~~ FIXED
+When opening command paletted, terminal cursor is not placed in text field
+
+**Fix:** The cursor positioning code in the renderer used hardcoded width (60) and height (20) values that didn't match the actual palette rendering, which uses responsive widths (120/80/60) based on terminal width and dynamic height based on terminal rows. Synchronized the cursor positioning calculations to match the palette rendering dimensions exactly.
+
+### ~~P1: Clicking document editor should unfocus file tree~~ FIXED
+If navigating file tree, and user clicks in main editor area, unfocus tree and return to editing.
+
+**Fix:** Added tree unfocus check at the beginning of the "Click in text area" section of `handle_mouse_event`. When the file tree is focused and the user clicks anywhere in the document area (gutter or text), `_tree_unfocus()` is called to cancel any preview, restore the original tab, and unfocus the tree. The view reference is also refreshed after unfocus in case the active tab changed.
+
+### P3: Toggle comment enhancements
+Support HTML which is both prefix and suffix. <!-- xxx -->. In HTML be aware of nested script or style and switch commenting char appropriately. Move the comment
+definitions outside of Base.pm into their respective syntax files.
+
+### P2: Scroll wheel cannot scroll more than a page : REPONED (not fixed)
 When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
 
 **Fix:** Added `_explicit_scroll` flag to View. When `scroll_up`/`scroll_down` are called (mouse wheel), the flag is set. `ensure_cursor_visible()` (called every render) checks for this flag and returns early if set, preventing the viewport from snapping back to the cursor. The flag is consumed after one render cycle, so the next user action (typing, clicking) restores normal cursor-following behavior. This allows unlimited scrolling away from the cursor position, matching standard editor behavior.
@@ -23,22 +37,30 @@ Pressing home once on line should jump to first non-whitespace char (e.g. where 
 ### P3: Move forward/back
 Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.
 
-### P2: Recent files
+### ~~P2: Recent files~~ FIXED
 Like ^O open, but list of recently visited files. Sorted by most recent first.
+
+**Fix:** Added `⌃E` shortcut for Recent Files. Files are tracked when opened (via file tree, command line, or the recent files picker itself) and persisted to `~/.config/zepto/recent_files`. The picker reuses the command palette overlay with mode-specific title ("⌃E Recent Files"), fuzzy filtering, and file-type icons. Files are shown with filename as label and directory as secondary text. Most recently opened file appears first. Registered in CommandRegistry under FILE section.
 
 ### ~~P0: Reports of sluggishness~~ FIXED
 Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
 
 **Fix:** Found three per-render bottlenecks: (1) WrapMap was unconditionally invalidated and rebuilt from scratch on every render, even when content hadn't changed — added `_content_version` counter to Document so WrapMap auto-detects changes and only rebuilds when needed. (2) `head_changed()` did file I/O (open + read + stat on `.git/HEAD`) on every render — debounced to every 2 seconds. (3) `check_external_changes()` did `stat()` on the active file every render — debounced to every 1 second.
 
-### P3: Lightmode glitches
-In lightmode. On short docs, the space beyond the final line is grey and looks out of place. 
+### ~~P3: Lightmode glitches~~ FIXED
+In lightmode. On short docs, the space beyond the final line is grey and looks out of place.
 
-### P3: Screen width
+**Fix:** Changed light theme `empty_line_bg` from `bg_rgb(225, 228, 235)` (grey) to `bg_rgb(250, 250, 252)` (near-white) so empty lines beyond the document blend with the white editor background.
+
+### ~~P3: Screen width~~ FIXED
 The ruler, minimap, and bottom status bar all stop one char short of the end of the window. The tab bar does not. Ensure all reach end of window so entire screen is filled.
 
-### P3: Status bar spacing
+**Fix:** Swapped the order of `RESET` and `CLEAR_LINE` escape sequences in all rendering functions (text rows, status bar, find bar, footer input, prompt). Previously `RESET . CLEAR_LINE` cleared the styling first, then erased to end-of-line using the terminal's default background — causing any residual gap to appear in the wrong color. Now `CLEAR_LINE . RESET` erases first using the editor's current background color, then resets. Applied to 8 locations across the renderer.
+
+### ~~P3: Status bar spacing~~ FIXED
 No space between the Line number pill (first in status bar) and word wrap, whereas all others have spaces.
+
+**Fix:** Added explicit gap space before the first center pill in the status bar, matching the spacing between other pills. Also adjusted the available space calculation to account for the extra space.
 
 ### ~~P2: Go-to-line new UI~~ FIXED
 The status bar starts with a line number pill, and also has a go to line pill. Collapse these into a single element.

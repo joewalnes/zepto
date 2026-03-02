@@ -341,8 +341,8 @@ sub light_theme {
         # Cursor column (subtle vertical highlight for crosshair effect)
         cursor_col_bg => bg_rgb(235, 237, 245),
 
-        # Empty lines (beyond end of file)
-        empty_line_bg => bg_rgb(225, 228, 235),
+        # Empty lines (beyond end of file) - near-white to blend with editor bg
+        empty_line_bg => bg_rgb(250, 250, 252),
 
         # Cursor color
         cursor_color => '#7287fd',  # Lavender

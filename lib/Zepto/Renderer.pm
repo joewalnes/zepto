@@ -386,9 +386,16 @@ sub render {
     # Position cursor
     if ($ui->{palette}) {
         # Position cursor in palette filter input
+        # MUST match dimensions in _render_command_palette exactly
         my $palette = $ui->{palette};
         my $pal_width = $cols - 4;
-        $pal_width = 60 if $pal_width > 60;
+        if ($cols >= 160) {
+            $pal_width = 120 if $pal_width > 120;
+        } elsif ($cols >= 120) {
+            $pal_width = 80 if $pal_width > 80;
+        } else {
+            $pal_width = 60 if $pal_width > 60;
+        }
         $pal_width = 30 if $pal_width < 30;
         my $pal_x = int(($cols - $pal_width) / 2);
         $pal_x = 1 if $pal_x < 1;
@@ -400,8 +407,13 @@ sub render {
         } else {
             $query_cursor_in_view = $palette->{query_cursor} // length($palette->{query} // '');
         }
+        # Compute palette height to match _render_command_palette
+        my $max_items = $rows - 6;
+        $max_items = 5 if $max_items < 5;
+        $max_items = 30 if $max_items > 30;
+        my $pal_height = 3 + $max_items + 1;
         # Filter input is on row 2 of palette (y_start + 1), starting at x + 5 (box + space + icon + space)
-        my $pal_y = int(($rows - 20) / 2);
+        my $pal_y = int(($rows - $pal_height) / 2);
         $pal_y = 2 if $pal_y < 2;
         $output .= _move_to($pal_y + 1, $pal_x + 5 + $query_cursor_in_view);
         $output .= SHOW_CURSOR;
@@ -1224,8 +1236,8 @@ sub _render_text_area {
             );
             $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
                 if $minimap_width > 0;
-            $output .= RESET;
             $output .= CLEAR_LINE;
+            $output .= RESET;
             next;
         }
 
@@ -1601,8 +1613,8 @@ sub _render_text_area {
         $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
             if $minimap_width > 0;
 
-        $output .= RESET;
         $output .= CLEAR_LINE;
+        $output .= RESET;
     }
 
     return $output;
@@ -2605,7 +2617,7 @@ sub _render_status_bar {
         $output .= ' ' . $message;
         my $padding = $cols - length($message) - 1;
         $output .= ' ' x $padding if $padding > 0;
-        $output .= RESET . CLEAR_LINE;
+        $output .= CLEAR_LINE . RESET;
         return $output;
     }
 
@@ -2696,8 +2708,8 @@ sub _render_status_bar {
         $output .= $hint_text;
     }
 
-    $output .= RESET;
     $output .= CLEAR_LINE;
+    $output .= RESET;
 
     return $output;
 }
@@ -2771,7 +2783,7 @@ sub _render_context_status_bar {
         $output .= ' ' . $message;
         my $padding = $cols - length($message) - 1;
         $output .= ' ' x $padding if $padding > 0;
-        $output .= RESET . CLEAR_LINE;
+        $output .= CLEAR_LINE . RESET;
         $class->_set_status_buttons([]);
         return $output;
     }
@@ -2862,7 +2874,7 @@ sub _render_context_status_bar {
             command_id => 'open_palette',
         };
 
-        $output .= RESET . CLEAR_LINE;
+        $output .= CLEAR_LINE . RESET;
         $class->_set_status_buttons(\@buttons);
         return $output;
     }
@@ -2929,7 +2941,8 @@ sub _render_context_status_bar {
     # 3. CENTER: Priority-based pills
     my $editor = $ui->{editor};
     # No trailing transition cost — each pill is self-contained with its own caps
-    my $available = $cols - $left_width - $palette_total_width;
+    # -2 accounts for gap before first pill and after cursor pill
+    my $available = $cols - $left_width - $palette_total_width - 2;
     $available = 0 if $available < 0;
 
     # Collect pills sorted by priority
@@ -3016,7 +3029,12 @@ sub _render_context_status_bar {
     }
 
     # Render center pills with rounded caps
+    # Add gap between cursor pill and first center pill (matching between-pill gaps)
     my $center_col = $left_width + 1;
+    if (@pills_to_render) {
+        $output .= $theme->color('status_bg') . ' ';
+        $center_col += 1;
+    }
     for my $i (0 .. $#pills_to_render) {
         my $pill = $pills_to_render[$i];
 
@@ -3071,7 +3089,7 @@ sub _render_context_status_bar {
         command_id => 'open_palette',
     };
 
-    $output .= RESET . CLEAR_LINE;
+    $output .= CLEAR_LINE . RESET;
     $class->_set_status_buttons(\@buttons);
 
     return $output;
@@ -3303,8 +3321,8 @@ sub _render_footer_input {
     my $remaining = $cols - $prompt_len - $input_width - $hint_len;
     $output .= ' ' x $remaining if $remaining > 0;
 
-    $output .= RESET;
     $output .= CLEAR_LINE;
+    $output .= RESET;
 
     return $output;
 }
@@ -3740,8 +3758,8 @@ sub _render_find_bar {
     $content .= ' ';
 
     $output .= $content;
-    $output .= RESET;
     $output .= CLEAR_LINE;
+    $output .= RESET;
 
     return $output;
 }
@@ -3815,8 +3833,8 @@ sub _render_prompt {
     my $padding = $cols - $x;
     $output .= $bg . ' ' x $padding if $padding > 0;
 
-    $output .= RESET;
     $output .= CLEAR_LINE;
+    $output .= RESET;
 
     $class->_set_prompt_buttons(\@buttons);
 
@@ -3893,7 +3911,10 @@ sub _render_command_palette {
     my $shortcut_fg = $theme->color('dropdown_shortcut');
 
     # === Top border with title ===
-    my $title = " \x{2303}\x{2423} Commands ";  # ⌃␣ Commands
+    my $mode = $palette->{mode} // 'commands';
+    my $title = $mode eq 'recent_files'
+        ? " \x{2303}E Recent Files "
+        : " \x{2303}\x{2423} Commands ";
     my $title_len = length($title);
     my $border_left = int(($pal_width - 2 - $title_len) / 2);
     $border_left = 0 if $border_left < 0;
@@ -4005,7 +4026,12 @@ sub _render_command_palette {
             $output .= $prefix;
 
             # Icon
-            my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+            my $icon;
+            if ($cmd->{_is_file}) {
+                $icon = Zepto::Chars->file_icon($cmd->{_filename});
+            } else {
+                $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+            }
             $output .= "$icon ";
 
             # Shortcut
@@ -4085,7 +4111,8 @@ sub _render_command_palette {
     $output .= $box_bl;
 
     # Bottom border content: item count hint
-    my $count_text = " $item_count commands ";
+    my $count_label = $mode eq 'recent_files' ? 'files' : 'commands';
+    my $count_text = " $item_count $count_label ";
     my $bottom_border_left = int(($pal_width - 2 - length($count_text)) / 2);
     $bottom_border_left = 0 if $bottom_border_left < 0;
     my $bottom_border_right = $pal_width - 2 - $bottom_border_left - length($count_text);
