@@ -1,3 +1,4 @@
 /zepto
 *.swp
 website/out/
+.DS_Store
