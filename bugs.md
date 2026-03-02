@@ -10,6 +10,78 @@ Priority scale:
 
 ## Existing bugs
 
+### P0: Reports of sluggishness
+Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
+
+### P3: Lightmode glitches
+In lightmode. On short docs, the space beyond the final line is grey and looks out of place. 
+
+### P3: Screen width
+The ruler, minimap, and bottom status bar all stop one char short of the end of the window. The tab bar does not. Ensure all reach end of window so entire screen is filled.
+
+### P3: Status bar spacing
+No space between the Line number pill (first in status bar) and word wrap, whereas all others have spaces.
+
+### P2: Go-to-line new UI
+The status bar starts with a line number pill, and also has a go to line pill. Collapse these into a single element.
+The line number pill (first), should also sho the ^G shortcut. When pressing this key, or clicking the pill, the line:col
+string should become editable. Initially the entire text should be selected, allowing user to start typing and replace selection, or to move the cursor and edit existing. User may end XX, XX:YY, or :YY to move line, line and col, or just col (on same line) respectively - there should be text hints displayed to explain this. Use standard text input component used elsewhere. Ensure this box is wide enough to support docs of at least 9999:999. Beyond that, ok to scroll.
+
+### P3: Theme ^T should be global shortcut
+For example, should work when in find dialog.
+
+### P2: Comment/uncomment line
+Ctrl+/ should comment or uncomment the current line. If no text selected, current line. If text selected, all lines this selection spans. Language specific comments, e.g. # or // or <!-- .. -->. For languages that support multiline comment blocks, dont use this, only single lines (e.g. yes on //, no on /* .. */). Handle cases for mixed language documents (e.g. HTML with embedded CSS or JS).
+
+### P3: Close empty start tab when opening first file.
+A common scenario is: open zepto (which shows an untitled empty tab), then navigate to a file to edit. In this case, if the initial empty tab has not been edited, automatically close it to reduce clutter.
+
+### P2: Line by line scrolling in editor.
+When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls item by item, which feels precise and smooth. However the editor has different behavior which feels janky. Make editor mouse scroll behave same way as tree.
+
+### P3: Diff view does not preserve line wrap
+If word wrap enabled, and diffing a hunk with long line, the word wrap is disabled in the diff, which is jarring. Preserve word wrap settings.
+
+### P2: Find/replace pills should be clickable
+Regex, case sensitivie, ok, cancel: mouse clicks should activate.
+
+### P3: Column mode mouse selection
+After activating col selection mode, dragging with mouse should select col based selection, but it defaults to line.
+
+### P2: Line number indicator resizing
+The left pill constantly resizes as moving across lines due to empty lines (e.g. :60 -> :1). This makes the whole bar jiggle.
+
+### P2: More prominent ctrl-space hint
+This is the most important key to know about, but it's hidden in corner, with no real clue as to what it means. How to make this obvious for first time users?
+
+### P3: Command palette too wide.
+Doesn't need to be as wide and ends up with shortcut keys too far from respective action. Pick a reasonable max width.
+
+### P2: Non-obvious tab keys
+Close tab, next tab, prev tab are common actions. Succinctly display these hints somewhere, maybe in tab bar.
+
+### P2: Command palette re-org
+Organize by:
+- File: tree, new, open, save, close, quit, next/prev tab, etc
+- Edit: cut, copy, paste, move line up/down, duplicate up/down
+- Navigate...
+- View: minimap, nerd, wrap
+- etc.
+Where should find/replace go
+
+### P2: Command palette rendering
+Highlighted row in command palette extends too far on right, overlapping border.
+
+### P3: Nerd icon overhaul
+Re-evaluate current icon selection. Many duplicates. Pick familiar feeling icons for actions.
+
+### P2: Fuzzy find text overflow
+Open fuzzy find with ^O and type long string - it overflows out of tree into main doc. Ensure its constrained to text box.
+
+### P2: Save changes prompt: more prominent
+Often when closign a tab, the save changes prompt appears at bottom, but it's hard to notice. Make this harder to miss, e.g. with
+a intense background color. Also make yes/no/cancel into pill buttons with icons.
+
 ### ~~P0: New file Enter key puts cursor at beginning of current line instead of next line~~ FIXED
 Create new doc, type a line of text on the last line (which for a new doc is also the first line), press Enter. Cursor jumps to beginning of current line, not next line.
 
