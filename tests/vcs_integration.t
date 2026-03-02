@@ -27,7 +27,7 @@ SKIP: {
 
         # Initialize git repo
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         # Create and commit a file
         my $file = "$tempdir/test.txt";
