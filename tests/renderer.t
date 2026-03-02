@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use utf8;
+use open ':std', ':utf8';
 use Test::More;
 use lib 'lib';
 use Zepto::Renderer;

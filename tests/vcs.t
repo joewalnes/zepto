@@ -89,7 +89,7 @@ SKIP: {
 
         # Initialize repo and add a file
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         my $file = "$tempdir/tracked.txt";
         open my $fh, '>', $file or die "Cannot create $file: $!";
@@ -122,7 +122,7 @@ SKIP: {
 
         # Initialize repo and commit a file
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         my $file = "$tempdir/test.txt";
         open my $fh, '>', $file or die "Cannot create $file: $!";
@@ -147,7 +147,7 @@ SKIP: {
 
         # Initialize repo
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         # Create initial commit so HEAD exists
         my $dummy = "$tempdir/dummy.txt";
@@ -173,7 +173,7 @@ SKIP: {
 
         # Initialize repo
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         my $file = "$tempdir/utf8.txt";
         open my $fh, '>:encoding(UTF-8)', $file or die "Cannot create $file: $!";
@@ -194,7 +194,7 @@ SKIP: {
 
         # Initialize repo
         system("cd $tempdir && git init --quiet 2>/dev/null");
-        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test'");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
 
         my $file = "$tempdir/test.txt";
         open my $fh, '>', $file or die "Cannot create $file: $!";
