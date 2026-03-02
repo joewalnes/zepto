@@ -332,6 +332,41 @@ subtest 'Scroll without cursor move' => sub {
     is($view->scroll_line(), 1, 'Scrolled up');
 };
 
+subtest 'Scroll sets explicit flag to prevent viewport snap-back' => sub {
+    my ($doc, $view) = make_view("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20", rows => 5);
+
+    # Cursor at top
+    $view->set_cursor(0, 0);
+    is($view->scroll_line(), 0, 'Start at top');
+
+    # Scroll down past cursor — should NOT snap back on ensure_cursor_visible
+    $view->scroll_down(10);
+    is($view->scroll_line(), 10, 'Scrolled down by 10');
+    is($view->cursor_line(), 0, 'Cursor still at line 0');
+
+    # ensure_cursor_visible should NOT snap back because _explicit_scroll is set
+    $view->ensure_cursor_visible();
+    is($view->scroll_line(), 10, 'Viewport did NOT snap back after explicit scroll');
+
+    # Second call to ensure_cursor_visible (flag consumed) SHOULD snap back
+    $view->ensure_cursor_visible();
+    is($view->scroll_line(), 0, 'Viewport snaps to cursor after flag consumed');
+
+    # Same test for scroll_up: scroll cursor down, then scroll viewport up past it
+    $view->set_cursor(15, 0);
+    is($view->scroll_line() + $view->{viewport_rows} > 15, 1, 'Cursor visible');
+
+    $view->scroll_up(100);  # Scroll to top
+    is($view->scroll_line(), 0, 'Scrolled up to top');
+    is($view->cursor_line(), 15, 'Cursor still at line 15');
+
+    $view->ensure_cursor_visible();
+    is($view->scroll_line(), 0, 'Viewport stays at top after scroll_up explicit flag');
+
+    $view->ensure_cursor_visible();
+    ok($view->scroll_line() > 0, 'Viewport snaps to cursor on second ensure');
+};
+
 subtest 'Set viewport size' => sub {
     my ($doc, $view) = make_view("1\n2\n3\n4\n5\n6\n7\n8\n9\n10", rows => 10);
 

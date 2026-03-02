@@ -762,6 +762,12 @@ sub visible_line_range {
 sub ensure_cursor_visible {
     my ($self) = @_;
 
+    # After explicit viewport scroll (mouse wheel), don't snap viewport back
+    # to cursor — allow the user to scroll freely away from the cursor position
+    if (delete $self->{_explicit_scroll}) {
+        return;
+    }
+
     # Word wrap mode: scroll by visual rows, no horizontal scroll
     my $wm = $self->{_wrap_map};
     if ($wm) {
@@ -875,6 +881,7 @@ sub scroll_up {
     $lines //= 1;
     $self->{scroll_line} -= $lines;
     $self->{scroll_line} = 0 if $self->{scroll_line} < 0;
+    $self->{_explicit_scroll} = 1;
 }
 
 sub scroll_down {
@@ -883,6 +890,7 @@ sub scroll_down {
     my $max_scroll = $self->{document}->line_count() - 1;
     $self->{scroll_line} += $lines;
     $self->{scroll_line} = $max_scroll if $self->{scroll_line} > $max_scroll;
+    $self->{_explicit_scroll} = 1;
 }
 
 # ============================================================================

@@ -10,8 +10,10 @@ Priority scale:
 
 ## Existing bugs
 
-### P2: Scroll wheel cannot scroll more than a page
+### ~~P2: Scroll wheel cannot scroll more than a page~~ FIXED
 When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
+
+**Fix:** Added `_explicit_scroll` flag to View. When `scroll_up`/`scroll_down` are called (mouse wheel), the flag is set. `ensure_cursor_visible()` (called every render) checks for this flag and returns early if set, preventing the viewport from snapping back to the cursor. The flag is consumed after one render cycle, so the next user action (typing, clicking) restores normal cursor-following behavior. This allows unlimited scrolling away from the cursor position, matching standard editor behavior.
 
 ### ~~P2: "More" home/end~~ FIXED
 Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
