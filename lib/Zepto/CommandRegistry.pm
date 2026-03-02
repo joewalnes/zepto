@@ -100,6 +100,16 @@ my @COMMANDS = (
         method   => 'cmd_prev_tab',
     },
     {
+        id       => 'recent_files',
+        label    => 'Recent Files',
+        icon     => 'clock',
+        shortcut => SYM_CTRL . 'E',
+        section  => 'FILE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_recent_files',
+    },
+    {
         id       => 'toggle_tree',
         label    => 'File Tree',
         icon     => 'folder',

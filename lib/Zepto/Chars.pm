@@ -98,6 +98,7 @@ use constant {
     NF_KEYBOARD         => "\x{f11c}",  #  keyboard
     NF_LINE_NUM_ICON    => "\x{e0a1}",  #  line number (nerd font)
     NF_COMMENT          => "\x{f075}",  #  comment
+    NF_CLOCK            => "\x{f017}",  #  clock/history
 };
 
 # Simple toggle indicators (single-width, more compatible)
@@ -215,6 +216,7 @@ my %CHARS = (
     next_change         => [ NF_CHEVRON_DOWN,   'v'         ],
     prev_change         => [ NF_CHEVRON_UP,     '^'         ],
     warning             => [ NF_WARNING,        '!'         ],
+    clock               => [ NF_CLOCK,          '*'         ],
 
     # VCS gutter indicators (same in both modes)
     vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐

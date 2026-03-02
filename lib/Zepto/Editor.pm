@@ -18,6 +18,7 @@ use strict;
 use warnings;
 use utf8;
 use Carp;
+use File::Spec;
 use Time::HiRes qw(time);
 
 use Exporter 'import';
@@ -131,6 +132,10 @@ sub new {
         palette_scroll       => 0,
         palette_filtered     => [],
         palette_visible_rows => 15,  # updated during render
+        palette_mode         => 'commands',  # 'commands' or 'recent_files'
+
+        # Recent files tracking
+        _recent_files        => [],  # Ordered list of recent file paths (most recent first)
     }, $class;
 
     # Initialize theme
@@ -166,6 +171,79 @@ sub _effective_word_wrap {
 
     # Global preference
     return $self->{prefs}->word_wrap();
+}
+
+# =============================================================================
+# Recent Files
+# =============================================================================
+
+use constant RECENT_FILES_MAX => 50;
+
+sub _recent_files_path {
+    my $home = $ENV{HOME} || (getpwuid($<))[7] || '.';
+    return "$home/.config/zepto/recent_files";
+}
+
+sub _load_recent_files {
+    my ($self) = @_;
+    my $path = $self->_recent_files_path();
+    return unless -f $path;
+
+    my @files;
+    if (open my $fh, '<', $path) {
+        while (my $line = <$fh>) {
+            chomp $line;
+            push @files, $line if length($line) && -f $line;
+        }
+        close $fh;
+    }
+    $self->{_recent_files} = \@files;
+}
+
+sub _save_recent_files {
+    my ($self) = @_;
+    my $path = $self->_recent_files_path();
+
+    # Ensure directory exists
+    my $dir = $path;
+    $dir =~ s{/[^/]+$}{};
+    if (!-d $dir) {
+        # Create directory recursively
+        my @parts = split m{/}, $dir;
+        my $built = '';
+        for my $part (@parts) {
+            $built .= "/$part";
+            next if -d $built;
+            mkdir $built or return;  # Silently fail
+        }
+    }
+
+    if (open my $fh, '>', $path) {
+        for my $file (@{$self->{_recent_files}}) {
+            print $fh "$file\n";
+        }
+        close $fh;
+    }
+}
+
+sub _track_recent_file {
+    my ($self, $file_path) = @_;
+    return unless defined $file_path && length($file_path);
+
+    # Resolve to absolute path
+    my $abs_path = File::Spec->rel2abs($file_path);
+
+    # Remove if already in list (we'll re-add at front)
+    my @files = grep { $_ ne $abs_path } @{$self->{_recent_files}};
+
+    # Add to front
+    unshift @files, $abs_path;
+
+    # Trim to max
+    splice @files, RECENT_FILES_MAX if @files > RECENT_FILES_MAX;
+
+    $self->{_recent_files} = \@files;
+    $self->_save_recent_files();
 }
 
 sub _create_document_state {
@@ -250,6 +328,9 @@ sub init {
         $self->{focus_tree} = 1;
     }
 
+    # Load recent files list from disk
+    $self->_load_recent_files();
+
     # Create tabs from initial files (or one empty tab if none specified)
     if (@files) {
         for my $file_path (@files) {
@@ -261,6 +342,8 @@ sub init {
                 highlighter => $highlighter,
                 file_path   => $file_path,
             );
+            # Track in recent files
+            $self->_track_recent_file($file_path);
         }
         # Activate the first tab
         $self->{tab_manager}->set_active(0);
@@ -531,8 +614,8 @@ sub handle_editing_event {
             # Global shortcuts that work regardless of focus
             if ($ch eq 'q' || $ch eq 's' || $ch eq 'n' ||
                 $ch eq 'o' || $ch eq 'w' || $ch eq 'f' ||
-                $ch eq 't' || $ch eq 'p' || $ch eq 'b' ||
-                $ch eq ' ') {
+                $ch eq 'e' || $ch eq 't' || $ch eq 'p' ||
+                $ch eq 'b' || $ch eq ' ') {
                 $self->handle_ctrl_char($ch);
                 return;
             }
@@ -667,6 +750,7 @@ sub handle_ctrl_char {
     elsif ($char eq 'j') { $self->cmd_find_next(); }
     elsif ($char eq 'k') { $self->cmd_find_prev(); }
     elsif ($char eq 'g') { $self->cmd_goto_line(); }
+    elsif ($char eq 'e') { $self->cmd_recent_files(); }
 
     # View
     elsif ($char eq 't') { $self->cmd_toggle_theme(); }
@@ -890,6 +974,13 @@ sub handle_mouse_event {
             my $scroll_display = $line_map->scroll_display_start($view->scroll_line());
             my $display_row = $scroll_display + $text_row;
             $entry = $line_map->display_entry($display_row);
+        }
+
+        # Clicking in the document area (gutter or text) unfocuses tree
+        if ($self->{file_tree} && $self->{file_tree}->focused()) {
+            $self->_tree_unfocus();
+            # Refresh view reference — tab may have changed during unfocus
+            $view = $self->active_view();
         }
 
         # Gutter click: toggle hunk expansion
@@ -3285,6 +3376,7 @@ sub render {
                 scroll         => $self->{palette_scroll},
                 filtered       => $self->{palette_filtered},
                 editor         => $self,
+                mode           => $self->{palette_mode} // 'commands',
             } : undef,
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},

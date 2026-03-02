@@ -15,6 +15,7 @@ use utf8;
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
 
+use Cwd qw(getcwd);
 use Zepto::CommandRegistry;
 use Zepto::InputWidget;
 
@@ -32,6 +33,7 @@ sub cmd_open_palette {
     return if $self->{state} eq 'dialog';
 
     $self->{state} = 'palette';
+    $self->{palette_mode} = 'commands';
     $self->{palette_widget} = Zepto::InputWidget->new();
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
@@ -41,6 +43,7 @@ sub cmd_open_palette {
 sub close_palette {
     my ($self) = @_;
     $self->{state} = 'editing';
+    $self->{palette_mode} = 'commands';
     $self->{palette_widget} = undef;
     $self->{palette_cursor} = 0;
     $self->{palette_scroll} = 0;
@@ -135,21 +138,28 @@ sub handle_palette_event {
 
 sub _palette_update_filtered {
     my ($self) = @_;
-    my $query   = $self->{palette_widget} ? $self->{palette_widget}->value() : '';
-    my @filtered = Zepto::CommandRegistry->filter_commands($query);
+    my $query = $self->{palette_widget} ? $self->{palette_widget}->value() : '';
 
-    # When no query, insert section headers before each group
-    if (length($query) == 0) {
-        my @with_headers;
-        my $current_section = '';
-        for my $cmd (@filtered) {
-            if (($cmd->{section} // '') ne $current_section) {
-                $current_section = $cmd->{section};
-                push @with_headers, { _is_header => 1, label => $current_section };
+    my @filtered;
+
+    if (($self->{palette_mode} // 'commands') eq 'recent_files') {
+        @filtered = $self->_filter_recent_files($query);
+    } else {
+        @filtered = Zepto::CommandRegistry->filter_commands($query);
+
+        # When no query, insert section headers before each group
+        if (length($query) == 0) {
+            my @with_headers;
+            my $current_section = '';
+            for my $cmd (@filtered) {
+                if (($cmd->{section} // '') ne $current_section) {
+                    $current_section = $cmd->{section};
+                    push @with_headers, { _is_header => 1, label => $current_section };
+                }
+                push @with_headers, $cmd;
             }
-            push @with_headers, $cmd;
+            @filtered = @with_headers;
         }
-        @filtered = @with_headers;
     }
 
     $self->{palette_filtered} = \@filtered;
@@ -161,6 +171,62 @@ sub _palette_update_filtered {
 
     # Ensure cursor is not on a section header
     $self->_palette_skip_headers(1);
+}
+
+sub _filter_recent_files {
+    my ($self, $query) = @_;
+    my @recent = @{$self->{_recent_files} || []};
+    my $cwd = Cwd::getcwd();
+
+    my @items;
+    for my $abs_path (@recent) {
+        # Compute display path (relative to cwd if possible)
+        my $display_path = $abs_path;
+        if (index($abs_path, "$cwd/") == 0) {
+            $display_path = substr($abs_path, length($cwd) + 1);
+        }
+
+        # Extract filename for label
+        my $filename = $display_path;
+        $filename =~ s{.*/}{};
+
+        # Compute directory for shortcut display
+        my $dir = $display_path;
+        if ($dir =~ m{/}) {
+            $dir =~ s{/[^/]+$}{};
+        } else {
+            $dir = '';
+        }
+
+        push @items, {
+            label     => $filename,
+            icon      => '_file_icon',  # special: use file_icon() method
+            shortcut  => $dir,
+            type      => 'action',
+            _is_file  => 1,
+            _path     => $abs_path,
+            _filename => $filename,
+            _display  => $display_path,
+        };
+    }
+
+    # Filter by query if provided
+    if (defined $query && length($query) > 0) {
+        my $q = lc($query);
+        my @scored;
+        for my $item (@items) {
+            # Match against full display path
+            my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
+            # Also try matching against just the filename
+            my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
+            $score = $name_score if $name_score > $score;
+            push @scored, { item => $item, score => $score } if $score > 0;
+        }
+        @scored = sort { $b->{score} <=> $a->{score} } @scored;
+        @items = map { $_->{item} } @scored;
+    }
+
+    return @items;
 }
 
 sub _palette_move_cursor {
@@ -234,6 +300,14 @@ sub _palette_execute_selected {
     my $cmd = $filtered->[$self->{palette_cursor}];
     return unless $cmd;
     return if $cmd->{_is_header};  # Section headers are not executable
+
+    # Recent file entry: open the file
+    if ($cmd->{_is_file}) {
+        my $path = $cmd->{_path};
+        $self->close_palette();
+        $self->_load_file($path);
+        return;
+    }
 
     if ($cmd->{type} eq 'toggle') {
         # Toggle commands: execute and stay open (update state live)

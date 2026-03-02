@@ -220,8 +220,35 @@ sub cmd_open_file {
     $tree->start_filter();
 }
 
+sub cmd_recent_files {
+    my ($self) = @_;
+
+    # Don't open during input-focused states
+    return if $self->{state} eq 'footer_input';
+    return if $self->{state} eq 'prompt';
+    return if $self->{state} eq 'find';
+    return if $self->{state} eq 'dialog';
+
+    my @recent = @{$self->{_recent_files} || []};
+    unless (@recent) {
+        $self->show_message("No recent files");
+        return;
+    }
+
+    # Open palette in recent_files mode
+    $self->{state} = 'palette';
+    $self->{palette_mode} = 'recent_files';
+    $self->{palette_widget} = Zepto::InputWidget->new();
+    $self->{palette_cursor} = 0;
+    $self->{palette_scroll} = 0;
+    $self->_palette_update_filtered();
+}
+
 sub _load_file {
     my ($self, $path) = @_;
+
+    # Track in recent files
+    $self->_track_recent_file($path);
 
     # Check if file is already open in another tab
     my $existing = $self->{tab_manager}->find_tab_by_path($path);
