@@ -10,8 +10,10 @@ Priority scale:
 
 ## Existing bugs
 
-### P2: "More" home/end
+### ~~P2: "More" home/end~~ FIXED
 Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
+
+**Fix:** Smart Home cycles three states: first-nonws → col 0 → document start. Smart End cycles: line end → document end. Both work in normal and word-wrap modes. Also fixed `do_enter()` to set cursor position directly instead of using `move_to_line_start()` (which now has smart cycling that would send the cursor to doc start on empty new lines).
 
 ### P3: Move forward/back
 Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.

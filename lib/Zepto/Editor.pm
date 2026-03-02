@@ -2210,10 +2210,9 @@ sub do_enter {
     # Invalidate wrap map so move_down() sees the updated line count
     $view->invalidate_wrap_map();
 
-    # Move to start of new line (after indent)
-    $view->move_down();
-    $view->move_to_line_start();
-    $view->move_right() for (1..length($indent));
+    # Move cursor to start of new line (after auto-indent)
+    my $new_line = $view->cursor_line() + 1;
+    $view->set_cursor($new_line, length($indent));
 }
 
 sub do_indent {

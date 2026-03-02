@@ -302,36 +302,83 @@ sub move_down {
 
 sub move_to_line_start {
     my ($self, $extend_selection) = @_;
+    my $line = $self->{cursor_line};
+    my $col  = $self->{cursor_col};
+    my $content = $self->{document}->get_line_content($line);
+
+    # Find first non-whitespace column
+    my $first_nonws = 0;
+    if ($content =~ /^(\s+)/) {
+        $first_nonws = CORE::length($1);
+    }
+
     my $wm = $self->{_wrap_map};
     if ($wm) {
-        # Move to start of current visual row
-        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
-        my ($doc_line, $doc_col) = $wm->visual_to_doc($cur_vrow, 0);
-        $self->set_cursor($doc_line, $doc_col, $extend_selection);
+        # In word-wrap mode, smart home cycles: first-nonws → visual row start → doc start
+        my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($line, $col, $self->{_cursor_affinity});
+        my ($row_start_line, $row_start_col) = $wm->visual_to_doc($cur_vrow, 0);
+
+        my $seg = $wm->segment_at_visual_row($cur_vrow);
+        if ($seg && $seg->{wrap_index} == 0) {
+            # First visual row: cycle first-nonws → col 0 → doc start
+            if ($col == 0) {
+                $self->move_to_document_start($extend_selection);
+            } elsif ($col == $first_nonws || $first_nonws == 0) {
+                $self->set_cursor($line, 0, $extend_selection);
+            } else {
+                $self->set_cursor($line, $first_nonws, $extend_selection);
+            }
+        } else {
+            # Continuation row: cycle row start → doc start
+            if ($col != $row_start_col || $line != $row_start_line) {
+                $self->set_cursor($row_start_line, $row_start_col, $extend_selection);
+            } else {
+                $self->move_to_document_start($extend_selection);
+            }
+        }
         return;
     }
-    $self->set_cursor($self->{cursor_line}, 0, $extend_selection);
+
+    # Smart home: cycle first-nonws → col 0 → document start
+    # Check col 0 first (otherwise col=0 with first_nonws>0 re-enters the cycle)
+    if ($col == 0) {
+        $self->move_to_document_start($extend_selection);
+    } elsif ($col == $first_nonws || $first_nonws == 0) {
+        $self->set_cursor($line, 0, $extend_selection);
+    } else {
+        $self->set_cursor($line, $first_nonws, $extend_selection);
+    }
 }
 
 sub move_to_line_end {
     my ($self, $extend_selection) = @_;
     my $wm = $self->{_wrap_map};
     if ($wm) {
-        # Move to end of current visual row
+        # Smart end in wrap mode: visual row end → document end
         my ($cur_vrow, $cur_vcol) = $wm->doc_to_visual($self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
         my $seg = $wm->segment_at_visual_row($cur_vrow);
         if ($seg) {
             my $line_len = $self->{document}->line_length($seg->{doc_line});
             my $end_col = $seg->{col_end};
             $end_col = $line_len if $end_col > $line_len;
-            # Use 'left' affinity so cursor renders at end of THIS visual row,
-            # not at start of next row (col_end is a segment boundary)
-            $self->set_cursor($seg->{doc_line}, $end_col, $extend_selection, 'left');
+            if ($self->{cursor_line} == $seg->{doc_line} && $self->{cursor_col} == $end_col) {
+                # Already at visual row end — go to document end
+                $self->move_to_document_end($extend_selection);
+            } else {
+                # Use 'left' affinity so cursor renders at end of THIS visual row,
+                # not at start of next row (col_end is a segment boundary)
+                $self->set_cursor($seg->{doc_line}, $end_col, $extend_selection, 'left');
+            }
             return;
         }
     }
-    my $end_col = $self->{document}->line_length($self->{cursor_line});
-    $self->set_cursor($self->{cursor_line}, $end_col, $extend_selection);
+    my $line_end = $self->{document}->line_length($self->{cursor_line});
+    # Smart end: if already at line end, go to document end
+    if ($self->{cursor_col} == $line_end) {
+        $self->move_to_document_end($extend_selection);
+    } else {
+        $self->set_cursor($self->{cursor_line}, $line_end, $extend_selection);
+    }
 }
 
 sub move_to_document_start {
