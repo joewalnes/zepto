@@ -1019,12 +1019,12 @@ sub handle_mouse_event {
             return;
         }
 
-        # Scroll viewport without moving cursor for smooth desktop-like feel
+        # Scroll viewport without moving cursor — 1 line per event for smooth feel
         if ($event->{button} eq 'up') {
-            $view->scroll_up(3);
+            $view->scroll_up(1);
         }
         else {
-            $view->scroll_down(3);
+            $view->scroll_down(1);
         }
     }
     elsif ($action eq 'drag') {

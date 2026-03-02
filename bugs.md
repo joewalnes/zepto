@@ -13,6 +13,12 @@ Priority scale:
 ### P2: "More" home/end
 Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
 
+### P3: Move forward/back
+Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.
+
+### P3: Open recent
+
+
 ### ~~P0: Reports of sluggishness~~ FIXED
 Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
 
@@ -41,8 +47,10 @@ Ctrl+/ should comment or uncomment the current line. If no text selected, curren
 ### P3: Close empty start tab when opening first file.
 A common scenario is: open zepto (which shows an untitled empty tab), then navigate to a file to edit. In this case, if the initial empty tab has not been edited, automatically close it to reduce clutter.
 
-### P2: Line by line scrolling in editor.
+### ~~P2: Line by line scrolling in editor.~~ FIXED
 When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls item by item, which feels precise and smooth. However the editor has different behavior which feels janky. Make editor mouse scroll behave same way as tree.
+
+**Fix:** Changed editor mouse scroll from 3 lines per event to 1 line per event, matching the file tree's behavior.
 
 ### P3: Diff view does not preserve line wrap
 If word wrap enabled, and diffing a hunk with long line, the word wrap is disabled in the diff, which is jarring. Preserve word wrap settings.
