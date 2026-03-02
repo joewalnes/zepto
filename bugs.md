@@ -92,7 +92,7 @@ Close tab, next tab, prev tab are common actions. Succinctly display these hints
 
 **Fix:** Added right-aligned tab navigation hints in the tab bar's remaining space: `⌃W × ⌥, ← ⌥. →` showing close tab, previous tab, and next tab shortcuts. Hints only appear when there's enough room, using the same dim shortcut color as the per-tab ⌥N hints.
 
-### P2: Command palette re-org
+### ~~P2: Command palette re-org~~ FIXED
 Organize by:
 - File: tree, new, open, save, close, quit, next/prev tab, etc
 - Edit: cut, copy, paste, move line up/down, duplicate up/down
@@ -100,6 +100,8 @@ Organize by:
 - View: minimap, nerd, wrap
 - etc.
 Where should find/replace go
+
+**Fix:** Reorganized command palette from DOCUMENT/APP/NAVIGATE/TOGGLES to FILE/EDIT/NAVIGATE/VIEW. FILE: New, Open, Save, Close Tab, Quit, Next/Prev Tab, File Tree. EDIT: Undo, Redo, Cut, Copy, Paste, Select All, Move/Duplicate Lines, Toggle Comment. NAVIGATE: Find/Replace, Go to Line, Find Next/Prev, Next/Prev Change. VIEW: Word Wrap, Column Mode, Diff View, Minimap, Nerd Font, Theme. Find/Replace goes in NAVIGATE (it's a search/navigation action).
 
 ### ~~P2: Command palette rendering~~ FIXED
 Highlighted row in command palette extends too far on right, overlapping border.

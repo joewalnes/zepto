@@ -154,7 +154,7 @@ subtest 'Backspace removes characters from query' => sub {
 subtest 'Arrow keys move cursor' => sub {
     my $editor = make_editor();
     $editor->cmd_open_palette();
-    # Cursor starts at 1 (first command, after DOCUMENT header at 0)
+    # Cursor starts at 1 (first command, after FILE header at 0)
     is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (first command)');
 
     $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });

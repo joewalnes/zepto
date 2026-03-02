@@ -46,10 +46,10 @@ subtest 'commands_by_section groups correctly' => sub {
         $seen_sections{$sec->{name}} = 1;
     }
 
-    ok($seen_sections{'DOCUMENT'}, 'Has DOCUMENT section');
-    ok($seen_sections{'APP'}, 'Has APP section');
+    ok($seen_sections{'FILE'}, 'Has FILE section');
+    ok($seen_sections{'EDIT'}, 'Has EDIT section');
     ok($seen_sections{'NAVIGATE'}, 'Has NAVIGATE section');
-    ok($seen_sections{'TOGGLES'}, 'Has TOGGLES section');
+    ok($seen_sections{'VIEW'}, 'Has VIEW section');
 };
 
 subtest 'find_command lookup' => sub {
@@ -121,10 +121,10 @@ subtest 'toggle commands have correct type' => sub {
 
 subtest 'section order is consistent' => sub {
     my @order = Zepto::CommandRegistry->section_order();
-    is($order[0], 'DOCUMENT', 'First section is DOCUMENT');
-    is($order[1], 'APP', 'Second section is APP');
+    is($order[0], 'FILE', 'First section is FILE');
+    is($order[1], 'EDIT', 'Second section is EDIT');
     is($order[2], 'NAVIGATE', 'Third section is NAVIGATE');
-    is($order[3], 'TOGGLES', 'Fourth section is TOGGLES');
+    is($order[3], 'VIEW', 'Fourth section is VIEW');
 };
 
 done_testing();
