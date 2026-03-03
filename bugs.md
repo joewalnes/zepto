@@ -10,6 +10,12 @@ Priority scale:
 
 ## Existing bugs
 
+### P3: Transform feature
+I'd like the ability to use cmd line tools to transform fragments of text. For example, select some text, press transform, type "sort | uniq", and have the selected text replaced with the result of piping it through those process. If no text selected, auto select current line (or maybe entire doc, WDYT?). Also give option to put output in clipboard instead of replacing inline. Give hints in UI as to how to use the functionality. e.g. "sort | uniq", "tac", "python3 -m json.tool"
+
+### P2: Smart sort.
+Sort files in tree/search results by human friendly numbers, not ascii. e.g. file7.txt, file8.txt, file9.txt, file10.txt (10 after 7).
+
 ### ~~P0: Slight lag on typing~~ FIXED
 I notice it when typing and it's annoying. Figure out the bottleneck. Particularly visible when holding down a key to repeat chars.
 
