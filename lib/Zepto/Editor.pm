@@ -3192,7 +3192,8 @@ sub cmd_toggle_diff {
         my $lm = $view->line_map();
         $lm->toggle_hunk($hunk_idx);
     } else {
-        $self->show_message("No change at cursor");
+        # No change at cursor — jump to next change if one exists
+        $self->cmd_next_change();
     }
 }
 
@@ -3254,17 +3255,19 @@ sub handle_tree_event {
 sub cmd_toggle_tree {
     my ($self) = @_;
 
-    if ($self->{file_tree}) {
-        if ($self->{file_tree}->focused()) {
+    if ($self->{prefs}->show_tree()) {
+        # Hide tree
+        $self->{prefs}->set_show_tree(0);
+        if ($self->{file_tree} && $self->{file_tree}->focused()) {
             $self->_tree_unfocus();
-        } else {
-            $self->{file_tree}->refresh();
-            $self->{file_tree}->set_focused(1);
-            $self->_tree_reveal_current();
         }
     } else {
-        # Create tree if it doesn't exist
-        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+        # Show tree
+        $self->{prefs}->set_show_tree(1);
+        if (!$self->{file_tree}) {
+            $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+        }
+        $self->{file_tree}->refresh();
         $self->{file_tree}->set_focused(1);
         $self->_tree_reveal_current();
     }
@@ -3393,6 +3396,12 @@ sub _tree_unfocus {
     $tree->{pre_preview_tab_index} = undef;
     $tree->set_focused(0);
 
+    # If tree was temporarily shown for ⌃O file open, hide it again
+    if ($self->{_tree_temp_for_open}) {
+        $self->{_tree_temp_for_open} = 0;
+        $self->{prefs}->set_show_tree(0);
+    }
+
     # Now that tree is unfocused, update highlight to match active tab
     if ($self->active_file_path()) {
         $tree->set_current_file($self->active_file_path());
@@ -3456,6 +3465,12 @@ sub _tree_open_selected {
     $tree->set_current_file($node->{path});
     $tree->expand_to_path($node->{path});
     $tree->set_focused(0);
+
+    # If tree was temporarily shown for ⌃O file open, hide it again
+    if ($self->{_tree_temp_for_open}) {
+        $self->{_tree_temp_for_open} = 0;
+        $self->{prefs}->set_show_tree(0);
+    }
 }
 
 # Map a scrollbar drag y-position to a scroll offset in the tree

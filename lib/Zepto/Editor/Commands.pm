@@ -42,6 +42,10 @@ sub cmd_save {
                         $tab->{file_path} = $filename;
                         $tab->{untitled_name} = undef;
                         $self->show_message("Saved: $filename");
+                        # Refresh file tree to show newly saved file
+                        if ($self->{file_tree}) {
+                            $self->{file_tree}->refresh();
+                        }
                     }
                 }
             },
@@ -208,6 +212,13 @@ sub cmd_new_file {
 
 sub cmd_open_file {
     my ($self) = @_;
+
+    # If tree is hidden, temporarily show it for file picking
+    if (!$self->{prefs}->show_tree()) {
+        $self->{_tree_temp_for_open} = 1;
+        $self->{prefs}->set_show_tree(1);
+    }
+
     # Focus tree and activate filter mode (replaces old file picker overlay)
     if (!$self->{file_tree}) {
         $self->{file_tree} = Zepto::FileTree->new(root_path => '.');

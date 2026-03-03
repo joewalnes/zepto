@@ -143,17 +143,22 @@ package main;
 # Parse command line options
 my @files;
 my $no_nerd_font = 0;
+my $no_tree = 0;
 
 for my $arg (@ARGV) {
     if ($arg eq '--no-nerd-font' || $arg eq '--no-powerline' || $arg eq '-P') {
         $no_nerd_font = 1;
+    } elsif ($arg eq '--no-tree') {
+        $no_tree = 1;
     } elsif ($arg eq '--help' || $arg eq '-h') {
         print "Usage: zepto [options] [file ...]\n";
         print "Options:\n";
         print "  --no-nerd-font, -P  Disable Nerd Font glyphs\n";
+        print "  --no-tree           Hide file tree on startup\n";
         print "  --help, -h          Show this help\n";
         print "\nEnvironment:\n";
         print "  ZEPTO_NERD_FONT=0   Disable Nerd Font glyphs by default\n";
+        print "  ZEPTO_TREE=0        Hide file tree by default\n";
         exit 0;
     } elsif ($arg !~ /^-/) {
         push @files, $arg;
@@ -174,8 +179,17 @@ if ($no_nerd_font || (defined $ENV{ZEPTO_NERD_FONT} && $ENV{ZEPTO_NERD_FONT} eq 
     $nerd_font = 0;
 }
 
-# Create preferences with nerd font setting
-my $prefs = Zepto::Preferences->new(nerd_font => $nerd_font);
+# Determine show_tree: explicit flag > env var > default (hidden when opening files)
+my $show_tree = 1;  # Default ON
+if ($no_tree || (defined $ENV{ZEPTO_TREE} && $ENV{ZEPTO_TREE} eq '0')) {
+    $show_tree = 0;
+} elsif (@files >= 1 && !$focus_tree) {
+    # Opening specific files (not a directory) — hide tree by default
+    $show_tree = 0;
+}
+
+# Create preferences
+my $prefs = Zepto::Preferences->new(nerd_font => $nerd_font, show_tree => $show_tree);
 Zepto::Chars->set_enabled($nerd_font);
 
 my $editor = Zepto::Editor->new(files => \@files, prefs => $prefs, focus_tree => $focus_tree);
