@@ -110,8 +110,10 @@ This is the most important key to know about, but it's hidden in corner, with no
 
 **Fix:** Added "Commands" label to the palette pill in the status bar. Previously showed only `{icon} ⌃␣` — now shows `{icon} Commands ⌃␣`. Updated in both document-context and tree-context status bars. The pill already uses a distinctive blue background that differentiates it from other pills.
 
-### P3: Command palette too wide.
+### ~~P3: Command palette too wide.~~ FIXED
 Doesn't need to be as wide and ends up with shortcut keys too far from respective action. Pick a reasonable max width.
+
+**Fix:** Reduced palette max width from 120 to 80 columns at wide terminals (>=120 cols). Standard terminals (<120 cols) keep the 60-column max. Removed the 160-col breakpoint that created an overly wide 120-column palette. Shortcuts now stay close to labels at all terminal widths.
 
 ### ~~P2: Non-obvious tab keys~~ FIXED
 Close tab, next tab, prev tab are common actions. Succinctly display these hints somewhere, maybe in tab bar.

@@ -389,9 +389,7 @@ sub render {
         # MUST match dimensions in _render_command_palette exactly
         my $palette = $ui->{palette};
         my $pal_width = $cols - 4;
-        if ($cols >= 160) {
-            $pal_width = 120 if $pal_width > 120;
-        } elsif ($cols >= 120) {
+        if ($cols >= 120) {
             $pal_width = 80 if $pal_width > 80;
         } else {
             $pal_width = 60 if $pal_width > 60;
@@ -3862,10 +3860,8 @@ sub _render_command_palette {
 
     # Palette dimensions — adapts to terminal width
     my $pal_width = $total_cols - 4;
-    if ($total_cols >= 160) {
-        $pal_width = 120 if $pal_width > 120;  # Wide terminal: wider palette
-    } elsif ($total_cols >= 120) {
-        $pal_width = 80 if $pal_width > 80;    # Medium-wide: moderately wider
+    if ($total_cols >= 120) {
+        $pal_width = 80 if $pal_width > 80;    # Wide terminal: moderately wider
     } else {
         $pal_width = 60 if $pal_width > 60;    # Standard: default width
     }
