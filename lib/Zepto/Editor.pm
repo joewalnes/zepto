@@ -2375,7 +2375,8 @@ sub do_insert_char {
     }
 
     # Delete selection first if any
-    if ($view->has_selection()) {
+    my $had_selection = $view->has_selection();
+    if ($had_selection) {
         $self->delete_selection();
     }
 
@@ -2385,6 +2386,11 @@ sub do_insert_char {
     );
 
     $doc->insert($offset, $char);
+
+    # Incremental wrap update for single-char insert (skip if selection was
+    # deleted first — that changed multiple lines, needs full rebuild)
+    $view->invalidate_wrap_line($view->cursor_line()) unless $had_selection;
+
     $view->move_right();
 }
 
@@ -2409,6 +2415,8 @@ sub do_backspace {
 
     return if $line == 0 && $col == 0;
 
+    my $joins_lines = ($col == 0);  # Will delete newline at end of prev line
+
     $view->move_left();
 
     my $offset = $doc->line_col_to_offset(
@@ -2417,6 +2425,13 @@ sub do_backspace {
     );
 
     $doc->delete($offset, 1);
+
+    # Incremental wrap for within-line delete; full rebuild when joining lines
+    if ($joins_lines) {
+        $view->invalidate_wrap_map();
+    } else {
+        $view->invalidate_wrap_line($view->cursor_line());
+    }
 }
 
 sub do_delete {
@@ -2442,7 +2457,17 @@ sub do_delete {
 
     return if $offset >= $doc->length();
 
+    # Deleting at end of line removes newline — joins with next line
+    my $joins_lines = ($view->cursor_col() >= $doc->line_length($view->cursor_line()));
+
     $doc->delete($offset, 1);
+
+    # Incremental wrap for within-line delete; full rebuild when joining lines
+    if ($joins_lines) {
+        $view->invalidate_wrap_map();
+    } else {
+        $view->invalidate_wrap_line($view->cursor_line());
+    }
 }
 
 sub do_enter {

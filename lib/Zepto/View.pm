@@ -77,6 +77,10 @@ sub set_line_map { $_[0]->{line_map} = $_[1] }
 sub wrap_map     { $_[0]->{_wrap_map} }
 sub set_wrap_map { $_[0]->{_wrap_map} = $_[1]; $_[0]->{_scroll_wrap_offset} = 0; }
 sub invalidate_wrap_map { $_[0]->{_wrap_map}->invalidate() if $_[0]->{_wrap_map} }
+sub invalidate_wrap_line {
+    my ($self, $line_idx) = @_;
+    $self->{_wrap_map}->invalidate_line($line_idx) if $self->{_wrap_map};
+}
 sub scroll_wrap_offset { $_[0]->{_scroll_wrap_offset} }
 sub cursor_affinity { $_[0]->{_cursor_affinity} // 'right' }
 

@@ -300,4 +300,109 @@ subtest 'doc_to_visual accounts for indent_width' => sub {
     }
 };
 
+# =============================================================================
+# Incremental invalidation (invalidate_line)
+# =============================================================================
+
+subtest 'invalidate_line updates single line without full rebuild' => sub {
+    my ($wm, $doc) = make_wm(10, "short", "x" x 25, "end");
+    # Force initial build: "short"(1) + "xxx..."(3) + "end"(1) + trailing ""(1) = 6
+    is($wm->total_visual_rows(), 6, 'Initial: 1 + 3 + 1 + 1 (trailing) = 6 visual rows');
+    my $old_vrow_line2 = $wm->doc_line_to_visual_row(2);
+    is($old_vrow_line2, 4, 'Line 2 starts at vrow 4');
+
+    # Modify line 0 via document (add chars to make it wrap)
+    my $offset = $doc->line_col_to_offset(0, 5);  # end of "short"
+    $doc->insert($offset, " plus extra text");  # "short plus extra text" — wraps at width 10
+
+    # Call incremental invalidate for line 0
+    $wm->invalidate_line(0);
+
+    # Line 0 should now have multiple segments
+    my $segs0 = $wm->segments_for_line(0);
+    ok(scalar @$segs0 > 1, 'Line 0 now wraps after incremental update');
+
+    # Total visual rows should have increased from the initial 6
+    my $new_total = $wm->total_visual_rows();
+    ok($new_total > 6, "Total visual rows increased (got $new_total)");
+
+    # Line 1 segments should be unchanged (still 3 visual rows for "x" x 25)
+    my $segs1 = $wm->segments_for_line(1);
+    is(scalar @$segs1, 3, 'Line 1 still has 3 segments');
+
+    # Line 2's visual row offset should have shifted by delta
+    my $delta = scalar @$segs0 - 1;  # was 1 segment, now more
+    is($wm->doc_line_to_visual_row(2), $old_vrow_line2 + $delta,
+       'Line 2 vrow shifted by delta');
+
+    # Verify segments are consistent with _visual_rows
+    my $seg_at_0 = $wm->segment_at_visual_row(0);
+    is($seg_at_0->{doc_line}, 0, 'Visual row 0 is still line 0');
+
+    # Verify _ensure_built doesn't trigger full rebuild (version synced)
+    ok(!$wm->{_dirty}, 'Not dirty after invalidate_line');
+    is($wm->{_last_content_version}, $doc->content_version(),
+       'Version synced — no full rebuild needed');
+};
+
+subtest 'invalidate_line with no segment count change' => sub {
+    # Line that wraps into exactly 2 segments; modify content but keep same wrap
+    my ($wm, $doc) = make_wm(10, "abcdefghijklmno");  # 15 chars → 2 segments
+    is($wm->total_visual_rows(), 3, '2 segments for line 0 + 1 trailing = 3');
+    my $old_total = $wm->total_visual_rows();
+
+    # Replace a character within line 0 (no length change)
+    my $offset = $doc->line_col_to_offset(0, 0);
+    $doc->delete($offset, 1);
+    $doc->insert($offset, 'X');
+
+    # Two version bumps — invalidate_line should fall back to dirty
+    # Actually this is 2 increments, so version drift > 1 → falls back to full rebuild
+    $wm->invalidate_line(0);
+    # Since drift > 1, it sets _dirty. Next query does full rebuild.
+    is($wm->total_visual_rows(), 3, 'Total rows unchanged after single-char replace');
+};
+
+subtest 'invalidate_line on unbuilt map is a no-op' => sub {
+    my $doc = make_doc("hello", "world");
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    # Don't query — map is still unbuilt (_dirty=1)
+    ok($wm->{_dirty}, 'Map is dirty initially');
+
+    $wm->invalidate_line(0);  # Should be a no-op since map is dirty
+    ok($wm->{_dirty}, 'Still dirty — invalidate_line was a no-op');
+};
+
+subtest 'invalidate_line shrinks segment count' => sub {
+    # Start with a wrapping line, then shorten it to fit in one segment
+    my ($wm, $doc) = make_wm(10, "abcdefghijklmno", "tail");
+    # Line 0: 15 chars → 2 segments. Line 1: 4 chars → 1 segment.
+    is($wm->total_visual_rows(), 4, 'Initial: 2 + 1 + 1 (trailing) = 4');
+    is($wm->doc_line_to_visual_row(1), 2, 'Line 1 at vrow 2');
+
+    # Delete chars from line 0 to make it fit in 1 segment
+    $doc->delete($doc->line_col_to_offset(0, 5), 10);  # "abcde" remains
+
+    $wm->invalidate_line(0);
+
+    is(scalar @{$wm->segments_for_line(0)}, 1, 'Line 0 now 1 segment');
+    is($wm->total_visual_rows(), 3, 'Total: 1 + 1 + 1 = 3');
+    is($wm->doc_line_to_visual_row(1), 1, 'Line 1 shifted up to vrow 1');
+};
+
+subtest 'doc_to_visual correct after invalidate_line' => sub {
+    my ($wm, $doc) = make_wm(20, "hello world", "second line here");
+    # Both lines fit in width 20 — 1 segment each + trailing
+    is($wm->total_visual_rows(), 3, 'Initial: 3 visual rows');
+
+    # Make line 0 longer so it wraps
+    $doc->insert($doc->line_col_to_offset(0, 11), " and more text added");
+    $wm->invalidate_line(0);
+
+    # Verify doc_to_visual still works correctly for line 1
+    my ($vrow1, $vcol1) = $wm->doc_to_visual(1, 0);
+    is($vrow1, $wm->doc_line_to_visual_row(1), 'doc_to_visual consistent with doc_line_to_visual_row');
+    ok($vrow1 > 1, 'Line 1 visual row shifted down due to line 0 wrapping');
+};
+
 done_testing();

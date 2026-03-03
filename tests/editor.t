@@ -1942,4 +1942,89 @@ subtest 'cmd_show_perf_log with frames' => sub {
     is($tab->{untitled_name}, 'Performance Log', 'Tab named correctly');
 };
 
+# ============================================================================
+# Incremental WrapMap update on single-char edits
+# ============================================================================
+subtest 'do_insert_char uses incremental wrap update' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world\nsecond line\n");
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    # Enable word wrap by setting up a WrapMap
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    $view->set_wrap_map($wm);
+
+    # Force initial build
+    $wm->total_visual_rows();
+    ok(!$wm->{_dirty}, 'WrapMap is clean after initial build');
+    my $initial_version = $wm->{_last_content_version};
+
+    # Insert a character
+    $editor->do_insert_char('X');
+
+    # The WrapMap should NOT be dirty — invalidate_line synced the version
+    ok(!$wm->{_dirty}, 'WrapMap not dirty after single-char insert (incremental path)');
+    is($wm->{_last_content_version}, $doc->content_version(),
+       'WrapMap version synced with document after insert');
+};
+
+subtest 'do_backspace within line uses incremental wrap' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world\nsecond line\n");
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    # Move cursor to middle of line 0
+    $view->set_cursor(0, 5);
+
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    $view->set_wrap_map($wm);
+    $wm->total_visual_rows();
+
+    $editor->do_backspace();
+
+    ok(!$wm->{_dirty}, 'WrapMap not dirty after within-line backspace');
+    is($wm->{_last_content_version}, $doc->content_version(),
+       'Version synced after backspace');
+};
+
+subtest 'do_backspace at line start triggers full rebuild' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello\nworld\n");
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    # Move cursor to start of line 1 (backspace will join lines)
+    $view->set_cursor(1, 0);
+
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    $view->set_wrap_map($wm);
+    $wm->total_visual_rows();
+
+    $editor->do_backspace();
+
+    # Should have called invalidate_wrap_map() → _dirty = 1
+    ok($wm->{_dirty}, 'WrapMap dirty after line-joining backspace (full rebuild needed)');
+};
+
+subtest 'do_delete within line uses incremental wrap' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world\nsecond line\n");
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    $view->set_cursor(0, 3);
+
+    my $wm = Zepto::WrapMap->new(document => $doc, width => 80);
+    $view->set_wrap_map($wm);
+    $wm->total_visual_rows();
+
+    $editor->do_delete();
+
+    ok(!$wm->{_dirty}, 'WrapMap not dirty after within-line delete');
+    is($wm->{_last_content_version}, $doc->content_version(),
+       'Version synced after delete');
+};
+
 done_testing();

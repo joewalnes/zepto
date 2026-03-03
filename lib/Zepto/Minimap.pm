@@ -142,8 +142,12 @@ sub _cache_key {
     my ($doc, $height, $total_lines) = @_;
     my $undo_size = scalar @{$doc->{undo_stack} // []};
     my $redo_size = scalar @{$doc->{redo_stack} // []};
-    my $vcs_dirty = $doc->{_vcs_dirty} // 0;
-    return "$total_lines:$height:$undo_size:$redo_size:$vcs_dirty";
+    # Use VCS diff timestamp instead of _vcs_dirty flag.  _vcs_dirty flips
+    # on every keystroke, but _vcs_last_diff only changes when the debounced
+    # VCS diff actually runs (~every 0.3s), preventing needless cache misses
+    # during rapid typing.
+    my $vcs_diff_ver = int(($doc->{_vcs_last_diff} // 0) * 1000);
+    return "$total_lines:$height:$undo_size:$redo_size:$vcs_diff_ver";
 }
 
 sub _get_cached_rows {

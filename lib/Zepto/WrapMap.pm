@@ -51,6 +51,63 @@ sub invalidate {
     $self->{_dirty} = 1;
 }
 
+# Incrementally re-wrap a single changed line without full rebuild.
+# Use for single-char insert/delete that doesn't change line count.
+# Falls back to lazy full rebuild if map is stale or unbuilt.
+sub invalidate_line {
+    my ($self, $line_idx) = @_;
+
+    my $doc = $self->{document};
+    return unless $doc;
+
+    # If never built or already dirty, skip — full rebuild will happen lazily
+    return if $self->{_dirty};
+
+    # If version drift > 1, multiple edits happened without us seeing them;
+    # incremental update would be incorrect, so fall back to full rebuild
+    my $current_version = $doc->content_version();
+    if ($current_version - $self->{_last_content_version} > 1) {
+        $self->{_dirty} = 1;
+        return;
+    }
+
+    my $content = $doc->get_line_content($line_idx);
+    my $new_segs = $self->wrap_line($content, $self->{width});
+
+    # Stamp doc_line onto each new segment
+    for my $seg (@$new_segs) {
+        $seg->{doc_line} = $line_idx;
+    }
+
+    # Get old segments and compute delta
+    my $old_segs = $self->{_segments}{$line_idx} // [];
+    my $old_count = scalar @$old_segs;
+    my $new_count = scalar @$new_segs;
+    my $delta = $new_count - $old_count;
+
+    # Replace in _segments hash
+    $self->{_segments}{$line_idx} = $new_segs;
+
+    # Splice _visual_rows: remove old segments, insert new ones
+    my $vrow_start = $self->{_doc_to_vrow}{$line_idx} // 0;
+    splice(@{$self->{_visual_rows}}, $vrow_start, $old_count, @$new_segs);
+
+    # Update total visual row count
+    $self->{_total} += $delta;
+
+    # Adjust _doc_to_vrow for all subsequent lines
+    if ($delta != 0) {
+        my $line_count = $doc->line_count();
+        for my $l ($line_idx + 1 .. $line_count - 1) {
+            $self->{_doc_to_vrow}{$l} += $delta
+                if exists $self->{_doc_to_vrow}{$l};
+        }
+    }
+
+    # Sync version so _ensure_built() won't trigger a full rebuild
+    $self->{_last_content_version} = $current_version;
+}
+
 # Rebuild the full map if dirty or document content has changed
 sub _ensure_built {
     my ($self) = @_;
