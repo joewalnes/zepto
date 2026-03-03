@@ -10,6 +10,25 @@ Priority scale:
 
 ## Existing bugs
 
+### P0: Slight lag on typing
+I notice it when typing and it's annoying. Figure out the bottleneck. Particularly visible when holding down a key to repeat chars.
+
+### P1: New files dont appear in tree.
+Open zepto, see tree. Create new tab. Save it. New file should be visible in tree.
+
+### P3: Ruler does not extend to width of screen
+Currently it stops 1 char short of end of screen. Particularly visible in light mode as it's a black filler.
+
+### P1: Cursor off by one in palette filter
+The cursor position is 1 char to the right of where it should be in palette filter. Actually, it may be correct, and the text rendering
+is 1 to the left. Shouldn't this be using the standard input text widget, and if so, how is just this one broken?
+
+### P2: Diff view discoverability
+When in diff view, make it visible on screen how to move to next/prev diff. If attempting to diff on a line that has no diff, jump to next one (if exists). Put a green/yellow/red/grey indicator in the diff view button on the status bar that matches diff status of where line is currently placed (grey is none). This is a subtle indicator of what this button's for to help users discover it.
+
+### P3: Tree hide
+Ability to competely hide tree. Sometimes I really just care about editing a single file and want minimal screen clutter. e.g. a git commit msg. There should be a cmd to completely toggle it. If using ctrl-o to open a file, the sidebar should vanish once the file is opened (assuming tree is meant to be hidden). Make it clear in UI how to toggle the tree - should be visible at all times. Add cli options to force opening mode. If opening a single file from CLI, default to tree hidden.
+
 ### ~~P1: Incorrect cursor placement in command palette~~ FIXED
 When opening command paletted, terminal cursor is not placed in text field
 
