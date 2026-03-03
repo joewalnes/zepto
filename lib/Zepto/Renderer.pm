@@ -1050,7 +1050,60 @@ sub _render_text_area {
     # Build visible entries from WrapMap, LineMap, or simple doc-line mapping
     my @entries;
     my $wrap_map = $view->wrap_map();
-    if ($wrap_map) {
+    if ($wrap_map && $has_expanded) {
+        # Combined: use LineMap for entry ordering, WrapMap for wrapping
+        # Get more raw entries than $height since wrapping will expand them
+        my $fetch_count = $height * 3;  # fetch extra — wrapping may expand lines
+        my $raw = $line_map->visible_entries($scroll_line, $fetch_count);
+        my $wrap_width = $wrap_map->{width};
+        my $tab_width = $wrap_map->{tab_width} // 8;
+        for my $entry (@$raw) {
+            last if @entries >= $height;
+            next unless $entry;
+            if ($entry->{type} eq 'old') {
+                # Wrap old-line content using WrapMap's wrap_line
+                my $base_lines = $doc->vcs_base_lines();
+                my $line_content = $base_lines ? ($base_lines->[$entry->{base_line}] // '') : '';
+                my $segments = $wrap_map->wrap_line($line_content, $wrap_width);
+                for my $seg (@$segments) {
+                    last if @entries >= $height;
+                    push @entries, {
+                        %$entry,
+                        wrap_index   => $seg->{wrap_index},
+                        col_start    => $seg->{col_start},
+                        col_end      => $seg->{col_end},
+                        vis_start    => $seg->{vis_start},
+                        vis_end      => $seg->{vis_end},
+                        indent_width => $seg->{indent_width},
+                    };
+                }
+            } else {
+                # Doc line: get wrap segments from WrapMap
+                my $segs = $wrap_map->segments_for_line($entry->{line});
+                if ($segs && @$segs) {
+                    for my $seg (@$segs) {
+                        last if @entries >= $height;
+                        push @entries, {
+                            type         => ($seg->{wrap_index} == 0) ? 'doc' : 'wrap_cont',
+                            line         => $entry->{line},
+                            hunk_idx     => $entry->{hunk_idx},
+                            wrap_index   => $seg->{wrap_index},
+                            col_start    => $seg->{col_start},
+                            col_end      => $seg->{col_end},
+                            vis_start    => $seg->{vis_start},
+                            vis_end      => $seg->{vis_end},
+                            indent_width => $seg->{indent_width},
+                        };
+                    }
+                } else {
+                    push @entries, $entry;
+                }
+            }
+        }
+        while (@entries < $height) {
+            push @entries, undef;
+        }
+    } elsif ($wrap_map) {
         my $scroll_vrow = $view->scroll_visual_row();
         for my $i (0 .. $height - 1) {
             my $seg = $wrap_map->segment_at_visual_row($scroll_vrow + $i);
@@ -1227,7 +1280,10 @@ sub _render_text_area {
                     $hunk_char_diffs{$hunk_idx} = { old => {}, new => {} };
                 }
             }
-            my $char_hl = $hunk_char_diffs{$hunk_idx}{old}{$entry->{base_line}};
+            # Only apply char-level highlights for the first segment of old lines
+            my $char_hl = (!$entry->{wrap_index})
+                ? $hunk_char_diffs{$hunk_idx}{old}{$entry->{base_line}}
+                : undef;
             $output .= $class->_render_old_line_row(
                 $doc, $view, $theme, $width, $gutter_width,
                 $entry, $highlighter, \$base_highlighter, $char_hl
@@ -2241,10 +2297,16 @@ sub _render_old_line_row {
     my $vcs_color = ($h && $h->{type} eq 'modified')
         ? $theme->color('vcs_modified')
         : $theme->color('vcs_deleted');
-    my $vcs_char = Zepto::Chars->get('vcs_expanded');  # Fat block for expanded lines
-    $output .= $gutter_bg . $vcs_color . $vcs_char;
-    # Blank padding for the rest of the gutter
-    $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+    if ($entry->{wrap_index} && $entry->{wrap_index} > 0) {
+        # Wrap continuation: extend diff gutter background but no VCS indicator
+        $output .= $gutter_bg . $vcs_color . Zepto::Chars->get('vcs_expanded');
+        $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+    } else {
+        my $vcs_char = Zepto::Chars->get('vcs_expanded');  # Fat block for expanded lines
+        $output .= $gutter_bg . $vcs_color . $vcs_char;
+        # Blank padding for the rest of the gutter
+        $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+    }
 
     # Line content from base
     my $line_bg = $theme->color('diff_old_bg');
@@ -2303,18 +2365,49 @@ sub _render_old_line_row {
         };
     }
 
-    # Apply horizontal scroll
-    my $scroll_col = $view->scroll_col();
+    # Apply horizontal scroll or wrap segment slicing
+    my $scroll_col;
+    my $segment_end;
+    if (defined $entry->{vis_start}) {
+        # Word-wrapped old line: slice to the segment's visual range
+        $scroll_col = $entry->{vis_start};
+        $segment_end = $entry->{vis_end};
+    } else {
+        $scroll_col = $view->scroll_col();
+    }
     if ($scroll_col > 0 && $scroll_col < length($expanded_content)) {
         $expanded_content = substr($expanded_content, $scroll_col);
     } elsif ($scroll_col >= length($expanded_content)) {
         $expanded_content = '';
     }
 
-    # Truncate to width (display columns, not character count)
+    # Truncate to segment end or viewport width
+    my $display_limit = defined $segment_end ? ($segment_end - $scroll_col) : $width;
+    # For wrap continuations, add indent prefix
+    my $indent_prefix = '';
+    if (defined $entry->{wrap_index} && $entry->{wrap_index} > 0) {
+        my $indent_width = $entry->{indent_width} // 0;
+        my $wrap_char = Zepto::Chars->get('wrap_indicator');
+        if ($indent_width > 1) {
+            $indent_prefix = (' ' x ($indent_width - 1)) . $wrap_char;
+        } elsif ($indent_width > 0) {
+            $indent_prefix = $wrap_char;
+        } else {
+            $indent_prefix = $wrap_char;
+        }
+        $display_limit -= length($indent_prefix);
+        $display_limit = 0 if $display_limit < 0;
+    }
+
     my $old_content_display_width = _display_width($expanded_content);
-    if ($old_content_display_width > $width) {
-        ($expanded_content, $old_content_display_width) = _truncate_to_display_width($expanded_content, $width);
+    if ($old_content_display_width > $display_limit) {
+        ($expanded_content, $old_content_display_width) = _truncate_to_display_width($expanded_content, $display_limit);
+    }
+
+    # Prepend indent prefix for wrap continuations
+    if (length($indent_prefix) > 0) {
+        $expanded_content = $indent_prefix . $expanded_content;
+        $old_content_display_width += length($indent_prefix);
     }
 
     # Render character by character with syntax highlighting on red background

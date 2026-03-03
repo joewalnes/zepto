@@ -93,8 +93,10 @@ When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls it
 
 **Fix:** Changed editor mouse scroll from 3 lines per event to 1 line per event, matching the file tree's behavior.
 
-### P3: Diff view does not preserve line wrap
+### ~~P3: Diff view does not preserve line wrap~~ FIXED
 If word wrap enabled, and diffing a hunk with long line, the word wrap is disabled in the diff, which is jarring. Preserve word wrap settings.
+
+**Fix:** Three changes: (1) Removed the conditional in Editor.pm that disabled WrapMap when diff hunks were expanded — word wrap now stays active in diff view. (2) Added a combined WrapMap+LineMap entry-building path in Renderer.pm: when both are active, LineMap provides the entry ordering (doc lines + old/base lines from expanded hunks) while WrapMap provides word wrapping for each entry. Old/base lines are wrapped using `wrap_line()` and doc lines use `segments_for_line()`. (3) Updated `_render_old_line_row` to handle wrap segments — continuation rows get indent prefix with `↪` indicator, and content is sliced to the segment's visual range instead of the full viewport width. Gutter markers extend across all wrap continuation rows of old lines.
 
 ### ~~P2: Find/replace pills should be clickable~~ FIXED
 Regex, case sensitivie, ok, cancel: mouse clicks should activate.

@@ -3491,11 +3491,7 @@ sub render {
     # Build/rebuild WrapMap for word wrap mode
     my $word_wrap_active = $self->_effective_word_wrap();
     if ($word_wrap_active) {
-        my $lm = $self->active_view()->line_map();
-        if ($lm && $lm->has_expanded_hunks()) {
-            # Disable wrap while diff hunks are expanded
-            $self->active_view()->set_wrap_map(undef);
-        } else {
+        {
             # Compute actual text content width (tree has priority over minimap)
             my $tree_width = 0;
             if ($self->{file_tree} && $self->{prefs}->show_tree() && $self->{file_tree}->panel_width() > 0) {
