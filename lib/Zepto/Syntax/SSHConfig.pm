@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 my $KEYWORDS = qr/\b(?:
     Host | Match | HostName | User | Port | IdentityFile | IdentitiesOnly |
     ProxyCommand | ProxyJump | ForwardAgent | ForwardX11 | ForwardX11Trusted |

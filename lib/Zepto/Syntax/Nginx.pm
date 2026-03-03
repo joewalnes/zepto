@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 my $BLOCKS = qr/\b(?:
     http | server | location | upstream | events | stream | mail |
     map | geo | split_clients | types | if | limit_except

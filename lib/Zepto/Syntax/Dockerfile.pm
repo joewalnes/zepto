@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 my $INSTRUCTIONS = qr/^(?:
     FROM | AS | MAINTAINER | RUN | CMD | LABEL | EXPOSE | ENV | ADD | COPY |
     ENTRYPOINT | VOLUME | USER | WORKDIR | ARG | ONBUILD | STOPSIGNAL |

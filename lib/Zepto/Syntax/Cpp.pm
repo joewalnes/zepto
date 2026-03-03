@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 # C++ keywords (includes C keywords plus C++ specific)
 my $KEYWORDS = qr/\b(?:
     alignas | alignof | and | and_eq | asm | auto | bitand | bitor |

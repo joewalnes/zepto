@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 use constant STATE_MULTI_STRING => 10;  # '' multi-line string
 
 my $KEYWORDS = qr/\b(?:

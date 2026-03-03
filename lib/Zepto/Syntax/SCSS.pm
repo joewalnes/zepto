@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 my $AT_RULES = qr/\@(?:
     import | use | forward | mixin | include | extend | function | return |
     if | else | each | for | while | debug | warn | error |

@@ -1687,4 +1687,133 @@ subtest 'Recent files - palette items' => sub {
     is($cmd->{method}, 'cmd_recent_files', 'Correct method');
 };
 
+# ============================================================================
+# Toggle Comment Tests
+# ============================================================================
+
+subtest 'Location history: go back/forward' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("line one\nline two\nline three\nline four\nline five\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    # Start at line 0
+    my $view = $editor->active_view();
+    is($view->cursor_line(), 0, 'Start at line 0');
+
+    # Record location and jump to line 3
+    $editor->_record_location();
+    $view->set_cursor(3, 0, 0);
+    is($view->cursor_line(), 3, 'Jumped to line 3');
+
+    # Record location and jump to line 1
+    $editor->_record_location();
+    $view->set_cursor(1, 0, 0);
+    is($view->cursor_line(), 1, 'Jumped to line 1');
+
+    # Go back — should return to line 3
+    $editor->cmd_go_back();
+    is($view->cursor_line(), 3, 'Go back returns to line 3');
+
+    # Go back again — should return to line 0
+    $editor->cmd_go_back();
+    is($view->cursor_line(), 0, 'Go back again returns to line 0');
+
+    # Go forward — should return to line 3
+    $editor->cmd_go_forward();
+    is($view->cursor_line(), 3, 'Go forward returns to line 3');
+
+    # Go forward — should return to line 1
+    $editor->cmd_go_forward();
+    is($view->cursor_line(), 1, 'Go forward returns to line 1');
+
+    # No more forward entries
+    $editor->cmd_go_forward();
+    is($view->cursor_line(), 1, 'No more forward — stays at line 1');
+};
+
+subtest 'Toggle comment: line prefix comments (Perl)' => sub {
+    my $term = mock_terminal();
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.pl');
+    print $fh "my \$x = 1;\nmy \$y = 2;\n";
+    close $fh;
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    # Trigger highlighter to detect language
+    $editor->active_highlighter()->set_file($filename);
+
+    # Comment single line
+    $editor->active_view()->set_cursor(0, 0, 0);
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), '# my $x = 1;', 'Perl line commented with #');
+
+    # Uncomment
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), 'my $x = 1;', 'Perl line uncommented');
+};
+
+subtest 'Toggle comment: HTML block comments' => sub {
+    my $term = mock_terminal();
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.html');
+    print $fh "<div>hello</div>\n<p>world</p>\n";
+    close $fh;
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    $editor->active_highlighter()->set_file($filename);
+
+    # Comment HTML line — should use <!-- -->
+    $editor->active_view()->set_cursor(0, 0, 0);
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), '<!-- <div>hello</div> -->', 'HTML commented with <!-- -->');
+
+    # Uncomment
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), '<div>hello</div>', 'HTML uncommented');
+};
+
+subtest 'Toggle comment: CSS block comments' => sub {
+    my $term = mock_terminal();
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.css');
+    print $fh "body { color: red; }\n";
+    close $fh;
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    $editor->active_highlighter()->set_file($filename);
+
+    # Comment CSS line — should use /* */
+    $editor->active_view()->set_cursor(0, 0, 0);
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), '/* body { color: red; } */', 'CSS commented with /* */');
+
+    # Uncomment
+    $editor->cmd_toggle_comment();
+    is($editor->active_doc()->get_line_content(0), 'body { color: red; }', 'CSS uncommented');
+};
+
+subtest 'Toggle comment: HTML context-aware (script block uses //)' => sub {
+    my $term = mock_terminal();
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.html');
+    print $fh "<html>\n<script>\nvar x = 1;\n</script>\n</html>\n";
+    close $fh;
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    $editor->active_highlighter()->set_file($filename);
+
+    # Force tokenize lines 0-2 to build up line states
+    my $doc = $editor->active_doc();
+    my $hl = $editor->active_highlighter();
+    for my $i (0..2) {
+        $hl->tokenize_line($doc->get_line_content($i), $i);
+    }
+
+    # Line 2 ("var x = 1;") is inside <script> — should use // comments
+    $editor->active_view()->set_cursor(2, 0, 0);
+    $editor->cmd_toggle_comment();
+    is($doc->get_line_content(2), '// var x = 1;', 'JS inside HTML commented with //');
+
+    # Uncomment
+    $editor->cmd_toggle_comment();
+    is($doc->get_line_content(2), 'var x = 1;', 'JS inside HTML uncommented');
+};
+
 done_testing();

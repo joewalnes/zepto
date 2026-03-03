@@ -18,6 +18,21 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+# Context-aware commenting: JS uses //, CSS uses /* */, HTML uses <!-- -->
+sub comment_style {
+    my ($self, $state) = @_;
+    $state //= 0;
+    if ($state >= 30 && $state < 40) {
+        # Inside <script> — JavaScript line comments
+        return { prefix => '//' };
+    } elsif ($state >= 40) {
+        # Inside <style> — CSS block comments
+        return { prefix => '/*', suffix => '*/' };
+    }
+    # Normal HTML — block comments
+    return { prefix => '<!--', suffix => '-->' };
+}
+
 # Zepto::Syntax::CSS and Zepto::Syntax::TypeScript are used for embedded
 # highlighting. They're not loaded here because in the single-file bundle
 # all packages are already available. They're instantiated lazily below.

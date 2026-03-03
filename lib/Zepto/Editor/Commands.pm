@@ -247,6 +247,9 @@ sub cmd_recent_files {
 sub _load_file {
     my ($self, $path) = @_;
 
+    # Record location before switching files
+    $self->_record_location();
+
     # Track in recent files
     $self->_track_recent_file($path);
 
@@ -515,6 +518,7 @@ sub cmd_find_next {
     my ($self) = @_;
 
     if ($self->{search_term}) {
+        $self->_record_location();
         # Enter find mode and navigate to next match
         $self->enter_find_mode();
         $self->_find_navigate(1);
@@ -528,6 +532,7 @@ sub cmd_find_prev {
     my ($self) = @_;
 
     if ($self->{search_term}) {
+        $self->_record_location();
         # Enter find mode and navigate to prev match
         $self->enter_find_mode();
         $self->_find_navigate(-1);
@@ -664,6 +669,7 @@ sub cmd_goto_line {
             my $max_col = $self->active_doc()->line_length($line);
             $col = $max_col if $col > $max_col;
 
+            $self->_record_location();
             $self->active_view()->set_cursor($line, $col);
         },
     );
@@ -680,12 +686,7 @@ sub cmd_toggle_comment {
     my $view = $self->active_view();
     my $hl   = $self->active_highlighter();
 
-    # Get comment prefix from the language grammar
-    my $prefix;
-    if ($hl && $hl->{grammar}) {
-        $prefix = $hl->{grammar}->line_comment_prefix();
-    }
-    return unless defined $prefix;  # No comment syntax for this language
+    return unless $hl && $hl->{grammar};
 
     # Determine line range
     my ($start_line, $end_line);
@@ -700,16 +701,32 @@ sub cmd_toggle_comment {
         $end_line   = $start_line;
     }
 
-    # Check if ALL lines in range are commented (to decide: uncomment or comment)
+    # Get context-aware comment style (uses line state for HTML/embedded langs)
+    my $line_state = $hl->line_start_state($start_line);
+    my $style = $hl->{grammar}->comment_style($line_state);
+    return unless defined $style;  # No comment syntax for this language/context
+
+    my $prefix = $style->{prefix};
+    my $suffix = $style->{suffix};  # undef for line-prefix comments
+
+    # Check if ALL non-blank lines in range are commented
     my $all_commented = 1;
     my $prefix_re = quotemeta($prefix);
+    my $suffix_re = defined $suffix ? quotemeta($suffix) : '';
     for my $ln ($start_line .. $end_line) {
         my $content = $doc->get_line_content($ln);
-        # Skip blank lines when checking (they don't affect the decision)
-        next if $content =~ /^\s*$/;
-        unless ($content =~ /^\s*$prefix_re/) {
-            $all_commented = 0;
-            last;
+        next if $content =~ /^\s*$/;  # skip blank lines
+        if (defined $suffix) {
+            # Block comment: must have both prefix and suffix
+            unless ($content =~ /^\s*$prefix_re/ && $content =~ /$suffix_re\s*$/) {
+                $all_commented = 0;
+                last;
+            }
+        } else {
+            unless ($content =~ /^\s*$prefix_re/) {
+                $all_commented = 0;
+                last;
+            }
         }
     }
 
@@ -718,7 +735,7 @@ sub cmd_toggle_comment {
     if (!$all_commented) {
         for my $ln ($start_line .. $end_line) {
             my $content = $doc->get_line_content($ln);
-            next if $content =~ /^\s*$/;  # skip blank
+            next if $content =~ /^\s*$/;
             if ($content =~ /^(\s*)/) {
                 my $indent_len = length($1);
                 $min_indent = $indent_len if !defined($min_indent) || $indent_len < $min_indent;
@@ -733,18 +750,43 @@ sub cmd_toggle_comment {
         my $line_start = $doc->line_start_offset($ln);
 
         if ($all_commented) {
-            # Uncomment: remove first occurrence of prefix (and optional trailing space)
-            if ($content =~ /^(\s*)$prefix_re ?/) {
-                my $indent_len = length($1);
-                my $match_len = length($&) - $indent_len;
-                my $replace_start = $line_start + $indent_len;
-                $doc->replace($replace_start, $replace_start + $match_len, '');
+            if (defined $suffix) {
+                # Uncomment block: remove suffix first (higher offset), then prefix
+                if ($content =~ / ?$suffix_re(\s*)$/) {
+                    my $trail_len = length($1);
+                    my $match_start = $-[0];
+                    my $match_len = length($&) - $trail_len;
+                    $doc->replace($line_start + $match_start, $line_start + $match_start + $match_len, '');
+                }
+                # Re-read content after suffix removal for prefix removal
+                $content = $doc->get_line_content($ln);
+                if ($content =~ /^(\s*)$prefix_re ?/) {
+                    my $indent_len = length($1);
+                    my $match_len = length($&) - $indent_len;
+                    $doc->replace($line_start + $indent_len, $line_start + $indent_len + $match_len, '');
+                }
+            } else {
+                # Uncomment line-prefix: remove prefix and optional trailing space
+                if ($content =~ /^(\s*)$prefix_re ?/) {
+                    my $indent_len = length($1);
+                    my $match_len = length($&) - $indent_len;
+                    my $replace_start = $line_start + $indent_len;
+                    $doc->replace($replace_start, $replace_start + $match_len, '');
+                }
             }
         } else {
-            # Comment: insert prefix at min_indent position
             next if $content =~ /^\s*$/;  # skip blank lines
-            my $insert_pos = $line_start + $min_indent;
-            $doc->replace($insert_pos, $insert_pos, "$prefix ");
+            if (defined $suffix) {
+                # Comment block: insert suffix at end first, then prefix at indent
+                my $line_end = $line_start + length($content);
+                $doc->replace($line_end, $line_end, " $suffix");
+                my $insert_pos = $line_start + $min_indent;
+                $doc->replace($insert_pos, $insert_pos, "$prefix ");
+            } else {
+                # Comment line-prefix: insert prefix at min_indent position
+                my $insert_pos = $line_start + $min_indent;
+                $doc->replace($insert_pos, $insert_pos, "$prefix ");
+            }
         }
     }
 

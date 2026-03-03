@@ -294,6 +294,26 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_prev_change',
     },
+    {
+        id       => 'go_back',
+        label    => 'Go Back',
+        icon     => 'clock',
+        shortcut => SYM_ALT . '-',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_go_back',
+    },
+    {
+        id       => 'go_forward',
+        label    => 'Go Forward',
+        icon     => 'clock',
+        shortcut => SYM_ALT . '=',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_go_forward',
+    },
 
     # === VIEW section ===
     {

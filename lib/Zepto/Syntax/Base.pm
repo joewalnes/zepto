@@ -259,61 +259,28 @@ sub _token {
 }
 
 # =============================================================================
-# Line Comment Prefix
+# Comment Style
 # =============================================================================
-# Returns the line comment prefix for this language (e.g. "//", "#", "--").
-# Used by the toggle-comment command. Returns undef if the language has no
-# single-line comment syntax.
-
-my %COMMENT_PREFIX = (
-    'Zepto::Syntax::C'               => '//',
-    'Zepto::Syntax::Clojure'         => ';;',
-    'Zepto::Syntax::CMake'           => '#',
-    'Zepto::Syntax::Cpp'             => '//',
-    'Zepto::Syntax::Crontab'         => '#',
-    'Zepto::Syntax::CSharp'          => '//',
-    'Zepto::Syntax::CSS'             => '//',
-    'Zepto::Syntax::Dockerfile'      => '#',
-    'Zepto::Syntax::Fish'            => '#',
-    'Zepto::Syntax::Go'              => '//',
-    'Zepto::Syntax::GraphQL'         => '#',
-    'Zepto::Syntax::Groovy'          => '//',
-    'Zepto::Syntax::INI'             => ';',
-    'Zepto::Syntax::Java'            => '//',
-    'Zepto::Syntax::JavaScript'      => '//',
-    'Zepto::Syntax::Kotlin'          => '//',
-    'Zepto::Syntax::LaTeX'           => '%',
-    'Zepto::Syntax::Lua'             => '--',
-    'Zepto::Syntax::Makefile'        => '#',
-    'Zepto::Syntax::Nginx'           => '#',
-    'Zepto::Syntax::Nix'             => '#',
-    'Zepto::Syntax::ObjectiveC'      => '//',
-    'Zepto::Syntax::Perl'            => '#',
-    'Zepto::Syntax::PHP'             => '//',
-    'Zepto::Syntax::Properties'      => '#',
-    'Zepto::Syntax::Protobuf'        => '//',
-    'Zepto::Syntax::Python'          => '#',
-    'Zepto::Syntax::R'               => '#',
-    'Zepto::Syntax::Ruby'            => '#',
-    'Zepto::Syntax::Rust'            => '//',
-    'Zepto::Syntax::Scala'           => '//',
-    'Zepto::Syntax::SCSS'            => '//',
-    'Zepto::Syntax::Shell'           => '#',
-    'Zepto::Syntax::SQL'             => '--',
-    'Zepto::Syntax::SSHConfig'       => '#',
-    'Zepto::Syntax::Swift'           => '//',
-    'Zepto::Syntax::Systemd'         => '#',
-    'Zepto::Syntax::Terraform'       => '#',
-    'Zepto::Syntax::Thrift'          => '//',
-    'Zepto::Syntax::TOML'            => '#',
-    'Zepto::Syntax::TypeScript'      => '//',
-    'Zepto::Syntax::YAML'            => '#',
-    'Zepto::Syntax::Zig'             => '//',
-);
+# Returns the comment style for this language, used by toggle-comment.
+#
+# line_comment_prefix(): Override in subclass to return "#", "//", etc.
+#   Returns undef by default (no comment support).
+#
+# comment_style($state): Returns a hashref { prefix => "...", suffix => "..." }
+#   or undef. The $state parameter enables context-aware commenting for
+#   languages with embedded sub-languages (e.g. HTML with <script>/<style>).
+#   Suffix is optional — omitted for line-prefix comments like # and //.
 
 sub line_comment_prefix {
     my ($self) = @_;
-    return $COMMENT_PREFIX{ref($self)};
+    return undef;
+}
+
+sub comment_style {
+    my ($self, $state) = @_;
+    my $prefix = $self->line_comment_prefix();
+    return undef unless defined $prefix;
+    return { prefix => $prefix };
 }
 
 # =============================================================================

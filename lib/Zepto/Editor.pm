@@ -136,6 +136,10 @@ sub new {
 
         # Recent files tracking
         _recent_files        => [],  # Ordered list of recent file paths (most recent first)
+
+        # Location history (back/forward navigation)
+        _loc_back_stack      => [],  # Stack of { file => path, line => N, col => N }
+        _loc_forward_stack   => [],  # Forward stack for redo
     }, $class;
 
     # Initialize theme
@@ -244,6 +248,113 @@ sub _track_recent_file {
 
     $self->{_recent_files} = \@files;
     $self->_save_recent_files();
+}
+
+# =============================================================================
+# Location History (back/forward navigation)
+# =============================================================================
+
+use constant LOC_HISTORY_MAX => 100;
+
+# Record current location before a major jump
+sub _record_location {
+    my ($self) = @_;
+    my $view = $self->active_view();
+    return unless $view;
+
+    my $loc = {
+        file => $self->active_file_path() // '',
+        line => $view->cursor_line(),
+        col  => $view->cursor_col(),
+    };
+
+    # Don't record if same as top of back stack (same file and line)
+    my $stack = $self->{_loc_back_stack};
+    if (@$stack) {
+        my $top = $stack->[-1];
+        return if $top->{file} eq $loc->{file} && $top->{line} == $loc->{line};
+    }
+
+    push @$stack, $loc;
+    # Trim to max
+    shift @$stack if @$stack > LOC_HISTORY_MAX;
+
+    # Clear forward stack — new navigation branch
+    $self->{_loc_forward_stack} = [];
+}
+
+sub cmd_go_back {
+    my ($self) = @_;
+    my $stack = $self->{_loc_back_stack};
+    return unless @$stack;
+
+    # Push current location to forward stack
+    my $view = $self->active_view();
+    if ($view) {
+        push @{$self->{_loc_forward_stack}}, {
+            file => $self->active_file_path() // '',
+            line => $view->cursor_line(),
+            col  => $view->cursor_col(),
+        };
+    }
+
+    my $loc = pop @$stack;
+    $self->_jump_to_location($loc);
+}
+
+sub cmd_go_forward {
+    my ($self) = @_;
+    my $fwd = $self->{_loc_forward_stack};
+    return unless @$fwd;
+
+    # Push current location to back stack
+    my $view = $self->active_view();
+    if ($view) {
+        push @{$self->{_loc_back_stack}}, {
+            file => $self->active_file_path() // '',
+            line => $view->cursor_line(),
+            col  => $view->cursor_col(),
+        };
+    }
+
+    my $loc = pop @$fwd;
+    $self->_jump_to_location($loc);
+}
+
+sub _jump_to_location {
+    my ($self, $loc) = @_;
+
+    # Switch file if needed
+    my $current_file = $self->active_file_path() // '';
+    if ($loc->{file} ne $current_file && $loc->{file} ne '') {
+        # Try to find open tab with this file
+        my $tabs = $self->{tab_manager}->{tabs};
+        my $found = 0;
+        for my $i (0 .. $#$tabs) {
+            if (($tabs->[$i]{file_path} // '') eq $loc->{file}) {
+                $self->{tab_manager}->switch_to($i);
+                $found = 1;
+                last;
+            }
+        }
+        # If not found among open tabs, try to open the file
+        unless ($found) {
+            if (-f $loc->{file}) {
+                $self->_load_file($loc->{file});
+            } else {
+                return;  # File no longer exists, skip
+            }
+        }
+    }
+
+    # Set cursor position
+    my $view = $self->active_view();
+    return unless $view;
+    my $doc = $self->active_doc();
+    my $max_line = $doc->line_count() - 1;
+    my $line = $loc->{line};
+    $line = $max_line if $line > $max_line;
+    $view->set_cursor($line, $loc->{col}, 0);
 }
 
 sub _create_document_state {
@@ -805,6 +916,10 @@ sub handle_alt_char {
     # Tab navigation (Alt+, prev, Alt+. next)
     elsif ($char eq ',') { $self->cmd_prev_tab(); }
     elsif ($char eq '.') { $self->cmd_next_tab(); }
+
+    # Location history (Alt+- back, Alt+= forward)
+    elsif ($char eq '-') { $self->cmd_go_back(); }
+    elsif ($char eq '=') { $self->cmd_go_forward(); }
 
     # Tab switching (Alt+1 through Alt+9)
     elsif ($char ge '1' && $char le '9') {
@@ -2978,6 +3093,8 @@ sub _navigate_to_hunk {
     my $doc = $self->active_doc();
     my $view = $self->active_view();
     my $hunk_idx = $anchor->{hunk_idx};
+
+    $self->_record_location();
 
     # Auto-expand the hunk
     $self->_ensure_line_map();

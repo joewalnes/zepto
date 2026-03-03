@@ -20,9 +20,11 @@ If navigating file tree, and user clicks in main editor area, unfocus tree and r
 
 **Fix:** Added tree unfocus check at the beginning of the "Click in text area" section of `handle_mouse_event`. When the file tree is focused and the user clicks anywhere in the document area (gutter or text), `_tree_unfocus()` is called to cancel any preview, restore the original tab, and unfocus the tree. The view reference is also refreshed after unfocus in case the active tab changed.
 
-### P3: Toggle comment enhancements
+### ~~P3: Toggle comment enhancements~~ FIXED
 Support HTML which is both prefix and suffix. <!-- xxx -->. In HTML be aware of nested script or style and switch commenting char appropriately. Move the comment
 definitions outside of Base.pm into their respective syntax files.
+
+**Fix:** Three changes: (1) Moved comment prefix definitions from the centralized `%COMMENT_PREFIX` hash in Base.pm to individual `sub line_comment_prefix` overrides in each of the 42 syntax files. Base.pm now returns `undef` by default. (2) Added `comment_style($state)` API to Base.pm that returns `{ prefix => ..., suffix => ... }` — suffix is optional for line-prefix comments. HTML.pm overrides this for context-aware commenting: normal HTML uses `<!-- -->`, `<script>` blocks use `//` (JavaScript), `<style>` blocks use `/* */` (CSS). CSS.pm overrides to use `/* */` block comments (was incorrectly mapped to `//`). (3) Updated `cmd_toggle_comment` in Commands.pm to handle prefix+suffix block comments: inserts/removes suffix at line end and prefix at indentation, with correct offset handling (processes end-to-start).
 
 ### ~~P2: Scroll wheel cannot scroll more than a page~~ FIXED
 When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
@@ -34,8 +36,10 @@ Pressing home once on line should jump to first non-whitespace char (e.g. where 
 
 **Fix:** Smart Home cycles three states: first-nonws → col 0 → document start. Smart End cycles: line end → document end. Both work in normal and word-wrap modes. Also fixed `do_enter()` to set cursor position directly instead of using `move_to_line_start()` (which now has smart cycling that would send the cursor to doc start on empty new lines).
 
-### P3: Move forward/back
+### ~~P3: Move forward/back~~ FIXED
 Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.
+
+**Fix:** Added location history with `⌥-` (Go Back) and `⌥=` (Go Forward) shortcuts. Uses dual-stack model: back stack and forward stack. Location is recorded automatically before major jumps: Go to Line, Find Next/Prev, Next/Prev Change, and file opens. Each entry stores file path + line + col. Back navigation pushes current position to forward stack and pops from back stack. Forward does the reverse. New jumps clear the forward stack (new branch of history). Cross-file navigation switches tabs or reopens files as needed. History limited to 100 entries. Both commands registered in command palette under NAVIGATE section.
 
 ### ~~P2: Recent files~~ FIXED
 Like ^O open, but list of recently visited files. Sorted by most recent first.
@@ -138,8 +142,10 @@ Highlighted row in command palette extends too far on right, overlapping border.
 
 **Fix:** Reset background to `$bg` before rendering the right border `$box_v` on each item row. The selection highlight (`$sel_bg`) was bleeding into the border character because only `$border_fg` (foreground) was set.
 
-### P3: Nerd icon overhaul
+### ~~P3: Nerd icon overhaul~~ FIXED
 Re-evaluate current icon selection. Many duplicates. Pick familiar feeling icons for actions.
+
+**Fix:** Audited all 52 icon definitions in Chars.pm. Found 3 duplicate codepoints: (1) NF_CLOSE (\x{f00d}) duplicated NF_TIMES — removed NF_CLOSE (was unused in %CHARS mapping). (2) NF_WRAP (\x{f0ea}) duplicated NF_PASTE — changed NF_WRAP to \x{f036} (fa-align-left, text lines icon). (3) NF_PALETTE (\x{f0c9}) duplicates NF_MENU — left as-is since both semantically represent the same hamburger menu concept. No other icon issues found; existing selections are appropriate for their actions.
 
 ### ~~P2: Fuzzy find text overflow~~ FIXED
 Open fuzzy find with ^O and type long string - it overflows out of tree into main doc. Ensure its constrained to text box.

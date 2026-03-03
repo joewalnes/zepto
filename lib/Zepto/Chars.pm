@@ -69,7 +69,7 @@ use constant {
     NF_JAVA             => "\x{e738}",  #  Java
     NF_JSON             => "\x{e60b}",  #  JSON
     NF_YAML             => "\x{e6a8}",  #  YAML
-    NF_CLOSE            => "\x{f00d}",  #  (same as NF_TIMES)
+    # NF_CLOSE removed — was duplicate of NF_TIMES (\x{f00d}), use NF_TIMES instead
 };
 
 # Nerd Font icons for status bar and command palette
@@ -79,7 +79,7 @@ use constant {
     NF_CUT              => "\x{f0c4}",  #  scissors
     NF_COPY             => "\x{f0c5}",  #  copy
     NF_PASTE            => "\x{f0ea}",  #  paste
-    NF_WRAP             => "\x{f0ea}",  #  wrap (reusing paste icon - visually similar to wrap)
+    NF_WRAP             => "\x{f036}",  #  wrap (fa-align-left — text lines)
     NF_COLUMNS          => "\x{f0db}",  #  columns
     NF_DIFF             => "\x{f121}",  #  code/diff
     NF_GOTO             => "\x{f0dc}",  #  sort/goto

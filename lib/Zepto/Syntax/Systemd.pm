@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 my $SECTIONS = qr/^\[(?:
     Unit | Service | Timer | Socket | Mount | Automount | Swap |
     Path | Slice | Scope | Install | Network | Address | Route |

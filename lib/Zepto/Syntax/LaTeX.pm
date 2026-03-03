@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '%' }
+
 use constant STATE_MATH_DISPLAY => 10;  # $$ ... $$
 use constant STATE_VERBATIM     => 11;  # \begin{verbatim} ... \end{verbatim}
 

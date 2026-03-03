@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 # Custom state for bracket comment/string
 use constant STATE_BRACKET_COMMENT => 10;
 use constant STATE_BRACKET_STRING  => 11;

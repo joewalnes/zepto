@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 # Thrift keywords
 my $KEYWORDS = qr/\b(?:
     namespace | include | cpp_include | php_namespace | py_module |

@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 my $KEYWORDS = qr/\b(?:
     abstract | as | assert | boolean | break | byte | case | catch |
     char | class | const | continue | def | default | do | double |

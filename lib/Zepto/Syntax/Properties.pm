@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 # Custom state for line continuation
 use constant STATE_CONTINUATION => 10;
 

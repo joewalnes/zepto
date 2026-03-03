@@ -559,6 +559,18 @@ sub tokenize_line {
     return ($tokens, $end_state);
 }
 
+# Get the start state for a given line (end state of previous line)
+# Used by toggle-comment for context-aware commenting in HTML
+sub line_start_state {
+    my ($self, $line_num) = @_;
+    return $self->{grammar} ? $self->{grammar}->initial_state() : 0 if !$line_num || $line_num <= 0;
+    my $prev_state = $self->{line_states}[$line_num - 1];
+    return $prev_state if defined $prev_state;
+    # State not cached — rebuild up to this line
+    $self->_rebuild_states_to($line_num);
+    return $self->{line_states}[$line_num - 1] // ($self->{grammar} ? $self->{grammar}->initial_state() : 0);
+}
+
 # Invalidate cached states from a line onwards
 # Call this after editing a line
 sub invalidate_from {

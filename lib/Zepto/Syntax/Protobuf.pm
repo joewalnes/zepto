@@ -8,6 +8,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 my $KEYWORDS = qr/\b(?:
     syntax | import | weak | public | package | option | message | enum |
     service | rpc | returns | stream | oneof | map | extensions | extend |

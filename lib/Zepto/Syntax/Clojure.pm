@@ -14,6 +14,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { ';;' }
+
 # Clojure special forms and keywords
 my $SPECIAL_FORMS = qr/\b(?:
     def | defn | defn- | defmacro | defmethod | defmulti | defonce |

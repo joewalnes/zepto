@@ -14,6 +14,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 # JavaScript keywords (also valid in TypeScript)
 my $JS_KEYWORDS = qr/\b(?:
     async | await | break | case | catch | class | const | continue |

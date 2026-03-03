@@ -15,6 +15,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 # Make built-in functions
 my $FUNCTIONS = qr/\$\((?:
     subst | patsubst | strip | findstring | filter | filter-out |

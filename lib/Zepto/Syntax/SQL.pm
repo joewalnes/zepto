@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '--' }
+
 # Standard SQL keywords (all dialects combined)
 my $KEYWORDS = qr/\b(?:
     ADD | ALL | ALTER | AND | ANY | AS | ASC | AUTHORIZATION |

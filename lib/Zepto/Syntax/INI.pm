@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { ';' }
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

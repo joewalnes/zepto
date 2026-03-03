@@ -12,6 +12,8 @@ use parent 'Zepto::Syntax::TypeScript';
 use strict;
 use warnings;
 
+sub line_comment_prefix { '//' }
+
 # All tokenization is handled by TypeScript.pm
 # No additional code needed - inheritance does the work
 

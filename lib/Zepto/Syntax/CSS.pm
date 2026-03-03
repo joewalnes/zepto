@@ -8,6 +8,9 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+# CSS only has block comments /* ... */
+sub comment_style { return { prefix => '/*', suffix => '*/' }; }
+
 # CSS at-rules
 my $AT_RULES = qr/\@(import|media|keyframes|font-face|supports|charset|namespace|page|viewport|counter-style|layer|container|property|scope)\b/;
 

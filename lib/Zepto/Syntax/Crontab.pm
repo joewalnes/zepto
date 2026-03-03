@@ -9,6 +9,8 @@ use Zepto::Syntax::Base;
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 my $SPECIAL_SCHEDULES = qr/\@(?:
     reboot | yearly | annually | monthly | weekly | daily | midnight | hourly
 )\b/x;

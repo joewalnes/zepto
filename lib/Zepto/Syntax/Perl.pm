@@ -15,6 +15,8 @@ use Zepto::Syntax::Base;  # Import TOKEN_*, STATE_*, and _token()
 use strict;
 use warnings;
 
+sub line_comment_prefix { '#' }
+
 # Keywords (control flow, declarations)
 my $KEYWORDS = qr/\b(?:
     sub | my | our | local | state |
