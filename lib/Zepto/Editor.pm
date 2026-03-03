@@ -140,6 +140,10 @@ sub new {
         # Location history (back/forward navigation)
         _loc_back_stack      => [],  # Stack of { file => path, line => N, col => N }
         _loc_forward_stack   => [],  # Forward stack for redo
+
+        # Performance profiling
+        _perf      => {},   # Subsystem flags set during each frame
+        _perf_log  => [],   # Top 20 slowest frames (sorted descending by total_ms)
     }, $class;
 
     # Initialize theme
@@ -510,6 +514,10 @@ sub run {
 
             my $needs_render = 0;
 
+            # Reset per-frame perf flags
+            my $frame_start = time();
+            $self->{_perf} = {};
+
             # Messages persist until replaced by a newer message (per UI guidelines).
             # Clear on any user input so normal status bar returns after next action.
             if ($self->{message} && length $input) {
@@ -528,6 +536,8 @@ sub run {
                     $needs_render = 1;
                 }
             }
+
+            my $event_end = time();
 
             # Continue background search if active
             if ($searching) {
@@ -560,7 +570,14 @@ sub run {
             }
 
             # Only render when needed to preserve cursor blink animation
-            $self->render() if $needs_render;
+            if ($needs_render) {
+                $self->render();
+                my $render_end = time();
+                my $event_ms = ($event_end - $frame_start) * 1000;
+                my $render_ms = ($render_end - $event_end) * 1000;
+                my $total_ms = $event_ms + $render_ms;
+                $self->_record_frame($frame_start, $total_ms, $event_ms, $render_ms, $input);
+            }
         }
         1;
     } or do {
@@ -3006,6 +3023,7 @@ sub _sync_line_map {
         doc_line_count => $doc->line_count(),
         hunks          => $doc->vcs_hunks(),
     );
+    $self->{_perf}{linemap_sync} = 1;
 }
 
 # Build sorted list of hunk anchor lines (first line of each hunk)
@@ -3444,7 +3462,7 @@ sub render {
     $self->update_title();
 
     # Update VCS diff if needed (debounced)
-    $self->active_doc()->update_vcs_diff();
+    $self->active_doc()->update_vcs_diff($self->{_perf});
 
     # Check for external file changes (only in editing state, not during prompts)
     if ($self->{state} eq STATE_EDITING) {
@@ -3515,6 +3533,7 @@ sub render {
                     tab_width => $self->{prefs}->tab_width(),
                 );
                 $self->active_view()->set_wrap_map($wm);
+                $self->{_perf}{wrapmap_rebuild} = 1;
             }
             # WrapMap is invalidated by View::invalidate_wrap_map() when
             # content actually changes (insert, delete, undo, redo, reload).
@@ -3606,6 +3625,7 @@ sub _check_external_file_changes {
     $self->{_last_external_check} //= 0;
     return if ($now - $self->{_last_external_check}) < EXTERNAL_CHECK_INTERVAL_SEC;
     $self->{_last_external_check} = $now;
+    $self->{_perf}{file_stat} = 1;
 
     return unless $doc->check_external_changes();
 
@@ -3666,6 +3686,103 @@ sub _check_external_file_changes {
         my $new_col = $old_col > $max_col ? $max_col : $old_col;
         $view->set_cursor($new_line, $new_col);
         $view->invalidate_wrap_map();
+    }
+}
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+# Open a new untitled tab with the given text content
+sub _open_content_tab {
+    my ($self, $content, $name) = @_;
+    my $doc = Zepto::Document->new(text => $content);
+    my $highlighter = Zepto::Highlighter->new();
+    my ($rows, $cols) = $self->{terminal}->get_size();
+    my $gutter_width = Zepto::Renderer->get_gutter_width($doc->line_count());
+    my $text_width = $cols - $gutter_width;
+    $text_width = Zepto::Renderer::MIN_TEXT_WIDTH if $text_width < Zepto::Renderer::MIN_TEXT_WIDTH;
+
+    my $view = Zepto::View->new(
+        document      => $doc,
+        viewport_rows => $rows - RESERVED_ROWS,
+        viewport_cols => $text_width,
+    );
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+
+    $self->{tab_manager}->add_tab(
+        document      => $doc,
+        view          => $view,
+        find_engine   => $find_engine,
+        highlighter   => $highlighter,
+        file_path     => undef,
+        untitled_name => $name,
+    );
+}
+
+# =============================================================================
+# Performance Profiling
+# =============================================================================
+
+use constant PERF_LOG_MAX_ENTRIES => 20;
+
+sub _record_frame {
+    my ($self, $timestamp, $total_ms, $event_ms, $render_ms, $input) = @_;
+
+    # Classify event type from raw input
+    my $event_type = 'timeout';
+    if (defined $input && length $input) {
+        my $ord = ord(substr($input, 0, 1));
+        if ($ord == 27) {
+            $event_type = length($input) > 1 ? 'alt' : 'escape';
+        } elsif ($ord < 32) {
+            $event_type = 'ctrl';
+        } elsif ($input =~ /^\x1b\[M/ || $input =~ /^\x1b\[</) {
+            $event_type = 'mouse';
+        } else {
+            $event_type = 'char';
+        }
+    }
+
+    # Gather context
+    my $file = '';
+    my $lines = 0;
+    if (my $doc = $self->active_doc()) {
+        $file = $doc->filename() // '';
+        $lines = $doc->line_count();
+    }
+
+    # Active features
+    my @features;
+    push @features, 'wrap' if $self->_effective_word_wrap();
+    push @features, 'tree' if $self->{file_tree} && $self->{prefs}->show_tree();
+    push @features, 'minimap' if $self->{prefs}->show_minimap();
+    my $features_str = join(',', @features) || 'none';
+
+    # Subsystem flags
+    my @subs = sort keys %{$self->{_perf}};
+    my $subsystems_str = join(',', @subs) || 'none';
+
+    my $entry = {
+        timestamp  => $timestamp,
+        total_ms   => $total_ms,
+        event_ms   => $event_ms,
+        render_ms  => $render_ms,
+        state      => uc($self->{state}),
+        event_type => $event_type,
+        file       => $file,
+        lines      => $lines,
+        features   => $features_str,
+        subsystems => $subsystems_str,
+    };
+
+    my $log = $self->{_perf_log};
+    if (@$log < PERF_LOG_MAX_ENTRIES) {
+        push @$log, $entry;
+        @$log = sort { $b->{total_ms} <=> $a->{total_ms} } @$log;
+    } elsif ($total_ms > $log->[-1]{total_ms}) {
+        $log->[-1] = $entry;
+        @$log = sort { $b->{total_ms} <=> $a->{total_ms} } @$log;
     }
 }
 

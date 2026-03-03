@@ -972,4 +972,61 @@ sub _restore_find_state_from_tab {
     $self->{find_replace_preview} = $tab->{find_replace_preview};
 }
 
+# =============================================================================
+# Diagnostics Commands
+# =============================================================================
+
+sub cmd_show_perf_log {
+    my ($self) = @_;
+
+    my $log = $self->{_perf_log};
+    my $content;
+
+    if (!$log || !@$log) {
+        $content = "No frames recorded yet.\n";
+    } else {
+        my @lines;
+        my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time());
+        my $generated = sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+            $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+
+        push @lines, "Zepto Performance Report";
+        push @lines, "========================";
+        push @lines, "Generated: $generated";
+        push @lines, sprintf("Showing: %d slowest frames", scalar @$log);
+        push @lines, "";
+
+        # Header
+        push @lines, sprintf("%-4s %-9s %-9s %-9s %-10s %-8s %-24s %s",
+            '#', 'Time', 'Event', 'Render', 'State', 'Trigger', 'Subsystems', 'File');
+
+        # Entries
+        my $i = 1;
+        for my $entry (@$log) {
+            my $file_display = $entry->{file};
+            $file_display .= " ($entry->{lines} lines)" if $entry->{lines};
+
+            push @lines, sprintf("%-4d %-9s %-9s %-9s %-10s %-8s %-24s %s",
+                $i,
+                sprintf('%.1fms', $entry->{total_ms}),
+                sprintf('%.1fms', $entry->{event_ms}),
+                sprintf('%.1fms', $entry->{render_ms}),
+                $entry->{state},
+                $entry->{event_type},
+                $entry->{subsystems},
+                $file_display,
+            );
+            $i++;
+        }
+
+        push @lines, "";
+        push @lines, "Features active: $log->[0]{features}" if @$log;
+
+        $content = join("\n", @lines) . "\n";
+    }
+
+    # Open as a new untitled tab — reuse _open_content_tab helper
+    $self->_open_content_tab($content, 'Performance Log');
+}
+
 1;

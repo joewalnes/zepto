@@ -547,7 +547,7 @@ sub _compute_vcs_diff {
 # Update VCS diff if needed (debounced)
 # Call this periodically (e.g., on idle or before render)
 sub update_vcs_diff {
-    my ($self) = @_;
+    my ($self, $perf) = @_;
     return unless $self->{_vcs_provider};
 
     # Check if HEAD changed (e.g., commit in another window)
@@ -555,6 +555,7 @@ sub update_vcs_diff {
     my $now = time();
     if ($now - $self->{_vcs_last_head_check} >= VCS_HEAD_CHECK_INTERVAL) {
         $self->{_vcs_last_head_check} = $now;
+        $perf->{vcs_head_check} = 1 if $perf;
         if ($self->{_vcs_provider}->head_changed()) {
             $self->{_vcs_provider}->invalidate_cache($self->{path});
             $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
@@ -568,6 +569,7 @@ sub update_vcs_diff {
     $now = time();
     if ($now - $self->{_vcs_last_diff} >= VCS_DIFF_DEBOUNCE) {
         $self->_compute_vcs_diff();
+        $perf->{vcs_diff} = 1 if $perf;
     }
 }
 

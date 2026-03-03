@@ -1816,4 +1816,130 @@ subtest 'Toggle comment: HTML context-aware (script block uses //)' => sub {
     is($doc->get_line_content(2), 'var x = 1;', 'JS inside HTML uncommented');
 };
 
+# ============================================================================
+# Performance Profiling
+# ============================================================================
+
+subtest '_record_frame populates perf log' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("line 1\nline 2\n");
+    setup_editor_doc($editor, $filename);
+
+    is(scalar @{$editor->{_perf_log}}, 0, 'Perf log starts empty');
+
+    # Record a frame
+    $editor->_record_frame(time(), 50.0, 10.0, 40.0, 'a');
+    is(scalar @{$editor->{_perf_log}}, 1, 'One entry after recording');
+    is($editor->{_perf_log}[0]{event_type}, 'char', 'Char input classified');
+
+    # Record more frames
+    $editor->_record_frame(time(), 30.0, 5.0, 25.0, "\x03");
+    is(scalar @{$editor->{_perf_log}}, 2, 'Two entries');
+    is($editor->{_perf_log}[1]{event_type}, 'ctrl', 'Ctrl input classified');
+
+    # Slowest should be first (sorted descending)
+    ok($editor->{_perf_log}[0]{total_ms} >= $editor->{_perf_log}[1]{total_ms},
+       'Sorted descending by total_ms');
+};
+
+subtest '_record_frame caps at 20 and keeps slowest' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("test\n");
+    setup_editor_doc($editor, $filename);
+
+    # Fill with 20 entries of increasing time
+    for my $i (1..20) {
+        $editor->_record_frame(time(), $i * 1.0, 0.5, $i * 1.0 - 0.5, 'x');
+    }
+    is(scalar @{$editor->{_perf_log}}, 20, 'Capped at 20');
+
+    # Smallest entry should be 1.0ms
+    my $min = $editor->{_perf_log}[-1]{total_ms};
+    ok($min <= 1.0 + 0.001, "Smallest is ~1.0ms (got $min)");
+
+    # Add a frame slower than the fastest (which is 1.0ms) but not slower than 20.0ms
+    $editor->_record_frame(time(), 1.5, 0.5, 1.0, 'y');
+    is(scalar @{$editor->{_perf_log}}, 20, 'Still capped at 20');
+    my $new_min = $editor->{_perf_log}[-1]{total_ms};
+    ok($new_min >= 1.5 - 0.001, "New smallest is >= 1.5ms (got $new_min) — replaced the 1.0ms entry");
+
+    # Add a frame slower than everything
+    $editor->_record_frame(time(), 999.0, 1.0, 998.0, 'z');
+    is($editor->{_perf_log}[0]{total_ms}, 999.0, 'Slowest frame is at position 0');
+
+    # Add a frame faster than the current minimum — should be ignored
+    my $current_min = $editor->{_perf_log}[-1]{total_ms};
+    $editor->_record_frame(time(), 0.1, 0.05, 0.05, 'a');
+    is($editor->{_perf_log}[-1]{total_ms}, $current_min, 'Faster-than-min frame is discarded');
+};
+
+subtest '_record_frame classifies event types' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("test\n");
+    setup_editor_doc($editor, $filename);
+
+    # Timeout (empty input)
+    $editor->_record_frame(time(), 10.0, 5.0, 5.0, '');
+    is($editor->{_perf_log}[-1]{event_type}, 'timeout', 'Empty input = timeout');
+
+    # Char
+    $editor->_record_frame(time(), 11.0, 5.0, 6.0, 'h');
+    is($editor->{_perf_log}[0]{event_type}, 'char', 'Regular char');
+
+    # Ctrl
+    $editor->{_perf_log} = [];
+    $editor->_record_frame(time(), 10.0, 5.0, 5.0, "\x01");
+    is($editor->{_perf_log}[0]{event_type}, 'ctrl', 'Ctrl char');
+
+    # Escape alone
+    $editor->{_perf_log} = [];
+    $editor->_record_frame(time(), 10.0, 5.0, 5.0, "\x1b");
+    is($editor->{_perf_log}[0]{event_type}, 'escape', 'Escape alone');
+
+    # Alt (escape + more)
+    $editor->{_perf_log} = [];
+    $editor->_record_frame(time(), 10.0, 5.0, 5.0, "\x1bx");
+    is($editor->{_perf_log}[0]{event_type}, 'alt', 'Alt combo');
+};
+
+subtest 'cmd_show_perf_log with no frames' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("test\n");
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_show_perf_log();
+
+    # Should have opened a new tab
+    is($editor->{tab_manager}->tab_count(), 2, 'New tab opened');
+    my $doc = $editor->active_doc();
+    like($doc->get_line_content(0), qr/No frames recorded yet/, 'Empty state message');
+};
+
+subtest 'cmd_show_perf_log with frames' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("test\n");
+    setup_editor_doc($editor, $filename);
+
+    # Record a couple of frames
+    $editor->{_perf} = { vcs_diff => 1 };
+    $editor->_record_frame(time(), 72.3, 5.1, 67.2, 'a');
+    $editor->{_perf} = {};
+    $editor->_record_frame(time(), 55.0, 2.0, 53.0, 'b');
+
+    $editor->cmd_show_perf_log();
+
+    my $doc = $editor->active_doc();
+    like($doc->get_line_content(0), qr/Zepto Performance Report/, 'Report header');
+    like($doc->get_line_content(3), qr/Showing: 2 slowest frames/, 'Frame count');
+
+    # Check that the tab is named "Performance Log"
+    my $tab = $editor->active_tab();
+    is($tab->{untitled_name}, 'Performance Log', 'Tab named correctly');
+};
+
 done_testing();

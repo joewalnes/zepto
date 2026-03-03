@@ -382,13 +382,24 @@ my @COMMANDS = (
         priority => 4,
         method   => 'cmd_toggle_theme',
     },
+    # === DIAGNOSTICS section ===
+    {
+        id       => 'show_perf_log',
+        label    => 'Performance Log',
+        icon     => 'clock',
+        shortcut => '',
+        section  => 'DIAGNOSTICS',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_show_perf_log',
+    },
 );
 
 # Build lookup index by id
 my %BY_ID = map { $_->{id} => $_ } @COMMANDS;
 
 # Section ordering for palette display
-my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW');
+my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'DIAGNOSTICS');
 
 # =============================================================================
 # Public API
