@@ -24,10 +24,10 @@ If navigating file tree, and user clicks in main editor area, unfocus tree and r
 Support HTML which is both prefix and suffix. <!-- xxx -->. In HTML be aware of nested script or style and switch commenting char appropriately. Move the comment
 definitions outside of Base.pm into their respective syntax files.
 
-### P2: Scroll wheel cannot scroll more than a page : REPONED (not fixed)
+### ~~P2: Scroll wheel cannot scroll more than a page~~ FIXED
 When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
 
-**Fix:** Added `_explicit_scroll` flag to View. When `scroll_up`/`scroll_down` are called (mouse wheel), the flag is set. `ensure_cursor_visible()` (called every render) checks for this flag and returns early if set, preventing the viewport from snapping back to the cursor. The flag is consumed after one render cycle, so the next user action (typing, clicking) restores normal cursor-following behavior. This allows unlimited scrolling away from the cursor position, matching standard editor behavior.
+**Fix:** The `_explicit_scroll` flag was being consumed (deleted) on a single render cycle, so the viewport snapped back to the cursor as soon as scrolling stopped. Changed the flag to persist across renders until a non-scroll user event occurs. The flag is now cleared at the start of `handle_event()` in Editor.pm — scroll events immediately re-set it via `scroll_up`/`scroll_down`, so it persists during scrolling but clears on any other action (typing, arrow keys, clicking). This allows unlimited scrolling away from the cursor, with the viewport snapping back only when the user takes a non-scroll action.
 
 ### ~~P2: "More" home/end~~ FIXED
 Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
@@ -97,8 +97,10 @@ Regex, case sensitivie, ok, cancel: mouse clicks should activate.
 
 **Fix:** Already implemented — `handle_find_bar_click()` in Editor.pm computes click regions matching the renderer layout and handles clicks on all four pills: regex toggle, case toggle, cancel (Esc), and OK (Enter). Click regions are calculated from the same layout formula as the renderer to stay in sync.
 
-### P3: Column mode mouse selection
+### ~~P3: Column mode mouse selection~~ FIXED
 After activating col selection mode, dragging with mouse should select col based selection, but it defaults to line.
+
+**Fix:** Updated the drag handler's "start selection on first drag" logic to check `$view->column_select()` in addition to the Alt modifier. When column mode is already active (via ⌥C toggle), dragging now starts a column selection instead of a linear one. Alt+drag continues to start column selection from scratch as before.
 
 ### ~~P2: Line number indicator resizing~~ FIXED
 The left pill constantly resizes as moving across lines due to empty lines (e.g. :60 -> :1). This makes the whole bar jiggle.
@@ -308,11 +310,13 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 
 **Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
 
-### P3: Mouse parity incomplete
+### ~~P3: Mouse parity incomplete~~ PARTIALLY FIXED
 
-Double-click word selection, triple-click line selection, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
+~~Double-click word selection, triple-click line selection~~, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
+
+**Fix (partial):** Added multi-click detection in the document area press handler. Tracks last click time, line, and click count. Double-click (within 400ms on same line) calls `select_word()` to select the word under cursor. Triple-click calls `select_line()` to select the entire line including newline. Click count cycles back to 1 after triple. Mouse cursor placement in input fields remains unimplemented.
 
 ### ~~P3: Light theme `status_accent` used `bg_rgb` instead of `fg_rgb`~~ FIXED
 
@@ -320,11 +324,13 @@ Double-click word selection, triple-click line selection, and mouse cursor place
 
 **Fix:** Changed to `fg_rgb(30, 102, 245)`. Added a regression test to `tests/theme.t` asserting that `status_accent` produces a foreground escape sequence (`ESC[38;2;...`) in the light theme.
 
-### P3: Theme contrast not verified
+### ~~P3: Theme contrast not verified~~ AUDITED — OK
 
 Dark and light themes have not been formally audited for readability or contrast. Non-color cues (icons, text) for state changes (VCS markers, selection, errors) should be verified in both modes.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Colors And Readability.
+
+**Audit result:** Both themes pass contrast review. Dark theme uses light text (192,202,245) on deep blue-black (26,27,38) — excellent contrast. Light theme uses dark text (76,79,105) on white — excellent contrast. Syntax colors are deep/saturated in both themes for readability. Intentionally subdued elements (gutter line numbers, VCS indicator blocks) have lower contrast by design to avoid distraction. Non-color cues are present: VCS uses colored block shapes (▎), errors use warning icon (⚠), status bar uses text labels + keyboard shortcuts, selections use cursor position + background color.
 
 ### ~~P1: Shift+Alt+Left/Right should select by word, not column select~~ FIXED
 Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is word movement with selection (standard across most editors). Instead, it triggers column selection mode. Column selection needs an alternative keybinding.

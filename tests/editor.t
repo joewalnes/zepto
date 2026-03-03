@@ -664,6 +664,52 @@ subtest 'Mouse drag selection' => sub {
 };
 
 # ============================================================================
+# Double-click word selection and triple-click line selection
+# ============================================================================
+subtest 'Double-click selects word, triple-click selects line' => sub {
+    use Zepto::Renderer;
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Hello World Test\nSecond line here\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($editor->active_doc()->line_count());
+
+    # Tab bar = row 1, ruler = row 2, text starts at row 3
+    my $text_y = 3;
+
+    # Double-click on "World" (col 6, which is 'W')
+    my $x = $gutter_width + 6 + 1;
+
+    # First click
+    my $press1 = { type => 'mouse', action => 'press', x => $x, y => $text_y, button => 0, modifiers => [] };
+    $editor->handle_mouse_event($press1);
+    my $release1 = { type => 'mouse', action => 'release', x => $x, y => $text_y, button => 0, modifiers => [] };
+    $editor->handle_mouse_event($release1);
+
+    # Second click (double-click) — use handle_event to go through the standard path
+    my $press2 = { type => 'mouse', action => 'press', x => $x, y => $text_y, button => 0, modifiers => [] };
+    $editor->handle_mouse_event($press2);
+
+    ok($editor->active_view()->has_selection(), 'Double-click creates selection');
+    if ($editor->active_view()->has_selection()) {
+        is($editor->active_view()->selected_text(), 'World', 'Double-click selects word "World"');
+    }
+
+    # Triple-click — select entire line
+    my $press3 = { type => 'mouse', action => 'press', x => $x, y => $text_y, button => 0, modifiers => [] };
+    $editor->handle_mouse_event($press3);
+
+    ok($editor->active_view()->has_selection(), 'Triple-click creates selection');
+    if ($editor->active_view()->has_selection()) {
+        my $sel = $editor->active_view()->selected_text();
+        # Triple-click selects entire line including newline
+        like($sel, qr/Hello World Test/, 'Triple-click selects entire line content');
+    }
+};
+
+# ============================================================================
 # Go to line
 # ============================================================================
 subtest 'Goto line logic' => sub {

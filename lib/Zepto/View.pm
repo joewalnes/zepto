@@ -763,8 +763,9 @@ sub ensure_cursor_visible {
     my ($self) = @_;
 
     # After explicit viewport scroll (mouse wheel), don't snap viewport back
-    # to cursor — allow the user to scroll freely away from the cursor position
-    if (delete $self->{_explicit_scroll}) {
+    # to cursor — allow the user to scroll freely away from the cursor position.
+    # Flag persists until cleared by the next non-scroll user event.
+    if ($self->{_explicit_scroll}) {
         return;
     }
 
@@ -891,6 +892,13 @@ sub scroll_down {
     $self->{scroll_line} += $lines;
     $self->{scroll_line} = $max_scroll if $self->{scroll_line} > $max_scroll;
     $self->{_explicit_scroll} = 1;
+}
+
+# Clear explicit scroll flag — called at start of each non-scroll event
+# so ensure_cursor_visible() resumes normal cursor-following behavior
+sub clear_explicit_scroll {
+    my ($self) = @_;
+    delete $self->{_explicit_scroll};
 }
 
 # ============================================================================

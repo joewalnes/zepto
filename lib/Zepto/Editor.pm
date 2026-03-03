@@ -569,6 +569,13 @@ sub handle_event {
 
     return unless $event;
 
+    # Clear explicit scroll flag before processing any event.
+    # Mouse scroll handlers will re-set it via scroll_up/scroll_down,
+    # so the flag persists across scroll events but clears on any other action.
+    if (my $view = $self->active_view()) {
+        $view->clear_explicit_scroll();
+    }
+
     # Global shortcuts that work in every UI state
     if ($event->{type} eq 'char' && Zepto::InputParser::has_modifier($event, 'ctrl')) {
         my $ch = lc($event->{char});
@@ -1070,7 +1077,31 @@ sub handle_mouse_event {
                 # Shift+Click with column mode: extend column selection
                 $view->set_cursor($doc_line, $doc_col, 1);
             } else {
-                $view->set_cursor($doc_line, $doc_col, $shift);
+                # Multi-click detection: double-click = word, triple-click = line
+                my $now = time();
+                my $click_count = 1;
+                if (defined $self->{_last_click_time} &&
+                    ($now - $self->{_last_click_time}) < 0.4 &&
+                    defined $self->{_last_click_line} &&
+                    $self->{_last_click_line} == $doc_line) {
+                    $click_count = ($self->{_last_click_count} || 1) + 1;
+                    $click_count = 1 if $click_count > 3;  # cycle back after triple
+                }
+                $self->{_last_click_time} = $now;
+                $self->{_last_click_line} = $doc_line;
+                $self->{_last_click_count} = $click_count;
+
+                if ($click_count == 2) {
+                    # Double-click: select word
+                    $view->set_cursor($doc_line, $doc_col, $shift);
+                    $view->select_word();
+                } elsif ($click_count == 3) {
+                    # Triple-click: select line
+                    $view->set_cursor($doc_line, $doc_col, 0);
+                    $view->select_line();
+                } else {
+                    $view->set_cursor($doc_line, $doc_col, $shift);
+                }
             }
         }
     }
@@ -1215,8 +1246,10 @@ sub handle_mouse_event {
 
         if ($visual_col >= 0 && !$view->has_selection()) {
             # Start selection on first drag
-            if ($alt) {
-                $view->start_column_selection();
+            if ($alt || $view->column_select()) {
+                $view->start_column_selection() unless $view->column_select();
+                # In column mode, set anchor at current cursor before extending
+                $view->_start_selection_if_needed();
             } else {
                 $view->set_cursor($view->cursor_line(), $view->cursor_col(), 1);
             }

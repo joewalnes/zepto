@@ -348,9 +348,14 @@ subtest 'Scroll sets explicit flag to prevent viewport snap-back' => sub {
     $view->ensure_cursor_visible();
     is($view->scroll_line(), 10, 'Viewport did NOT snap back after explicit scroll');
 
-    # Second call to ensure_cursor_visible (flag consumed) SHOULD snap back
+    # Flag persists — multiple renders keep viewport scrolled
     $view->ensure_cursor_visible();
-    is($view->scroll_line(), 0, 'Viewport snaps to cursor after flag consumed');
+    is($view->scroll_line(), 10, 'Viewport still stays after second ensure (flag persists)');
+
+    # clear_explicit_scroll + ensure_cursor_visible SHOULD snap back
+    $view->clear_explicit_scroll();
+    $view->ensure_cursor_visible();
+    is($view->scroll_line(), 0, 'Viewport snaps to cursor after flag cleared');
 
     # Same test for scroll_up: scroll cursor down, then scroll viewport up past it
     $view->set_cursor(15, 0);
@@ -360,11 +365,17 @@ subtest 'Scroll sets explicit flag to prevent viewport snap-back' => sub {
     is($view->scroll_line(), 0, 'Scrolled up to top');
     is($view->cursor_line(), 15, 'Cursor still at line 15');
 
+    # Flag persists across multiple renders
     $view->ensure_cursor_visible();
     is($view->scroll_line(), 0, 'Viewport stays at top after scroll_up explicit flag');
 
     $view->ensure_cursor_visible();
-    ok($view->scroll_line() > 0, 'Viewport snaps to cursor on second ensure');
+    is($view->scroll_line(), 0, 'Viewport still stays after second ensure');
+
+    # Only clears when explicitly cleared (simulating next non-scroll event)
+    $view->clear_explicit_scroll();
+    $view->ensure_cursor_visible();
+    ok($view->scroll_line() > 0, 'Viewport snaps to cursor after flag cleared');
 };
 
 subtest 'Set viewport size' => sub {
