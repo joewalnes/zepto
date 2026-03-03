@@ -42,6 +42,11 @@ sub new {
         _total       => 0,     # total visual row count
         _dirty       => 1,
         _last_content_version => -1,  # Track document changes
+
+        # Content-keyed wrap cache: content_string => [segment_templates]
+        # Survives full rebuilds so unchanged lines skip wrap_line()
+        _wrap_cache    => {},
+        _cached_width  => 0,
     }, $class;
 }
 
@@ -108,7 +113,9 @@ sub invalidate_line {
     $self->{_last_content_version} = $current_version;
 }
 
-# Rebuild the full map if dirty or document content has changed
+# Rebuild the full map if dirty or document content has changed.
+# Uses a content-keyed cache to skip wrap_line() for unchanged lines,
+# making undo/redo rebuilds nearly as fast as incremental updates.
 sub _ensure_built {
     my ($self) = @_;
 
@@ -123,21 +130,37 @@ sub _ensure_built {
 
     my $width = $self->{width};
 
+    # Wrap cache: reuse previous wrap_line() results for lines whose content
+    # hasn't changed.  Keyed by content string.  Invalidate on width change.
+    my $prev_cache = ($self->{_cached_width} == $width)
+                   ? $self->{_wrap_cache}
+                   : {};
+
     $self->{_segments} = {};
     $self->{_visual_rows} = [];
     $self->{_doc_to_vrow} = {};
 
     my $line_count = $doc ? $doc->line_count() : 0;
     my $vrow = 0;
+    my %new_cache;
 
     for my $line_idx (0 .. $line_count - 1) {
         my $content = $doc->get_line_content($line_idx);
-        my $segs = $self->wrap_line($content, $width);
+        my $segs;
 
-        # Stamp doc_line onto each segment
-        for my $seg (@$segs) {
-            $seg->{doc_line} = $line_idx;
+        if (exists $prev_cache->{$content}) {
+            # Cache hit — clone segments with correct doc_line
+            $segs = [map { {%$_, doc_line => $line_idx} } @{$prev_cache->{$content}}];
+        } else {
+            # Cache miss — compute wrapping
+            $segs = $self->wrap_line($content, $width);
+            for my $seg (@$segs) {
+                $seg->{doc_line} = $line_idx;
+            }
         }
+
+        # Store in new cache (first occurrence of each content wins)
+        $new_cache{$content} //= $segs;
 
         $self->{_segments}{$line_idx} = $segs;
         $self->{_doc_to_vrow}{$line_idx} = $vrow;
@@ -148,6 +171,8 @@ sub _ensure_built {
         }
     }
 
+    $self->{_wrap_cache} = \%new_cache;
+    $self->{_cached_width} = $width;
     $self->{_total} = $vrow;
     $self->{_dirty} = 0;
 }
