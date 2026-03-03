@@ -3206,6 +3206,25 @@ sub _tree_unfocus {
     }
 }
 
+# Check if a tab at the given index is an empty, unedited, untitled tab.
+# Returns the index if it should be closed, undef otherwise.
+sub _empty_untitled_tab_index {
+    my ($self, $idx) = @_;
+    return undef unless defined $idx;
+    my $tab = $self->{tab_manager}->tab_at($idx);
+    return undef unless $tab;
+    return undef if $tab->{file_path};      # has a real file
+    my $doc = $tab->{document};
+    return undef unless $doc;
+    return undef if $doc->is_dirty();       # has been edited
+    # Check if content is empty (new doc has 1 empty line)
+    return undef if $doc->line_count() > 1;
+    if ($doc->line_count() == 1) {
+        return undef if $doc->get_line_content(0) ne '';
+    }
+    return $idx;
+}
+
 sub _tree_open_selected {
     my ($self) = @_;
     my $tree = $self->{file_tree};
@@ -3221,9 +3240,15 @@ sub _tree_open_selected {
     if ($tree->{preview_active}) {
         # Preview was loaded without VCS — initialize it now for gutter indicators
         $self->active_doc()->init_vcs();
+        # Check if the pre-preview tab was an empty untitled tab to close
+        my $close_idx = $self->_empty_untitled_tab_index($tree->{pre_preview_tab_index});
         $tree->{preview_active} = 0;
         $tree->{preview_path} = undef;
         $tree->{pre_preview_tab_index} = undef;
+        # Close the empty untitled tab after clearing preview state
+        if (defined $close_idx) {
+            $self->{tab_manager}->remove_tab($close_idx);
+        }
     } else {
         # Open file via existing _load_file (handles duplicate detection)
         $self->_load_file($node->{path});

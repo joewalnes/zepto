@@ -257,6 +257,10 @@ sub _load_file {
         return;
     }
 
+    # Check if current tab is an empty untitled tab before opening new file
+    my $prev_idx = $self->{tab_manager}->active_index();
+    my $close_idx = $self->_empty_untitled_tab_index($prev_idx);
+
     eval {
         my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state($path);
         $self->{tab_manager}->add_tab(
@@ -269,6 +273,12 @@ sub _load_file {
     };
     if ($@) {
         $self->show_message("Error opening file: $@");
+        return;
+    }
+
+    # Close the previous empty untitled tab now that new file is open
+    if (defined $close_idx) {
+        $self->{tab_manager}->remove_tab($close_idx);
     }
 }
 

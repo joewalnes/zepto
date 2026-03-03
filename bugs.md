@@ -79,8 +79,10 @@ Ctrl+/ should comment or uncomment the current line. If no text selected, curren
 
 **Fix:** Added `line_comment_prefix()` to `Zepto::Syntax::Base` with a lookup table covering all 42 syntax languages. `cmd_toggle_comment` in Commands.pm detects the language from the active highlighter's grammar, determines the line range (single line or selection), checks if all non-blank lines are already commented, and toggles accordingly. Comments are aligned at the minimum indentation of the selected lines. Wired to `⌃/` (Ctrl+/) and registered in CommandRegistry under DOCUMENT section.
 
-### P3: Close empty start tab when opening first file.
+### ~~P3: Close empty start tab when opening first file.~~ FIXED
 A common scenario is: open zepto (which shows an untitled empty tab), then navigate to a file to edit. In this case, if the initial empty tab has not been edited, automatically close it to reduce clutter.
+
+**Fix:** Added `_empty_untitled_tab_index()` helper that checks if a tab is empty, unedited, and has no file. When opening a file via `_load_file()` (⌃O, recent files, command palette) or confirming a tree preview (Enter), if the previous tab was an empty untitled tab, it's automatically closed. Edited untitled tabs are preserved.
 
 ### ~~P2: Line by line scrolling in editor.~~ FIXED
 When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls item by item, which feels precise and smooth. However the editor has different behavior which feels janky. Make editor mouse scroll behave same way as tree.
