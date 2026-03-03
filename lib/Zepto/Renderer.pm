@@ -281,13 +281,8 @@ sub render {
         Zepto::Chars->set_enabled($prefs->nerd_font());
     }
 
-    my $output = '';
-
-    # Hide cursor during redraw to avoid flicker
-    $output .= HIDE_CURSOR;
-
-    # Move to top-left
-    $output .= CURSOR_HOME;
+    # Build per-row buffer for differential rendering
+    my @row_buf = ('') x $rows;
 
     # Calculate layout (no menu bar — tab bar + ruler + text + status)
     my $tab_height = 1;
@@ -326,64 +321,72 @@ sub render {
 
     # Render tree panel (left side, from row 1 to row N-1)
     if ($tree_width > 0 && $tree) {
-        $output .= $class->_render_tree_panel(
+        my $tree_rows = $class->_render_tree_panel(
             $tree, $rows - $status_height, $theme, $tree_width, $ui
         );
+        for my $i (0 .. $#$tree_rows) {
+            $row_buf[$i] .= $tree_rows->[$i];
+        }
     }
 
-    # Render tab bar (row 1)
-    $output .= _move_to(1, $tree_width + 1);
-    $output .= $class->_render_tab_bar($theme, $cols, $ui, $tree_width);
+    # Render tab bar (row 1 = index 0)
+    $row_buf[0] .= _move_to(1, $tree_width + 1)
+        . $class->_render_tab_bar($theme, $cols, $ui, $tree_width);
 
-    # Render ruler (row 2)
-    $output .= _move_to(2, $tree_width + 1);
-    $output .= $class->_render_ruler_bar(
-        $theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui
-    );
+    # Render ruler (row 2 = index 1)
+    $row_buf[1] .= _move_to(2, $tree_width + 1)
+        . $class->_render_ruler_bar(
+            $theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui
+        );
 
-    # Render text area (rows 3 to N-1)
-    $output .= $class->_render_text_area(
+    # Render text area (rows 3..N-1 = index 2..N-2)
+    my $text_rows = $class->_render_text_area(
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width, $highlighter,
         $ui->{find_mode}, $minimap_width, $tree_width
     );
+    for my $i (0 .. $#$text_rows) {
+        $row_buf[$i + 2] .= $text_rows->[$i];
+    }
 
-    # Render status bar (last row) - prompt/footer_input/find replace normal content
-    $output .= _move_to($rows, 1);
+    # Render status bar (last row = index N-1)
+    $row_buf[$rows - 1] .= _move_to($rows, 1);
     if ($ui->{prompt}) {
-        $output .= $class->_render_prompt(
+        $row_buf[$rows - 1] .= $class->_render_prompt(
             $theme, $ui->{prompt}, $cols, $rows
         );
     } elsif ($ui->{find_mode}) {
-        $output .= $class->_render_find_bar(
+        $row_buf[$rows - 1] .= $class->_render_find_bar(
             $theme, $ui->{find_mode}, $cols
         );
     } elsif ($ui->{footer_input}) {
-        $output .= $class->_render_footer_input(
+        $row_buf[$rows - 1] .= $class->_render_footer_input(
             $theme, $ui->{footer_input}, $cols
         );
     } else {
-        $output .= $class->_render_context_status_bar(
+        $row_buf[$rows - 1] .= $class->_render_context_status_bar(
             $doc, $view, $theme, $cols, $message, $ui, $word_wrap_active
         );
     }
 
-    # Render dialog if open
+    # Render dialog overlay (writes to the rows it occupies)
     if ($ui->{dialog}) {
-        $output .= $class->_render_dialog(
+        my $dialog_output = $class->_render_dialog(
             $theme, $ui->{dialog}, $rows, $cols
         );
+        $class->_merge_into_rows(\@row_buf, $dialog_output, $rows);
     }
 
-    # Render command palette if open
+    # Render command palette overlay
     if ($ui->{palette}) {
-        $output .= $class->_render_command_palette(
+        my $palette_output = $class->_render_command_palette(
             $theme, $ui->{palette}, $rows, $cols
         );
+        $class->_merge_into_rows(\@row_buf, $palette_output, $rows);
     }
 
-
-    # Position cursor
+    # Build cursor positioning sequence (separate from row content)
+    my $cursor_seq = '';
     if ($ui->{palette}) {
         # Position cursor in palette filter input
         # MUST match dimensions in _render_command_palette exactly
@@ -413,11 +416,24 @@ sub render {
         # Filter input is on row 2 of palette (y_start + 1), starting at x + 5 (box + space + icon + space)
         my $pal_y = int(($rows - $pal_height) / 2);
         $pal_y = 2 if $pal_y < 2;
-        $output .= _move_to($pal_y + 1, $pal_x + 5 + $query_cursor_in_view);
-        $output .= SHOW_CURSOR;
+        $cursor_seq .= _move_to($pal_y + 1, $pal_x + 5 + $query_cursor_in_view);
+        $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{dialog}) {
-        # Dialogs position cursor themselves
-        $output .= SHOW_CURSOR;
+        # Position cursor in dialog input field
+        my $dialog = $ui->{dialog};
+        my $dialog_width = DIALOG_WIDTH;
+        $dialog_width = $cols - 4 if $dialog_width > $cols - 4;
+        my $dx = int(($cols - $dialog_width) / 2);
+        $dx = 1 if $dx < 1;
+        my $dy = int(($rows - DIALOG_HEIGHT) / 2);
+        $dy = 1 if $dy < 1;
+        my $cursor_pos = $dialog->{cursor} // length($dialog->{value} // '');
+        my $cursor_x = $dx + 2 + $cursor_pos;
+        if ($cursor_x > $dx + $dialog_width - 4) {
+            $cursor_x = $dx + $dialog_width - 4;
+        }
+        $cursor_seq .= _move_to($dy + 3, $cursor_x);
+        $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
         my $input      = $ui->{footer_input};
@@ -439,8 +455,8 @@ sub render {
         } else {
             $cursor_in_view = $input->{cursor} // 0;
         }
-        $output .= _move_to($rows, $prompt_len + $cursor_in_view + 1);
-        $output .= SHOW_CURSOR;
+        $cursor_seq .= _move_to($rows, $prompt_len + $cursor_in_view + 1);
+        $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{find_mode}) {
         # Position cursor in find or replace input field based on focus
         my $find = $ui->{find_mode};
@@ -496,7 +512,7 @@ sub render {
             }
             # Replace field position: " Find:" (6) + input_width + " Replace:" (9)
             my $replace_start = 1 + 5 + $input_width + 1 + 8;
-            $output .= _move_to($rows, $replace_start + $cursor_in_field + 1);
+            $cursor_seq .= _move_to($rows, $replace_start + $cursor_in_field + 1);
         } else {
             my $cursor_in_field;
             if (my $w = $find->{find_widget}) {
@@ -512,12 +528,12 @@ sub render {
             }
             # Find field starts at column 7 (" Find:")
             my $label_len = 6;  # " Find:"
-            $output .= _move_to($rows, $label_len + $cursor_in_field + 1);
+            $cursor_seq .= _move_to($rows, $label_len + $cursor_in_field + 1);
         }
-        $output .= SHOW_CURSOR;
+        $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{prompt}) {
         # Hide cursor during prompt - no text input
-        $output .= HIDE_CURSOR;
+        $cursor_seq .= HIDE_CURSOR;
     } elsif ($ui->{file_tree} && $ui->{file_tree}->focused()) {
         # Tree is focused — show cursor in search bar (always row 2, above stickies)
         if ($ui->{file_tree}->filter_active()) {
@@ -527,21 +543,48 @@ sub render {
             my $max_query = $panel_w - $prefix_len;
             my $visible_cursor = ($max_query > 0 && $filter_len > $max_query)
                 ? $max_query : $filter_len;
-            $output .= _move_to(1, $prefix_len + $visible_cursor + 1);
-            $output .= SHOW_CURSOR;
+            $cursor_seq .= _move_to(1, $prefix_len + $visible_cursor + 1);
+            $cursor_seq .= SHOW_CURSOR;
         } else {
-            $output .= HIDE_CURSOR;
+            $cursor_seq .= HIDE_CURSOR;
         }
     } elsif ($view && $doc) {
         # Position terminal cursor for editing
         my ($cursor_row, $cursor_col) = $class->_cursor_screen_pos(
             $view, $gutter_width, $doc, $tree_width
         );
-        $output .= _move_to($cursor_row, $cursor_col);
-        $output .= SHOW_CURSOR;
+        $cursor_seq .= _move_to($cursor_row, $cursor_col);
+        $cursor_seq .= SHOW_CURSOR;
     }
 
-    return $output;
+    return {
+        rows       => \@row_buf,
+        cursor_seq => $cursor_seq,
+    };
+}
+
+# Backward-compatible render that returns a monolithic string.
+# Used by tests; Editor.pm uses render() directly for differential output.
+sub render_string {
+    my ($class, %args) = @_;
+    my $frame = $class->render(%args);
+    return HIDE_CURSOR . CURSOR_HOME . join('', @{$frame->{rows}}) . $frame->{cursor_seq};
+}
+
+# Parse a multi-row output string and merge segments into the per-row buffer.
+# Each segment starts with _move_to(\x1b[ROW;COLH) and is assigned to that row.
+sub _merge_into_rows {
+    my ($class, $row_buf, $str, $max_rows) = @_;
+    return unless length($str);
+    # Split at the start of each _move_to sequence, keeping the sequence with its content
+    my @parts = split(/(?=\x1b\[\d+;\d+H)/, $str);
+    for my $part (@parts) {
+        next unless length($part);
+        if ($part =~ /^\x1b\[(\d+);\d+H/) {
+            my $row_idx = $1 - 1;  # Convert 1-indexed terminal row to 0-indexed
+            $row_buf->[$row_idx] .= $part if $row_idx >= 0 && $row_idx < $max_rows;
+        }
+    }
 }
 
 # Render the tab bar showing open file tabs
@@ -1035,9 +1078,9 @@ sub _render_text_area {
     $minimap_width //= 0;
     $tree_width //= 0;
 
-    my $output = '';
+    my @text_rows;
 
-    return $output unless $doc && $view;
+    return \@text_rows unless $doc && $view;
 
     my $scroll_line = $view->scroll_line();
     my $visible_start = $scroll_line;
@@ -1262,8 +1305,8 @@ sub _render_text_area {
     for my $screen_row (0 .. $height - 1) {
         my $entry = $entries[$screen_row];
 
-        # Position cursor at start of this row (row 3 is first text row, after tabs and ruler)
-        $output .= _move_to($screen_row + 3, $tree_width + 1);
+        # Per-row output buffer (for differential rendering)
+        my $output = _move_to($screen_row + 3, $tree_width + 1);
 
         # Handle old-line entries (expanded hunk base content)
         if ($entry && $entry->{type} eq 'old') {
@@ -1292,6 +1335,7 @@ sub _render_text_area {
                 if $minimap_width > 0;
             $output .= CLEAR_LINE;
             $output .= RESET;
+            push @text_rows, $output;
             next;
         }
 
@@ -1669,9 +1713,10 @@ sub _render_text_area {
 
         $output .= CLEAR_LINE;
         $output .= RESET;
+        push @text_rows, $output;
     }
 
-    return $output;
+    return \@text_rows;
 }
 
 # =============================================================================
@@ -1733,7 +1778,7 @@ sub _render_minimap_column {
 sub _render_tree_panel {
     my ($class, $tree, $height, $theme, $tree_width, $ui) = @_;
 
-    my $output = '';
+    my @tree_rows;
     my $panel_w = $tree_width - 1;  # Subtract border column
     my $border_char = Zepto::Chars->get('tree_vertical') || '|';
 
@@ -1797,7 +1842,7 @@ sub _render_tree_panel {
     # Always render search bar first (above stickies)
     if ($row_idx < $height) {
         my $screen_row = $row_idx + 1;
-        $output .= _move_to($screen_row, 1);
+        my $output = _move_to($screen_row, 1);
         $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
         my $query = $tree->filter_query() // '';
         my $search_icon = Zepto::Chars->get('search');
@@ -1837,6 +1882,7 @@ sub _render_tree_panel {
 
         # Border
         $output .= $border_fg . $tree_bg . $border_char;
+        push @tree_rows, $output;
         $row_idx++;
     }
 
@@ -1845,13 +1891,14 @@ sub _render_tree_panel {
         last if $row_idx >= $height;
         my $screen_row = $row_idx + 1;  # tree starts at row 1
 
-        $output .= _move_to($screen_row, 1);
+        my $output = _move_to($screen_row, 1);
         $output .= $class->_render_tree_node_content(
             $sticky, $content_width, $theme, 0, 1, $focused,
             $has_scrollbar, $row_idx, $sb, undef, []
         );
         # Border
         $output .= $border_fg . $tree_bg . $border_char;
+        push @tree_rows, $output;
         $row_idx++;
     }
 
@@ -1864,7 +1911,7 @@ sub _render_tree_panel {
         my $flat_idx = $scroll + $i;
         my $screen_row = $row_idx + 1;
 
-        $output .= _move_to($screen_row, 1);
+        my $output = _move_to($screen_row, 1);
 
         if ($flat_idx <= $#$flat) {
             my $node = $flat->[$flat_idx];
@@ -1899,10 +1946,11 @@ sub _render_tree_panel {
 
         # Border
         $output .= $border_fg . $tree_bg . $border_char;
+        push @tree_rows, $output;
         $row_idx++;
     }
 
-    return $output;
+    return \@tree_rows;
 }
 
 sub _render_tree_node_content {
@@ -3271,13 +3319,6 @@ sub _render_dialog {
     $output .= $box_br;
 
     $output .= RESET;
-
-    # Position cursor in input field
-    my $cursor_x = $x + 2 + $cursor_pos;
-    if ($cursor_x > $x + $dialog_width - 4) {
-        $cursor_x = $x + $dialog_width - 4;
-    }
-    $output .= _move_to($y + 3, $cursor_x);
 
     return $output;
 }

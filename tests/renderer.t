@@ -63,7 +63,7 @@ subtest 'Render returns string' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -80,7 +80,7 @@ subtest 'Render structure' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -99,7 +99,7 @@ subtest 'Render structure' => sub {
 subtest 'Render without document' => sub {
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => undef,
         view     => undef,
         theme    => $theme,
@@ -118,7 +118,7 @@ subtest 'Status bar has palette trigger pill' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -134,7 +134,7 @@ subtest 'Active menu highlighting' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -154,7 +154,7 @@ subtest 'Line numbers displayed' => sub {
     my ($doc, $view) = create_test_state("Line 1\nLine 2\nLine 3\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -172,7 +172,7 @@ subtest 'Content displayed' => sub {
     my ($doc, $view) = create_test_state("Hello World\nFoo Bar\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -191,7 +191,7 @@ subtest 'Empty lines beyond document use distinct background' => sub {
     my ($doc, $view) = create_test_state("Short\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -213,7 +213,7 @@ subtest 'Status bar shows cursor position' => sub {
     my $view = Zepto::View->new(document => $doc);
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -228,7 +228,7 @@ subtest 'Status bar shows palette trigger' => sub {
     my ($doc, $view) = create_test_state("Original\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -247,7 +247,7 @@ subtest 'Ruler bar shows cursor column' => sub {
     $view->move_right();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -266,7 +266,7 @@ subtest 'Status bar shows cursor position and palette trigger' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -285,7 +285,7 @@ subtest 'Dialog rendering' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -310,7 +310,7 @@ subtest 'Dialog box characters' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -350,7 +350,7 @@ subtest 'Selection highlighting' => sub {
     ok($view->has_selection(), 'Selection is active');
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -373,7 +373,7 @@ subtest 'Small terminal' => sub {
     my ($doc, $view) = create_test_state("Short\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -389,7 +389,7 @@ subtest 'Very small terminal' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -404,7 +404,7 @@ subtest 'Large terminal' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -427,7 +427,7 @@ subtest 'Cursor position escape sequence' => sub {
 
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -446,7 +446,7 @@ subtest 'Light theme rendering' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->light_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -462,7 +462,7 @@ subtest 'Both themes produce different output' => sub {
     my ($doc1, $view1) = create_test_state("Test\n");
     my ($doc2, $view2) = create_test_state("Test\n");
 
-    my $dark_output = Zepto::Renderer->render(
+    my $dark_output = Zepto::Renderer->render_string(
         document => $doc1,
         view     => $view1,
         theme    => Zepto::Theme->dark_theme(),
@@ -470,7 +470,7 @@ subtest 'Both themes produce different output' => sub {
         cols     => 80,
     );
 
-    my $light_output = Zepto::Renderer->render(
+    my $light_output = Zepto::Renderer->render_string(
         document => $doc2,
         view     => $view2,
         theme    => Zepto::Theme->light_theme(),
@@ -488,7 +488,7 @@ subtest 'Default terminal size' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -504,7 +504,7 @@ subtest 'Tab bar rendered on row 1' => sub {
     my ($doc, $view) = create_test_state("Test\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -524,7 +524,7 @@ subtest 'Text area uses cursor positioning' => sub {
     my $rows = 10;
     my $cols = 80;
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -545,7 +545,7 @@ subtest 'Text lines have consistent column alignment' => sub {
     my ($doc, $view) = create_test_state("AAA\nBBB\nCCC\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -577,7 +577,7 @@ subtest 'Layout has 3 chrome rows' => sub {
     my ($doc, $view) = create_test_state("Line 1\nLine 2\n");
     my $theme = Zepto::Theme->dark_theme();
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -660,7 +660,7 @@ subtest 'Expanded modified hunk renders old and new lines' => sub {
     $lm->toggle_hunk(0);
     $view->set_line_map($lm);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -703,7 +703,7 @@ subtest 'Expanded deleted hunk shows only old lines' => sub {
     $lm->toggle_hunk(0);
     $view->set_line_map($lm);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -738,7 +738,7 @@ subtest 'Expanded added hunk shows green bg, no old lines' => sub {
     $lm->toggle_hunk(0);
     $view->set_line_map($lm);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -777,7 +777,7 @@ subtest 'Collapse hunk restores normal rendering' => sub {
     $view->set_line_map($lm);
 
     # Render without expansion — no diff colors
-    my $output_normal = Zepto::Renderer->render(
+    my $output_normal = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
     );
 
@@ -785,7 +785,7 @@ subtest 'Collapse hunk restores normal rendering' => sub {
     $lm->toggle_hunk(0);
     $lm->toggle_hunk(0);
 
-    my $output_collapsed = Zepto::Renderer->render(
+    my $output_collapsed = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
     );
 
@@ -888,7 +888,7 @@ subtest 'Light theme diff colors in expanded hunk' => sub {
     $lm->toggle_hunk(0);
     $view->set_line_map($lm);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme, rows => 10, cols => 80,
     );
 
@@ -912,7 +912,7 @@ subtest 'Minimap not shown when disabled' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $prefs = Zepto::Preferences->new(show_minimap => 0);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -930,7 +930,7 @@ subtest 'Minimap not shown for short documents' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $prefs = Zepto::Preferences->new(show_minimap => 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -949,7 +949,7 @@ subtest 'Minimap shown for long documents' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $prefs = Zepto::Preferences->new(show_minimap => 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,
@@ -976,7 +976,7 @@ subtest 'Minimap viewport highlight' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $prefs = Zepto::Preferences->new(show_minimap => 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc,
         view     => $view,
         theme    => $theme,

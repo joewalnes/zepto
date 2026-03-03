@@ -432,6 +432,7 @@ sub init {
     # Setup SIGWINCH handler for terminal resize
     $SIG{WINCH} = sub {
         $term->refresh_size();
+        $self->{_prev_frame} = undef;  # Force full redraw on resize
         $self->render();
     };
 
@@ -3570,7 +3571,14 @@ sub render {
 
     $self->active_view()->ensure_cursor_visible();
 
-    my $output = Zepto::Renderer->render(
+    # Force full redraw on state transitions
+    my $current_state = $self->{state};
+    if (($self->{_prev_render_state} // '') ne $current_state) {
+        $self->{_prev_frame} = undef;
+        $self->{_prev_render_state} = $current_state;
+    }
+
+    my $frame = Zepto::Renderer->render(
         document    => $self->active_doc(),
         view        => $self->active_view(),
         theme       => $self->{theme},
@@ -3628,6 +3636,23 @@ sub render {
         },
     );
 
+    # Differential rendering: only emit rows that changed since last frame
+    my $new_rows = $frame->{rows};
+    my $prev = $self->{_prev_frame};
+
+    my $output = "\x1b[?25l";  # HIDE_CURSOR
+    if (!$prev || scalar(@$prev) != scalar(@$new_rows)) {
+        # Full redraw (first frame, resize, etc.)
+        $output .= join('', @$new_rows);
+    } else {
+        # Only emit changed rows
+        for my $i (0 .. $#$new_rows) {
+            $output .= $new_rows->[$i] if $new_rows->[$i] ne $prev->[$i];
+        }
+    }
+    $output .= $frame->{cursor_seq};
+
+    $self->{_prev_frame} = $new_rows;
     $term->write($output);
 }
 

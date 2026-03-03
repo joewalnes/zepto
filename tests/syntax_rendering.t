@@ -122,7 +122,7 @@ PERL
     my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
     # Render
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document    => $doc,
         view        => $view,
         theme       => $theme,
@@ -174,7 +174,7 @@ PYTHON
     my $theme = Zepto::Theme->get_theme('dark');
     my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document    => $doc,
         view        => $view,
         theme       => $theme,
@@ -211,7 +211,7 @@ JS
     my $theme = Zepto::Theme->get_theme('dark');
     my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document    => $doc,
         view        => $view,
         theme       => $theme,
@@ -310,7 +310,7 @@ subtest 'Unknown file type has no syntax colors' => sub {
     my $theme = Zepto::Theme->get_theme('dark');
     my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document    => $doc,
         view        => $view,
         theme       => $theme,
@@ -344,7 +344,7 @@ subtest 'Light theme syntax colors' => sub {
     my $theme = Zepto::Theme->get_theme('light');
     my $prefs = Zepto::Preferences->new(nerd_font => 0);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document    => $doc,
         view        => $view,
         theme       => $theme,

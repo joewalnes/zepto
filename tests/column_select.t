@@ -405,7 +405,7 @@ subtest 'Column selection uses column_selection_bg color' => sub {
     $view->start_column_selection();
     $view->set_cursor(1, 4, 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme,
         rows => 10, cols => 40,
     );
@@ -423,7 +423,7 @@ subtest 'Linear selection still uses selection_bg (regression)' => sub {
 
     ok(!$view->column_select(), 'linear selection, not column');
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme,
         rows => 10, cols => 40,
     );
@@ -446,7 +446,7 @@ subtest 'Zero-width column cursor uses column_cursor_bg' => sub {
     is($left, 3, 'zero width: left == right');
     is($right, 3, 'zero width confirmed');
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme,
         rows => 10, cols => 40,
     );
@@ -464,7 +464,7 @@ subtest 'Column selection fill area shows virtual whitespace' => sub {
     $view->start_column_selection();
     $view->set_cursor(2, 5, 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme,
         rows => 10, cols => 40,
     );
@@ -712,7 +712,7 @@ subtest 'Column selection rendering extends past short line in fill area' => sub
     $view->start_column_selection();
     $view->set_cursor(2, 7, 1);
 
-    my $output = Zepto::Renderer->render(
+    my $output = Zepto::Renderer->render_string(
         document => $doc, view => $view, theme => $theme,
         rows => 10, cols => 40,
     );
