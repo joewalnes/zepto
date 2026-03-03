@@ -393,3 +393,8 @@ The feature that toggles Nerd Font glyph rendering is called "Powerline" everywh
 - **Tests**: `tests/chars.t`, `tests/renderer.t`, `tests/syntax_rendering.t`
 
 **Fix:** Renamed across all files: command palette label now says "Nerd Font", preference key is `nerd_font`, CLI flag is `--no-nerd-font` (with `--no-powerline` kept as backwards-compat alias), env var is `ZEPTO_NERD_FONT`, all internal variables/methods/comments updated. Also fixed a latent bug in Renderer.pm where `Zepto::Chars->get('powerline_round_left')` referenced a non-existent key (should be `round_left`). **Manual test:** Open command palette — should show "Nerd Font" not "Powerline". Run `./zepto --no-nerd-font` — should start without nerd font glyphs.
+
+### ~~P2: Markdown underscore emphasis renders inside identifiers~~ FIXED
+Text like `NF_CLOSE (\x{f00d}) duplicated NF_TIMES` renders the substring between underscores as italic. Per CommonMark spec, `_` emphasis delimiters must not be intraword — an opening `_` must not be preceded by an alphanumeric character, and a closing `_` must not be followed by one. Only `*` allows intraword emphasis.
+
+**Fix:** Split the combined `(\*|_)` emphasis regexes in Markdown.pm into separate `*` and `_` branches. The `_`, `__`, and `___` branches now check that the character before the opening delimiter and after the closing delimiter are not `\w` (word characters), matching CommonMark's intraword restriction. `*` branches remain unrestricted.

@@ -134,7 +134,17 @@ sub tokenize {
         }
 
         # Bold+italic ***text*** or ___text___
-        if ($rest =~ /^(\*\*\*|___)(.+?)\1/) {
+        # CommonMark: ___ must not be intraword (no alnum before open / after close)
+        if ($rest =~ /^(\*\*\*)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 3, TOKEN_PUNCTUATION);
+            $pos += 3;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD_ITALIC);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 3, TOKEN_PUNCTUATION);
+            $pos += 3;
+            next;
+        }
+        if ($rest =~ /^(___)(.+?)\1/ && ($pos == 0 || substr($line, $pos - 1, 1) !~ /\w/) && ($pos + 3 + length($2) + 3 >= $len || substr($line, $pos + 3 + length($2) + 3, 1) !~ /\w/)) {
             push @tokens, _token($pos, $pos + 3, TOKEN_PUNCTUATION);
             $pos += 3;
             push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD_ITALIC);
@@ -144,7 +154,18 @@ sub tokenize {
             next;
         }
 
-        if ($rest =~ /^(\*\*|__)(.+?)\1/) {
+        # Bold **text** or __text__
+        # CommonMark: __ must not be intraword
+        if ($rest =~ /^(\*\*)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
+            $pos += 2;
+            next;
+        }
+        if ($rest =~ /^(__)(.+?)\1/ && ($pos == 0 || substr($line, $pos - 1, 1) !~ /\w/) && ($pos + 2 + length($2) + 2 >= $len || substr($line, $pos + 2 + length($2) + 2, 1) !~ /\w/)) {
             push @tokens, _token($pos, $pos + 2, TOKEN_PUNCTUATION);
             $pos += 2;
             push @tokens, _token($pos, $pos + length($2), TOKEN_BOLD);
@@ -154,7 +175,18 @@ sub tokenize {
             next;
         }
 
-        if ($rest =~ /^(\*|_)(.+?)\1/) {
+        # Italic *text* or _text_
+        # CommonMark: _ must not be intraword
+        if ($rest =~ /^(\*)(.+?)\1/) {
+            push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
+            $pos += 1;
+            push @tokens, _token($pos, $pos + length($2), TOKEN_ITALIC);
+            $pos += length($2);
+            push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
+            $pos += 1;
+            next;
+        }
+        if ($rest =~ /^(_)(.+?)\1/ && ($pos == 0 || substr($line, $pos - 1, 1) !~ /\w/) && ($pos + 1 + length($2) + 1 >= $len || substr($line, $pos + 1 + length($2) + 1, 1) !~ /\w/)) {
             push @tokens, _token($pos, $pos + 1, TOKEN_PUNCTUATION);
             $pos += 1;
             push @tokens, _token($pos, $pos + length($2), TOKEN_ITALIC);
