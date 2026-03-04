@@ -2903,11 +2903,14 @@ sub get_status_buttons { return @{$_status_buttons}; }
     sub get_ruler_buttons { return @{$_ruler_buttons}; }
 }
 
-# Store and retrieve palette button positions for click handling
+# Store and retrieve palette button positions and geometry for click handling
 {
     my $_palette_buttons = [];
+    my $_palette_geometry = {};
     sub _set_palette_buttons { shift; $_palette_buttons = shift; }
     sub get_palette_buttons { return @{$_palette_buttons}; }
+    sub _set_palette_geometry { shift; $_palette_geometry = shift; }
+    sub get_palette_geometry { return $_palette_geometry; }
 }
 
 # =============================================================================
@@ -4312,6 +4315,11 @@ sub _render_command_palette {
     $output .= RESET;
 
     $class->_set_palette_buttons(\@buttons);
+    $class->_set_palette_geometry({
+        x => $x, y => $y, width => $pal_width,
+        filter_row => $y + 1, filter_x_start => $x + 4,
+        filter_input_width => $pal_width - 6,
+    });
 
     return $output;
 }

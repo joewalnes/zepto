@@ -232,6 +232,16 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_toggle_comment',
     },
+    {
+        id       => 'transform',
+        label    => 'Transform via Shell',
+        icon     => 'terminal',
+        shortcut => SYM_ALT . 'T',
+        section  => 'EDIT',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform',
+    },
 
     # === NAVIGATE section ===
     {

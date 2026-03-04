@@ -656,4 +656,23 @@ subtest 'Scroll ensures visibility' => sub {
     is($tree->scroll(), 0, 'home resets scroll to 0');
 };
 
+# =============================================================================
+# Natural sort ordering
+# =============================================================================
+
+subtest 'Natural sort ordering' => sub {
+    my $natdir = tempdir(CLEANUP => 1);
+    for my $name (qw(file1.txt file10.txt file2.txt file20.txt file3.txt)) {
+        open my $fh, '>', "$natdir/$name" or die $!;
+        close $fh;
+    }
+
+    my $tree = Zepto::FileTree->new(root_path => $natdir);
+    my @names = map { $_->{name} } @{$tree->flat_list()};
+
+    is_deeply(\@names,
+        [qw(file1.txt file2.txt file3.txt file10.txt file20.txt)],
+        'files sorted in natural numeric order');
+};
+
 done_testing();

@@ -567,9 +567,15 @@ sub run {
                     $last_search_render = $now;
                 }
 
-                # Always render when search completes
+                # When search completes, update matches and jump if needed
                 if (!$engine->is_searching) {
                     $needs_render = 1;
+                    my $old_count = scalar(@{$self->{find_matches} // []});
+                    $self->{find_matches} = $engine->matches();
+                    # Jump to nearest match if background found new matches
+                    if (!$old_count && @{$self->{find_matches}}) {
+                        $self->_find_nearest_match();
+                    }
                 }
             }
 
@@ -937,6 +943,9 @@ sub handle_alt_char {
     # Tab navigation (Alt+, prev, Alt+. next)
     elsif ($char eq ',') { $self->cmd_prev_tab(); }
     elsif ($char eq '.') { $self->cmd_next_tab(); }
+
+    # Transform via shell
+    elsif ($char eq 't') { $self->cmd_transform(); }
 
     # Location history (Alt+- back, Alt+= forward)
     elsif ($char eq '-') { $self->cmd_go_back(); }
@@ -1900,7 +1909,7 @@ sub _find_value_changed {
     } else {
         if ($self->{find_widget}->value() ne $old_find) {
             $self->_reset_replace_preview();
-            $self->_update_find_matches(1);
+            $self->_update_find_matches();
         }
     }
 }

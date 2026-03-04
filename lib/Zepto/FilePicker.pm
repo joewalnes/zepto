@@ -12,6 +12,23 @@ use strict;
 use warnings;
 use Zepto::Config;
 
+# Natural sort: "file2" before "file10", case-insensitive
+sub _natural_cmp {
+    my ($a, $b) = @_;
+    my @a_parts = map { /^\d+$/ ? $_ : lc($_) } split(/(\d+)/, $a);
+    my @b_parts = map { /^\d+$/ ? $_ : lc($_) } split(/(\d+)/, $b);
+    for my $i (0 .. ($#a_parts < $#b_parts ? $#a_parts : $#b_parts)) {
+        my $cmp;
+        if ($a_parts[$i] =~ /^\d+$/ && $b_parts[$i] =~ /^\d+$/) {
+            $cmp = $a_parts[$i] <=> $b_parts[$i];
+        } else {
+            $cmp = $a_parts[$i] cmp $b_parts[$i];
+        }
+        return $cmp if $cmp;
+    }
+    return @a_parts <=> @b_parts;
+}
+
 # =============================================================================
 # Constructor
 # =============================================================================
@@ -63,7 +80,7 @@ sub _discover_files {
         my @entries = readdir($dh);
         closedir($dh);
 
-        for my $entry (sort @entries) {
+        for my $entry (sort { _natural_cmp($a, $b) } @entries) {
             next if $entry eq '.' || $entry eq '..';
             return if @files >= $max_files;
 
@@ -154,7 +171,7 @@ sub _apply_filter {
 
     if (!length($query)) {
         # No query - show all files sorted alphabetically
-        $self->{filtered} = [sort @files];
+        $self->{filtered} = [sort { _natural_cmp($a, $b) } @files];
     } else {
         # Score and filter
         my @scored;

@@ -12,6 +12,7 @@ use warnings;
 
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
+use IPC::Open2;
 
 use Zepto::Theme;
 
@@ -803,6 +804,64 @@ sub cmd_toggle_comment {
 
     # Invalidate wrap map
     $view->invalidate_wrap_map();
+}
+
+sub cmd_transform {
+    my ($self) = @_;
+
+    $self->open_footer_input(
+        prompt => 'Shell:',
+        hint   => 'sort | uniq, tac, python3 -m json.tool',
+        on_submit => sub {
+            my ($cmd) = @_;
+            return unless length($cmd);
+
+            my $doc  = $self->active_doc();
+            my $view = $self->active_view();
+
+            # Get input text: selection or current line
+            my ($input, $start_off, $end_off);
+            if ($view->has_selection()) {
+                ($start_off, $end_off) = $view->selection_offsets();
+                $input = $view->selected_text();
+            } else {
+                my $ln = $view->cursor_line();
+                $start_off = $doc->line_start_offset($ln);
+                $input = $doc->get_line_content($ln);
+                $end_off = $start_off + length($input);
+            }
+
+            # Pipe through shell command
+            my $output = eval {
+                my $pid = open2(my $out_fh, my $in_fh, 'sh', '-c', $cmd);
+                print $in_fh $input;
+                close $in_fh;
+                local $/;
+                my $result = <$out_fh>;
+                close $out_fh;
+                waitpid($pid, 0);
+                $result;
+            };
+
+            if ($@) {
+                $self->show_message("Transform error: $@");
+                return;
+            }
+
+            if (!defined $output) {
+                $self->show_message("Transform produced no output");
+                return;
+            }
+
+            # Strip trailing newline that shell commands typically add
+            chomp $output;
+
+            # Replace the original text
+            $view->clear_selection();
+            $doc->replace($start_off, $end_off, $output);
+            $view->invalidate_wrap_map();
+        },
+    );
 }
 
 # =============================================================================

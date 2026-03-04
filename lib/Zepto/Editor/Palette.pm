@@ -361,7 +361,17 @@ sub _handle_palette_mouse {
         my $x = $event->{x};
         my $y = $event->{y};
 
-        # Check if click is inside palette area
+        # Check if click is on the filter input row
+        my $geo = Zepto::Renderer::get_palette_geometry();
+        if ($geo && $y == $geo->{filter_row}
+            && $x >= $geo->{filter_x_start}
+            && $x < $geo->{filter_x_start} + $geo->{filter_input_width}) {
+            my $char_offset = $x - $geo->{filter_x_start};
+            $self->{palette_widget}->handle_mouse_click($char_offset);
+            return;
+        }
+
+        # Check if click is on a command item row
         my @buttons = Zepto::Renderer::get_palette_buttons();
         for my $btn (@buttons) {
             if ($y == $btn->{y} && $x >= $btn->{x_start} && $x <= $btn->{x_end}) {

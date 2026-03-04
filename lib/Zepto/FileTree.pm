@@ -30,6 +30,23 @@ use constant {
     VCS_DEBOUNCE_SEC   => 5.0,
 };
 
+# Natural sort: "file2" before "file10", case-insensitive
+sub _natural_cmp {
+    my ($a, $b) = @_;
+    my @a_parts = map { /^\d+$/ ? $_ : lc($_) } split(/(\d+)/, $a);
+    my @b_parts = map { /^\d+$/ ? $_ : lc($_) } split(/(\d+)/, $b);
+    for my $i (0 .. ($#a_parts < $#b_parts ? $#a_parts : $#b_parts)) {
+        my $cmp;
+        if ($a_parts[$i] =~ /^\d+$/ && $b_parts[$i] =~ /^\d+$/) {
+            $cmp = $a_parts[$i] <=> $b_parts[$i];
+        } else {
+            $cmp = $a_parts[$i] cmp $b_parts[$i];
+        }
+        return $cmp if $cmp;
+    }
+    return @a_parts <=> @b_parts;
+}
+
 # =============================================================================
 # Constructor
 # =============================================================================
@@ -99,7 +116,7 @@ sub _scan_dir_one_level {
     my ($self, $dir_path, $depth, $skip) = @_;
 
     opendir(my $dh, $dir_path) or return [];
-    my @entries = sort { lc($a) cmp lc($b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+    my @entries = sort { _natural_cmp($a, $b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
     closedir($dh);
 
     my @dirs;
@@ -536,7 +553,7 @@ sub _walk_for_files {
     return if $depth > $max_depth;
 
     opendir(my $dh, $dir) or return;
-    my @entries = sort { lc($a) cmp lc($b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+    my @entries = sort { _natural_cmp($a, $b) } grep { $_ ne '.' && $_ ne '..' } readdir($dh);
     closedir($dh);
 
     for my $entry (@entries) {

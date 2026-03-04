@@ -10,19 +10,25 @@ Priority scale:
 
 ## Existing bugs
 
-### P1: Search should jump to first
+### ~~P1: Search should jump to first~~ FIXED
 When searching for a string that's not currently in view, screen/cursor should jump to match.
 
-### P3: Transform feature
+**Fix:** Removed `skip_jump` from `_find_value_changed()` so typing in the find bar triggers `_find_nearest_match()` on each keystroke. For matches outside the viewport, the background search completion in the main loop now also triggers a jump when it finds new matches that weren't available during the synchronous viewport-only search.
+
+### ~~P3: Transform feature~~ FIXED
 I'd like the ability to use cmd line tools to transform fragments of text. For example, select some text, press transform, type "sort | uniq", and have the selected text replaced with the result of piping it through those process. If no text selected, auto select current line (or maybe entire doc, WDYT?). Also give option to put output in clipboard instead of replacing inline. Give hints in UI as to how to use the functionality. e.g. "sort | uniq", "tac", "python3 -m json.tool"
+
+**Fix:** Added `⌥T` "Transform via Shell" command. Opens a footer input with hint showing example commands (`sort | uniq`, `tac`, `python3 -m json.tool`). Pipes the selected text (or current line if no selection) through `sh -c "$command"` via `IPC::Open2` and replaces inline. Registered in command palette under EDIT section. **Decision:** No selection defaults to current line (not entire doc) — more predictable and less destructive. Clipboard output option deferred — users can use `pbcopy`/`xclip` in the command itself.
 
 ### ~~P2: Syntax highlighting misaligned on lines with ⌥, ⚠, and similar Unicode symbols~~ FIXED
 `_char_display_width()` used overly broad Unicode ranges (U+231A-23FF, U+2600-27BF, U+2B50-2B55) that returned width 2 for hundreds of narrow (EAW=N) characters like ⌥ (U+2325), ⚠ (U+26A0), ✔ (U+2714). These are width 1 in terminals. On lines with these characters (common in bugs.md keyboard shortcuts), syntax tokens were shifted right by 1 per such char, word wrap broke at wrong positions, and the minimap viewport alignment was off.
 
 **Fix:** Replaced the three broad ranges with precise sub-ranges listing only the characters that are actually East Asian Wide (EAW=W/F) per Unicode. For example, the Misc Technical range (U+231A-23FF) now only matches ⌚⌛ (U+231A-231B), 〈〉 (U+2329-232A), ⏩⏪⏫⏬ (U+23E9-23EC), ⏰ (U+23F0), ⏳ (U+23F3). Added regression tests for both the wide and narrow characters.
 
-### P2: Smart sort.
+### ~~P2: Smart sort~~ FIXED
 Sort files in tree/search results by human friendly numbers, not ascii. e.g. file7.txt, file8.txt, file9.txt, file10.txt (10 after 7).
+
+**Fix:** Added `_natural_cmp()` function that splits filenames into text and numeric chunks and compares numbers numerically. Applied to all four sort locations: FileTree `_scan_dir_one_level` and `_walk_for_files`, FilePicker `_discover_files` and `_apply_filter`.
 
 ### ~~P0: Slight lag on typing~~ FIXED
 I notice it when typing and it's annoying. Figure out the bottleneck. Particularly visible when holding down a key to repeat chars.
@@ -363,13 +369,15 @@ Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prom
 
 **Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
 
-### ~~P3: Mouse parity incomplete~~ PARTIALLY FIXED
+### ~~P3: Mouse parity incomplete~~ FIXED
 
-~~Double-click word selection, triple-click line selection~~, and mouse cursor placement inside input fields (find/replace, go to line) are not implemented.
+~~Double-click word selection, triple-click line selection~~, and ~~mouse cursor placement inside input fields (find/replace, go to line)~~ are not implemented.
 
 **Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
 
-**Fix (partial):** Added multi-click detection in the document area press handler. Tracks last click time, line, and click count. Double-click (within 400ms on same line) calls `select_word()` to select the word under cursor. Triple-click calls `select_line()` to select the entire line including newline. Click count cycles back to 1 after triple. Mouse cursor placement in input fields remains unimplemented.
+**Fix (partial):** Added multi-click detection in the document area press handler. Tracks last click time, line, and click count. Double-click (within 400ms on same line) calls `select_word()` to select the word under cursor. Triple-click calls `select_line()` to select the entire line including newline. Click count cycles back to 1 after triple.
+
+**Fix (complete):** Mouse cursor placement in input fields was already implemented for find/replace bar and footer input (Go to Line, Save As, Transform). Added the missing piece: command palette filter input now supports mouse click cursor placement via `get_palette_geometry()` in Renderer.pm and click detection in `_handle_palette_mouse()` in Palette.pm.
 
 ### ~~P3: Light theme `status_accent` used `bg_rgb` instead of `fg_rgb`~~ FIXED
 

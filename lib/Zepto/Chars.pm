@@ -217,6 +217,7 @@ my %CHARS = (
     prev_change         => [ NF_CHEVRON_UP,     '^'         ],
     warning             => [ NF_WARNING,        '!'         ],
     clock               => [ NF_CLOCK,          '*'         ],
+    terminal            => [ NF_SHELL,          '$'         ],
 
     # VCS gutter indicators (same in both modes)
     vcs_added           => [ VCS_ADDED,           VCS_ADDED     ],  # ▐
