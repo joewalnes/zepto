@@ -366,7 +366,10 @@ sub _create_document_state {
 
     my $doc;
     if ($file_path && -f $file_path) {
-        $doc = Zepto::Document->load($file_path, skip_vcs => $opts{skip_vcs});
+        $doc = Zepto::Document->load($file_path,
+            skip_vcs => $opts{skip_vcs},
+            ($opts{max_bytes} ? (max_bytes => $opts{max_bytes}) : ()),
+        );
     } else {
         $doc = Zepto::Document->new(
             path => $file_path,
@@ -3309,25 +3312,6 @@ sub _tree_preview_current {
     my $path = $node->{path};
     return if $tree->{preview_path} && $tree->{preview_path} eq $path;
 
-    # Skip preview for large files to avoid UI freeze
-    # Use absolute path for stat since tree paths may be relative
-    my $abs_path = File::Spec->rel2abs($path, $tree->root_path());
-    my $file_size = -s $abs_path;
-    if (defined $file_size && $file_size > PREVIEW_MAX_FILE_SIZE) {
-        # Cancel any active preview and show nothing
-        if ($tree->{preview_active}) {
-            $self->_close_preview_tab();
-            if (defined $tree->{pre_preview_tab_index}) {
-                my $idx = $tree->{pre_preview_tab_index};
-                $idx = 0 if $idx >= $self->{tab_manager}->tab_count();
-                $self->_switch_to_tab($idx);
-            }
-            $tree->{preview_active} = 0;
-            $tree->{preview_path} = undef;
-        }
-        return;
-    }
-
     # If already previewing a different file, close that preview tab first
     if ($tree->{preview_active}) {
         $self->_close_preview_tab();
@@ -3346,9 +3330,18 @@ sub _tree_preview_current {
         return;
     }
 
+    # For large files, only read the beginning to keep preview instant
+    my $abs_path = File::Spec->rel2abs($path, $tree->root_path());
+    my $file_size = -s $abs_path;
+    my $max_bytes = (defined $file_size && $file_size > PREVIEW_MAX_FILE_SIZE)
+        ? PREVIEW_MAX_FILE_SIZE : undef;
+
     # Open file in a new transient tab (skip VCS to keep preview instant)
     eval {
-        my ($doc, $view, $fe, $hl) = $self->_create_document_state($path, skip_vcs => 1);
+        my ($doc, $view, $fe, $hl) = $self->_create_document_state($path,
+            skip_vcs => 1,
+            ($max_bytes ? (max_bytes => $max_bytes) : ()),
+        );
         $self->{tab_manager}->add_tab(
             document => $doc, view => $view,
             find_engine => $fe, highlighter => $hl,
@@ -3441,8 +3434,15 @@ sub _tree_open_selected {
 
     # If previewing this file, confirm it (keep the tab, init VCS now)
     if ($tree->{preview_active}) {
-        # Preview was loaded without VCS — initialize it now for gutter indicators
-        $self->active_doc()->init_vcs();
+        # Preview may have been truncated for large files — reload fully
+        if ($self->active_doc()->{_truncated_preview}) {
+            my $path = $node->{path};
+            $self->_close_preview_tab();
+            $self->_load_file($path);
+        } else {
+            # Preview was loaded without VCS — initialize it now for gutter indicators
+            $self->active_doc()->init_vcs();
+        }
         # Check if the pre-preview tab was an empty untitled tab to close
         my $close_idx = $self->_empty_untitled_tab_index($tree->{pre_preview_tab_index});
         $tree->{preview_active} = 0;

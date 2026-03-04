@@ -57,14 +57,26 @@ sub new {
 
 # Load document from file
 # Options: skip_vcs => 1 to defer VCS initialization (for preview tabs)
+#          max_bytes => N to read only the first N bytes (for large file preview)
 sub load {
     my ($class, $path, %opts) = @_;
 
     open my $fh, '<:encoding(UTF-8)', $path
         or die "Cannot open $path: $!";
 
-    local $/;
-    my $content = <$fh>;
+    my $content;
+    if ($opts{max_bytes}) {
+        read($fh, $content, $opts{max_bytes});
+        $content //= '';
+        # Truncate at last newline to avoid partial lines
+        if (length($content) == $opts{max_bytes}) {
+            my $last_nl = rindex($content, "\n");
+            $content = substr($content, 0, $last_nl + 1) if $last_nl >= 0;
+        }
+    } else {
+        local $/;
+        $content = <$fh>;
+    }
     close $fh;
 
     # Detect line ending style
@@ -81,6 +93,10 @@ sub load {
     # Get file permissions
     my $permissions = (stat($path))[2] & 07777;
 
+    # Track whether we truncated the file for preview
+    my $was_truncated = $opts{max_bytes}
+        && (-s $path) > $opts{max_bytes};
+
     my $doc = $class->new(
         text        => $content,
         path        => $path,
@@ -88,6 +104,7 @@ sub load {
         permissions => $permissions,
         ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
     );
+    $doc->{_truncated_preview} = 1 if $was_truncated;
     $doc->_capture_file_mtime();
     return $doc;
 }
