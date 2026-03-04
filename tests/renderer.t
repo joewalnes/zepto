@@ -1049,6 +1049,25 @@ subtest 'char display width - wide characters' => sub {
     is(Zepto::Renderer::_char_display_width("\x{4E2D}"), 2, 'CJK character (中) is 2 columns');
     # Fullwidth
     is(Zepto::Renderer::_char_display_width("\x{FF01}"), 2, 'fullwidth exclamation is 2 columns');
+    # Misc Technical wide chars
+    is(Zepto::Renderer::_char_display_width("\x{231A}"), 2, 'watch (⌚) is 2 columns');
+    is(Zepto::Renderer::_char_display_width("\x{23F0}"), 2, 'alarm clock (⏰) is 2 columns');
+    # Misc Symbols wide chars
+    is(Zepto::Renderer::_char_display_width("\x{2614}"), 2, 'umbrella (☔) is 2 columns');
+    is(Zepto::Renderer::_char_display_width("\x{26A1}"), 2, 'high voltage (⚡) is 2 columns');
+    is(Zepto::Renderer::_char_display_width("\x{2B50}"), 2, 'star (⭐) is 2 columns');
+};
+
+subtest 'char display width - narrow symbols (not wide per Unicode EAW)' => sub {
+    # These chars are in ranges that were previously (incorrectly) treated as wide.
+    # They have EAW=N (Narrow) and render as 1 column in terminals.
+    is(Zepto::Renderer::_char_display_width("\x{2325}"), 1, 'option key (⌥) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{2318}"), 1, 'command key (⌘) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{2328}"), 1, 'keyboard (⌨) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{26A0}"), 1, 'warning sign (⚠) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{2714}"), 1, 'check mark (✔) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{2764}"), 1, 'heavy heart (❤) is 1 column');
+    is(Zepto::Renderer::_char_display_width("\x{2B51}"), 1, 'small star (⭑) is 1 column');
 };
 
 subtest 'display width - string' => sub {

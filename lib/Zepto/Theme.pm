@@ -160,6 +160,16 @@ sub dark_theme {
         pill_palette_fg     => fg_rgb(255, 255, 255),    # Bright white text
         pill_palette_bg     => bg_rgb(86, 119, 252),    # Bold blue background
         pill_palette_edge   => fg_rgb(86, 119, 252),
+        # Diff pill VCS status colors
+        pill_diff_added_fg   => fg_rgb(255, 255, 255),
+        pill_diff_added_bg   => bg_rgb(56, 110, 56),     # Dark green
+        pill_diff_added_edge => fg_rgb(56, 110, 56),
+        pill_diff_modified_fg   => fg_rgb(255, 255, 255),
+        pill_diff_modified_bg   => bg_rgb(140, 105, 40),  # Dark yellow/amber
+        pill_diff_modified_edge => fg_rgb(140, 105, 40),
+        pill_diff_deleted_fg   => fg_rgb(255, 255, 255),
+        pill_diff_deleted_bg   => bg_rgb(140, 50, 60),    # Dark red
+        pill_diff_deleted_edge => fg_rgb(140, 50, 60),
 
         # Dialog
         dialog_fg    => fg_rgb(192, 202, 245),
@@ -396,6 +406,16 @@ sub light_theme {
         pill_palette_fg     => fg_rgb(255, 255, 255),     # White text
         pill_palette_bg     => bg_rgb(114, 135, 253),    # Lavender (matching file segment)
         pill_palette_edge   => fg_rgb(114, 135, 253),
+        # Diff pill VCS status colors
+        pill_diff_added_fg   => fg_rgb(255, 255, 255),
+        pill_diff_added_bg   => bg_rgb(40, 140, 60),      # Green
+        pill_diff_added_edge => fg_rgb(40, 140, 60),
+        pill_diff_modified_fg   => fg_rgb(255, 255, 255),
+        pill_diff_modified_bg   => bg_rgb(180, 120, 20),   # Amber
+        pill_diff_modified_edge => fg_rgb(180, 120, 20),
+        pill_diff_deleted_fg   => fg_rgb(255, 255, 255),
+        pill_diff_deleted_bg   => bg_rgb(190, 50, 60),     # Red
+        pill_diff_deleted_edge => fg_rgb(190, 50, 60),
 
         # Dialog
         dialog_fg    => fg_rgb(76, 79, 105),

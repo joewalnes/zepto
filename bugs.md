@@ -10,8 +10,16 @@ Priority scale:
 
 ## Existing bugs
 
+### P1: Search should jump to first
+When searching for a string that's not currently in view, screen/cursor should jump to match.
+
 ### P3: Transform feature
 I'd like the ability to use cmd line tools to transform fragments of text. For example, select some text, press transform, type "sort | uniq", and have the selected text replaced with the result of piping it through those process. If no text selected, auto select current line (or maybe entire doc, WDYT?). Also give option to put output in clipboard instead of replacing inline. Give hints in UI as to how to use the functionality. e.g. "sort | uniq", "tac", "python3 -m json.tool"
+
+### ~~P2: Syntax highlighting misaligned on lines with ⌥, ⚠, and similar Unicode symbols~~ FIXED
+`_char_display_width()` used overly broad Unicode ranges (U+231A-23FF, U+2600-27BF, U+2B50-2B55) that returned width 2 for hundreds of narrow (EAW=N) characters like ⌥ (U+2325), ⚠ (U+26A0), ✔ (U+2714). These are width 1 in terminals. On lines with these characters (common in bugs.md keyboard shortcuts), syntax tokens were shifted right by 1 per such char, word wrap broke at wrong positions, and the minimap viewport alignment was off.
+
+**Fix:** Replaced the three broad ranges with precise sub-ranges listing only the characters that are actually East Asian Wide (EAW=W/F) per Unicode. For example, the Misc Technical range (U+231A-23FF) now only matches ⌚⌛ (U+231A-231B), 〈〉 (U+2329-232A), ⏩⏪⏫⏬ (U+23E9-23EC), ⏰ (U+23F0), ⏳ (U+23F3). Added regression tests for both the wide and narrow characters.
 
 ### P2: Smart sort.
 Sort files in tree/search results by human friendly numbers, not ascii. e.g. file7.txt, file8.txt, file9.txt, file10.txt (10 after 7).

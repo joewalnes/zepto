@@ -82,14 +82,50 @@ use constant TAB_WIDTH => 4;
 
 # Terminal display width of a single character.
 # Returns 2 for wide chars (CJK, emoji), 0 for control/combining, 1 otherwise.
+# Based on Unicode East Asian Width property (EAW=W or F only).
 sub _char_display_width {
     my $ord = ord($_[0]);
     return 0 if $ord < 0x20;       # control chars
     return 1 if $ord < 0x1100;     # ASCII, Latin, Cyrillic, etc.
     return 2 if ($ord >= 0x1100 && $ord <= 0x115F)    # Hangul Jamo
-             || ($ord >= 0x231A && $ord <= 0x23FF)    # Misc Technical (⌚ etc.)
-             || ($ord >= 0x2600 && $ord <= 0x27BF)    # Misc Symbols, Dingbats (❌ etc.)
-             || ($ord >= 0x2B50 && $ord <= 0x2B55)    # Stars
+             # Misc Technical — only the EAW=W characters
+             || $ord == 0x231A || $ord == 0x231B       # ⌚⌛
+             || $ord == 0x2329 || $ord == 0x232A       # 〈〉
+             || ($ord >= 0x23E9 && $ord <= 0x23EC)     # ⏩⏪⏫⏬
+             || $ord == 0x23F0                          # ⏰
+             || $ord == 0x23F3                          # ⏳
+             # Misc Symbols / Dingbats — only the EAW=W characters
+             || $ord == 0x2614 || $ord == 0x2615       # ☔☕
+             || ($ord >= 0x2630 && $ord <= 0x2637)     # ☰-☷ trigrams
+             || ($ord >= 0x2648 && $ord <= 0x2653)     # ♈-♓ zodiac
+             || $ord == 0x267F                          # ♿
+             || ($ord >= 0x268A && $ord <= 0x268F)     # ⚊-⚏ monograms/digrams
+             || $ord == 0x2693                          # ⚓
+             || $ord == 0x26A1                          # ⚡
+             || $ord == 0x26AA || $ord == 0x26AB       # ⚪⚫
+             || $ord == 0x26BD || $ord == 0x26BE       # ⚽⚾
+             || $ord == 0x26C4 || $ord == 0x26C5       # ⛄⛅
+             || $ord == 0x26CE                          # ⛎
+             || $ord == 0x26D4                          # ⛔
+             || $ord == 0x26EA                          # ⛪
+             || $ord == 0x26F2 || $ord == 0x26F3       # ⛲⛳
+             || $ord == 0x26F5                          # ⛵
+             || $ord == 0x26FA                          # ⛺
+             || $ord == 0x26FD                          # ⛽
+             || $ord == 0x2705                          # ✅
+             || $ord == 0x270A || $ord == 0x270B       # ✊✋
+             || $ord == 0x2728                          # ✨
+             || $ord == 0x274C                          # ❌
+             || $ord == 0x274E                          # ❎
+             || ($ord >= 0x2753 && $ord <= 0x2755)     # ❓❔❕
+             || $ord == 0x2757                          # ❗
+             || ($ord >= 0x2795 && $ord <= 0x2797)     # ➕➖➗
+             || $ord == 0x27B0                          # ➰
+             || $ord == 0x27BF                          # ➿
+             # Stars — only EAW=W
+             || $ord == 0x2B50                          # ⭐
+             || $ord == 0x2B55                          # ⭕
+             # CJK and East Asian ranges (broadly wide)
              || ($ord >= 0x2E80 && $ord <= 0x303E)    # CJK Radicals
              || ($ord >= 0x3040 && $ord <= 0x33BF)    # Japanese
              || ($ord >= 0x3400 && $ord <= 0x4DBF)    # CJK Extension A
@@ -413,10 +449,10 @@ sub render {
         $max_items = 5 if $max_items < 5;
         $max_items = 30 if $max_items > 30;
         my $pal_height = 3 + $max_items + 1;
-        # Filter input is on row 2 of palette (y_start + 1), starting at x + 5 (box + space + icon + space)
+        # Filter input is on row 2 of palette (y_start + 1), starting at x + 4 (box_v + space + icon + space)
         my $pal_y = int(($rows - $pal_height) / 2);
         $pal_y = 2 if $pal_y < 2;
-        $cursor_seq .= _move_to($pal_y + 1, $pal_x + 5 + $query_cursor_in_view);
+        $cursor_seq .= _move_to($pal_y + 1, $pal_x + 4 + $query_cursor_in_view);
         $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{dialog}) {
         # Position cursor in dialog input field
@@ -1066,8 +1102,8 @@ sub _render_ruler_bar {
     }
     $class->_set_ruler_buttons(\@ruler_buttons);
 
-    $output .= RESET;
     $output .= CLEAR_LINE;
+    $output .= RESET;
 
     return $output;
 }
@@ -3111,6 +3147,27 @@ sub _render_context_status_bar {
                     $fg = 'pill_toggle_off_fg';
                     $bg = 'pill_toggle_off_bg';
                     $edge = 'pill_toggle_off_edge';
+                }
+
+                # Diff pill: color based on VCS status of current line
+                if ($cmd->{id} eq 'toggle_diff' && $doc && $view) {
+                    my $line = $view->cursor_line();
+                    my $vcs_status = $doc->vcs_change_status($line);
+                    my $del_status = $doc->vcs_deletion_status($line);
+                    if ($vcs_status && $vcs_status eq 'added') {
+                        $fg = 'pill_diff_added_fg';
+                        $bg = 'pill_diff_added_bg';
+                        $edge = 'pill_diff_added_edge';
+                    } elsif ($vcs_status && ($vcs_status eq 'modified' || $vcs_status eq 'modified_whitespace')) {
+                        $fg = 'pill_diff_modified_fg';
+                        $bg = 'pill_diff_modified_bg';
+                        $edge = 'pill_diff_modified_edge';
+                    } elsif ($del_status) {
+                        $fg = 'pill_diff_deleted_fg';
+                        $bg = 'pill_diff_deleted_bg';
+                        $edge = 'pill_diff_deleted_edge';
+                    }
+                    # else: keep default on/off colors (grey = no change)
                 }
 
                 my $label = $cmd->{label};
