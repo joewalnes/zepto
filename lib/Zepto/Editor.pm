@@ -857,7 +857,14 @@ sub handle_editing_event {
         my $alt = Zepto::InputParser::has_modifier($event, 'alt');
 
         if ($ctrl) {
-            $self->handle_ctrl_char($char);
+            my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+            # Ctrl+Shift+P: command palette (VS Code convention)
+            if ($shift && lc($char) eq 'p') {
+                $self->cmd_open_palette();
+                $self->{quit_pending} = 0;
+            } else {
+                $self->handle_ctrl_char($char);
+            }
         }
         elsif ($alt) {
             $self->handle_alt_char($char);

@@ -255,6 +255,14 @@ sub _decode_csi {
         if ($code eq '24') { return $self->_make_key_event(KEY_F12, $modifiers); }
     }
 
+    # CSI u (fixterms/kitty keyboard protocol): ESC [ codepoint ; modifiers u
+    if ($final eq 'u' && @parts >= 1) {
+        my $codepoint = $parts[0];
+        if ($codepoint >= 32 && $codepoint < 127) {
+            return $self->_make_char_event(chr($codepoint), $modifiers);
+        }
+    }
+
     # Unknown CSI sequence
     return { type => EVT_NONE };
 }
