@@ -363,7 +363,7 @@ sub _handle_palette_mouse {
 
         # Check if click is on the filter input row
         my $geo = Zepto::Renderer::get_palette_geometry();
-        if ($geo && $y == $geo->{filter_row}
+        if ($geo && defined($geo->{filter_row}) && $y == $geo->{filter_row}
             && $x >= $geo->{filter_x_start}
             && $x < $geo->{filter_x_start} + $geo->{filter_input_width}) {
             my $char_offset = $x - $geo->{filter_x_start};

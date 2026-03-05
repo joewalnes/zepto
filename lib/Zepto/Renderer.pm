@@ -309,6 +309,7 @@ sub render {
     my $rows        = $args{rows} // DEFAULT_ROWS;
     my $cols        = $args{cols} // DEFAULT_COLS;
     my $message     = $args{message} // '';
+    my $message_is_error = $args{message_is_error} // 0;
     my $highlighter = $args{highlighter};  # Optional syntax highlighter
     my $word_wrap_active = $args{word_wrap_active} // ($prefs ? $prefs->word_wrap() : 0);
 
@@ -401,7 +402,7 @@ sub render {
         );
     } else {
         $row_buf[$rows - 1] .= $class->_render_context_status_bar(
-            $doc, $view, $theme, $cols, $message, $ui, $word_wrap_active
+            $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active
         );
     }
 
@@ -482,7 +483,14 @@ sub render {
             $input_width = 10;
         } else {
             $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
-            $input_width = 12;
+            if ($input->{wide}) {
+                my $hint = $input->{hint} // '';
+                my $hint_str = $hint ? " ($hint)" : '';
+                $input_width = $cols - $prompt_len - length($hint_str) - 2;
+                $input_width = 20 if $input_width < 20;
+            } else {
+                $input_width = 12;
+            }
         }
         my $cursor_in_view;
         if ($input->{widget}) {
@@ -2948,16 +2956,17 @@ sub _render_pill {
 }
 
 sub _render_context_status_bar {
-    my ($class, $doc, $view, $theme, $cols, $message, $ui, $word_wrap_active) = @_;
+    my ($class, $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active) = @_;
 
     my $output = '';
     my @buttons;
     my $ar = Zepto::Chars->get('arrow_right');
     my $nerd_font = Zepto::Chars->enabled();
 
-    # If there's a message, show it simply (same as before)
+    # If there's a message, show it simply
     if ($message) {
-        $output .= $theme->color('status_bg') . $theme->color('warning_fg');
+        my $fg = $message_is_error ? $theme->color('error_fg') : $theme->color('warning_fg');
+        $output .= $theme->color('status_bg') . $fg;
         $output .= ' ' . $message;
         my $padding = $cols - length($message) - 1;
         $output .= ' ' x $padding if $padding > 0;
@@ -3471,7 +3480,16 @@ sub _render_footer_input {
     my $prompt_len = length($prompt_str);
     my $hint_str = $hint ? ($input_id eq 'goto_line' ? "  $hint" : " ($hint)") : '';
     my $hint_len = length($hint_str);
-    my $input_width = ($input_id eq 'goto_line') ? 10 : 12;
+    my $input_width;
+    if ($input->{wide}) {
+        # Use most available space for the input field
+        $input_width = $cols - $prompt_len - $hint_len - 2;
+        $input_width = 20 if $input_width < 20;
+    } elsif ($input_id eq 'goto_line') {
+        $input_width = 10;
+    } else {
+        $input_width = 12;
+    }
 
     # Get viewport (handles overflow scrolling)
     my $vp = $widget ? $widget->viewport($input_width) : { display_text => ($input->{value} // ''), sel_start_in_view => undef, sel_end_in_view => undef };

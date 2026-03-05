@@ -12,7 +12,8 @@ use warnings;
 
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
-use IPC::Open2;
+use IPC::Open3;
+use Symbol 'gensym';
 
 use Zepto::Theme;
 
@@ -809,46 +810,79 @@ sub cmd_toggle_comment {
 sub cmd_transform {
     my ($self) = @_;
 
+    my $view = $self->active_view();
+
+    # Auto-select all if nothing is selected
+    my $auto_selected;
+    if (!$view->has_selection()) {
+        $view->select_all();
+        $auto_selected = 1;
+    }
+
+    my $last_cmd = $self->{last_transform_cmd};
     $self->open_footer_input(
         prompt => 'Shell:',
         hint   => 'sort | uniq, tac, python3 -m json.tool',
+        wide   => 1,
+        hint_clickable => 1,
+        value  => $last_cmd,
+        select_all => length($last_cmd) ? 1 : 0,
         on_submit => sub {
             my ($cmd) = @_;
-            return unless length($cmd);
-
-            my $doc  = $self->active_doc();
-            my $view = $self->active_view();
-
-            # Get input text: selection or current line
-            my ($input, $start_off, $end_off);
-            if ($view->has_selection()) {
-                ($start_off, $end_off) = $view->selection_offsets();
-                $input = $view->selected_text();
-            } else {
-                my $ln = $view->cursor_line();
-                $start_off = $doc->line_start_offset($ln);
-                $input = $doc->get_line_content($ln);
-                $end_off = $start_off + length($input);
-            }
-
-            # Pipe through shell command
-            my $output = eval {
-                my $pid = open2(my $out_fh, my $in_fh, 'sh', '-c', $cmd);
-                print $in_fh $input;
-                close $in_fh;
-                local $/;
-                my $result = <$out_fh>;
-                close $out_fh;
-                waitpid($pid, 0);
-                $result;
-            };
-
-            if ($@) {
-                $self->show_message("Transform error: $@");
+            unless (length($cmd)) {
+                $view->clear_selection() if $auto_selected;
                 return;
             }
 
-            if (!defined $output) {
+            $self->{last_transform_cmd} = $cmd;
+
+            my $doc = $self->active_doc();
+
+            # Get input text from selection (always have one at this point)
+            my ($start_off, $end_off) = $view->selection_offsets();
+            my $input = $view->selected_text();
+
+            # Ensure input ends with newline for line-oriented shell tools
+            # (the document may strip trailing newlines on load)
+            my $added_newline;
+            if (length($input) && substr($input, -1) ne "\n") {
+                $input .= "\n";
+                $added_newline = 1;
+            }
+
+            # Pipe through shell command, capturing both stdout and stderr
+            my ($output, $stderr_text);
+            eval {
+                my $err_fh = gensym;
+                my $pid = open3(my $in_fh, my $out_fh, $err_fh, 'sh', '-c', $cmd);
+                print $in_fh $input;
+                close $in_fh;
+                local $/;
+                $output = <$out_fh>;
+                $stderr_text = <$err_fh>;
+                close $out_fh;
+                close $err_fh;
+                waitpid($pid, 0);
+            };
+
+            if ($@) {
+                my $err = $@;
+                $err =~ s/\s+at\s+\S+\s+line\s+\d+.*//s;  # strip Perl location
+                $self->show_error_message("Transform failed: $err");
+                return;
+            }
+
+            # Check for command failure (non-zero exit)
+            my $exit_code = $? >> 8;
+            if ($exit_code != 0) {
+                my $err = $stderr_text // '';
+                chomp $err;
+                $err = "Command exited with code $exit_code" unless length($err);
+                $self->show_error_message($err);
+                return;
+            }
+
+            if (!defined $output || !length($output)) {
                 $self->show_message("Transform produced no output");
                 return;
             }
@@ -860,6 +894,9 @@ sub cmd_transform {
             $view->clear_selection();
             $doc->replace($start_off, $end_off, $output);
             $view->invalidate_wrap_map();
+        },
+        on_cancel => sub {
+            $view->clear_selection() if $auto_selected;
         },
     );
 }

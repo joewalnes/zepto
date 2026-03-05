@@ -79,12 +79,14 @@ sub new {
         state        => STATE_EDITING,
         dialog       => undef,
         message      => '',
+        message_is_error => 0,
         message_time => 0,
 
         # Search state
         search_term   => '',
         search_replace => '',
         last_search_pos => 0,
+        last_transform_cmd => '',
 
         # Incremental find state
         find_widget       => undef,   # InputWidget for search field
@@ -526,6 +528,7 @@ sub run {
             # Clear on any user input so normal status bar returns after next action.
             if ($self->{message} && length $input) {
                 $self->{message} = '';
+                $self->{message_is_error} = 0;
             }
 
             if (length $input) {
@@ -1693,6 +1696,8 @@ sub open_footer_input {
         prompt    => $opts{prompt} // '',
         widget    => $widget,
         hint      => $opts{hint},
+        wide      => $opts{wide},
+        hint_clickable => $opts{hint_clickable},
         on_submit => $opts{on_submit},
         on_cancel => $opts{on_cancel},
     };
@@ -1711,7 +1716,10 @@ sub handle_footer_input_event {
     my $widget = $input->{widget};
     my $type   = $event->{type};
 
-    if ($type eq 'key') {
+    if ($type eq 'mouse') {
+        $self->handle_mouse_event($event);
+    }
+    elsif ($type eq 'key') {
         my $key = $event->{key};
         if ($key eq 'enter') {
             my $value    = $widget->value();
@@ -2023,13 +2031,56 @@ sub _handle_find_bar_drag {
     }
 }
 
-# Click within footer input field: place cursor.
+# Click within footer input field: place cursor or select hint example.
 sub _handle_footer_input_click {
     my ($self, $x) = @_;
     my $input = $self->{footer_input};
     return unless $input && $input->{widget};
-    # Field starts right after " Prompt: " — prompt_len includes the two surrounding spaces
+
     my $prompt_len = length($input->{prompt} // '') + 2;
+    my $hint = $input->{hint} // '';
+    my $input_id = $input->{id} // '';
+
+    # Calculate input width (must match renderer)
+    my $hint_str = $hint ? ($input_id eq 'goto_line' ? "  $hint" : " ($hint)") : '';
+    my $hint_len = length($hint_str);
+    my ($rows, $cols) = $self->{terminal}->get_size();
+    my $input_width;
+    if ($input->{wide}) {
+        $input_width = $cols - $prompt_len - $hint_len - 2;
+        $input_width = 20 if $input_width < 20;
+    } elsif ($input_id eq 'goto_line') {
+        $input_width = 10;
+    } else {
+        $input_width = 12;
+    }
+
+    # 1-indexed x position of input field start and hint start
+    my $input_start = $prompt_len + 1;
+    my $hint_start  = $prompt_len + $input_width + 1;
+
+    if ($input->{hint_clickable} && $hint && $x >= $hint_start) {
+        # Click on hint area — find which comma-separated example was clicked
+        my $offset_in_hint = $x - $hint_start;  # 0-indexed offset into hint_str
+        # hint_str is " (sort | uniq, tac, python3 -m json.tool)"
+        # Parse examples from the inner text (strip parens and surrounding spaces)
+        my $inner = $hint;
+        my @examples = split(/,\s*/, $inner);
+        # Map each example to its position within hint_str
+        my $pos = 2;  # skip " ("
+        for my $ex (@examples) {
+            my $ex_end = $pos + length($ex);
+            if ($offset_in_hint >= $pos && $offset_in_hint < $ex_end) {
+                # Clicked on this example — replace input value
+                $input->{widget}->set_value($ex);
+                return;
+            }
+            $pos = $ex_end + 2;  # skip ", "
+        }
+        return;
+    }
+
+    # Click within the input field — place cursor
     my $char_offset = $x - $prompt_len - 1;  # -1: terminal columns are 1-indexed
     $input->{widget}->handle_mouse_click($char_offset);
 }
@@ -3610,6 +3661,7 @@ sub render {
         rows        => $rows,
         cols        => $cols,
         message     => $self->{message},
+        message_is_error => $self->{message_is_error},
         highlighter => $self->active_highlighter(),
         word_wrap_active => $word_wrap_active,
         ui          => {
@@ -3683,6 +3735,18 @@ sub render {
 sub show_message {
     my ($self, $msg) = @_;
     $self->{message} = $msg;
+    $self->{message_is_error} = 0;
+}
+
+sub show_error_message {
+    my ($self, $msg) = @_;
+    # For multiline errors, show first line with truncation indicator
+    if ($msg =~ /\n/) {
+        my ($first) = split(/\n/, $msg);
+        $msg = "$first ...";
+    }
+    $self->{message} = $msg;
+    $self->{message_is_error} = 1;
 }
 
 # =============================================================================
