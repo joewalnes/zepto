@@ -1046,16 +1046,6 @@ sub handle_mouse_event {
             my $tree_row = $y - 1;
             my $stickies = $tree->sticky_headers();
             my $sticky_count = scalar @$stickies;
-            my $search_bar_rows = 1;  # search bar always present
-
-            # Click on search bar (row 0) — focus tree and activate filter
-            if ($tree_row == 0) {
-                $tree->set_focused(1);
-                if (!$tree->filter_active()) {
-                    $tree->start_filter();
-                }
-                return;
-            }
 
             # Check if click is on scrollbar column (rightmost col of panel)
             my $sb = $tree->scrollbar_data();
@@ -1063,11 +1053,11 @@ sub handle_mouse_event {
             if ($has_scrollbar && $x == $tree_width - 1) {
                 # Start scrollbar drag
                 $self->{tree_scrollbar_dragging} = 1;
-                $self->_handle_tree_scrollbar_drag($tree_row - $search_bar_rows - $sticky_count, $sb);
+                $self->_handle_tree_scrollbar_drag($tree_row - $sticky_count, $sb);
                 return;
             }
 
-            my $content_row = $tree_row - $search_bar_rows - $sticky_count;
+            my $content_row = $tree_row - $sticky_count;
             if ($content_row >= 0) {
                 my $flat_idx = $tree->scroll() + $content_row;
                 if ($flat_idx < $tree->visible_count()) {
@@ -3284,38 +3274,18 @@ sub handle_tree_event {
         elsif ($key eq 'left')     { $tree->collapse_current(); }
         elsif ($key eq 'right')    { $tree->expand_current(); }
         elsif ($key eq 'enter')    { $self->_tree_open_selected(); }
-        elsif ($key eq 'escape') {
-            if ($tree->filter_active()) {
-                my $had_query = length($tree->filter_query() // '');
-                $tree->clear_filter();
-                # If filter had no query, also unfocus (single Esc exits)
-                $self->_tree_unfocus() unless $had_query;
-            }
-            else { $self->_tree_unfocus(); }
-        }
+        elsif ($key eq 'escape') { $self->_tree_unfocus(); }
         elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); }
         elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); }
         elsif ($key eq 'home')     { $tree->home(); }
         elsif ($key eq 'end')      { $tree->end(); }
-        elsif ($key eq 'backspace') { $tree->filter_backspace(); }
+        elsif ($key eq 'backspace') { }  # no-op in tree
     }
     elsif ($event->{type} eq 'char') {
         my $char = $event->{char};
         if    ($char eq '{') { $tree->shrink(2); }
         elsif ($char eq '}') { $tree->grow(2); }
-        elsif ($char eq ' ') {
-            if ($tree->filter_active()) { $tree->filter_append_char($char); }
-            else { $tree->toggle_current(); }
-        }
-        elsif ($char eq '/') {
-            if (!$tree->filter_active()) { $tree->start_filter(); }
-            else { $tree->filter_append_char($char); }
-        }
-        else {
-            # Auto-start filter on any other character
-            if (!$tree->filter_active()) { $tree->start_filter(); }
-            $tree->filter_append_char($char);
-        }
+        elsif ($char eq ' ') { $tree->toggle_current(); }
     }
     elsif ($event->{type} eq 'mouse') {
         $self->handle_mouse_event($event);
@@ -3456,12 +3426,6 @@ sub _tree_unfocus {
     $tree->{pre_preview_tab_index} = undef;
     $tree->set_focused(0);
 
-    # If tree was temporarily shown for ⌃O file open, hide it again
-    if ($self->{_tree_temp_for_open}) {
-        $self->{_tree_temp_for_open} = 0;
-        $self->{prefs}->set_show_tree(0);
-    }
-
     # Now that tree is unfocused, update highlight to match active tab
     if ($self->active_file_path()) {
         $tree->set_current_file($self->active_file_path());
@@ -3532,12 +3496,6 @@ sub _tree_open_selected {
     $tree->set_current_file($node->{path});
     $tree->expand_to_path($node->{path});
     $tree->set_focused(0);
-
-    # If tree was temporarily shown for ⌃O file open, hide it again
-    if ($self->{_tree_temp_for_open}) {
-        $self->{_tree_temp_for_open} = 0;
-        $self->{prefs}->set_show_tree(0);
-    }
 }
 
 # Map a scrollbar drag y-position to a scroll offset in the tree

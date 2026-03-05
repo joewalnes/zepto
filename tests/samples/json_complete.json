@@ -46,9 +46,9 @@
     },
     "emptyObject": {},
     "emptyArray": [],
-    "unicode": "Hello \u0048\u0065\u006c\u006c\u006f",
+    "unicode": "Hello Hello",
     "escaped": "Line1\nLine2\tTabbed\"Quoted\"",
-    "scientific": 1.5e10,
+    "scientific": 15000000000.0,
     "negative": -42,
     "fraction": 0.001
 }

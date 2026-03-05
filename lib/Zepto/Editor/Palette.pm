@@ -144,6 +144,8 @@ sub _palette_update_filtered {
 
     if (($self->{palette_mode} // 'commands') eq 'recent_files') {
         @filtered = $self->_filter_recent_files($query);
+    } elsif (($self->{palette_mode} // 'commands') eq 'files') {
+        @filtered = $self->_filter_all_files($query);
     } else {
         @filtered = Zepto::CommandRegistry->filter_commands($query);
 
@@ -218,6 +220,62 @@ sub _filter_recent_files {
             # Match against full display path
             my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
             # Also try matching against just the filename
+            my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
+            $score = $name_score if $name_score > $score;
+            push @scored, { item => $item, score => $score } if $score > 0;
+        }
+        @scored = sort { $b->{score} <=> $a->{score} } @scored;
+        @items = map { $_->{item} } @scored;
+    }
+
+    return @items;
+}
+
+sub _filter_all_files {
+    my ($self, $query) = @_;
+
+    # Ensure file tree exists and has built its file list
+    if (!$self->{file_tree}) {
+        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    }
+    my $tree = $self->{file_tree};
+    $tree->_build_all_files_list();
+
+    my @items;
+    for my $rel_path (@{$tree->{_all_files}}) {
+        # Extract filename
+        my $filename = $rel_path;
+        $filename =~ s{.*/}{};
+
+        # Compute directory portion for shortcut display
+        my $dir = $rel_path;
+        if ($dir =~ m{/}) {
+            $dir =~ s{/[^/]+$}{};
+        } else {
+            $dir = '';
+        }
+
+        # Absolute path for opening
+        my $abs_path = File::Spec->rel2abs($rel_path, $tree->{root_path});
+
+        push @items, {
+            label     => $filename,
+            icon      => '_file_icon',
+            shortcut  => $dir,
+            type      => 'action',
+            _is_file  => 1,
+            _path     => $abs_path,
+            _filename => $filename,
+            _display  => $rel_path,
+        };
+    }
+
+    # Filter by query if provided
+    if (defined $query && length($query) > 0) {
+        my $q = lc($query);
+        my @scored;
+        for my $item (@items) {
+            my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
             my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
             $score = $name_score if $name_score > $score;
             push @scored, { item => $item, score => $score } if $score > 0;
@@ -338,16 +396,36 @@ sub _palette_try_shortcut {
             next;
         }
 
-        if ($shortcut eq $expected) {
-            if ($cmd->{type} eq 'toggle') {
-                Zepto::CommandRegistry->execute($self, $cmd->{id});
-                $self->_palette_update_filtered();
-            } else {
-                $self->close_palette();
-                Zepto::CommandRegistry->execute($self, $cmd->{id});
+        # Check if expected matches any shortcut alternative (split on /)
+        my $matched = 0;
+        for my $alt (split m{/}, $shortcut) {
+            if ($alt eq $expected) {
+                $matched = 1;
+                last;
             }
+        }
+        next unless $matched;
+
+        # If this command would open the same palette mode, toggle-close
+        my %cmd_to_mode = (
+            open_palette => 'commands',
+            recent_files => 'recent_files',
+            open_file    => 'files',
+        );
+        my $target_mode = $cmd_to_mode{$cmd->{id}};
+        if ($target_mode && ($self->{palette_mode} // 'commands') eq $target_mode) {
+            $self->close_palette();
             return 1;
         }
+
+        if ($cmd->{type} eq 'toggle') {
+            Zepto::CommandRegistry->execute($self, $cmd->{id});
+            $self->_palette_update_filtered();
+        } else {
+            $self->close_palette();
+            Zepto::CommandRegistry->execute($self, $cmd->{id});
+        }
+        return 1;
     }
     return 0;
 }

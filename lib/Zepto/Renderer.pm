@@ -1883,54 +1883,7 @@ sub _render_tree_panel {
     # Track which row we're rendering
     my $row_idx = 0;
 
-    # Always render search bar first (above stickies)
-    if ($row_idx < $height) {
-        my $screen_row = $row_idx + 1;
-        my $output = _move_to($screen_row, 1);
-        $output .= $theme->color('tree_filter_bg') . $theme->color('tree_filter_fg');
-        my $query = $tree->filter_query() // '';
-        my $search_icon = Zepto::Chars->get('search');
-        my $prefix = " $search_icon ";
-        my $match_count = $tree->filter_match_count();
-        my $suffix = '';
-        if ($filter_active && length($query)) {
-            my $unit = $match_count == 1 ? 'file' : 'files';
-            $suffix = " $match_count $unit ";
-        } elsif (!$filter_active) {
-            $suffix = " " . Zepto::CommandRegistry::SYM_CTRL() . "O ";
-        }
-
-        my $suffix_space = length($suffix);
-        my $max_query_width = $content_width - length($prefix) - $suffix_space;
-        my $display;
-        if ($max_query_width > 0 && length($query) > $max_query_width) {
-            # Show the tail of the query so the cursor (always at end) stays visible
-            $display = $prefix . substr($query, -$max_query_width);
-        } else {
-            $display = $prefix . $query;
-        }
-
-        $output .= $display;
-
-        # Right-align suffix (match count or keyboard hint)
-        my $pad = $content_width - length($display) - $suffix_space;
-        $output .= ' ' x $pad if $pad > 0;
-        if (length($suffix)) {
-            $output .= $theme->color('tree_filter_fg') . $suffix;
-        }
-
-        # Scrollbar column
-        if ($has_scrollbar) {
-            $output .= $tree_bg . ' ';
-        }
-
-        # Border
-        $output .= $border_fg . $tree_bg . $border_char;
-        push @tree_rows, $output;
-        $row_idx++;
-    }
-
-    # Render sticky headers below search bar
+    # Render sticky headers
     for my $sticky (@$stickies) {
         last if $row_idx >= $height;
         my $screen_row = $row_idx + 1;  # tree starts at row 1
@@ -2997,10 +2950,16 @@ sub _render_context_status_bar {
         my $round_l = Zepto::Chars->get('round_left');
         my $round_r = Zepto::Chars->get('round_right');
 
-        # Right: palette trigger pill
+        # Right: Open File + palette trigger pills
+        my $open_icon = Zepto::Chars->get('folder_open');
+        my $open_text = " $open_icon Open \x{2303}O ";
+        my $open_width = length($open_text) + ($nerd_font ? 2 : 0);
+
         my $palette_icon = Zepto::Chars->get('palette');
         my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";  # ⌃␣
         my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
+
+        my $right_width = $open_width + 1 + $palette_width;  # +1 for gap
 
         # Middle: tree-context hint pills
         my $nav_icon = Zepto::Chars->get('cursor_pos');
@@ -3008,11 +2967,10 @@ sub _render_context_status_bar {
             { text => "$nav_icon \x{2191}\x{2193}", fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { text => "\x{2190}\x{2192} fold",      fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { text => "\x{21B5} open",               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
-            { text => "/ filter",                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { text => "Esc back",                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
         );
 
-        my $available = $cols - $left_width - $palette_width;
+        my $available = $cols - $left_width - $right_width;
         $available = 0 if $available < 0;
         my $center_col = $left_width + 1;
 
@@ -3038,10 +2996,29 @@ sub _render_context_status_bar {
         }
 
         # Fill remaining space
-        my $remaining = $cols - $center_col - $palette_width + 1;
+        my $remaining = $cols - $center_col - $right_width + 1;
         $remaining = 0 if $remaining < 0;
         $output .= $theme->color('status_bg');
         $output .= ' ' x $remaining if $remaining > 0;
+
+        # Open File pill
+        if ($nerd_font) {
+            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            $output .= $round_l;
+        }
+        $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+        $output .= $open_text;
+        if ($nerd_font) {
+            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            $output .= $round_r;
+        }
+        push @buttons, {
+            x_start    => $cols - $right_width + 1,
+            x_end      => $cols - $right_width + $open_width,
+            command_id => 'open_file',
+        };
+
+        $output .= $theme->color('status_bg') . ' ';  # gap between pills
 
         # Palette trigger with rounded caps
         if ($nerd_font) {
@@ -3118,18 +3095,24 @@ sub _render_context_status_bar {
         $left_width += 1;
     }
 
-    # 2. RIGHT: Palette trigger pill (always visible, rightmost)
+    # 2. RIGHT: Open File + Palette trigger pills (always visible, rightmost)
+    my $open_icon = Zepto::Chars->get('folder_open');
+    my $open_text = " $open_icon Open \x{2303}O ";
+    my $open_total_width = length($open_text) + ($nerd_font ? 2 : 0);
+
     my $palette_icon = Zepto::Chars->get('palette');
     my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
     my $palette_text_width = length($palette_text);
     # Total palette width includes the round caps (left + right)
     my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
 
+    my $right_total_width = $open_total_width + 1 + $palette_total_width;  # +1 for gap
+
     # 3. CENTER: Priority-based pills
     my $editor = $ui->{editor};
     # No trailing transition cost — each pill is self-contained with its own caps
     # -2 accounts for gap before first pill and after cursor pill
-    my $available = $cols - $left_width - $palette_total_width - 2;
+    my $available = $cols - $left_width - $right_total_width - 2;
     $available = 0 if $available < 0;
 
     # Collect pills sorted by priority
@@ -3275,10 +3258,29 @@ sub _render_context_status_bar {
     }
 
     # Middle fill
-    my $remaining = $cols - $center_col - $palette_total_width + 1;
+    my $remaining = $cols - $center_col - $right_total_width + 1;
     $remaining = 0 if $remaining < 0;
     $output .= $theme->color('status_bg');
     $output .= ' ' x $remaining if $remaining > 0;
+
+    # Open File pill
+    if ($nerd_font) {
+        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        $output .= $round_l;
+    }
+    $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+    $output .= $open_text;
+    if ($nerd_font) {
+        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        $output .= $round_r;
+    }
+    push @buttons, {
+        x_start    => $cols - $right_total_width + 1,
+        x_end      => $cols - $right_total_width + $open_total_width,
+        command_id => 'open_file',
+    };
+
+    $output .= $theme->color('status_bg') . ' ';  # gap between pills
 
     # Palette trigger pill (rightmost) with rounded caps
     if ($nerd_font) {
@@ -4120,9 +4122,14 @@ sub _render_command_palette {
 
     # === Top border with title ===
     my $mode = $palette->{mode} // 'commands';
-    my $title = $mode eq 'recent_files'
-        ? " \x{2303}E Recent Files "
-        : " \x{2303}\x{2423} Commands ";
+    my $title;
+    if ($mode eq 'recent_files') {
+        $title = " \x{2303}E Recent Files ";
+    } elsif ($mode eq 'files') {
+        $title = " \x{2303}O Open File ";
+    } else {
+        $title = " \x{2303}\x{2423} Commands ";
+    }
     my $title_len = length($title);
     my $border_left = int(($pal_width - 2 - $title_len) / 2);
     $border_left = 0 if $border_left < 0;

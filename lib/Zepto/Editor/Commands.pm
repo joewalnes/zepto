@@ -215,22 +215,19 @@ sub cmd_new_file {
 sub cmd_open_file {
     my ($self) = @_;
 
-    # If tree is hidden, temporarily show it for file picking
-    if (!$self->{prefs}->show_tree()) {
-        $self->{_tree_temp_for_open} = 1;
-        $self->{prefs}->set_show_tree(1);
-    }
+    # Don't open during input-focused states
+    return if $self->{state} eq 'footer_input';
+    return if $self->{state} eq 'prompt';
+    return if $self->{state} eq 'find';
+    return if $self->{state} eq 'dialog';
 
-    # Focus tree and activate filter mode (replaces old file picker overlay)
-    if (!$self->{file_tree}) {
-        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
-    }
-    my $tree = $self->{file_tree};
-    $tree->set_focused(1);
-    if ($tree->filter_active()) {
-        $tree->clear_filter();
-    }
-    $tree->start_filter();
+    # Open palette in files mode
+    $self->{state} = 'palette';
+    $self->{palette_mode} = 'files';
+    $self->{palette_widget} = Zepto::InputWidget->new();
+    $self->{palette_cursor} = 0;
+    $self->{palette_scroll} = 0;
+    $self->_palette_update_filtered();
 }
 
 sub cmd_recent_files {

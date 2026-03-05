@@ -1036,13 +1036,13 @@ subtest 'Open file on clean document shows picker' => sub {
 
     $editor->cmd_open_file();
 
-    is($editor->{state}, 'editing', 'State remains editing');
-    ok($editor->{file_tree}, 'File tree is created');
-    ok($editor->{file_tree}->focused(), 'File tree is focused');
-    ok($editor->{file_tree}->filter_active(), 'Filter mode is active');
+    is($editor->{state}, 'palette', 'State is palette');
+    is($editor->{palette_mode}, 'files', 'Palette mode is files');
+    ok($editor->{palette_widget}, 'Palette widget created');
+    ok(scalar @{$editor->{palette_filtered}} > 0, 'Palette has filtered items');
 };
 
-subtest 'Open file on dirty document opens tree filter' => sub {
+subtest 'Open file on dirty document opens palette picker' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Original\n");
     my $editor = Zepto::Editor->new(
@@ -1057,9 +1057,9 @@ subtest 'Open file on dirty document opens tree filter' => sub {
 
     $editor->cmd_open_file();
 
-    # With tabs, open file goes straight to tree filter (dirty doc stays in its tab)
-    ok($editor->{file_tree}->focused(), 'File tree focused');
-    ok($editor->{file_tree}->filter_active(), 'Filter active');
+    # With tabs, open file opens palette in files mode (dirty doc stays in its tab)
+    is($editor->{state}, 'palette', 'State is palette');
+    is($editor->{palette_mode}, 'files', 'Palette mode is files');
 };
 
 # ============================================================================
@@ -1121,9 +1121,9 @@ subtest 'Prompt escape cancels' => sub {
 };
 
 # ============================================================================
-# Tree-based file search (replaces file picker)
+# Palette-based file picker (Ctrl+O)
 # ============================================================================
-subtest 'Tree filter navigation' => sub {
+subtest 'File picker navigation' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1134,21 +1134,21 @@ subtest 'Tree filter navigation' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    ok($editor->{file_tree}->focused(), 'Tree focused');
-    ok($editor->{file_tree}->filter_active(), 'Filter active');
+    is($editor->{state}, 'palette', 'Palette open');
+    is($editor->{palette_mode}, 'files', 'Files mode');
 
-    my $initial = $editor->{file_tree}->cursor();
+    my $initial = $editor->{palette_cursor};
 
     # Arrow down
     $editor->handle_input("\e[B");  # Down arrow
-    is($editor->{file_tree}->cursor(), $initial + 1, 'Down arrow moves cursor');
+    is($editor->{palette_cursor}, $initial + 1, 'Down arrow moves cursor');
 
     # Arrow up
     $editor->handle_input("\e[A");  # Up arrow
-    is($editor->{file_tree}->cursor(), $initial, 'Up arrow moves cursor back');
+    is($editor->{palette_cursor}, $initial, 'Up arrow moves cursor back');
 };
 
-subtest 'Tree filter typing filters' => sub {
+subtest 'File picker typing filters' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1159,17 +1159,17 @@ subtest 'Tree filter typing filters' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    my $initial_count = $editor->{file_tree}->visible_count();
+    my $initial_count = scalar @{$editor->{palette_filtered}};
 
-    # Type to filter
-    $editor->handle_input('xyznonexistent');  # Unlikely to match much
+    # Type to filter — unlikely to match much
+    $editor->handle_input('xyznonexistent');
 
-    my $new_count = $editor->{file_tree}->visible_count();
+    my $new_count = scalar @{$editor->{palette_filtered}};
     ok($new_count <= $initial_count, 'Typing filters results');
-    is($editor->{file_tree}->filter_query(), 'xyznonexistent', 'Query updated');
+    is($editor->{palette_widget}->value(), 'xyznonexistent', 'Query updated');
 };
 
-subtest 'Tree filter escape clears then unfocuses' => sub {
+subtest 'File picker escape closes palette' => sub {
     my $term = mock_terminal();
     my $filename = create_temp_file("Content\n");
     my $editor = Zepto::Editor->new(
@@ -1180,27 +1180,21 @@ subtest 'Tree filter escape clears then unfocuses' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    ok($editor->{file_tree}->filter_active(), 'Filter active');
+    is($editor->{state}, 'palette', 'Palette open');
 
-    # Escape with empty query clears filter AND unfocuses in one step
+    # Escape closes palette
     $editor->handle_input("\e");
     $editor->flush_pending_input();
-    ok(!$editor->{file_tree}->filter_active(), 'Filter cleared');
-    ok(!$editor->{file_tree}->focused(), 'Tree unfocused (empty query = single Esc exits)');
+    is($editor->{state}, 'editing', 'Back to editing');
 
-    # With a query: Esc clears filter but tree stays focused
+    # Re-open, type something, then escape still closes
     $editor->cmd_open_file();
-    $editor->{file_tree}->filter_append_char('t');
-    ok($editor->{file_tree}->filter_active(), 'Filter active with query');
+    is($editor->{state}, 'palette', 'Palette re-opened');
+    $editor->handle_input('t');
+    ok(length($editor->{palette_widget}->value()) > 0, 'Query has content');
     $editor->handle_input("\e");
     $editor->flush_pending_input();
-    ok(!$editor->{file_tree}->filter_active(), 'Filter cleared');
-    ok($editor->{file_tree}->focused(), 'Tree still focused (had query)');
-
-    # Second escape unfocuses tree
-    $editor->handle_input("\e");
-    $editor->flush_pending_input();
-    ok(!$editor->{file_tree}->focused(), 'Tree unfocused');
+    is($editor->{state}, 'editing', 'Back to editing after typed query');
 };
 
 # ============================================================================
