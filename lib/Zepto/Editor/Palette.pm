@@ -230,53 +230,56 @@ sub _filter_recent_files {
 
     my @items;
     for my $abs_path (@recent) {
-        # Compute display path (relative to cwd if possible)
         my $display_path = $abs_path;
         if (index($abs_path, "$cwd/") == 0) {
             $display_path = substr($abs_path, length($cwd) + 1);
         }
-
-        # Extract filename for label
-        my $filename = $display_path;
-        $filename =~ s{.*/}{};
-
-        # Compute directory for shortcut display
-        my $dir = $display_path;
-        if ($dir =~ m{/}) {
-            $dir =~ s{/[^/]+$}{};
-        } else {
-            $dir = '';
-        }
-
-        push @items, {
-            label     => $filename,
-            icon      => '_file_icon',  # special: use file_icon() method
-            shortcut  => $dir,
-            type      => 'action',
-            _is_file  => 1,
-            _path     => $abs_path,
-            _filename => $filename,
-            _display  => $display_path,
-        };
+        push @items, _build_file_item($abs_path, $display_path);
     }
 
-    # Filter by query if provided
     if (defined $query && length($query) > 0) {
-        my $q = lc($query);
-        my @scored;
-        for my $item (@items) {
-            # Match against full display path
-            my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
-            # Also try matching against just the filename
-            my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
-            $score = $name_score if $name_score > $score;
-            push @scored, { item => $item, score => $score } if $score > 0;
-        }
-        @scored = sort { $b->{score} <=> $a->{score} } @scored;
-        @items = map { $_->{item} } @scored;
+        @items = _fuzzy_rank_file_items(\@items, $query);
     }
 
     return @items;
+}
+
+# Build a palette item hash for a file entry.
+sub _build_file_item {
+    my ($abs_path, $display_path) = @_;
+    my $filename = $display_path;
+    $filename =~ s{.*/}{};
+    my $dir = $display_path;
+    if ($dir =~ m{/}) {
+        $dir =~ s{/[^/]+$}{};
+    } else {
+        $dir = '';
+    }
+    return {
+        label     => $filename,
+        icon      => '_file_icon',
+        shortcut  => $dir,
+        type      => 'action',
+        _is_file  => 1,
+        _path     => $abs_path,
+        _filename => $filename,
+        _display  => $display_path,
+    };
+}
+
+# Fuzzy-score and rank file items by query, returning only matches.
+sub _fuzzy_rank_file_items {
+    my ($items, $query) = @_;
+    my $q = lc($query);
+    my @scored;
+    for my $item (@$items) {
+        my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
+        my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
+        $score = $name_score if $name_score > $score;
+        push @scored, { item => $item, score => $score } if $score > 0;
+    }
+    @scored = sort { $b->{score} <=> $a->{score} } @scored;
+    return map { $_->{item} } @scored;
 }
 
 sub _filter_all_files {
@@ -347,22 +350,9 @@ sub _filter_all_files {
         # Build palette items only for results
         my @items;
         for my $s (@scored) {
-            my $dir = $s->{path};
-            if ($dir =~ m{/}) {
-                $dir =~ s{/[^/]+$}{};
-            } else {
-                $dir = '';
-            }
-            push @items, {
-                label     => $s->{filename},
-                icon      => '_file_icon',
-                shortcut  => $dir,
-                type      => 'action',
-                _is_file  => 1,
-                _path     => File::Spec->rel2abs($s->{path}, $root_path),
-                _filename => $s->{filename},
-                _display  => $s->{path},
-            };
+            push @items, _build_file_item(
+                File::Spec->rel2abs($s->{path}, $root_path), $s->{path}
+            );
         }
         return @items;
     }
@@ -378,26 +368,9 @@ sub _filter_all_files {
     my @items;
     for my $i (0 .. $count - 1) {
         my $rel_path = $all_files->[$i];
-        my $filename = $rel_path;
-        $filename =~ s{.*/}{};
-
-        my $dir = $rel_path;
-        if ($dir =~ m{/}) {
-            $dir =~ s{/[^/]+$}{};
-        } else {
-            $dir = '';
-        }
-
-        push @items, {
-            label     => $filename,
-            icon      => '_file_icon',
-            shortcut  => $dir,
-            type      => 'action',
-            _is_file  => 1,
-            _path     => File::Spec->rel2abs($rel_path, $root_path),
-            _filename => $filename,
-            _display  => $rel_path,
-        };
+        push @items, _build_file_item(
+            File::Spec->rel2abs($rel_path, $root_path), $rel_path
+        );
     }
 
     return @items;
