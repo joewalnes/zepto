@@ -34,9 +34,10 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
 
 ### Shell Execution
 
-Shell commands are limited to two places:
+Shell commands are limited to three places:
 - **VCS integration**: `git` commands in `lib/Zepto/VCS/Git.pm`
 - **Clipboard tools**: xclip / pbcopy / xsel / wl-copy in `lib/Zepto/Terminal.pm`
+- **File search**: `git grep`, `rg`, `grep` in `lib/Zepto/FileSearchEngine.pm`
 
 Rules:
 - All user-controlled strings passed to the shell **must** be quoted with `_shell_quote()` or equivalent
@@ -50,6 +51,12 @@ my $cmd = "git diff -- " . _shell_quote($path);
 # Wrong — injectable
 my $cmd = "git diff -- $path";
 ```
+
+**File search** (`lib/Zepto/FileSearchEngine.pm`):
+- Commands: `git grep`, `rg` (ripgrep), `grep` — for cross-file text search
+- Quoting: list-form `open(my $fh, '-|', @cmd)` — no shell interpolation; search pattern passed via `-e` flag as a direct argument, never interpolated into a string
+- Scope directory validated with `-d` before use
+- Results are display-only until user explicitly selects one to open
 
 If a new shell exec is needed, it must:
 1. Accept only a fixed command with quoted arguments — never a user-supplied command string

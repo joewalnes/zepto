@@ -428,8 +428,11 @@ sub render {
         # Position cursor in palette filter input
         # MUST match dimensions in _render_command_palette exactly
         my $palette = $ui->{palette};
+        my $pal_mode = $palette->{mode} // 'commands';
         my $pal_width = $cols - 4;
-        if ($cols >= 120) {
+        if ($pal_mode eq 'find_in_files') {
+            $pal_width = 120 if $pal_width > 120;
+        } elsif ($cols >= 120) {
             $pal_width = 80 if $pal_width > 80;
         } else {
             $pal_width = 60 if $pal_width > 60;
@@ -446,10 +449,11 @@ sub render {
             $query_cursor_in_view = $palette->{query_cursor} // length($palette->{query} // '');
         }
         # Compute palette height to match _render_command_palette
-        my $max_items = $rows - 6;
+        my $has_footer_row = ($pal_mode eq 'find_in_files') ? 1 : 0;
+        my $max_items = $rows - 6 - $has_footer_row;
         $max_items = 5 if $max_items < 5;
         $max_items = 30 if $max_items > 30;
-        my $pal_height = 3 + $max_items + 1;
+        my $pal_height = 3 + $max_items + $has_footer_row + 1;
         # Filter input is on row 2 of palette (y_start + 1), starting at x + 4 (box_v + space + icon + space)
         my $pal_y = int(($rows - $pal_height) / 2);
         $pal_y = 2 if $pal_y < 2;
@@ -4072,16 +4076,20 @@ sub _render_command_palette {
     my $filtered = $palette->{filtered} // [];
     my $editor   = $palette->{editor};
 
-    # Palette dimensions — adapts to terminal width
+    # Palette dimensions — adapts to terminal width and mode
+    my $mode = $palette->{mode} // 'commands';
     my $pal_width = $total_cols - 4;
-    if ($total_cols >= 120) {
+    if ($mode eq 'find_in_files') {
+        $pal_width = 120 if $pal_width > 120;  # Find in Files: extra wide for content
+    } elsif ($total_cols >= 120) {
         $pal_width = 80 if $pal_width > 80;    # Wide terminal: moderately wider
     } else {
         $pal_width = 60 if $pal_width > 60;    # Standard: default width
     }
     $pal_width = 30 if $pal_width < 30;
 
-    my $max_items = $total_rows - 6;
+    my $has_footer_row = ($mode eq 'find_in_files') ? 1 : 0;
+    my $max_items = $total_rows - 6 - $has_footer_row;
     $max_items = 5 if $max_items < 5;
     $max_items = 30 if $max_items > 30;
 
@@ -4089,8 +4097,8 @@ sub _render_command_palette {
     # Fixed height: always use max_items so palette doesn't resize when filtering
     my $visible_items = $max_items;
 
-    # Palette height: border(1) + filter(1) + separator(1) + items + border(1)
-    my $pal_height = 3 + $visible_items + 1;
+    # Palette height: border(1) + filter(1) + separator(1) + items + [footer(1)] + border(1)
+    my $pal_height = 3 + $visible_items + $has_footer_row + 1;
 
     # Center palette
     my $x = int(($total_cols - $pal_width) / 2);
@@ -4120,13 +4128,23 @@ sub _render_command_palette {
     my $border_fg = $theme->color('dropdown_border');
     my $shortcut_fg = $theme->color('dropdown_shortcut');
 
+    # Tree branch chars for find-in-files result grouping
+    my $tree_branch_ch = Zepto::Chars->get('tree_branch');  # ├
+    my $tree_last_ch   = Zepto::Chars->get('tree_last');    # ╰
+    my $tree_dash_ch   = Zepto::Chars->get('tree_dash');    # ─
+    my $tree_fg        = $theme->color('tree_indent_fg');
+    my $fsr_path_fg    = $theme->color('fsr_path_fg');
+    my $fsr_path_active_fg = $theme->color('fsr_path_active_fg');
+
     # === Top border with title ===
-    my $mode = $palette->{mode} // 'commands';
     my $title;
     if ($mode eq 'recent_files') {
         $title = " \x{2303}E Recent Files ";
     } elsif ($mode eq 'files') {
         $title = " \x{2303}O Open File ";
+    } elsif ($mode eq 'find_in_files') {
+        my $scope = $editor->{_file_search_scope_label} // 'project';
+        $title = " \x{2303}\x{21E7}F Find in Files ($scope) ";
     } else {
         $title = " \x{2303}\x{2423} Commands ";
     }
@@ -4203,6 +4221,13 @@ sub _render_command_palette {
     my @buttons;
     my $current_section = '';
 
+    # For find_in_files: determine the selected item's group to highlight its path header
+    my $selected_group_idx = -1;
+    if ($mode eq 'find_in_files' && $cursor < $item_count) {
+        my $sel_item = $filtered->[$cursor];
+        $selected_group_idx = $sel_item->{_group_idx} // -1;
+    }
+
     for my $vi (0 .. $visible_items - 1) {
         my $item_idx = $scroll + $vi;
         my $row_y = $y + 3 + $vi;
@@ -4213,7 +4238,35 @@ sub _render_command_palette {
         if ($item_idx < $item_count) {
             my $cmd = $filtered->[$item_idx];
 
-            # Section header row
+            # File search path header row (non-selectable, BOLD filename)
+            if ($cmd->{_is_fsr_path}) {
+                my $path_highlighted = ($selected_group_idx >= 0
+                    && ($cmd->{_group_idx} // -2) == $selected_group_idx);
+                # Filenames: BOLD + themed color on normal bg
+                $output .= $bg;
+                if ($path_highlighted) {
+                    $output .= BOLD . $fsr_path_active_fg;
+                } else {
+                    $output .= BOLD . $fsr_path_fg;
+                }
+                $output .= "  ";
+                my $ficon = Zepto::Chars->file_icon($cmd->{_filename});
+                $output .= "$ficon ";
+                my $path_label = $cmd->{label} // '';
+                my $max_path = $inner_width - 4;
+                if (length($path_label) > $max_path) {
+                    $path_label = "\x{2026}" . substr($path_label, length($path_label) - $max_path + 1);
+                }
+                $output .= $path_label;
+                my $ppad = $inner_width - 4 - length($path_label);
+                $output .= RESET . $bg;  # Clear BOLD before padding
+                $output .= ' ' x $ppad if $ppad > 0;
+                $output .= $border_fg . $box_v;
+                $output .= RESET;
+                next;
+            }
+
+            # Section header row (commands mode)
             if ($cmd->{_is_header}) {
                 $output .= $bg . $shortcut_fg;
                 my $header_label = "  \x{2500}\x{2500} " . $cmd->{label} . " ";
@@ -4236,80 +4289,137 @@ sub _render_command_palette {
                 $output .= $bg . $fg;
             }
 
-            # Selection indicator
-            my $prefix = $is_selected ? ($ar . ' ') : '  ';
-            $output .= $prefix;
+            # File search content row — tree branch + match highlighting
+            if ($cmd->{_is_fsr_content}) {
+                my $row_bg = $is_selected ? $sel_bg : $bg;
+                my $row_fg = $is_selected ? $sel_fg : $fg;
 
-            # Icon
-            my $icon;
-            if ($cmd->{_is_file}) {
-                $icon = Zepto::Chars->file_icon($cmd->{_filename});
-            } else {
-                $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
-            }
-            $output .= "$icon ";
+                # Tree branch prefix: "  ├─ " or "  ╰─ " (aligned under file icon)
+                my $is_last = $cmd->{_is_last_in_group};
+                my $branch = $is_last ? $tree_last_ch : $tree_branch_ch;
+                my $tree_prefix = "  $branch$tree_dash_ch ";
+                my $tree_prefix_len = 5;
 
-            # Shortcut
-            my $shortcut = $cmd->{shortcut} // '';
-            my $shortcut_display = $shortcut;
-            my $shortcut_width = length($shortcut_display);
+                $output .= $row_bg . $tree_fg . $tree_prefix;
+                $output .= $row_fg;
 
-            # Toggle state (right-aligned)
-            my $toggle_text = '';
-            if ($cmd->{type} eq 'toggle' && $editor) {
-                my $state = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
-                $toggle_text = "[$state]" if $state ne '';
-            }
-            my $toggle_width = length($toggle_text);
+                my $label = $cmd->{label} // '';
+                my $ms = $cmd->{_match_start} // -1;
+                my $ml = $cmd->{_match_len} // 0;
 
-            # Label - fill remaining space
-            my $label = $cmd->{label} // '';
-            # Available: inner_width - 2(prefix) - 2(icon+space) - shortcut - toggle - spaces
-            my $label_space = $inner_width - 2 - 2 - $shortcut_width - 1 - $toggle_width - 2;
-            $label_space = 4 if $label_space < 4;
-
-            if (length($label) > $label_space) {
-                $label = substr($label, 0, $label_space - 1) . "\x{2026}";  # …
-            }
-
-            $output .= $label;
-            my $label_pad = $label_space - length($label);
-            $output .= ' ' x $label_pad if $label_pad > 0;
-            $output .= ' ';
-
-            # Shortcut (dimmed unless selected)
-            if (!$is_selected) {
-                $output .= $shortcut_fg;
-            }
-            $output .= $shortcut_display;
-
-            # Toggle state
-            if ($toggle_width > 0) {
-                $output .= ' ';
-                if ($is_selected) {
-                    $output .= $toggle_text;
-                } else {
-                    $output .= $shortcut_fg . $toggle_text;
+                # Available width for label (tree prefix takes 5 chars)
+                my $available_width = $inner_width - $tree_prefix_len;
+                if (length($label) > $available_width) {
+                    $label = substr($label, 0, $available_width - 1) . "\x{2026}";
                 }
-            }
 
-            # Pad to fill row
-            my $content_len = 2 + 2 + length($label) + $label_pad + 1 + $shortcut_width + ($toggle_width > 0 ? 1 + $toggle_width : 0);
-            my $row_pad = $inner_width - $content_len;
-            if ($is_selected) {
-                $output .= $sel_bg;
-            } else {
-                $output .= $bg;
-            }
-            $output .= ' ' x $row_pad if $row_pad > 0;
+                # Render with match highlighting
+                my $match_hl_bg = $theme->color('match_bg');
+                my $match_hl_fg = $theme->color('match_fg');
 
-            # Store button region for click handling
-            push @buttons, {
-                y       => $row_y,
-                x_start => $x + 1,
-                x_end   => $x + $pal_width - 2,
-                index   => $item_idx,
-            };
+                if ($ms >= 0 && $ml > 0 && $ms < length($label)) {
+                    my $before = substr($label, 0, $ms);
+                    my $end_pos = $ms + $ml;
+                    $end_pos = length($label) if $end_pos > length($label);
+                    my $match  = substr($label, $ms, $end_pos - $ms);
+                    my $after  = $end_pos < length($label) ? substr($label, $end_pos) : '';
+
+                    $output .= $before;
+                    $output .= $match_hl_bg . $match_hl_fg . $match;
+                    $output .= $row_bg . $row_fg . $after;
+                } else {
+                    $output .= $label;
+                }
+
+                my $rpad = $available_width - length($label);
+                $output .= $row_bg;
+                $output .= ' ' x $rpad if $rpad > 0;
+
+                push @buttons, {
+                    y       => $row_y,
+                    x_start => $x + 1,
+                    x_end   => $x + $pal_width - 2,
+                    index   => $item_idx,
+                };
+            }
+            else {
+                # Standard palette item rendering
+
+                # Selection indicator
+                my $prefix = $is_selected ? ($ar . ' ') : '  ';
+                $output .= $prefix;
+
+                # Icon
+                my $icon;
+                if ($cmd->{_is_file}) {
+                    $icon = Zepto::Chars->file_icon($cmd->{_filename});
+                } else {
+                    $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+                }
+                $output .= "$icon ";
+
+                # Shortcut
+                my $shortcut = $cmd->{shortcut} // '';
+                my $shortcut_display = $shortcut;
+                my $shortcut_width = length($shortcut_display);
+
+                # Toggle state (right-aligned)
+                my $toggle_text = '';
+                if ($cmd->{type} eq 'toggle' && $editor) {
+                    my $state = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
+                    $toggle_text = "[$state]" if $state ne '';
+                }
+                my $toggle_width = length($toggle_text);
+
+                # Label - fill remaining space
+                my $label = $cmd->{label} // '';
+                # Available: inner_width - 2(prefix) - 2(icon+space) - shortcut - toggle - spaces
+                my $label_space = $inner_width - 2 - 2 - $shortcut_width - 1 - $toggle_width - 2;
+                $label_space = 4 if $label_space < 4;
+
+                if (length($label) > $label_space) {
+                    $label = substr($label, 0, $label_space - 1) . "\x{2026}";  # …
+                }
+
+                $output .= $label;
+                my $label_pad = $label_space - length($label);
+                $output .= ' ' x $label_pad if $label_pad > 0;
+                $output .= ' ';
+
+                # Shortcut (dimmed unless selected)
+                if (!$is_selected) {
+                    $output .= $shortcut_fg;
+                }
+                $output .= $shortcut_display;
+
+                # Toggle state
+                if ($toggle_width > 0) {
+                    $output .= ' ';
+                    if ($is_selected) {
+                        $output .= $toggle_text;
+                    } else {
+                        $output .= $shortcut_fg . $toggle_text;
+                    }
+                }
+
+                # Pad to fill row
+                my $content_len = 2 + 2 + length($label) + $label_pad + 1 + $shortcut_width + ($toggle_width > 0 ? 1 + $toggle_width : 0);
+                my $row_pad = $inner_width - $content_len;
+                if ($is_selected) {
+                    $output .= $sel_bg;
+                } else {
+                    $output .= $bg;
+                }
+                $output .= ' ' x $row_pad if $row_pad > 0;
+
+                # Store button region for click handling
+                push @buttons, {
+                    y       => $row_y,
+                    x_start => $x + 1,
+                    x_end   => $x + $pal_width - 2,
+                    index   => $item_idx,
+                };
+            }
         } else {
             # Empty row (fixed-height palette may have unfilled rows)
             $output .= $bg . (' ' x $inner_width);
@@ -4319,22 +4429,163 @@ sub _render_command_palette {
         $output .= RESET;
     }
 
+    # === Footer row with pill buttons (find_in_files only) ===
+    my $footer_y;
+    if ($has_footer_row) {
+        $footer_y = $y + 3 + $visible_items;
+        $output .= _move_to($footer_y, $x);
+        $output .= $bg . $border_fg . $box_v;
+
+        # Render pills inside the footer row using find bar style
+        my $rl = Zepto::Chars->get('round_left');
+        my $rr = Zepto::Chars->get('round_right');
+        my $regex_on = $editor ? ($editor->{_file_search_regex} // 0) : 0;
+        my $case_on  = $editor ? ($editor->{_file_search_case} // 0) : 0;
+        my $scope_label = $editor ? ($editor->{_file_search_scope_label} // 'project') : 'project';
+        my $sym_ctrl = Zepto::CommandRegistry::SYM_CTRL();
+
+        my $pill_content = '';
+        my $pill_vis_len = 0;  # track visible width
+
+        $pill_content .= $bg . ' ';
+        $pill_vis_len += 1;
+
+        # Regex pill — position tracking for click regions
+        my $regex_pill_start = $x + 1 + $pill_vis_len;
+        if ($regex_on) {
+            $pill_content .= $bg . $theme->color('menu_active_edge') . $rl;
+            $pill_content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+            $pill_content .= ' .* ';
+            $pill_content .= $theme->color('dropdown_shortcut') . $sym_ctrl . 'R';
+            $pill_content .= $theme->color('menu_active_text') . ' ';
+            $pill_content .= $bg . $theme->color('menu_active_edge') . $rr;
+        } else {
+            $pill_content .= $bg . $theme->color('menu_pill_edge') . $rl;
+            $pill_content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+            $pill_content .= ' .* ';
+            $pill_content .= $theme->color('dropdown_shortcut') . $sym_ctrl . 'R';
+            $pill_content .= $theme->color('menu_pill_text') . ' ';
+            $pill_content .= $bg . $theme->color('menu_pill_edge') . $rr;
+        }
+        $pill_vis_len += 9;  # pill width: edges(2) + " .* ^R "(7)
+
+        $pill_content .= $bg . ' ';
+        $pill_vis_len += 1;
+
+        # Case pill
+        my $case_pill_start = $x + 1 + $pill_vis_len;
+        if ($case_on) {
+            $pill_content .= $bg . $theme->color('menu_active_edge') . $rl;
+            $pill_content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+            $pill_content .= ' Aa ';
+            $pill_content .= $theme->color('dropdown_shortcut') . $sym_ctrl . 'C';
+            $pill_content .= $theme->color('menu_active_text') . ' ';
+            $pill_content .= $bg . $theme->color('menu_active_edge') . $rr;
+        } else {
+            $pill_content .= $bg . $theme->color('menu_pill_edge') . $rl;
+            $pill_content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+            $pill_content .= ' Aa ';
+            $pill_content .= $theme->color('dropdown_shortcut') . $sym_ctrl . 'C';
+            $pill_content .= $theme->color('menu_pill_text') . ' ';
+            $pill_content .= $bg . $theme->color('menu_pill_edge') . $rr;
+        }
+        $pill_vis_len += 9;
+
+        $pill_content .= $bg . ' ';
+        $pill_vis_len += 1;
+
+        # Scope pill (always inactive style)
+        my $scope_pill_start = $x + 1 + $pill_vis_len;
+        my $scope_text = " $scope_label ";
+        my $scope_shortcut = 'Tab';
+        my $scope_pill_width = 2 + length($scope_text) + length($scope_shortcut);
+        $pill_content .= $bg . $theme->color('menu_pill_edge') . $rl;
+        $pill_content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+        $pill_content .= $scope_text;
+        $pill_content .= $theme->color('dropdown_shortcut') . $scope_shortcut;
+        $pill_content .= $theme->color('menu_pill_text') . ' ';
+        $pill_content .= $bg . $theme->color('menu_pill_edge') . $rr;
+        $pill_vis_len += $scope_pill_width + 1;  # +1 for trailing space in pill
+
+        # Result count on the right (use actual match count, not item count)
+        my $actual_count = ($editor && $editor->{_file_search_engine})
+            ? $editor->{_file_search_engine}->{result_count} : 0;
+        my $result_count_text;
+        if ($editor && $editor->{_file_search_engine}
+            && $editor->{_file_search_engine}->is_searching()) {
+            $result_count_text = "searching\x{2026} ($actual_count)";
+        } elsif ($editor && $editor->{_file_search_engine}
+            && $actual_count >= $editor->{_file_search_engine}->{_max_results}) {
+            $result_count_text = "$actual_count results (capped)";
+        } else {
+            my $result_word = $actual_count == 1 ? 'result' : 'results';
+            $result_count_text = "$actual_count $result_word";
+        }
+
+        my $right_pad = $inner_width - $pill_vis_len - length($result_count_text) - 1;
+        $right_pad = 1 if $right_pad < 1;
+        $pill_content .= $bg . $fg;
+        $pill_content .= ' ' x $right_pad;
+        $pill_content .= $shortcut_fg . $result_count_text . ' ';
+
+        $output .= $pill_content;
+        $output .= $bg . $border_fg . $box_v;
+        $output .= RESET;
+
+        # Store pill click regions
+        push @buttons, {
+            y => $footer_y,
+            x_start => $regex_pill_start,
+            x_end   => $regex_pill_start + 8,
+            _action => 'toggle_regex',
+        };
+        push @buttons, {
+            y => $footer_y,
+            x_start => $case_pill_start,
+            x_end   => $case_pill_start + 8,
+            _action => 'toggle_case',
+        };
+        push @buttons, {
+            y => $footer_y,
+            x_start => $scope_pill_start,
+            x_end   => $scope_pill_start + $scope_pill_width,
+            _action => 'cycle_scope',
+        };
+    }
+
     # === Bottom border ===
-    my $bottom_y = $y + 3 + $visible_items;
+    my $bottom_y = $y + 3 + $visible_items + $has_footer_row;
     $output .= _move_to($bottom_y, $x);
     $output .= $bg . $border_fg;
     $output .= $box_bl;
 
-    # Bottom border content: item count hint
-    my $count_label = $mode eq 'recent_files' ? 'files' : 'commands';
-    my $count_text = " $item_count $count_label ";
-    my $bottom_border_left = int(($pal_width - 2 - length($count_text)) / 2);
-    $bottom_border_left = 0 if $bottom_border_left < 0;
-    my $bottom_border_right = $pal_width - 2 - $bottom_border_left - length($count_text);
-    $bottom_border_right = 0 if $bottom_border_right < 0;
+    # Bottom border content: item count
+    my $count_label = $mode eq 'recent_files' ? 'files'
+                    : $mode eq 'find_in_files' ? 'results'
+                    : 'commands';
+    my $count_text;
+    if ($has_footer_row) {
+        # Count already shown in footer row; keep border clean
+        $count_text = '';
+    } elsif ($mode eq 'find_in_files' && $editor->{_file_search_engine}
+        && $editor->{_file_search_engine}->is_searching()) {
+        $count_text = " searching\x{2026} ($item_count so far) ";
+    } elsif ($mode eq 'find_in_files' && $editor->{_file_search_engine}
+        && $editor->{_file_search_engine}->{result_count} >= $editor->{_file_search_engine}->{_max_results}) {
+        $count_text = " $item_count results (capped) ";
+    } else {
+        $count_text = " $item_count $count_label ";
+    }
+
+    my $bottom_border_avail = $pal_width - 2 - length($count_text);
+    $bottom_border_avail = 0 if $bottom_border_avail < 0;
+    my $bottom_border_left = int($bottom_border_avail / 2);
+    my $bottom_border_right = $bottom_border_avail - $bottom_border_left;
     $output .= $box_h x $bottom_border_left;
-    $output .= $fg . $count_text;
-    $output .= $border_fg;
+    if (length($count_text)) {
+        $output .= $fg . $count_text;
+        $output .= $border_fg;
+    }
     $output .= $box_h x $bottom_border_right;
     $output .= $box_br;
     $output .= RESET;
@@ -4344,6 +4595,7 @@ sub _render_command_palette {
         x => $x, y => $y, width => $pal_width,
         filter_row => $y + 1, filter_x_start => $x + 4,
         filter_input_width => $pal_width - 6,
+        footer_row => $footer_y,
     });
 
     return $output;

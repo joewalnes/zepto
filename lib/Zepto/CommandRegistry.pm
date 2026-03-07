@@ -324,6 +324,16 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_go_forward',
     },
+    {
+        id       => 'find_in_files',
+        label    => 'Find in Files',
+        icon     => 'search',
+        shortcut => SYM_CTRL . SYM_SHIFT . 'F',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_find_in_files',
+    },
 
     # === VIEW section ===
     {

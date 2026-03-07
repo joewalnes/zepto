@@ -16,6 +16,7 @@ use IPC::Open3;
 use Symbol 'gensym';
 
 use Zepto::Theme;
+use Zepto::FileSearchEngine;
 
 # =============================================================================
 # File Commands
@@ -628,6 +629,50 @@ sub do_find_prev {
     else {
         $self->show_message("Not found: $term");
     }
+}
+
+sub cmd_find_in_files {
+    my ($self) = @_;
+
+    # Don't open during input-focused states
+    return if $self->{state} eq 'footer_input';
+    return if $self->{state} eq 'prompt';
+    return if $self->{state} eq 'find';
+    return if $self->{state} eq 'dialog';
+
+    # Lazily init FileSearchEngine
+    if (!$self->{_file_search_engine}) {
+        $self->{_file_search_engine} = Zepto::FileSearchEngine->new();
+    }
+    $self->{_file_search_engine}->detect_backend(Cwd::getcwd());
+
+    # Set default scope to project root (only on first open)
+    if (!defined $self->{_file_search_scope}) {
+        $self->{_file_search_scope} = Cwd::getcwd();
+        $self->{_file_search_scope_label} = 'project';
+    }
+
+    # Open palette in find_in_files mode
+    $self->{state} = 'palette';
+    $self->{palette_mode} = 'find_in_files';
+
+    # Restore previous widget if available, with text selected for easy replacement
+    if ($self->{_file_search_saved_widget} && length($self->{_file_search_saved_widget}->value())) {
+        $self->{palette_widget} = $self->{_file_search_saved_widget};
+        # Select all text so typing replaces it immediately
+        $self->{palette_widget}->{sel_start} = 0;
+        $self->{palette_widget}->{sel_end} = length($self->{palette_widget}->value());
+        $self->{palette_widget}->{cursor} = length($self->{palette_widget}->value());
+        # Restore cursor position in results list
+        $self->{palette_cursor} = $self->{_file_search_saved_cursor} // 0;
+        $self->{palette_scroll} = $self->{_file_search_saved_scroll} // 0;
+    } else {
+        $self->{palette_widget} = Zepto::InputWidget->new();
+        $self->{palette_cursor} = 0;
+        $self->{palette_scroll} = 0;
+    }
+
+    $self->_palette_update_filtered();
 }
 
 sub cmd_goto_line {

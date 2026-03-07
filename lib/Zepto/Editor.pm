@@ -136,6 +136,13 @@ sub new {
         palette_visible_rows => 15,  # updated during render
         palette_mode         => 'commands',  # 'commands' or 'recent_files'
 
+        # File search state (Find in Files)
+        _file_search_engine      => undef,
+        _file_search_scope       => undef,
+        _file_search_scope_label => 'project',
+        _file_search_case        => 0,
+        _file_search_regex       => 0,
+
         # Recent files tracking
         _recent_files        => [],  # Ordered list of recent file paths (most recent first)
 
@@ -512,7 +519,8 @@ sub run {
 
         while ($self->{state} ne STATE_QUIT) {
             # Use shorter timeout when background search is active
-            my $searching = $self->active_find_engine() && $self->active_find_engine()->is_searching;
+            my $searching = ($self->active_find_engine() && $self->active_find_engine()->is_searching)
+                         || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
             my $timeout = $searching ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
 
             # Read input with timeout
@@ -578,6 +586,34 @@ sub run {
                     # Jump to nearest match if background found new matches
                     if (!$old_count && @{$self->{find_matches}}) {
                         $self->_find_nearest_match();
+                    }
+                }
+            }
+
+            # Continue background file search if active
+            if ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching()) {
+                my $term = $self->{terminal};
+                my $fs_engine = $self->{_file_search_engine};
+
+                my $batch_start = time();
+                while ($fs_engine->is_searching()) {
+                    $fs_engine->tick(10);
+                    last if $term->has_input();
+                    last if (time() - $batch_start) > 0.03;
+                }
+
+                # Throttle render during search - only every 100ms
+                my $now = time();
+                if ($now - $last_search_render > 0.1) {
+                    $needs_render = 1;
+                    $last_search_render = $now;
+                }
+
+                # Update palette items when new results arrive or search completes
+                if (($self->{palette_mode} // '') eq 'find_in_files') {
+                    $self->_palette_update_filtered();
+                    if (!$fs_engine->is_searching()) {
+                        $needs_render = 1;
                     }
                 }
             }
@@ -861,6 +897,9 @@ sub handle_editing_event {
             # Ctrl+Shift+P: command palette (VS Code convention)
             if ($shift && lc($char) eq 'p') {
                 $self->cmd_open_palette();
+                $self->{quit_pending} = 0;
+            } elsif ($shift && lc($char) eq 'f') {
+                $self->cmd_find_in_files();
                 $self->{quit_pending} = 0;
             } else {
                 $self->handle_ctrl_char($char);

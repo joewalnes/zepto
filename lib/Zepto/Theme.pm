@@ -133,6 +133,10 @@ sub dark_theme {
         dropdown_border => fg_rgb(61, 66, 91),
         dropdown_shortcut => fg_rgb(86, 95, 137),
 
+        # Find-in-files path headers
+        fsr_path_fg        => fg_rgb(255, 255, 255),    # White bold filenames
+        fsr_path_active_fg => fg_rgb(229, 192, 123),    # Yellow bold when selected
+
         # Status bar
         status_fg    => fg_rgb(169, 177, 214),
         status_bg    => bg_rgb(36, 40, 59),
@@ -378,6 +382,10 @@ sub light_theme {
         dropdown_selected_bg => bg_rgb(114, 135, 253),
         dropdown_border => fg_rgb(172, 176, 190),
         dropdown_shortcut => fg_rgb(124, 127, 147),
+
+        # Find-in-files path headers
+        fsr_path_fg        => fg_rgb(0, 0, 0),          # Black bold filenames
+        fsr_path_active_fg => fg_rgb(166, 117, 0),      # Dark yellow bold when selected
 
         # Status bar
         status_fg    => fg_rgb(76, 79, 105),

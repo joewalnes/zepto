@@ -35,6 +35,7 @@ my %priority = (
     'lib/Zepto/Config.pm'       => 20,
     'lib/Zepto/Chars.pm'        => 21,
     'lib/Zepto/FileTree.pm'     => 22,
+    'lib/Zepto/FileSearchEngine.pm' => 25,
     # Minimap has no Zepto deps — must come before Renderer which derives constants from it
     'lib/Zepto/Minimap.pm'     => 23,
     # Syntax/Base must come first among Syntax modules
