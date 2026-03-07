@@ -150,8 +150,10 @@ DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. S
 ### P3: [Tests] No test for CommandRegistry consistency
 No test verifies that all commands have unique IDs, all shortcuts are unique, or all section names in `@SECTION_ORDER` are valid. If someone breaks CommandRegistry, all 33 commands silently disappear from the palette.
 
-### P3: [Repo Hygiene] Junk files not gitignored
+### ~~P3: [Repo Hygiene] Junk files not gitignored~~ FIXED
 11 `perflog*.txt` files, `foo.txt`, and `lib/Zepto/goo.js` are untracked in the working directory. These should be `.gitignore`d to prevent accidental commits.
+
+**Fix:** Added `perflog*.txt` and `foo.txt` to `.gitignore`. `lib/Zepto/goo.js` was not present in working directory (already removed).
 
 ## ~~P3: long filenames in open file dialog~~ FIXED
 Long filenames bust out of the box. Actually it's kinda useful to use more of the screenspace, but it leaves screen artifacts. Also useful to widen the picker, like with find across files picker.

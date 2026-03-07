@@ -2,3 +2,5 @@
 *.swp
 website/out/
 .DS_Store
+perflog*.txt
+foo.txt
