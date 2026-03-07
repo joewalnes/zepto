@@ -590,6 +590,11 @@ The feature that toggles Nerd Font glyph rendering is called "Powerline" everywh
 
 **Fix:** Renamed across all files: command palette label now says "Nerd Font", preference key is `nerd_font`, CLI flag is `--no-nerd-font` (with `--no-powerline` kept as backwards-compat alias), env var is `ZEPTO_NERD_FONT`, all internal variables/methods/comments updated. Also fixed a latent bug in Renderer.pm where `Zepto::Chars->get('powerline_round_left')` referenced a non-existent key (should be `round_left`). **Manual test:** Open command palette — should show "Nerd Font" not "Powerline". Run `./zepto --no-nerd-font` — should start without nerd font glyphs.
 
+### ~~P1: [Bug] Ctrl+O file open doesn't unfocus file tree~~ FIXED
+When launching zepto in directory mode (`./zepto .`), the file tree gets focus. After pressing Ctrl+O and selecting a file from the palette, focus remains on the file tree instead of transferring to the document. The status bar continues showing tree navigation hints instead of document editing pills.
+
+**Fix:** Added tree unfocus logic to `_load_file()` in Commands.pm. After opening a file, if the file tree is focused, `set_focused(0)` is called to transfer focus back to the document editor.
+
 ### ~~P2: Markdown underscore emphasis renders inside identifiers~~ FIXED
 Text like `NF_CLOSE (\x{f00d}) duplicated NF_TIMES` renders the substring between underscores as italic. Per CommonMark spec, `_` emphasis delimiters must not be intraword — an opening `_` must not be preceded by an alphanumeric character, and a closing `_` must not be followed by one. Only `*` allows intraword emphasis.
 

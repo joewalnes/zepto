@@ -261,6 +261,11 @@ sub _load_file {
     # Track in recent files
     $self->_track_recent_file($path);
 
+    # Unfocus file tree so document gets focus after opening
+    if ($self->{file_tree} && $self->{file_tree}->focused()) {
+        $self->{file_tree}->set_focused(0);
+    }
+
     # Check if file is already open in another tab
     my $existing = $self->{tab_manager}->find_tab_by_path($path);
     if (defined $existing) {
