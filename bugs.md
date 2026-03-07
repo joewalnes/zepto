@@ -10,7 +10,7 @@ Priority scale:
 
 ## Existing bugs
 
-### P1: [Usability] Global shortcuts should work from any state
+### P1: [Usability] Global shortcuts should work from any state — SKIPPED
 Several core shortcuts are swallowed when in find/replace (`⌃F`), footer input, or other modal states. These should be global — they should work regardless of what mode the editor is in:
 
 - `⌃O` Open File
@@ -26,6 +26,8 @@ Several core shortcuts are swallowed when in find/replace (`⌃F`), footer input
 - `⌃B` File Tree toggle
 
 Principle: anything that navigates between files, saves, or exits should never be blocked by a sub-mode. The sub-mode should close (or stay open, as appropriate) and the command should execute. For example, pressing `⌃O` while in find/replace should close the find bar and open the file picker.
+
+**Skipped — fix requires modifying event handling across all 5+ UI states (find, palette, footer input, dialog, prompt) for 11 shortcuts. Needs careful interactive testing of each state × shortcut combination. Not suitable for a bug bash.**
 
 ### ~~P1: [Security] Shell injection in VCS/Git.pm via backtick execution~~ FIXED
 `VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
@@ -72,27 +74,35 @@ User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~
 
 **Fix:** Replaced PID-based temp filename with `File::Temp::tempfile()` which creates files with unpredictable names via exclusive `O_EXCL` open, preventing symlink attacks. Temp file is created in the same directory as the target file (required for same-filesystem `rename`).
 
-### P2: [Performance] Renderer uses 381+ string concatenations in hot path
+### P2: [Performance] Renderer uses 381+ string concatenations in hot path — SKIPPED
 `Renderer.pm` uses 381+ `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation. For a full-screen render this is thousands of concatenations. Should use array buffering (`push @parts, ...; join '', @parts`).
+
+**Skipped — fix requires refactoring Renderer.pm (4461 lines) to change the output assembly pattern throughout. Not suitable for a bug bash.**
 
 ### ~~P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved~~ FIXED
 `docs/CODE_QUALITY.md` lines 173-180 lists four items as "Open" (unified input widget, global nav keys audit, theme contrast, mouse parity) but all four are marked FIXED or AUDITED in bugs.md. The audit list is stale and creates a false impression of outstanding work.
 
 **Fix:** Removed the entire "Open Items" section from `docs/CODE_QUALITY.md` since all four items are resolved in bugs.md.
 
-### P2: [Documentation] README.md lists zero features
+### ~~P2: [Documentation] README.md lists zero features~~ FIXED
 README.md is 32 lines with no feature list despite the editor having command palette, 52-language syntax highlighting, file tree, find/replace, git diff, minimap, tabs, etc. This violates CLAUDE.md Rule 7 which says to update README when features change.
+
+**Fix:** Added a "Features" section to README.md with 12 bullet points covering command palette, syntax highlighting, find/replace, find in files, file tree, tabs, git integration, minimap, view modes, themes, shell transform, and zero-dependency architecture.
 
 ### ~~P2: [Build] build.pl not in Makefile dependency list~~ FIXED
 `Makefile` line ~53: `zepto: $(MODULES)` doesn't depend on `build.pl`. Changing the build script won't trigger a rebuild. Should be `zepto: $(MODULES) build.pl`.
 
 **Fix:** Added `build.pl` to the dependency list: `zepto: $(MODULES) build.pl`.
 
-### P2: [Architecture] Editor is a 5800-line god object across 3 files
+### P2: [Architecture] Editor is a 5800-line god object across 3 files — SKIPPED
 `Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 157+ methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.
 
-### P2: [Code Quality] Inconsistent error handling across commands
+**Skipped — fix requires major architectural refactor across Editor.pm, Commands.pm, and Palette.pm. Not suitable for a bug bash.**
+
+### P2: [Code Quality] Inconsistent error handling across commands — SKIPPED
 `cmd_save` shows raw `$@` with Perl stack traces to users. `cmd_transform` strips location info from errors. `_load_file` shows "Error opening file: $@" including internal paths. No consistent policy for user-facing error messages.
+
+**Skipped — fix requires establishing a consistent error formatting policy and updating all command error paths across Commands.pm. Needs design decision on error message format.**
 
 ### P3: [Security] Terminal escape sequence injection via filenames
 `Terminal.pm` line ~540 sanitizes titles by stripping `[\x00-\x1f]` (ASCII control chars only). UTF-8 sequences or characters outside this range could potentially manipulate terminal state. Should consider a whitelist of allowed characters.
