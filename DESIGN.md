@@ -34,46 +34,62 @@ it's the pragmatic choice.
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                  Editor                                     │
-│                    (event loop, state machine, dispatch)                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│         Commands          │           Menu            │     Preferences     │
-│    (editing operations)   │    (dropdown handling)    │  (settings storage) │
-├───────────────────────────┴───────────────────────────┴─────────────────────┤
-│                                   View                                      │
-│              (viewport, cursor position, selection, scrolling)              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                 Document                                    │
-│                (file I/O, undo/redo, dirty tracking, metadata)              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                  Buffer                                     │
-│                    (gap buffer text storage, line index)                    │
-├──────────────────────────────────┬──────────────────────────────────────────┤
-│            Renderer              │               Terminal                   │
-│   (state → ANSI escape codes)    │    (raw mode, I/O, size detection)       │
-├──────────────────────────────────┴──────────────────────────────────────────┤
-│                               InputParser                                   │
-│               (byte sequences → keyboard/mouse events)                      │
-├────────────────────────────────────────────┬────────────────────────────────┤
-│                  Theme                     │           (stdin/stdout)       │
-│         (semantic color definitions)       │                                │
-└────────────────────────────────────────────┴────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                  Editor                                      │
+│              (event loop, state machine, dispatch, key bindings)             │
+├──────────────────┬──────────────────┬─────────────────┬──────────────────────┤
+│     Commands     │     Palette      │ CommandRegistry  │    Preferences      │
+│ (editing ops,    │ (command palette,│ (command table,  │ (user settings,     │
+│  file I/O, find) │  file picker,    │  shortcut map,   │  change callbacks)  │
+│                  │  find-in-files)  │  fuzzy filter)   │                     │
+├──────────────────┴──────────────────┴─────────────────┴──────────────────────┤
+│  View        │ FindEngine     │ FileTree       │ FileSearchEngine            │
+│ (viewport,   │ (incremental   │ (file explorer │ (cross-file grep via        │
+│  cursor,     │  search with   │  with lazy     │  git grep / rg / perl)      │
+│  selection)  │  background)   │  loading)      │                             │
+├──────────────┴────────────────┴────────────────┴─────────────────────────────┤
+│   Document         │ Highlighter      │ Diff          │ WrapMap / LineMap    │
+│ (file I/O, undo,   │ (syntax dispatch │ (Myers diff   │ (word wrap, inline   │
+│  redo, VCS status)  │  + line cache)   │  for gutter)  │  diff expansion)    │
+├─────────────────────┴──────────────────┴───────────────┴─────────────────────┤
+│                                  Buffer                                      │
+│                     (gap buffer text storage, line index)                    │
+├────────────────────────────────┬─────────────────────────────────────────────┤
+│          Renderer              │               Terminal                      │
+│ (state → ANSI escape codes,   │  (raw mode, I/O, clipboard,                │
+│  minimap, tab bar, status bar) │   size detection, mouse tracking)          │
+├────────────────────────────────┴─────────────────────────────────────────────┤
+│  InputParser     │  InputWidget      │  Theme          │ Chars / Config     │
+│ (bytes → events, │ (text input for   │ (semantic color │ (Nerd Font glyphs, │
+│  CSI u support)  │  find, palette)   │  definitions)   │  global settings)  │
+└──────────────────┴───────────────────┴─────────────────┴────────────────────┘
 ```
 
 ### Module Responsibilities
 
-| Module          | Purpose                                           | Purity                      |
-|-----------------|---------------------------------------------------|-----------------------------|
-| **Buffer**      | Gap buffer text storage with line indexing        | Pure (no I/O)               |
-| **Document**    | File operations, undo/redo, modification tracking | Stateful                    |
-| **View**        | Viewport position, cursor, selection state        | Stateful                    |
-| **Renderer**    | Converts editor state to ANSI escape sequences    | Pure function               |
-| **InputParser** | Decodes terminal input into semantic events       | Stateful (partial sequences)|
-| **Terminal**    | Raw mode, screen size, low-level I/O              | Side effects                |
-| **Theme**       | Color definitions for UI elements                 | Pure data                   |
-| **Preferences** | User settings with change callbacks               | Stateful                    |
-| **Editor**      | Main loop, key bindings, orchestration            | Stateful                    |
+| Module               | Purpose                                           | Purity                       |
+|----------------------|---------------------------------------------------|------------------------------|
+| **Buffer**           | Gap buffer text storage with line indexing         | Pure (no I/O)                |
+| **Document**         | File operations, undo/redo, VCS diff integration  | Stateful                     |
+| **View**             | Viewport position, cursor, selection state        | Stateful                     |
+| **Renderer**         | Converts editor state to ANSI escape sequences    | Pure function                |
+| **InputParser**      | Decodes terminal input into semantic events       | Stateful (partial sequences) |
+| **Terminal**         | Raw mode, screen size, clipboard, low-level I/O   | Side effects                 |
+| **Theme**            | Color definitions for UI elements                 | Pure data                    |
+| **Preferences**      | User settings with change callbacks               | Stateful                     |
+| **Editor**           | Main loop, key bindings, orchestration            | Stateful                     |
+| **CommandRegistry**  | Command table, shortcuts, palette filtering       | Pure data + functions        |
+| **FindEngine**       | Incremental search with background processing     | Stateful                     |
+| **Highlighter**      | Syntax detection, line-level token caching        | Stateful                     |
+| **FileTree**         | File explorer tree model with VCS status          | Stateful                     |
+| **FileSearchEngine** | Cross-file search via external tools              | Stateful (async I/O)         |
+| **Diff**             | Myers diff algorithm for VCS gutter               | Pure function                |
+| **InputWidget**      | Text input for find bar, palette, footer          | Stateful                     |
+| **WrapMap**          | Word wrap computation, visual row mapping         | Pure function                |
+| **LineMap**          | Maps display rows to document lines (diff view)   | Pure function                |
+| **Minimap**          | Braille-based scrollbar/minimap computation       | Pure function                |
+| **Chars**            | Nerd Font / ASCII glyph abstraction               | Pure data                    |
+| **Config**           | Global configuration constants                    | Pure data                    |
 
 ### Data Flow
 
@@ -82,20 +98,21 @@ it's the pragmatic choice.
        │                                                         ▲
        ▼                                                         │
   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
-  │ Terminal│───▶│  Input  │───▶│ Editor  │───▶│Renderer │───▶│Terminal │
-  │  (read) │    │ Parser  │    │         │    │         │    │ (write) │
-  └─────────┘    └─────────┘    └─────────┘    └─────────┘    └─────────┘
-                                     │
-                      ┌──────────────┼──────────────┐
-                      ▼              ▼              ▼
-                 ┌─────────┐   ┌─────────┐   ┌─────────┐
-                 │  View   │   │Document │   │  Menu   │
-                 └─────────┘   └─────────┘   └─────────┘
-                                     │
-                                     ▼
-                               ┌─────────┐
-                               │ Buffer  │
-                               └─────────┘
+  │ Terminal │───▶│  Input  │───▶│ Editor  │───▶│Renderer │───▶│Terminal │
+  │  (read)  │    │ Parser  │    │         │    │         │    │ (write) │
+  └──────────┘    └─────────┘    └─────────┘    └─────────┘    └─────────┘
+                                      │
+                 ┌────────────────┬────┴────┬────────────────┐
+                 ▼                ▼         ▼                ▼
+           ┌──────────┐   ┌──────────┐ ┌────────┐   ┌────────────┐
+           │   View   │   │ Document │ │FileTree│   │ FindEngine │
+           └──────────┘   └──────────┘ └────────┘   └────────────┘
+                                │
+                          ┌─────┴─────┐
+                          ▼           ▼
+                    ┌──────────┐ ┌────────┐
+                    │  Buffer  │ │  Diff  │
+                    └──────────┘ └────────┘
 ```
 
 ## The Gap Buffer
