@@ -10,24 +10,10 @@ Priority scale:
 
 ## Existing bugs
 
-### P1: [Usability] Global shortcuts should work from any state — SKIPPED
-Several core shortcuts are swallowed when in find/replace (`⌃F`), footer input, or other modal states. These should be global — they should work regardless of what mode the editor is in:
+### ~~P1: [Usability] Global shortcuts should work from any state~~ FIXED
+Several core shortcuts were swallowed when in find/replace (`⌃F`), footer input, or other modal states.
 
-- `⌃O` Open File
-- `⌃⇧F` Find in Files
-- `⌃S` Save
-- `⌃W` Close Tab
-- `⌃Q` Quit
-- `⌃Space` Command Palette
-- `⌃E` Recent Files
-- `⌃N` New File
-- `⌥,` / `⌥.` Prev/Next Tab
-- `⌃G` Go to Line
-- `⌃B` File Tree toggle
-
-Principle: anything that navigates between files, saves, or exits should never be blocked by a sub-mode. The sub-mode should close (or stay open, as appropriate) and the command should execute. For example, pressing `⌃O` while in find/replace should close the find bar and open the file picker.
-
-**Skipped — fix requires modifying event handling across all 5+ UI states (find, palette, footer input, dialog, prompt) for 11 shortcuts. Needs careful interactive testing of each state × shortcut combination. Not suitable for a bug bash.**
+**Fix:** Extended the global shortcut intercept in `handle_event()` to cover 6 additional shortcuts beyond the existing ⌃Q/⌃S/⌃T: `⌃O` (Open File), `⌃W` (Close Tab), `⌃N` (New File), `⌃E` (Recent Files), `⌃Space`/`⌃⇧P` (Command Palette), and `⌃⇧F` (Find in Files). All close the current modal first via `_close_any_modal()`, then execute. `⌃Space` toggles the palette (closes if already open). Removed `_in_modal_state()` guards from `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `cmd_open_palette`. Updated tests to reflect the new behavior.
 
 ### ~~P1: [Security] Shell injection in VCS/Git.pm via backtick execution~~ FIXED
 `VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
@@ -74,10 +60,10 @@ User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~
 
 **Fix:** Replaced PID-based temp filename with `File::Temp::tempfile()` which creates files with unpredictable names via exclusive `O_EXCL` open, preventing symlink attacks. Temp file is created in the same directory as the target file (required for same-filesystem `rename`).
 
-### P2: [Performance] Renderer uses 381+ string concatenations in hot path — SKIPPED
-`Renderer.pm` uses 381+ `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation. For a full-screen render this is thousands of concatenations. Should use array buffering (`push @parts, ...; join '', @parts`).
+### ~~P2: [Performance] Renderer uses 381+ string concatenations in hot path~~ FIXED
+`Renderer.pm` used 391 `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation.
 
-**Skipped — fix requires refactoring Renderer.pm (4461 lines) to change the output assembly pattern throughout. Not suitable for a bug bash.**
+**Fix:** Refactored all 19 render methods from `$output .= EXPR` to `push @_out, EXPR` with `join('', @_out)` at return. 426 lines changed across all render methods including `_render_command_palette` (87 concat ops), `_render_context_status_bar` (63), `_render_tree_node_content` (32), `_render_dialog` (30), `_render_tab_bar` (28), and 14 others. Array accumulation avoids per-append reallocation — Perl's `join()` pre-calculates total size and allocates once.
 
 ### ~~P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved~~ FIXED
 `docs/CODE_QUALITY.md` lines 173-180 lists four items as "Open" (unified input widget, global nav keys audit, theme contrast, mouse parity) but all four are marked FIXED or AUDITED in bugs.md. The audit list is stale and creates a false impression of outstanding work.
@@ -94,15 +80,15 @@ README.md is 32 lines with no feature list despite the editor having command pal
 
 **Fix:** Added `build.pl` to the dependency list: `zepto: $(MODULES) build.pl`.
 
-### P2: [Architecture] Editor is a 5800-line god object across 3 files — SKIPPED
-`Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 157+ methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.
+### P2: [Architecture] Editor is a 6000-line god object across 3 files — SKIPPED
+`Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 162 methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.
 
-**Skipped — fix requires major architectural refactor across Editor.pm, Commands.pm, and Palette.pm. Not suitable for a bug bash.**
+**Skipped — 6000 lines, 162 methods, 929 tests touching `$editor` objects directly. Extracting subsystems (find/replace, dialog management, scroll handling) requires defining stable interfaces, migrating shared `$self` state to composition, and updating tests. Multi-session project. Recommended approach: extract one subsystem at a time (start with dialog/prompt/footer — most self-contained), validate tests between each extraction.**
 
-### P2: [Code Quality] Inconsistent error handling across commands — SKIPPED
-`cmd_save` shows raw `$@` with Perl stack traces to users. `cmd_transform` strips location info from errors. `_load_file` shows "Error opening file: $@" including internal paths. No consistent policy for user-facing error messages.
+### ~~P2: [Code Quality] Inconsistent error handling across commands~~ FIXED
+`cmd_save` showed raw `$@` with Perl stack traces to users. `cmd_transform` stripped location info. `_load_file` showed "Error opening file: $@" with internal paths.
 
-**Skipped — fix requires establishing a consistent error formatting policy and updating all command error paths across Commands.pm. Needs design decision on error message format.**
+**Fix:** Added `_user_error($action, $@)` helper that strips Perl file/line info from `$@` and formats as `"$action: $reason"`. Applied to all 5 error paths: Save As, Save, file open, transform, and file reload (2 locations in Editor.pm). All errors now use `show_error_message()` for consistent styling. Format: "Save failed: Permission denied", "Could not open file: No such file or directory", etc.
 
 ### ~~P3: [Security] Terminal escape sequence injection via filenames~~ FIXED
 `Terminal.pm` line ~540 sanitizes titles by stripping `[\x00-\x1f]` (ASCII control chars only). UTF-8 sequences or characters outside this range could potentially manipulate terminal state. Should consider a whitelist of allowed characters.
