@@ -25,6 +25,16 @@ use Symbol 'gensym';
 use Zepto::Theme;
 use Zepto::FileSearchEngine;
 
+# Strip Perl internals from $@ to produce a user-friendly error message.
+# "Permission denied at lib/Zepto/Document.pm line 142.\n" -> "Permission denied"
+sub _user_error {
+    my ($action, $err) = @_;
+    $err //= 'Unknown error';
+    $err =~ s/\s+at\s+\S+\s+line\s+\d+.*//s;
+    chomp $err;
+    return "$action: $err";
+}
+
 # =============================================================================
 # File Commands
 # =============================================================================
@@ -44,7 +54,7 @@ sub cmd_save {
                     $doc->set_path($filename);
                     eval { $doc->save(); };
                     if ($@) {
-                        $self->show_message("Error: $@");
+                        $self->show_error_message(_user_error("Save failed", $@));
                     }
                     else {
                         # Update tab's file_path and clear untitled name
@@ -68,7 +78,7 @@ sub cmd_save {
 
     eval { $doc->save(); };
     if ($@) {
-        $self->show_message("Error: $@");
+        $self->show_error_message(_user_error("Save failed", $@));
     }
     else {
         $self->show_message("Saved: " . $doc->filename());
@@ -222,7 +232,6 @@ sub cmd_new_file {
 
 sub cmd_open_file {
     my ($self) = @_;
-    return if $self->_in_modal_state();
 
     # Open palette in files mode
     $self->{state} = 'palette';
@@ -235,7 +244,6 @@ sub cmd_open_file {
 
 sub cmd_recent_files {
     my ($self) = @_;
-    return if $self->_in_modal_state();
 
     my @recent = @{$self->{_recent_files} || []};
     unless (@recent) {
@@ -288,7 +296,7 @@ sub _load_file {
         );
     };
     if ($@) {
-        $self->show_message("Error opening file: $@");
+        $self->show_error_message(_user_error("Could not open file", $@));
         return;
     }
 
@@ -635,7 +643,6 @@ sub do_find_prev {
 
 sub cmd_find_in_files {
     my ($self) = @_;
-    return if $self->_in_modal_state();
 
     # Lazily init FileSearchEngine
     if (!$self->{_file_search_engine}) {
@@ -906,9 +913,7 @@ sub cmd_transform {
             };
 
             if ($@) {
-                my $err = $@;
-                $err =~ s/\s+at\s+\S+\s+line\s+\d+.*//s;  # strip Perl location
-                $self->show_error_message("Transform failed: $err");
+                $self->show_error_message(_user_error("Transform failed", $@));
                 return;
             }
 

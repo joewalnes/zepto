@@ -69,35 +69,35 @@ subtest 'Escape closes palette' => sub {
 };
 
 # =============================================================================
-# Palette does NOT open during certain states
+# Palette opens from any modal state (global shortcut)
 # =============================================================================
 
-subtest 'cmd_open_palette blocked during STATE_FIND' => sub {
+subtest 'cmd_open_palette opens from STATE_FIND' => sub {
     my $editor = make_editor();
     $editor->{state} = STATE_FIND;
     $editor->cmd_open_palette();
-    is($editor->{state}, STATE_FIND, 'State unchanged - still find');
+    is($editor->{state}, STATE_PALETTE, 'Palette opens from find state');
 };
 
-subtest 'cmd_open_palette blocked during STATE_FOOTER_INPUT' => sub {
+subtest 'cmd_open_palette opens from STATE_FOOTER_INPUT' => sub {
     my $editor = make_editor();
     $editor->{state} = STATE_FOOTER_INPUT;
     $editor->cmd_open_palette();
-    is($editor->{state}, STATE_FOOTER_INPUT, 'State unchanged - still footer_input');
+    is($editor->{state}, STATE_PALETTE, 'Palette opens from footer_input state');
 };
 
-subtest 'cmd_open_palette blocked during STATE_PROMPT' => sub {
+subtest 'cmd_open_palette opens from STATE_PROMPT' => sub {
     my $editor = make_editor();
     $editor->{state} = STATE_PROMPT;
     $editor->cmd_open_palette();
-    is($editor->{state}, STATE_PROMPT, 'State unchanged - still prompt');
+    is($editor->{state}, STATE_PALETTE, 'Palette opens from prompt state');
 };
 
-subtest 'cmd_open_palette blocked during STATE_DIALOG' => sub {
+subtest 'cmd_open_palette opens from STATE_DIALOG' => sub {
     my $editor = make_editor();
     $editor->{state} = STATE_DIALOG;
     $editor->cmd_open_palette();
-    is($editor->{state}, STATE_DIALOG, 'State unchanged - still dialog');
+    is($editor->{state}, STATE_PALETTE, 'Palette opens from dialog state');
 };
 
 # =============================================================================

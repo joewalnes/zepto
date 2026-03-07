@@ -28,12 +28,6 @@ use Zepto::InputWidget;
 sub cmd_open_palette {
     my ($self) = @_;
 
-    # Don't open palette during input-focused states
-    return if $self->{state} eq 'footer_input';
-    return if $self->{state} eq 'prompt';
-    return if $self->{state} eq 'find';
-    return if $self->{state} eq 'dialog';
-
     $self->{state} = 'palette';
     $self->{palette_mode} = 'commands';
     $self->{palette_widget} = Zepto::InputWidget->new();

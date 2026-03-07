@@ -763,8 +763,32 @@ sub handle_event {
     # Global shortcuts that work in every UI state
     if ($event->{type} eq 'char' && Zepto::InputParser::has_modifier($event, 'ctrl')) {
         my $ch = lc($event->{char});
+        my $shift = Zepto::InputParser::has_modifier($event, 'shift');
+        # Always-global: quit, save, theme toggle
         if ($ch eq 'q' || $ch eq 's' || $ch eq 't') {
             $self->handle_ctrl_char($ch);
+            return;
+        }
+        # Close-modal-then-execute globals: open, close tab, new, recent, palette, find in files
+        if ($ch eq 'o' || $ch eq 'w' || $ch eq 'n' || $ch eq 'e' || $ch eq ' '
+            || ($shift && $ch eq 'f') || ($shift && $ch eq 'p')) {
+            # Ctrl+Space / Ctrl+Shift+P toggle: if palette is open, just close it
+            if (($ch eq ' ' || ($shift && $ch eq 'p')) && $self->{state} eq STATE_PALETTE) {
+                $self->close_palette();
+                $self->{quit_pending} = 0;
+                return;
+            }
+            if ($self->{state} ne STATE_EDITING) {
+                $self->_close_any_modal();
+            }
+            if ($shift && $ch eq 'f') {
+                $self->cmd_find_in_files();
+            } elsif ($shift && $ch eq 'p') {
+                $self->cmd_open_palette();
+            } else {
+                $self->handle_ctrl_char($ch);
+            }
+            $self->{quit_pending} = 0;
             return;
         }
     }
@@ -1580,6 +1604,20 @@ sub _handle_minimap_click {
     $new_scroll = $max_scroll if $new_scroll > $max_scroll;
 
     $view->{scroll_line} = $new_scroll;
+}
+
+# =============================================================================
+# Close Any Modal
+# =============================================================================
+
+sub _close_any_modal {
+    my ($self) = @_;
+    my $state = $self->{state};
+    if    ($state eq STATE_PALETTE)      { $self->close_palette(); }
+    elsif ($state eq STATE_FIND)         { $self->exit_find_mode(0); }
+    elsif ($state eq STATE_FOOTER_INPUT) { $self->close_footer_input(); }
+    elsif ($state eq STATE_DIALOG)       { $self->close_dialog(); }
+    elsif ($state eq STATE_PROMPT)       { $self->close_prompt(); }
 }
 
 # =============================================================================
@@ -3801,7 +3839,7 @@ sub _check_external_file_changes {
                     my $old_col = $view->cursor_col();
                     eval { $doc->reload_from_disk(); };
                     if ($@) {
-                        $self->show_message("Reload error: $@");
+                        $self->show_error_message(_user_error("Reload failed", $@));
                         return;
                     }
                     # Restore cursor (clamped to valid range)
@@ -3829,7 +3867,7 @@ sub _check_external_file_changes {
         my $old_col = $view->cursor_col();
         eval { $doc->reload_from_disk(); };
         if ($@) {
-            $self->show_message("Reload error: $@");
+            $self->show_error_message(_user_error("Reload failed", $@));
             return;
         }
         # Restore cursor (clamped to valid range)
