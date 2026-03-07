@@ -599,3 +599,12 @@ When launching zepto in directory mode (`./zepto .`), the file tree gets focus. 
 Text like `NF_CLOSE (\x{f00d}) duplicated NF_TIMES` renders the substring between underscores as italic. Per CommonMark spec, `_` emphasis delimiters must not be intraword — an opening `_` must not be preceded by an alphanumeric character, and a closing `_` must not be followed by one. Only `*` allows intraword emphasis.
 
 **Fix:** Split the combined `(\*|_)` emphasis regexes in Markdown.pm into separate `*` and `_` branches. The `_`, `__`, and `___` branches now check that the character before the opening delimiter and after the closing delimiter are not `\w` (word characters), matching CommonMark's intraword restriction. `*` branches remain unrestricted.
+
+### P2: [Bug] Binary files should not be previewed or naively opened
+Binary files (images, executables, .o files, etc.) currently get previewed in the file tree and can be opened as a tab, displaying garbage. Preview should detect binary content (e.g. NUL bytes in the first few KB) and show a "Binary file — cannot preview" message instead. Opening a binary file should show a read-only notice rather than dumping raw bytes into an editable buffer.
+
+### P2: [Feature] Render images in terminal via Kitty graphics protocol
+On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), previewing or opening an image file (PNG, JPEG, GIF, BMP, SVG, etc.) should render the image inline in the terminal instead of showing binary garbage or a "cannot preview" message. Detect protocol support via the `TERM`/`TERM_PROGRAM` env var or a DA1/graphics query. Fall back gracefully to a text placeholder on unsupported terminals.
+
+### P3: [Feature] Inline image rendering in Markdown preview
+On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.
