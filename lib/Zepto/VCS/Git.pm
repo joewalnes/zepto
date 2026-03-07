@@ -9,6 +9,7 @@ package Zepto::VCS::Git;
 #   - Tracking status: Check if file is tracked
 #
 # Uses the git command-line tool for operations. Gracefully handles missing git.
+# All git commands use list-form exec (no shell interpretation) for safety.
 # =============================================================================
 
 use strict;
@@ -24,14 +25,39 @@ my $_git_available;
 sub _git_available {
     return $_git_available if defined $_git_available;
 
-    my $result = `git --version 2>/dev/null`;
-    $_git_available = ($? == 0) ? 1 : 0;
+    my ($output, $status) = _run_git('--version');
+    $_git_available = ($status == 0) ? 1 : 0;
 
     return $_git_available;
 }
 
 # Register with the provider system
 Zepto::VCS::Provider->register(__PACKAGE__);
+
+# =============================================================================
+# Safe git execution (no shell interpretation)
+# =============================================================================
+
+# Run a git command with list-form exec, suppressing stderr.
+# Returns ($output, $exit_status) where exit_status is $? from waitpid.
+sub _run_git {
+    my (@args) = @_;
+    my $pid = open(my $fh, '-|');
+    return ('', -1) unless defined $pid;
+    if ($pid == 0) {
+        open(STDERR, '>', '/dev/null');
+        exec('git', @args) or exit(127);
+    }
+    my $output = do { local $/; <$fh> };
+    close($fh);
+    return (defined $output ? $output : '', $?);
+}
+
+# Instance helper: run git -C <repo_root> with given args
+sub _git {
+    my ($self, @args) = @_;
+    return _run_git('-C', $self->{repo_root}, @args);
+}
 
 # =============================================================================
 # Class Methods
@@ -74,13 +100,9 @@ sub is_tracked {
     return 0 unless defined $file_path && -e $file_path;
 
     my $rel_path = $self->_relative_path($file_path);
-    my $repo_root = $self->{repo_root};
+    my ($output, $status) = $self->_git('ls-files', '--error-unmatch', $rel_path);
 
-    # Use git ls-files to check if file is tracked
-    my $cmd = "cd " . _shell_quote($repo_root) . " && git ls-files --error-unmatch " . _shell_quote($rel_path) . " 2>/dev/null";
-    `$cmd`;
-
-    return $? == 0;
+    return $status == 0;
 }
 
 # Get the content of a file at HEAD
@@ -95,13 +117,10 @@ sub get_head_content {
         return $self->{_content_cache}{$rel_path};
     }
 
-    my $repo_root = $self->{repo_root};
-
     # Use git show to get content at HEAD
-    my $cmd = "cd " . _shell_quote($repo_root) . " && git show HEAD:" . _shell_quote($rel_path) . " 2>/dev/null";
-    my $content = `$cmd`;
+    my ($content, $status) = $self->_git('show', "HEAD:$rel_path");
 
-    if ($? != 0) {
+    if ($status != 0) {
         # File doesn't exist at HEAD (new file or not tracked)
         $self->{_content_cache}{$rel_path} = undef;
         return undef;
@@ -126,13 +145,11 @@ sub get_staged_content {
     return undef unless defined $file_path;
 
     my $rel_path = $self->_relative_path($file_path);
-    my $repo_root = $self->{repo_root};
 
     # Use git show :path to get staged content
-    my $cmd = "cd " . _shell_quote($repo_root) . " && git show :" . _shell_quote($rel_path) . " 2>/dev/null";
-    my $content = `$cmd`;
+    my ($content, $status) = $self->_git('show', ":$rel_path");
 
-    if ($? != 0) {
+    if ($status != 0) {
         return undef;
     }
 
@@ -158,13 +175,6 @@ sub invalidate_cache {
 # =============================================================================
 # Utility
 # =============================================================================
-
-# Simple shell quoting (single quotes, escape existing single quotes)
-sub _shell_quote {
-    my ($str) = @_;
-    $str =~ s/'/'\\''/g;
-    return "'$str'";
-}
 
 # Get mtime of the file that tracks current HEAD commit
 # .git/HEAD may be a symbolic ref (ref: refs/heads/main) or detached (commit hash)
@@ -196,10 +206,8 @@ sub _get_head_mtime {
 # Returns hashref: { relative_path => status_string }
 sub get_worktree_status {
     my ($self) = @_;
-    my $repo_root = $self->{repo_root};
-    my $cmd = "cd " . _shell_quote($repo_root) . " && git status --porcelain 2>/dev/null";
-    my $output = `$cmd`;
-    return {} if $? != 0;
+    my ($output, $status) = $self->_git('status', '--porcelain');
+    return {} if $status != 0;
 
     my %status;
     for my $line (split /\n/, $output) {

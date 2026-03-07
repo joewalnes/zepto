@@ -27,8 +27,10 @@ Several core shortcuts are swallowed when in find/replace (`⌃F`), footer input
 
 Principle: anything that navigates between files, saves, or exits should never be blocked by a sub-mode. The sub-mode should close (or stay open, as appropriate) and the command should execute. For example, pressing `⌃O` while in find/replace should close the find bar and open the file picker.
 
-### P1: [Security] Shell injection in VCS/Git.pm via backtick execution
+### ~~P1: [Security] Shell injection in VCS/Git.pm via backtick execution~~ FIXED
 `VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
+
+**Fix:** Replaced all 5 backtick executions with a `_run_git()` helper that uses `open(FH, '-|')` + `exec('git', @args)` list-form execution (no shell interpretation). Added `_git()` instance method that prepends `-C <repo_root>` to avoid `cd && git` pattern. Removed the now-unnecessary `_shell_quote()` function. All git operations (version check, ls-files, show, status) now use safe list-form exec.
 
 ### P1: [Security] Shell injection in Terminal.pm clipboard and command detection
 `Terminal.pm` uses backtick execution in two places: `paste_from_clipboard()` (line ~524: `` `$self->{_clipboard_paste_cmd} 2>/dev/null` ``) and `_command_exists()` (line ~487: `` `which $cmd 2>/dev/null` ``). While the command strings are currently hardcoded, backtick execution is unsafe by default. Should replace with list-form `system()` or `open()` with pipes.
