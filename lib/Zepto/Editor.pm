@@ -550,6 +550,13 @@ sub run {
                 if ($self->flush_pending_input()) {
                     $needs_render = 1;
                 }
+
+                # Deferred tree VCS: run on first idle after initial render
+                if ($self->{_tree_vcs_deferred}) {
+                    $self->{_tree_vcs_deferred} = 0;
+                    $self->{_tree_vcs_ready} = 1;
+                    $needs_render = 1;
+                }
             }
 
             my $event_end = time();
@@ -3594,13 +3601,18 @@ sub render {
         $self->{file_tree}->set_viewport_height($rows - RESERVED_ROWS + 2);
         # Update VCS statuses (debounced internally)
         # Use tree's own VCS provider (not tied to active doc which may be a preview tab)
-        if (!$self->{_tree_vcs_provider}) {
-            $self->{_tree_vcs_provider} = Zepto::VCS::Provider->detect(
-                $self->{file_tree}->root_path()
-            );
+        # Skip on first render to avoid blocking first paint — deferred via _tree_vcs_deferred
+        if ($self->{_tree_vcs_ready}) {
+            if (!$self->{_tree_vcs_provider}) {
+                $self->{_tree_vcs_provider} = Zepto::VCS::Provider->detect(
+                    $self->{file_tree}->root_path()
+                );
+            }
+            $self->{file_tree}->update_vcs_statuses($self->{_tree_vcs_provider})
+                if $self->{_tree_vcs_provider};
+        } else {
+            $self->{_tree_vcs_deferred} = 1;
         }
-        $self->{file_tree}->update_vcs_statuses($self->{_tree_vcs_provider})
-            if $self->{_tree_vcs_provider};
     }
 
     # Update view size - account for gutter width

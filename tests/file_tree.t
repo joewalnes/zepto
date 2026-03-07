@@ -121,41 +121,32 @@ subtest 'Skip directories' => sub {
 };
 
 # =============================================================================
-# Single-child Directory Collapsing
+# Directory structure (no collapsing)
 # =============================================================================
 
-subtest 'Single-child directory collapsing' => sub {
+subtest 'Directories show raw names without collapsing' => sub {
     my $tree = Zepto::FileTree->new(root_path => $tmpdir);
     my $flat = $tree->flat_list();
 
-    # src/ has two children: utils/ and main.rs
-    # So src/ should NOT be collapsed with utils/
-    # But utils/ has only one child (helpers/) which has only one child (format.js)
-    # So after collapsing: utils/helpers should appear as one node
-
-    # First, find and expand src/
+    # Find and expand src/
     my ($src_idx) = grep { $flat->[$_]{name} eq 'src' } 0 .. $#$flat;
     ok(defined $src_idx, 'found src/ in tree');
 
-    # Expand src/
     $tree->set_cursor($src_idx);
     $tree->expand_current();
     $flat = $tree->flat_list();
 
-    # Under src/, look for the collapsed utils/helpers
+    # Under src/, should find "utils" (not collapsed) and "main.rs"
     my @src_children;
     for my $i (0 .. $#$flat) {
-        next unless $flat->[$i]{depth} == 1;  # direct children of src/
-        # Check if parent is src
         my $node = $flat->[$i];
-        if ($node->{path} =~ m{^src/}) {
+        if ($node->{path} =~ m{^src/[^/]+$}) {
             push @src_children, $node;
         }
     }
 
-    # Should find collapsed "utils/helpers" dir and "main.rs" file
     my @child_names = map { $_->{name} } @src_children;
-    ok((grep { $_ eq 'utils/helpers' } @child_names), 'single-child dirs collapsed into utils/helpers');
+    ok((grep { $_ eq 'utils' } @child_names), 'utils dir shown with raw name');
     ok((grep { $_ eq 'main.rs' } @child_names), 'main.rs visible under src/');
 };
 

@@ -8,8 +8,7 @@ package Zepto::FileTree;
 # filtering, and VCS status propagation.
 #
 # Lazy loading: only scans one directory level at a time. Children are
-# loaded on-demand when the user expands a directory. Single-child dir
-# chains are collapsed by peeking ahead (cheap: one readdir per level).
+# loaded on-demand when the user expands a directory.
 #
 # =============================================================================
 
@@ -100,11 +99,6 @@ sub _build_tree {
     # Scan only the root directory's immediate children
     $self->{nodes} = $self->_scan_dir_one_level($root, 0, \%skip);
 
-    # Collapse single-child dir chains at root by peeking deeper
-    for my $node (@{$self->{nodes}}) {
-        $self->_collapse_single_child_chain($node, \%skip) if $node->{is_dir};
-    }
-
     # File list for filter is built lazily on first filter activation
     $self->{_all_files} = [];
     $self->{_all_files_loaded} = 0;
@@ -137,7 +131,6 @@ sub _scan_dir_one_level {
                 expanded   => 0,
                 children   => undef,  # lazy — loaded on expand
                 vcs_status => undef,
-                collapsed_prefix => undef,
             };
         }
         elsif (-f $full_path && -r $full_path) {
@@ -155,34 +148,6 @@ sub _scan_dir_one_level {
     return [@dirs, @files];
 }
 
-# Follow single-child dir chains, loading just enough to detect and merge.
-# E.g. com/ → com/stripe/ → com/stripe/api/ (with files) becomes "com/stripe/api".
-# Each step is a single readdir — no deep recursion.
-sub _collapse_single_child_chain {
-    my ($self, $node, $skip) = @_;
-    return unless $node->{is_dir};
-
-    while (1) {
-        # Load children if not yet loaded
-        if (!defined $node->{children}) {
-            my $full_path = "$self->{root_path}/$node->{path}";
-            $node->{children} = $self->_scan_dir_one_level($full_path, $node->{depth} + 1, $skip);
-        }
-
-        # Stop if not a single-child dir chain
-        last unless @{$node->{children}} == 1 && $node->{children}[0]{is_dir};
-
-        my $child = $node->{children}[0];
-
-        # Merge: "a" with single child "b" becomes "a/b"
-        my $prefix = $node->{collapsed_prefix} // $node->{name};
-        $node->{name} = $prefix . '/' . $child->{name};
-        $node->{collapsed_prefix} = $node->{name};
-        $node->{path} = $child->{path};
-        $node->{children} = $child->{children};  # may be undef — loop will load
-    }
-}
-
 # Load a dir node's children on demand (called before expanding).
 sub _ensure_children_loaded {
     my ($self, $node) = @_;
@@ -193,15 +158,6 @@ sub _ensure_children_loaded {
     if (!defined $node->{children}) {
         my $full_path = "$self->{root_path}/$node->{path}";
         $node->{children} = $self->_scan_dir_one_level($full_path, $node->{depth} + 1, \%skip);
-    }
-
-    # Collapse single-child chains among dir children that haven't been loaded yet.
-    # This handles the case where a parent's children were loaded during the root
-    # collapse check, but the children's own chains weren't followed.
-    for my $child (@{$node->{children}}) {
-        if ($child->{is_dir} && !defined $child->{children}) {
-            $self->_collapse_single_child_chain($child, \%skip);
-        }
     }
 }
 
