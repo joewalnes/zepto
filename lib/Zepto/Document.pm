@@ -57,11 +57,48 @@ sub new {
     return $self;
 }
 
+# Check if a file contains binary content (NUL bytes in first 8KB)
+sub _is_binary_file {
+    my ($path) = @_;
+    open my $fh, '<:raw', $path or return 0;
+    my $sample;
+    read($fh, $sample, 8192);
+    close $fh;
+    return 0 unless defined $sample && length($sample) > 0;
+    return index($sample, "\x00") >= 0;
+}
+
+sub _format_file_size {
+    my ($bytes) = @_;
+    return '0 B' unless $bytes;
+    if ($bytes >= 1_073_741_824) { return sprintf('%.1f GB', $bytes / 1_073_741_824); }
+    if ($bytes >= 1_048_576)     { return sprintf('%.1f MB', $bytes / 1_048_576); }
+    if ($bytes >= 1024)          { return sprintf('%.1f KB', $bytes / 1024); }
+    return "$bytes B";
+}
+
 # Load document from file
 # Options: skip_vcs => 1 to defer VCS initialization (for preview tabs)
 #          max_bytes => N to read only the first N bytes (for large file preview)
 sub load {
     my ($class, $path, %opts) = @_;
+
+    # Detect binary files before attempting UTF-8 decode
+    my $is_binary = _is_binary_file($path);
+
+    if ($is_binary) {
+        my $file_size = -s $path;
+        my $size_str = defined $file_size ? _format_file_size($file_size) : 'unknown size';
+        my $doc = $class->new(
+            text => "(Binary file — $size_str)",
+            path => $path,
+            ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
+        );
+        $doc->{_is_binary} = 1;
+        $doc->{_truncated_preview} = 0;
+        $doc->_capture_file_mtime();
+        return $doc;
+    }
 
     open my $fh, '<:encoding(UTF-8)', $path
         or die "Cannot open $path: $!";
@@ -124,6 +161,7 @@ sub save {
     $path //= $self->{path};
 
     die "No path specified" unless defined $path;
+    die "Cannot save binary file" if $self->{_is_binary};
 
     my $content = $self->{buffer}->text();
 
@@ -194,6 +232,7 @@ sub check_external_changes {
 sub reload_from_disk {
     my ($self) = @_;
     return unless defined $self->{path} && -f $self->{path};
+    return if $self->{_is_binary};
 
     open my $fh, '<:encoding(UTF-8)', $self->{path}
         or die "Cannot open $self->{path}: $!";
@@ -329,6 +368,7 @@ sub _push_undo {
 sub insert {
     my ($self, $pos, $text) = @_;
     return if !defined($text) || $text eq '';
+    return if $self->{_is_binary};
 
     $self->{buffer}->insert($pos, $text);
 
@@ -345,6 +385,7 @@ sub insert {
 sub delete {
     my ($self, $pos, $len) = @_;
     return '' if !defined($len) || $len <= 0;
+    return '' if $self->{_is_binary};
 
     my $deleted = $self->{buffer}->delete($pos, $len);
 

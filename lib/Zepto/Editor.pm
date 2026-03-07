@@ -3549,8 +3549,11 @@ sub _tree_open_selected {
 
     # If previewing this file, confirm it (keep the tab, init VCS now)
     if ($tree->{preview_active}) {
+        # Binary files stay as read-only placeholder
+        if ($self->active_doc()->{_is_binary}) {
+            $self->show_message("Binary file — read only");
         # Preview may have been truncated for large files — reload fully
-        if ($self->active_doc()->{_truncated_preview}) {
+        } elsif ($self->active_doc()->{_truncated_preview}) {
             my $path = $node->{path};
             $self->_close_preview_tab();
             $self->_load_file($path);

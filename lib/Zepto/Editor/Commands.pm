@@ -294,6 +294,9 @@ sub _load_file {
             highlighter => $highlighter,
             file_path   => $path,
         );
+        if ($doc->{_is_binary}) {
+            $self->show_message("Binary file — read only");
+        }
     };
     if ($@) {
         $self->show_error_message(_user_error("Could not open file", $@));

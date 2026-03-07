@@ -586,8 +586,10 @@ Text like `NF_CLOSE (\x{f00d}) duplicated NF_TIMES` renders the substring betwee
 
 **Fix:** Split the combined `(\*|_)` emphasis regexes in Markdown.pm into separate `*` and `_` branches. The `_`, `__`, and `___` branches now check that the character before the opening delimiter and after the closing delimiter are not `\w` (word characters), matching CommonMark's intraword restriction. `*` branches remain unrestricted.
 
-### P2: [Bug] Binary files should not be previewed or naively opened
+### ~~P2: [Bug] Binary files should not be previewed or naively opened~~ FIXED
 Binary files (images, executables, .o files, etc.) currently get previewed in the file tree and can be opened as a tab, displaying garbage. Preview should detect binary content (e.g. NUL bytes in the first few KB) and show a "Binary file — cannot preview" message instead. Opening a binary file should show a read-only notice rather than dumping raw bytes into an editable buffer.
+
+**Fix:** Added `_is_binary_file()` check in `Document::load()` that reads the first 8KB of raw bytes and looks for NUL characters. Binary files load a placeholder "(Binary file — size)" instead of the actual content. Insert and delete operations are blocked on binary documents. Save is blocked with "Cannot save binary file" error. Tree preview shows the placeholder. Pressing Enter on a binary file in the tree shows "Binary file — read only" status message. Added `_format_file_size()` helper for human-readable sizes.
 
 ### P2: [Feature] Render images in terminal via Kitty graphics protocol
 On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), previewing or opening an image file (PNG, JPEG, GIF, BMP, SVG, etc.) should render the image inline in the terminal instead of showing binary garbage or a "cannot preview" message. Detect protocol support via the `TERM`/`TERM_PROGRAM` env var or a DA1/graphics query. Fall back gracefully to a text placeholder on unsupported terminals.

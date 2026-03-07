@@ -471,4 +471,43 @@ subtest 'save updates mtime so check_external_changes returns false' => sub {
     ok(!$doc->check_external_changes(), 'No external change after save');
 };
 
+# ============================================================================
+# Binary file detection
+# ============================================================================
+subtest 'Binary file detection' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+
+    # Create a binary file with NUL bytes
+    my $bin_path = "$dir/test.bin";
+    open my $fh, '>:raw', $bin_path or die "Cannot create $bin_path: $!";
+    print $fh "HEADER\x00\x01\x02binary data\x00";
+    close $fh;
+
+    my $doc = Zepto::Document->load($bin_path);
+    ok($doc->{_is_binary}, 'Binary file detected');
+    like($doc->text(), qr/Binary file/, 'Placeholder text shown for binary file');
+
+    # Insert should be blocked on binary documents
+    $doc->insert(0, 'x');
+    like($doc->text(), qr/Binary file/, 'Insert blocked on binary document');
+
+    # Delete should be blocked on binary documents
+    $doc->delete(0, 1);
+    like($doc->text(), qr/Binary file/, 'Delete blocked on binary document');
+
+    # Save should be blocked on binary documents
+    eval { $doc->save() };
+    like($@, qr/Cannot save binary/, 'Save blocked on binary document');
+
+    # Create a normal text file
+    my $txt_path = "$dir/test.txt";
+    open $fh, '>:encoding(UTF-8)', $txt_path or die;
+    print $fh "Hello, world!\n";
+    close $fh;
+
+    my $txt_doc = Zepto::Document->load($txt_path);
+    ok(!$txt_doc->{_is_binary}, 'Text file not detected as binary');
+    is($txt_doc->text(), 'Hello, world!', 'Text content loaded normally');
+};
+
 done_testing();
