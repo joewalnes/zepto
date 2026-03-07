@@ -28,8 +28,7 @@ Key invariant: **Renderer is a pure function** — no I/O, no side effects, same
 3. Verify all tests pass
 4. Test interactively (see CLAUDE.md Testing Workflow) for anything UI-visible
 5. Update `README.md` feature list
-6. Remove from `TODO.md` if listed
-7. Update this file if new patterns or lessons emerge
+6. Update this file if new patterns or lessons emerge
 
 ---
 

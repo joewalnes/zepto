@@ -33,8 +33,10 @@ Principle: anything that navigates between files, saves, or exits should never b
 ### P1: [Security] Shell injection in Terminal.pm clipboard and command detection
 `Terminal.pm` uses backtick execution in two places: `paste_from_clipboard()` (line ~524: `` `$self->{_clipboard_paste_cmd} 2>/dev/null` ``) and `_command_exists()` (line ~487: `` `which $cmd 2>/dev/null` ``). While the command strings are currently hardcoded, backtick execution is unsafe by default. Should replace with list-form `system()` or `open()` with pipes.
 
-### P1: [Documentation] Stale references to deleted TODO.md
+### ~~P1: [Documentation] Stale references to deleted TODO.md~~ FIXED
 `TODO.md` was deleted in commit `90a4c38` but is still referenced in `CLAUDE.md` (line 143, "Keeping Docs Current" table) and `docs/CODE_QUALITY.md` (line 31, "Remove from `TODO.md` if listed"). Anyone following the documented workflow will try to update a non-existent file.
+
+**Fix:** Removed `TODO.md` row from the "Keeping Docs Current" table in `CLAUDE.md` and removed step 6 "Remove from `TODO.md` if listed" from the feature completion checklist in `docs/CODE_QUALITY.md`.
 
 ### P1: [Documentation] UI_GUIDELINES.md palette sections are wrong
 `UI_GUIDELINES.md` says palette sections are "DOCUMENT, APP, NAVIGATE, TOGGLES" but the actual sections in `CommandRegistry.pm` are FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS. The sections were reorganized (see P2 "Command palette re-org" FIXED entry) but the guidelines were never updated.

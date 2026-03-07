@@ -140,4 +140,3 @@ If any rule is not satisfied:
 | `docs/SECURITY.md` | New security concerns or mitigations |
 | `docs/UI_GUIDELINES.md` | New UI standards or design decisions |
 | `README.md` | Features added or removed |
-| `TODO.md` | Planned features added; implemented features removed |
