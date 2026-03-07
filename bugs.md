@@ -104,8 +104,10 @@ README.md is 32 lines with no feature list despite the editor having command pal
 
 **Skipped — fix requires establishing a consistent error formatting policy and updating all command error paths across Commands.pm. Needs design decision on error message format.**
 
-### P3: [Security] Terminal escape sequence injection via filenames
+### ~~P3: [Security] Terminal escape sequence injection via filenames~~ FIXED
 `Terminal.pm` line ~540 sanitizes titles by stripping `[\x00-\x1f]` (ASCII control chars only). UTF-8 sequences or characters outside this range could potentially manipulate terminal state. Should consider a whitelist of allowed characters.
+
+**Fix:** Extended the title sanitizer to also strip DEL (0x7F) and C1 control characters (0x80-0x9F), which can trigger terminal-specific escape sequences.
 
 ### P3: [Performance] Tab bar geometry recalculated every frame
 `Renderer.pm` lines ~658-710: every frame recalculates tab pill widths, runs progressive name truncation, and recalculates tab range visibility — even if only the cursor moved. Should cache and invalidate only on tab count/active tab/terminal width changes.
