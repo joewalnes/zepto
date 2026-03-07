@@ -711,7 +711,8 @@ sub cmd_goto_line {
                 $col = 0;
             }
             else {
-                return;  # Invalid input
+                $self->{status_msg} = "Invalid format. Use: line, line:col, or :col";
+                return;
             }
 
             # Clamp line to valid range

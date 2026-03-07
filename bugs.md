@@ -130,8 +130,10 @@ The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palett
 ### P3: [Code Quality] State guard clauses copy-pasted 4+ times
 `Commands.pm` repeats the same 4-line guard block (`return if $self->{state} eq 'footer_input'` etc.) in `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `_column_paste`. Should extract to `_in_modal_state()` helper.
 
-### P3: [Bug] No user feedback for invalid goto_line input
+### ~~P3: [Bug] No user feedback for invalid goto_line input~~ FIXED
 `Commands.pm` lines ~682-699: if the user enters something like `abc` or `1:2:3` in the Go To Line input, the function silently returns with no message. Should display an error or hint about expected format.
+
+**Fix:** Added status message "Invalid format. Use: line, line:col, or :col" when the input doesn't match any valid pattern.
 
 ### P3: [Documentation] DESIGN.md architecture diagram is stale
 The architecture diagram references "Commands/Menu/Preferences" module layout and doesn't reflect the current pill-based status bar, progressive disclosure, or the FILE/EDIT/NAVIGATE/VIEW section organization.
