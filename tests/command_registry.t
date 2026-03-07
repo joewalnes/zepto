@@ -119,6 +119,28 @@ subtest 'toggle commands have correct type' => sub {
     }
 };
 
+subtest 'All shortcuts are unique' => sub {
+    my @cmds = Zepto::CommandRegistry->all_commands();
+    my %seen;
+    for my $cmd (@cmds) {
+        next unless defined $cmd->{shortcut} && $cmd->{shortcut} ne '';
+        ok(!$seen{$cmd->{shortcut}},
+           "Shortcut '$cmd->{shortcut}' for '$cmd->{id}' is unique"
+           . ($seen{$cmd->{shortcut}} ? " (conflicts with '$seen{$cmd->{shortcut}}')" : ''));
+        $seen{$cmd->{shortcut}} = $cmd->{id};
+    }
+};
+
+subtest 'All command sections are in SECTION_ORDER' => sub {
+    my @cmds = Zepto::CommandRegistry->all_commands();
+    my @order = Zepto::CommandRegistry->section_order();
+    my %valid = map { $_ => 1 } @order;
+    for my $cmd (@cmds) {
+        ok($valid{$cmd->{section}},
+           "Section '$cmd->{section}' for '$cmd->{id}' is in SECTION_ORDER");
+    }
+};
+
 subtest 'section order is consistent' => sub {
     my @order = Zepto::CommandRegistry->section_order();
     is($order[0], 'FILE', 'First section is FILE');

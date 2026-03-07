@@ -147,8 +147,10 @@ DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. S
 ### P3: [Tests] Performance tests with hard timing thresholds are flaky
 `find_engine_perf.t` uses `ok($median < 5, ...)` which will fail on slow CI or loaded machines. Should use `diag()` to report timing without failing the test.
 
-### P3: [Tests] No test for CommandRegistry consistency
+### ~~P3: [Tests] No test for CommandRegistry consistency~~ FIXED
 No test verifies that all commands have unique IDs, all shortcuts are unique, or all section names in `@SECTION_ORDER` are valid. If someone breaks CommandRegistry, all 33 commands silently disappear from the palette.
+
+**Fix:** Added two new subtests to `tests/command_registry.t`: "All shortcuts are unique" (verifies no two commands share a shortcut) and "All command sections are in SECTION_ORDER" (verifies every command's section is valid). Note: unique IDs were already tested.
 
 ### ~~P3: [Repo Hygiene] Junk files not gitignored~~ FIXED
 11 `perflog*.txt` files, `foo.txt`, and `lib/Zepto/goo.js` are untracked in the working directory. These should be `.gitignore`d to prevent accidental commits.
