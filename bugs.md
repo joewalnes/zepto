@@ -75,8 +75,10 @@ User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~
 ### P2: [Performance] Renderer uses 381+ string concatenations in hot path
 `Renderer.pm` uses 381+ `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation. For a full-screen render this is thousands of concatenations. Should use array buffering (`push @parts, ...; join '', @parts`).
 
-### P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved
+### ~~P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved~~ FIXED
 `docs/CODE_QUALITY.md` lines 173-180 lists four items as "Open" (unified input widget, global nav keys audit, theme contrast, mouse parity) but all four are marked FIXED or AUDITED in bugs.md. The audit list is stale and creates a false impression of outstanding work.
+
+**Fix:** Removed the entire "Open Items" section from `docs/CODE_QUALITY.md` since all four items are resolved in bugs.md.
 
 ### P2: [Documentation] README.md lists zero features
 README.md is 32 lines with no feature list despite the editor having command palette, 52-language syntax highlighting, file tree, find/replace, git diff, minimap, tabs, etc. This violates CLAUDE.md Rule 7 which says to update README when features change.

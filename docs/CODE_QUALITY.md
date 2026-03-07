@@ -169,15 +169,6 @@ subtest 'All rendered rows have consistent width' => sub {
 
 Items identified during code review. Add new findings here. Move to `bugs.md` when actionable as a bug.
 
-### Open Items
-
-| Priority | Finding | Location | Notes |
-|----------|---------|----------|-------|
-| P2 | Unified input widget: Find bar, Go To Line, Save As, and palette filter are separate implementations with inconsistent editing semantics | `Editor.pm`, `Renderer.pm` | Tracked in `bugs.md` |
-| P2 | Global navigation keys audit: verify ⌃Q, ⌃S, Esc work from every UI state | `Editor.pm` | Tracked in `bugs.md` |
-| P3 | Theme contrast: dark/light modes not verified against readability standards | `Theme.pm`, `Renderer.pm` | Tracked in `bugs.md` |
-| P3 | Mouse parity: double-click word selection, triple-click line, mouse cursor placement in input fields | `Editor.pm`, `InputParser.pm` | Tracked in `bugs.md` |
-
 ### Patterns to Avoid
 
 - Adding CPAN dependencies — zero external dependencies is a core design constraint
