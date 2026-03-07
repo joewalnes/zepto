@@ -10,6 +10,23 @@ Priority scale:
 
 ## Existing bugs
 
+### P1: [Usability] Global shortcuts should work from any state
+Several core shortcuts are swallowed when in find/replace (`⌃F`), footer input, or other modal states. These should be global — they should work regardless of what mode the editor is in:
+
+- `⌃O` Open File
+- `⌃⇧F` Find in Files
+- `⌃S` Save
+- `⌃W` Close Tab
+- `⌃Q` Quit
+- `⌃Space` Command Palette
+- `⌃E` Recent Files
+- `⌃N` New File
+- `⌥,` / `⌥.` Prev/Next Tab
+- `⌃G` Go to Line
+- `⌃B` File Tree toggle
+
+Principle: anything that navigates between files, saves, or exits should never be blocked by a sub-mode. The sub-mode should close (or stay open, as appropriate) and the command should execute. For example, pressing `⌃O` while in find/replace should close the find bar and open the file picker.
+
 ### P1: [Security] Shell injection in VCS/Git.pm via backtick execution
 `VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
 
