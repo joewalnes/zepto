@@ -10,8 +10,100 @@ Priority scale:
 
 ## Existing bugs
 
-## P3: long filenames in open file dialog
+### P1: [Security] Shell injection in VCS/Git.pm via backtick execution
+`VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
+
+### P1: [Security] Shell injection in Terminal.pm clipboard and command detection
+`Terminal.pm` uses backtick execution in two places: `paste_from_clipboard()` (line ~524: `` `$self->{_clipboard_paste_cmd} 2>/dev/null` ``) and `_command_exists()` (line ~487: `` `which $cmd 2>/dev/null` ``). While the command strings are currently hardcoded, backtick execution is unsafe by default. Should replace with list-form `system()` or `open()` with pipes.
+
+### P1: [Documentation] Stale references to deleted TODO.md
+`TODO.md` was deleted in commit `90a4c38` but is still referenced in `CLAUDE.md` (line 143, "Keeping Docs Current" table) and `docs/CODE_QUALITY.md` (line 31, "Remove from `TODO.md` if listed"). Anyone following the documented workflow will try to update a non-existent file.
+
+### P1: [Documentation] UI_GUIDELINES.md palette sections are wrong
+`UI_GUIDELINES.md` says palette sections are "DOCUMENT, APP, NAVIGATE, TOGGLES" but the actual sections in `CommandRegistry.pm` are FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS. The sections were reorganized (see P2 "Command palette re-org" FIXED entry) but the guidelines were never updated.
+
+### P1: [Performance] Character width computed per-character with no caching
+`_char_display_width()` in `Renderer.pm` (130+ lines of Unicode range checks) is called for every character on every visible line on every frame. For a 40-line, 200-column viewport that's ~160,000 function calls per frame. Should memoize by codepoint or use a lookup table.
+
+### P2: [Bug] Shift+Tab does same thing as Tab in find-in-files palette
+`Palette.pm` lines 85-90: both Tab and Shift+Tab call `_file_search_cycle_scope()` with no direction parameter. Shift+Tab should cycle backward through scopes but currently cycles forward, identical to Tab.
+
+### P2: [Bug] Missing `use File::Spec` in Palette.pm
+`Palette.pm` line 286 calls `File::Spec->rel2abs()` but never imports `File::Spec`. It works by accident because `Editor.pm` imports it, but this is fragile and violates the module's own import conventions.
+
+### P2: [Security] ReDoS vulnerability via user search input
+User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~455) and `FileSearchEngine.pm` (line ~268, ~449) via `eval { qr/$query/ }`. A crafted pattern like `(a+)+$` could cause catastrophic backtracking and freeze the editor. Should add regex complexity validation or a timeout mechanism.
+
+### P2: [Security] Predictable temp file names in Document.pm atomic save
+`Document.pm` line ~138 uses `"$path.zepto.tmp.$$"` (PID-based) for temp files during atomic save. On multi-user systems this is predictable and vulnerable to symlink attacks (TOCTOU). Should use `File::Temp` for secure temporary file creation.
+
+### P2: [Performance] Renderer uses 381+ string concatenations in hot path
+`Renderer.pm` uses 381+ `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation. For a full-screen render this is thousands of concatenations. Should use array buffering (`push @parts, ...; join '', @parts`).
+
+### P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved
+`docs/CODE_QUALITY.md` lines 173-180 lists four items as "Open" (unified input widget, global nav keys audit, theme contrast, mouse parity) but all four are marked FIXED or AUDITED in bugs.md. The audit list is stale and creates a false impression of outstanding work.
+
+### P2: [Documentation] README.md lists zero features
+README.md is 32 lines with no feature list despite the editor having command palette, 52-language syntax highlighting, file tree, find/replace, git diff, minimap, tabs, etc. This violates CLAUDE.md Rule 7 which says to update README when features change.
+
+### P2: [Build] build.pl not in Makefile dependency list
+`Makefile` line ~53: `zepto: $(MODULES)` doesn't depend on `build.pl`. Changing the build script won't trigger a rebuild. Should be `zepto: $(MODULES) build.pl`.
+
+### P2: [Architecture] Editor is a 5800-line god object across 3 files
+`Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 157+ methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.
+
+### P2: [Code Quality] Inconsistent error handling across commands
+`cmd_save` shows raw `$@` with Perl stack traces to users. `cmd_transform` strips location info from errors. `_load_file` shows "Error opening file: $@" including internal paths. No consistent policy for user-facing error messages.
+
+### P3: [Security] Terminal escape sequence injection via filenames
+`Terminal.pm` line ~540 sanitizes titles by stripping `[\x00-\x1f]` (ASCII control chars only). UTF-8 sequences or characters outside this range could potentially manipulate terminal state. Should consider a whitelist of allowed characters.
+
+### P3: [Performance] Tab bar geometry recalculated every frame
+`Renderer.pm` lines ~658-710: every frame recalculates tab pill widths, runs progressive name truncation, and recalculates tab range visibility — even if only the cursor moved. Should cache and invalidate only on tab count/active tab/terminal width changes.
+
+### P3: [Performance] VCS status checked per visible line per frame
+`Renderer.pm` lines ~1430-1465: calls `vcs_deletion_status()` and `vcs_change_status()` for every visible line on every frame, even when the document hasn't changed. Should cache per frame and invalidate on document change.
+
+### P3: [Performance] Palette filtering rescans all files on every keystroke
+`_filter_recent_files` and `_filter_all_files` in `Palette.pm` iterate the entire file list and call `_fuzzy_score` twice per item on every keystroke. No debouncing, no early termination, no result count limiting despite only showing 15-30 items.
+
+### P3: [Performance] Regex recompilation in FileSearchEngine inner loop
+`FileSearchEngine.pm` line ~449: `_find_match_in_content` compiles the search regex via `eval { qr/$query/ }` on every per-line match check. Should pre-compile once at search start.
+
+### P3: [Code Quality] _filter_recent_files and _filter_all_files are 90% identical
+`Palette.pm` lines 205-315: two ~55-line functions with nearly identical item-building and scoring logic. Only the data source differs. Should extract to a shared `_filter_file_items()` helper.
+
+### P3: [Code Quality] Display path normalization duplicated in 5+ locations
+The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palette.pm`, `FileSearchEngine.pm` (`_parse_lines` twice, `_tick_perl`), and elsewhere. Should be a utility function.
+
+### P3: [Code Quality] State guard clauses copy-pasted 4+ times
+`Commands.pm` repeats the same 4-line guard block (`return if $self->{state} eq 'footer_input'` etc.) in `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `_column_paste`. Should extract to `_in_modal_state()` helper.
+
+### P3: [Bug] No user feedback for invalid goto_line input
+`Commands.pm` lines ~682-699: if the user enters something like `abc` or `1:2:3` in the Go To Line input, the function silently returns with no message. Should display an error or hint about expected format.
+
+### P3: [Documentation] DESIGN.md architecture diagram is stale
+The architecture diagram references "Commands/Menu/Preferences" module layout and doesn't reflect the current pill-based status bar, progressive disclosure, or the FILE/EDIT/NAVIGATE/VIEW section organization.
+
+### P3: [Documentation] Unverified "95%+ coverage" claim in DESIGN.md
+DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. Several modules (`Config.pm`, VCS integration paths) have little or no direct test coverage.
+
+### P3: [Tests] Tautological tests verify messages not behavior
+`editor.t` tests like `cmd_undo` check that a status message is set but don't verify the edit was actually reversed. If `cmd_undo()` is broken but still sets a message, the test passes.
+
+### P3: [Tests] Performance tests with hard timing thresholds are flaky
+`find_engine_perf.t` uses `ok($median < 5, ...)` which will fail on slow CI or loaded machines. Should use `diag()` to report timing without failing the test.
+
+### P3: [Tests] No test for CommandRegistry consistency
+No test verifies that all commands have unique IDs, all shortcuts are unique, or all section names in `@SECTION_ORDER` are valid. If someone breaks CommandRegistry, all 33 commands silently disappear from the palette.
+
+### P3: [Repo Hygiene] Junk files not gitignored
+11 `perflog*.txt` files, `foo.txt`, and `lib/Zepto/goo.js` are untracked in the working directory. These should be `.gitignore`d to prevent accidental commits.
+
+## ~~P3: long filenames in open file dialog~~ FIXED
 Long filenames bust out of the box. Actually it's kinda useful to use more of the screenspace, but it leaves screen artifacts. Also useful to widen the picker, like with find across files picker.
+
+**Fix:** Widened Open File and Recent Files pickers to 120 chars (matching Find in Files). Long directory paths (shortcuts) are now truncated from the start with ellipsis to prevent overflow past the box border.
 
 ### ~~P1: Search should jump to first~~ FIXED
 When searching for a string that's not currently in view, screen/cursor should jump to match.

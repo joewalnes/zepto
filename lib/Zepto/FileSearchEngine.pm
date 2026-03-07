@@ -19,6 +19,7 @@ use Cwd ();
 use File::Find ();
 use File::Basename ();
 use Time::HiRes qw(time);
+use POSIX qw(WNOHANG);
 
 use Zepto::Config;
 
@@ -136,6 +137,9 @@ sub backend {
 sub search {
     my ($self, $query, $scope_dir, %opts) = @_;
 
+    # Reap any stale child processes from previous searches
+    $self->_reap_stale();
+
     # Abort any in-flight search
     $self->abort() if !$self->{done};
 
@@ -213,17 +217,36 @@ sub _start_subprocess_search {
         push @cmd, '-e', $query, $scope_dir;
     }
 
-    # Open pipe — list-form, no shell
-    my $pid = open(my $pipe, '-|', @cmd);
+    # Use pipe + fork + exec (not open '-|') so close() won't block on waitpid
+    pipe(my $read_end, my $write_end) or do {
+        $self->{done} = 1;
+        return;
+    };
+
+    my $pid = fork();
     if (!defined $pid) {
-        # Failed to open pipe — fall back to done state
+        close($read_end);
+        close($write_end);
         $self->{done} = 1;
         return;
     }
 
+    if ($pid == 0) {
+        # Child: redirect stdout to pipe, suppress stderr, exec search command
+        close($read_end);
+        open(STDOUT, '>&', $write_end) or exit(1);
+        open(STDERR, '>', '/dev/null');
+        close($write_end);
+        exec(@cmd);
+        exit(1);
+    }
+
+    # Parent: read from pipe
+    close($write_end);
+
     $self->{_pid}    = $pid;
-    $self->{_pipe}   = $pipe;
-    $self->{_select} = IO::Select->new($pipe);
+    $self->{_pipe}   = $read_end;
+    $self->{_select} = IO::Select->new($read_end);
 }
 
 sub _start_perl_search {
@@ -292,6 +315,9 @@ sub _start_perl_search {
 sub tick {
     my ($self, $max_ms) = @_;
     $max_ms //= 30;
+
+    # Reap any stale child processes from previous searches
+    $self->_reap_stale();
 
     return { done => 1, count => $self->{result_count}, capped => 0 }
         if $self->{done};
@@ -585,15 +611,7 @@ sub _tick_perl {
 sub abort {
     my ($self) = @_;
 
-    if ($self->{_pid}) {
-        kill('TERM', $self->{_pid});
-    }
-    if ($self->{_pipe}) {
-        close($self->{_pipe});
-    }
-    if ($self->{_pid}) {
-        waitpid($self->{_pid}, 0);
-    }
+    $self->_cleanup_subprocess();
 
     # Clean up Perl fallback state
     if ($self->{_perl_fh}) {
@@ -601,29 +619,46 @@ sub abort {
         $self->{_perl_fh} = undef;
     }
 
-    $self->{_pid}    = undef;
-    $self->{_pipe}   = undef;
-    $self->{_select} = undef;
-    $self->{_buf}    = '';
     $self->{done}    = 1;
     $self->{search_id}++;
 }
 
 sub _finish {
     my ($self) = @_;
+    $self->_cleanup_subprocess();
+    $self->{done}    = 1;
+}
+
+# Non-blocking subprocess cleanup: close pipe, signal child, reap with WNOHANG
+sub _cleanup_subprocess {
+    my ($self) = @_;
 
     if ($self->{_pipe}) {
         close($self->{_pipe});
+        $self->{_pipe} = undef;
     }
-    if ($self->{_pid}) {
-        waitpid($self->{_pid}, 0);
-    }
-
-    $self->{_pid}    = undef;
-    $self->{_pipe}   = undef;
     $self->{_select} = undef;
     $self->{_buf}    = '';
-    $self->{done}    = 1;
+
+    if ($self->{_pid}) {
+        kill('TERM', $self->{_pid});
+        my $ret = waitpid($self->{_pid}, WNOHANG);
+        if ($ret <= 0) {
+            # Child not dead yet — stash for later reaping
+            push @{$self->{_stale_pids} //= []}, $self->{_pid};
+        }
+        $self->{_pid} = undef;
+    }
+}
+
+# Reap any stale child processes (non-blocking)
+sub _reap_stale {
+    my ($self) = @_;
+    my $pids = $self->{_stale_pids} or return;
+    @$pids = grep {
+        my $ret = waitpid($_, WNOHANG);
+        $ret <= 0;  # keep if not yet reaped
+    } @$pids;
 }
 
 sub is_searching {

@@ -4079,8 +4079,8 @@ sub _render_command_palette {
     # Palette dimensions — adapts to terminal width and mode
     my $mode = $palette->{mode} // 'commands';
     my $pal_width = $total_cols - 4;
-    if ($mode eq 'find_in_files') {
-        $pal_width = 120 if $pal_width > 120;  # Find in Files: extra wide for content
+    if ($mode eq 'find_in_files' || $mode eq 'files' || $mode eq 'recent_files') {
+        $pal_width = 120 if $pal_width > 120;  # File pickers: wide for long paths
     } elsif ($total_cols >= 120) {
         $pal_width = 80 if $pal_width > 80;    # Wide terminal: moderately wider
     } else {
@@ -4358,10 +4358,16 @@ sub _render_command_palette {
                 }
                 $output .= "$icon ";
 
-                # Shortcut
+                # Shortcut (truncate from start if too long, keeping the end)
                 my $shortcut = $cmd->{shortcut} // '';
                 my $shortcut_display = $shortcut;
                 my $shortcut_width = length($shortcut_display);
+                my $max_shortcut = int($inner_width / 2) - 4;
+                $max_shortcut = 8 if $max_shortcut < 8;
+                if ($shortcut_width > $max_shortcut) {
+                    $shortcut_display = "\x{2026}" . substr($shortcut, length($shortcut) - $max_shortcut + 1);
+                    $shortcut_width = length($shortcut_display);
+                }
 
                 # Toggle state (right-aligned)
                 my $toggle_text = '';
@@ -4559,23 +4565,8 @@ sub _render_command_palette {
     $output .= $bg . $border_fg;
     $output .= $box_bl;
 
-    # Bottom border content: item count
-    my $count_label = $mode eq 'recent_files' ? 'files'
-                    : $mode eq 'find_in_files' ? 'results'
-                    : 'commands';
-    my $count_text;
-    if ($has_footer_row) {
-        # Count already shown in footer row; keep border clean
-        $count_text = '';
-    } elsif ($mode eq 'find_in_files' && $editor->{_file_search_engine}
-        && $editor->{_file_search_engine}->is_searching()) {
-        $count_text = " searching\x{2026} ($item_count so far) ";
-    } elsif ($mode eq 'find_in_files' && $editor->{_file_search_engine}
-        && $editor->{_file_search_engine}->{result_count} >= $editor->{_file_search_engine}->{_max_results}) {
-        $count_text = " $item_count results (capped) ";
-    } else {
-        $count_text = " $item_count $count_label ";
-    }
+    # Bottom border — clean (find_in_files shows counts in its footer row)
+    my $count_text = '';
 
     my $bottom_border_avail = $pal_width - 2 - length($count_text);
     $bottom_border_avail = 0 if $bottom_border_avail < 0;
