@@ -250,13 +250,28 @@ subtest 'Ctrl char mapping' => sub {
     # Initialize document and view manually for testing
     setup_editor_doc($editor, $filename);
 
-    # Test undo when nothing to undo
+    # Test undo when nothing to undo — verify document unchanged
+    my $original_text = $editor->active_doc()->text();
     $editor->cmd_undo();
-    like($editor->{message}, qr/undo/i, 'Undo message');
+    like($editor->{message}, qr/undo/i, 'Undo message when nothing to undo');
+    is($editor->active_doc()->text(), $original_text, 'Document unchanged after empty undo');
 
-    # Test redo when nothing to redo
+    # Test redo when nothing to redo — verify document unchanged
     $editor->cmd_redo();
-    like($editor->{message}, qr/redo/i, 'Redo message');
+    like($editor->{message}, qr/redo/i, 'Redo message when nothing to redo');
+    is($editor->active_doc()->text(), $original_text, 'Document unchanged after empty redo');
+
+    # Make an edit, then undo — verify document actually reverts
+    $editor->active_doc()->insert(0, 'XYZ');
+    my $edited_text = $editor->active_doc()->text();
+    isnt($edited_text, $original_text, 'Edit changed document');
+
+    $editor->cmd_undo();
+    is($editor->active_doc()->text(), $original_text, 'Undo reverted the edit');
+
+    # Redo — verify document restores the edit
+    $editor->cmd_redo();
+    is($editor->active_doc()->text(), $edited_text, 'Redo restored the edit');
 };
 
 # ============================================================================
