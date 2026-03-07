@@ -245,8 +245,8 @@ subtest 'Clipboard command detection' => sub {
 
     if ($^O eq 'darwin') {
         ok($term->has_system_clipboard(), 'macOS should have pbcopy');
-        is($term->{_clipboard_copy_cmd}, 'pbcopy', 'Copy command is pbcopy');
-        is($term->{_clipboard_paste_cmd}, 'pbpaste', 'Paste command is pbpaste');
+        is_deeply($term->{_clipboard_copy_cmd}, ['pbcopy'], 'Copy command is pbcopy');
+        is_deeply($term->{_clipboard_paste_cmd}, ['pbpaste'], 'Paste command is pbpaste');
     }
 };
 

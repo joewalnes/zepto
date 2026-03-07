@@ -32,8 +32,10 @@ Principle: anything that navigates between files, saves, or exits should never b
 
 **Fix:** Replaced all 5 backtick executions with a `_run_git()` helper that uses `open(FH, '-|')` + `exec('git', @args)` list-form execution (no shell interpretation). Added `_git()` instance method that prepends `-C <repo_root>` to avoid `cd && git` pattern. Removed the now-unnecessary `_shell_quote()` function. All git operations (version check, ls-files, show, status) now use safe list-form exec.
 
-### P1: [Security] Shell injection in Terminal.pm clipboard and command detection
+### ~~P1: [Security] Shell injection in Terminal.pm clipboard and command detection~~ FIXED
 `Terminal.pm` uses backtick execution in two places: `paste_from_clipboard()` (line ~524: `` `$self->{_clipboard_paste_cmd} 2>/dev/null` ``) and `_command_exists()` (line ~487: `` `which $cmd 2>/dev/null` ``). While the command strings are currently hardcoded, backtick execution is unsafe by default. Should replace with list-form `system()` or `open()` with pipes.
+
+**Fix:** Added `_safe_backtick()` helper that uses `open(FH, '-|')` + list-form `exec()` (no shell interpretation). Converted `_command_exists()`, `paste_from_clipboard()`, `stty size`, and `tput cols/lines` to use it. Changed clipboard command storage from strings to arrayrefs so `copy_to_clipboard()` and `paste_from_clipboard()` can use list-form `open()`/`exec()`. Updated test to use `is_deeply` for arrayref comparison.
 
 ### ~~P1: [Documentation] Stale references to deleted TODO.md~~ FIXED
 `TODO.md` was deleted in commit `90a4c38` but is still referenced in `CLAUDE.md` (line 143, "Keeping Docs Current" table) and `docs/CODE_QUALITY.md` (line 31, "Remove from `TODO.md` if listed"). Anyone following the documented workflow will try to update a non-existent file.

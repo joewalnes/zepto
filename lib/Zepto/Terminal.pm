@@ -255,7 +255,7 @@ sub get_size {
 
     # Method 3: stty
     if (!$rows || !$cols) {
-        my $stty = `stty size 2>/dev/null`;
+        my $stty = _safe_backtick('stty', 'size');
         if ($stty && $stty =~ /(\d+)\s+(\d+)/) {
             $rows = $1;
             $cols = $2;
@@ -264,8 +264,8 @@ sub get_size {
 
     # Method 4: tput
     if (!$rows || !$cols) {
-        $cols ||= `tput cols 2>/dev/null`;
-        $rows ||= `tput lines 2>/dev/null`;
+        $cols ||= _safe_backtick('tput', 'cols');
+        $rows ||= _safe_backtick('tput', 'lines');
         chomp($cols) if $cols;
         chomp($rows) if $rows;
     }
@@ -449,33 +449,33 @@ sub _detect_clipboard_commands {
     # macOS
     if ($^O eq 'darwin') {
         if (_command_exists('pbcopy')) {
-            $self->{_clipboard_copy_cmd} = 'pbcopy';
-            $self->{_clipboard_paste_cmd} = 'pbpaste';
+            $self->{_clipboard_copy_cmd} = ['pbcopy'];
+            $self->{_clipboard_paste_cmd} = ['pbpaste'];
             return;
         }
     }
     # Linux/BSD with X11
     elsif (_command_exists('xclip')) {
-        $self->{_clipboard_copy_cmd} = 'xclip -selection clipboard';
-        $self->{_clipboard_paste_cmd} = 'xclip -selection clipboard -o';
+        $self->{_clipboard_copy_cmd} = ['xclip', '-selection', 'clipboard'];
+        $self->{_clipboard_paste_cmd} = ['xclip', '-selection', 'clipboard', '-o'];
         return;
     }
     elsif (_command_exists('xsel')) {
-        $self->{_clipboard_copy_cmd} = 'xsel --clipboard --input';
-        $self->{_clipboard_paste_cmd} = 'xsel --clipboard --output';
+        $self->{_clipboard_copy_cmd} = ['xsel', '--clipboard', '--input'];
+        $self->{_clipboard_paste_cmd} = ['xsel', '--clipboard', '--output'];
         return;
     }
     # Wayland
     elsif (_command_exists('wl-copy')) {
-        $self->{_clipboard_copy_cmd} = 'wl-copy';
-        $self->{_clipboard_paste_cmd} = 'wl-paste';
+        $self->{_clipboard_copy_cmd} = ['wl-copy'];
+        $self->{_clipboard_paste_cmd} = ['wl-paste'];
         return;
     }
     # WSL
     elsif (_command_exists('clip.exe')) {
-        $self->{_clipboard_copy_cmd} = 'clip.exe';
+        $self->{_clipboard_copy_cmd} = ['clip.exe'];
         # paste on WSL requires PowerShell
-        $self->{_clipboard_paste_cmd} = 'powershell.exe -command "Get-Clipboard"';
+        $self->{_clipboard_paste_cmd} = ['powershell.exe', '-command', 'Get-Clipboard'];
         return;
     }
 
@@ -484,8 +484,23 @@ sub _detect_clipboard_commands {
 
 sub _command_exists {
     my ($cmd) = @_;
-    my $check = `which $cmd 2>/dev/null`;
-    return defined $check && $check ne '';
+    my $check = _safe_backtick('which', $cmd);
+    return defined $check && $check ne '' && $? == 0;
+}
+
+# Run a command with list-form exec (no shell interpretation), suppressing stderr.
+# Returns the command's stdout output.
+sub _safe_backtick {
+    my (@cmd) = @_;
+    my $pid = open(my $fh, '-|');
+    return '' unless defined $pid;
+    if ($pid == 0) {
+        open(STDERR, '>', '/dev/null');
+        exec(@cmd) or exit(127);
+    }
+    my $output = do { local $/; <$fh> };
+    close($fh);
+    return defined $output ? $output : '';
 }
 
 # Copy text to system clipboard
@@ -501,10 +516,9 @@ sub copy_to_clipboard {
     # OSC 52 ; c ; base64-data ST (ST = \x1b\\)
     $self->write("\x1b]52;c;${encoded}\x1b\\");
 
-    # Method 2: Platform clipboard command
+    # Method 2: Platform clipboard command (list-form exec, no shell)
     if ($self->{_clipboard_copy_cmd}) {
-        # Use pipe to avoid shell escaping issues
-        my $pid = open(my $pipe, '|-', $self->{_clipboard_copy_cmd});
+        my $pid = open(my $pipe, '|-', @{$self->{_clipboard_copy_cmd}});
         if ($pid) {
             print $pipe $text;
             close $pipe;
@@ -521,7 +535,15 @@ sub paste_from_clipboard {
 
     return '' unless $self->{_clipboard_paste_cmd};
 
-    my $text = `$self->{_clipboard_paste_cmd} 2>/dev/null`;
+    my @cmd = @{$self->{_clipboard_paste_cmd}};
+    my $pid = open(my $fh, '-|');
+    return '' unless defined $pid;
+    if ($pid == 0) {
+        open(STDERR, '>', '/dev/null');
+        exec(@cmd) or exit(127);
+    }
+    my $text = do { local $/; <$fh> };
+    close($fh);
     return defined $text ? $text : '';
 }
 
