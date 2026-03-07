@@ -83,10 +83,21 @@ use constant TAB_WIDTH => 4;
 # Terminal display width of a single character.
 # Returns 2 for wide chars (CJK, emoji), 0 for control/combining, 1 otherwise.
 # Based on Unicode East Asian Width property (EAW=W or F only).
+# Results are memoized by codepoint to avoid repeated range checks.
+my %_cdw_cache;
 sub _char_display_width {
     my $ord = ord($_[0]);
+    # Fast path: printable ASCII (covers ~99% of typical source code)
+    return 1 if $ord >= 0x20 && $ord < 0x7F;
+    return $_cdw_cache{$ord} if exists $_cdw_cache{$ord};
+    my $w = _compute_char_width($ord);
+    $_cdw_cache{$ord} = $w;
+    return $w;
+}
+sub _compute_char_width {
+    my ($ord) = @_;
     return 0 if $ord < 0x20;       # control chars
-    return 1 if $ord < 0x1100;     # ASCII, Latin, Cyrillic, etc.
+    return 1 if $ord < 0x1100;     # Latin, Cyrillic, etc.
     return 2 if ($ord >= 0x1100 && $ord <= 0x115F)    # Hangul Jamo
              # Misc Technical — only the EAW=W characters
              || $ord == 0x231A || $ord == 0x231B       # ⌚⌛

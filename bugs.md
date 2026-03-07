@@ -47,8 +47,10 @@ Principle: anything that navigates between files, saves, or exits should never b
 
 **Fix:** Updated line 61 in `docs/UI_GUIDELINES.md` from "DOCUMENT, APP, NAVIGATE, TOGGLES" to "FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS" to match the actual `@SECTION_ORDER` in `CommandRegistry.pm`.
 
-### P1: [Performance] Character width computed per-character with no caching
+### ~~P1: [Performance] Character width computed per-character with no caching~~ FIXED
 `_char_display_width()` in `Renderer.pm` (130+ lines of Unicode range checks) is called for every character on every visible line on every frame. For a 40-line, 200-column viewport that's ~160,000 function calls per frame. Should memoize by codepoint or use a lookup table.
+
+**Fix:** Added memoization cache (`%_cdw_cache`) keyed by codepoint. Extracted range-check logic into `_compute_char_width()` which is only called on cache miss. Added fast path: printable ASCII (0x20-0x7E) returns 1 immediately without cache lookup, covering ~99% of typical source code characters.
 
 ### P2: [Bug] Shift+Tab does same thing as Tab in find-in-files palette
 `Palette.pm` lines 85-90: both Tab and Shift+Tab call `_file_search_cycle_scope()` with no direction parameter. Shift+Tab should cycle backward through scopes but currently cycles forward, identical to Tab.
