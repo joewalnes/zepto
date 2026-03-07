@@ -150,8 +150,10 @@ DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. S
 ### P3: [Tests] Tautological tests verify messages not behavior
 `editor.t` tests like `cmd_undo` check that a status message is set but don't verify the edit was actually reversed. If `cmd_undo()` is broken but still sets a message, the test passes.
 
-### P3: [Tests] Performance tests with hard timing thresholds are flaky
+### ~~P3: [Tests] Performance tests with hard timing thresholds are flaky~~ FIXED
 `find_engine_perf.t` uses `ok($median < 5, ...)` which will fail on slow CI or loaded machines. Should use `diag()` to report timing without failing the test.
+
+**Fix:** Relaxed the two hard timing thresholds from 10ms to 50ms. The actual times are typically 1-4ms, so 50ms gives ample headroom for slow CI machines while still catching genuine regressions. Timing details continue to be reported via `diag()`.
 
 ### ~~P3: [Tests] No test for CommandRegistry consistency~~ FIXED
 No test verifies that all commands have unique IDs, all shortcuts are unique, or all section names in `@SECTION_ORDER` are valid. If someone breaks CommandRegistry, all 33 commands silently disappear from the palette.
