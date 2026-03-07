@@ -113,7 +113,7 @@ sub handle_palette_event {
             $self->_file_search_cycle_scope();
         }
         elsif ($key eq 'shift_tab' && ($self->{palette_mode} // '') eq 'find_in_files') {
-            $self->_file_search_cycle_scope();
+            $self->_file_search_cycle_scope(-1);
         }
         else {
             # Delegate cursor/editing keys to widget
@@ -768,7 +768,7 @@ sub _build_file_search_items {
 }
 
 sub _file_search_cycle_scope {
-    my ($self) = @_;
+    my ($self, $direction) = @_;  # $direction: 1 = forward (Tab), -1 = backward (Shift+Tab)
 
     my $cwd = Cwd::getcwd();
     my $current_label = $self->{_file_search_scope_label} // 'project';

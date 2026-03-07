@@ -52,8 +52,10 @@ Principle: anything that navigates between files, saves, or exits should never b
 
 **Fix:** Added memoization cache (`%_cdw_cache`) keyed by codepoint. Extracted range-check logic into `_compute_char_width()` which is only called on cache miss. Added fast path: printable ASCII (0x20-0x7E) returns 1 immediately without cache lookup, covering ~99% of typical source code characters.
 
-### P2: [Bug] Shift+Tab does same thing as Tab in find-in-files palette
+### ~~P2: [Bug] Shift+Tab does same thing as Tab in find-in-files palette~~ FIXED
 `Palette.pm` lines 85-90: both Tab and Shift+Tab call `_file_search_cycle_scope()` with no direction parameter. Shift+Tab should cycle backward through scopes but currently cycles forward, identical to Tab.
+
+**Fix:** Added `$direction` parameter to `_file_search_cycle_scope()`. Shift+Tab now passes -1 (backward), Tab passes no direction (forward). With the current 2-scope setup (project, file dir) the visible behavior is identical, but the code is now correct for future scope additions.
 
 ### P2: [Bug] Missing `use File::Spec` in Palette.pm
 `Palette.pm` line 286 calls `File::Spec->rel2abs()` but never imports `File::Spec`. It works by accident because `Editor.pm` imports it, but this is fragile and violates the module's own import conventions.
