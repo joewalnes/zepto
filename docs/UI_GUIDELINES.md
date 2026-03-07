@@ -58,7 +58,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - All commands are defined in a single registry (`lib/Zepto/CommandRegistry.pm`).
 - The registry is the source of truth for: command palette display, status bar pills, and shortcut dispatch.
 - Every command has: id, label, icon, shortcut, section, type, priority, and method.
-- Sections group commands in the palette: DOCUMENT, APP, NAVIGATE, TOGGLES.
+- Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS.
 
 ## Mouse And Keyboard Behavior
 

@@ -38,8 +38,10 @@ Principle: anything that navigates between files, saves, or exits should never b
 
 **Fix:** Removed `TODO.md` row from the "Keeping Docs Current" table in `CLAUDE.md` and removed step 6 "Remove from `TODO.md` if listed" from the feature completion checklist in `docs/CODE_QUALITY.md`.
 
-### P1: [Documentation] UI_GUIDELINES.md palette sections are wrong
+### ~~P1: [Documentation] UI_GUIDELINES.md palette sections are wrong~~ FIXED
 `UI_GUIDELINES.md` says palette sections are "DOCUMENT, APP, NAVIGATE, TOGGLES" but the actual sections in `CommandRegistry.pm` are FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS. The sections were reorganized (see P2 "Command palette re-org" FIXED entry) but the guidelines were never updated.
+
+**Fix:** Updated line 61 in `docs/UI_GUIDELINES.md` from "DOCUMENT, APP, NAVIGATE, TOGGLES" to "FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS" to match the actual `@SECTION_ORDER` in `CommandRegistry.pm`.
 
 ### P1: [Performance] Character width computed per-character with no caching
 `_char_display_width()` in `Renderer.pm` (130+ lines of Unicode range checks) is called for every character on every visible line on every frame. For a 40-line, 200-column viewport that's ~160,000 function calls per frame. Should memoize by codepoint or use a lookup table.
