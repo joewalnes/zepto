@@ -2,7 +2,7 @@
 
 A modern, intuitive, terminal text editor. Single file. No dependencies. No config.
 
-**Website: [zepto.now](https://zepto.now)**
+**Website: [zepto.now](https://zepto.now)** | **[Full feature list](FEATURES.md)**
 
 ## Install
 
