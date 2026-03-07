@@ -10,6 +10,9 @@ Priority scale:
 
 ## Existing bugs
 
+## P3: long filenames in open file dialog
+Long filenames bust out of the box. Actually it's kinda useful to use more of the screenspace, but it leaves screen artifacts. Also useful to widen the picker, like with find across files picker.
+
 ### ~~P1: Search should jump to first~~ FIXED
 When searching for a string that's not currently in view, screen/cursor should jump to match.
 
