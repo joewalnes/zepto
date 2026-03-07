@@ -13,6 +13,13 @@ use warnings;
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
 use IPC::Open3;
+
+# Check if editor is in a modal input state (footer_input, prompt, find, dialog)
+sub _in_modal_state {
+    my ($self) = @_;
+    my $s = $self->{state};
+    return $s eq 'footer_input' || $s eq 'prompt' || $s eq 'find' || $s eq 'dialog';
+}
 use Symbol 'gensym';
 
 use Zepto::Theme;
@@ -215,12 +222,7 @@ sub cmd_new_file {
 
 sub cmd_open_file {
     my ($self) = @_;
-
-    # Don't open during input-focused states
-    return if $self->{state} eq 'footer_input';
-    return if $self->{state} eq 'prompt';
-    return if $self->{state} eq 'find';
-    return if $self->{state} eq 'dialog';
+    return if $self->_in_modal_state();
 
     # Open palette in files mode
     $self->{state} = 'palette';
@@ -233,12 +235,7 @@ sub cmd_open_file {
 
 sub cmd_recent_files {
     my ($self) = @_;
-
-    # Don't open during input-focused states
-    return if $self->{state} eq 'footer_input';
-    return if $self->{state} eq 'prompt';
-    return if $self->{state} eq 'find';
-    return if $self->{state} eq 'dialog';
+    return if $self->_in_modal_state();
 
     my @recent = @{$self->{_recent_files} || []};
     unless (@recent) {
@@ -633,12 +630,7 @@ sub do_find_prev {
 
 sub cmd_find_in_files {
     my ($self) = @_;
-
-    # Don't open during input-focused states
-    return if $self->{state} eq 'footer_input';
-    return if $self->{state} eq 'prompt';
-    return if $self->{state} eq 'find';
-    return if $self->{state} eq 'dialog';
+    return if $self->_in_modal_state();
 
     # Lazily init FileSearchEngine
     if (!$self->{_file_search_engine}) {

@@ -129,8 +129,10 @@ README.md is 32 lines with no feature list despite the editor having command pal
 ### P3: [Code Quality] Display path normalization duplicated in 5+ locations
 The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palette.pm`, `FileSearchEngine.pm` (`_parse_lines` twice, `_tick_perl`), and elsewhere. Should be a utility function.
 
-### P3: [Code Quality] State guard clauses copy-pasted 4+ times
+### ~~P3: [Code Quality] State guard clauses copy-pasted 4+ times~~ FIXED
 `Commands.pm` repeats the same 4-line guard block (`return if $self->{state} eq 'footer_input'` etc.) in `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `_column_paste`. Should extract to `_in_modal_state()` helper.
+
+**Fix:** Added `_in_modal_state()` helper that checks for footer_input, prompt, find, and dialog states. Replaced the 4-line guard blocks in `cmd_open_file`, `cmd_recent_files`, and `cmd_find_in_files` with single-line `return if $self->_in_modal_state()`. Note: `_column_paste` did not have the guard pattern.
 
 ### ~~P3: [Bug] No user feedback for invalid goto_line input~~ FIXED
 `Commands.pm` lines ~682-699: if the user enters something like `abc` or `1:2:3` in the Go To Line input, the function silently returns with no message. Should display an error or hint about expected format.
