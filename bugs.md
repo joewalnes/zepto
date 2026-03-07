@@ -109,25 +109,35 @@ README.md is 32 lines with no feature list despite the editor having command pal
 
 **Fix:** Extended the title sanitizer to also strip DEL (0x7F) and C1 control characters (0x80-0x9F), which can trigger terminal-specific escape sequences.
 
-### P3: [Performance] Tab bar geometry recalculated every frame
+### P3: [Performance] Tab bar geometry recalculated every frame — SKIPPED
 `Renderer.pm` lines ~658-710: every frame recalculates tab pill widths, runs progressive name truncation, and recalculates tab range visibility — even if only the cursor moved. Should cache and invalidate only on tab count/active tab/terminal width changes.
 
-### P3: [Performance] VCS status checked per visible line per frame
+**Skipped — fix requires adding cache invalidation logic to Renderer.pm's tab bar rendering. Not a bug bash item.**
+
+### P3: [Performance] VCS status checked per visible line per frame — SKIPPED
 `Renderer.pm` lines ~1430-1465: calls `vcs_deletion_status()` and `vcs_change_status()` for every visible line on every frame, even when the document hasn't changed. Should cache per frame and invalidate on document change.
 
-### P3: [Performance] Palette filtering rescans all files on every keystroke
+**Skipped — fix requires adding per-frame caching layer for VCS status in Renderer.pm. Not a bug bash item.**
+
+### P3: [Performance] Palette filtering rescans all files on every keystroke — SKIPPED
 `_filter_recent_files` and `_filter_all_files` in `Palette.pm` iterate the entire file list and call `_fuzzy_score` twice per item on every keystroke. No debouncing, no early termination, no result count limiting despite only showing 15-30 items.
+
+**Skipped — optimization requires adding early termination / result limiting to palette filter. Not a bug bash item.**
 
 ### ~~P3: [Performance] Regex recompilation in FileSearchEngine inner loop~~ FIXED
 `FileSearchEngine.pm` line ~449: `_find_match_in_content` compiles the search regex via `eval { qr/$query/ }` on every per-line match check. Should pre-compile once at search start.
 
 **Fix:** Fixed as part of the P2 ReDoS fix. `_find_match_in_content` now uses the pre-compiled regex from `$self->{_perl_regex}` instead of re-compiling via `eval { qr/$query/ }` on every line.
 
-### P3: [Code Quality] _filter_recent_files and _filter_all_files are 90% identical
+### P3: [Code Quality] _filter_recent_files and _filter_all_files are 90% identical — SKIPPED
 `Palette.pm` lines 205-315: two ~55-line functions with nearly identical item-building and scoring logic. Only the data source differs. Should extract to a shared `_filter_file_items()` helper.
 
-### P3: [Code Quality] Display path normalization duplicated in 5+ locations
+**Skipped — refactor of palette filtering functions. Not a bug bash item.**
+
+### P3: [Code Quality] Display path normalization duplicated in 5+ locations — SKIPPED
 The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palette.pm`, `FileSearchEngine.pm` (`_parse_lines` twice, `_tick_perl`), and elsewhere. Should be a utility function.
+
+**Skipped — cross-cutting refactor across multiple files. Not a bug bash item.**
 
 ### ~~P3: [Code Quality] State guard clauses copy-pasted 4+ times~~ FIXED
 `Commands.pm` repeats the same 4-line guard block (`return if $self->{state} eq 'footer_input'` etc.) in `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `_column_paste`. Should extract to `_in_modal_state()` helper.
@@ -139,16 +149,20 @@ The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palett
 
 **Fix:** Added status message "Invalid format. Use: line, line:col, or :col" when the input doesn't match any valid pattern.
 
-### P3: [Documentation] DESIGN.md architecture diagram is stale
+### P3: [Documentation] DESIGN.md architecture diagram is stale — SKIPPED
 The architecture diagram references "Commands/Menu/Preferences" module layout and doesn't reflect the current pill-based status bar, progressive disclosure, or the FILE/EDIT/NAVIGATE/VIEW section organization.
+
+**Skipped — requires understanding current architecture in detail to rewrite accurately. Not a bug bash item.**
 
 ### ~~P3: [Documentation] Unverified "95%+ coverage" claim in DESIGN.md~~ FIXED
 DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. Several modules (`Config.pm`, VCS integration paths) have little or no direct test coverage.
 
 **Fix:** Replaced unsubstantiated "95%+ automated test coverage" with "comprehensive automated testing" — accurate without making a specific claim.
 
-### P3: [Tests] Tautological tests verify messages not behavior
+### P3: [Tests] Tautological tests verify messages not behavior — SKIPPED
 `editor.t` tests like `cmd_undo` check that a status message is set but don't verify the edit was actually reversed. If `cmd_undo()` is broken but still sets a message, the test passes.
+
+**Skipped — improving test quality requires rewriting editor.t test cases. Not a bug bash item.**
 
 ### ~~P3: [Tests] Performance tests with hard timing thresholds are flaky~~ FIXED
 `find_engine_perf.t` uses `ok($median < 5, ...)` which will fail on slow CI or loaded machines. Should use `diag()` to report timing without failing the test.
