@@ -57,11 +57,15 @@ Principle: anything that navigates between files, saves, or exits should never b
 
 **Fix:** Added `$direction` parameter to `_file_search_cycle_scope()`. Shift+Tab now passes -1 (backward), Tab passes no direction (forward). With the current 2-scope setup (project, file dir) the visible behavior is identical, but the code is now correct for future scope additions.
 
-### P2: [Bug] Missing `use File::Spec` in Palette.pm
+### ~~P2: [Bug] Missing `use File::Spec` in Palette.pm~~ FIXED
 `Palette.pm` line 286 calls `File::Spec->rel2abs()` but never imports `File::Spec`. It works by accident because `Editor.pm` imports it, but this is fragile and violates the module's own import conventions.
 
-### P2: [Security] ReDoS vulnerability via user search input
+**Fix:** Already fixed in commit 4f3c5a0 (Find in Files). `use File::Spec;` is now at line 20.
+
+### ~~P2: [Security] ReDoS vulnerability via user search input~~ FIXED
 User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~455) and `FileSearchEngine.pm` (line ~268, ~449) via `eval { qr/$query/ }`. A crafted pattern like `(a+)+$` could cause catastrophic backtracking and freeze the editor. Should add regex complexity validation or a timeout mechanism.
+
+**Fix:** Added 1000-character pattern length limit to `FileSearchEngine.pm` (matching `FindEngine.pm`'s existing limit). Also fixed `_find_match_in_content` to use the pre-compiled regex from `_perl_regex` instead of re-compiling from the query string on every line match — this also fixes the P3 "regex recompilation in inner loop" bug.
 
 ### P2: [Security] Predictable temp file names in Document.pm atomic save
 `Document.pm` line ~138 uses `"$path.zepto.tmp.$$"` (PID-based) for temp files during atomic save. On multi-user systems this is predictable and vulnerable to symlink attacks (TOCTOU). Should use `File::Temp` for secure temporary file creation.
@@ -96,8 +100,10 @@ README.md is 32 lines with no feature list despite the editor having command pal
 ### P3: [Performance] Palette filtering rescans all files on every keystroke
 `_filter_recent_files` and `_filter_all_files` in `Palette.pm` iterate the entire file list and call `_fuzzy_score` twice per item on every keystroke. No debouncing, no early termination, no result count limiting despite only showing 15-30 items.
 
-### P3: [Performance] Regex recompilation in FileSearchEngine inner loop
+### ~~P3: [Performance] Regex recompilation in FileSearchEngine inner loop~~ FIXED
 `FileSearchEngine.pm` line ~449: `_find_match_in_content` compiles the search regex via `eval { qr/$query/ }` on every per-line match check. Should pre-compile once at search start.
+
+**Fix:** Fixed as part of the P2 ReDoS fix. `_find_match_in_content` now uses the pre-compiled regex from `$self->{_perl_regex}` instead of re-compiling via `eval { qr/$query/ }` on every line.
 
 ### P3: [Code Quality] _filter_recent_files and _filter_all_files are 90% identical
 `Palette.pm` lines 205-315: two ~55-line functions with nearly identical item-building and scoring logic. Only the data source differs. Should extract to a shared `_filter_file_items()` helper.

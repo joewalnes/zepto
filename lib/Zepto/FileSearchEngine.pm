@@ -294,6 +294,11 @@ sub _start_perl_search {
 
     # Precompile regex if in regex mode
     if ($self->{use_regex}) {
+        # Limit pattern length to mitigate ReDoS (matches FindEngine limit)
+        if (length($query) > 1000) {
+            $self->{done} = 1;
+            return;
+        }
         my $re = eval {
             $self->{case_sensitive} ? qr/$query/ : qr/$query/i;
         };
@@ -478,9 +483,7 @@ sub _find_match_in_content {
     my $match_len = 0;
 
     if ($self->{use_regex}) {
-        my $re = eval {
-            $self->{case_sensitive} ? qr/$query/ : qr/$query/i;
-        };
+        my $re = $self->{_perl_regex};
         if ($re && $content =~ $re) {
             $match_col = $-[0];
             $match_len = $+[0] - $-[0];
