@@ -67,8 +67,10 @@ User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~
 
 **Fix:** Added 1000-character pattern length limit to `FileSearchEngine.pm` (matching `FindEngine.pm`'s existing limit). Also fixed `_find_match_in_content` to use the pre-compiled regex from `_perl_regex` instead of re-compiling from the query string on every line match — this also fixes the P3 "regex recompilation in inner loop" bug.
 
-### P2: [Security] Predictable temp file names in Document.pm atomic save
+### ~~P2: [Security] Predictable temp file names in Document.pm atomic save~~ FIXED
 `Document.pm` line ~138 uses `"$path.zepto.tmp.$$"` (PID-based) for temp files during atomic save. On multi-user systems this is predictable and vulnerable to symlink attacks (TOCTOU). Should use `File::Temp` for secure temporary file creation.
+
+**Fix:** Replaced PID-based temp filename with `File::Temp::tempfile()` which creates files with unpredictable names via exclusive `O_EXCL` open, preventing symlink attacks. Temp file is created in the same directory as the target file (required for same-filesystem `rename`).
 
 ### P2: [Performance] Renderer uses 381+ string concatenations in hot path
 `Renderer.pm` uses 381+ `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation. For a full-screen render this is thousands of concatenations. Should use array buffering (`push @parts, ...; join '', @parts`).

@@ -9,6 +9,8 @@ use Zepto::Buffer;
 use Zepto::VCS::Provider;
 use Zepto::VCS::Git;  # Ensure Git provider is registered
 use Zepto::Diff;
+use File::Temp ();
+use File::Basename qw(dirname);
 
 # Undo grouping timeout in seconds (consecutive edits within this window are grouped)
 use constant UNDO_GROUP_TIMEOUT => 1.0;
@@ -135,12 +137,17 @@ sub save {
         $content =~ s/\n/\r\n/g;
     }
 
-    # Atomic save: write to temp file, then rename
-    my $temp_path = "$path.zepto.tmp.$$";
+    # Atomic save: write to temp file, then rename.
+    # Use File::Temp for secure creation (unpredictable name, exclusive open).
+    my $dir = dirname($path);
+    my ($fh, $temp_path) = File::Temp::tempfile(
+        '.zepto-save-XXXXXXXX',
+        DIR    => $dir,
+        UNLINK => 0,
+    );
 
     eval {
-        open my $fh, '>:encoding(UTF-8)', $temp_path
-            or die "Cannot create temp file $temp_path: $!";
+        binmode($fh, ':encoding(UTF-8)');
         print $fh $content;
         close $fh or die "Cannot close temp file: $!";
 
