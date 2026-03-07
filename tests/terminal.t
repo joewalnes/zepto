@@ -278,6 +278,29 @@ subtest 'copy_to_clipboard handles empty/undef' => sub {
     unlike($output, qr/\x1b\]52/, 'No OSC 52 for empty input');
 };
 
+subtest 'copy_to_clipboard handles wide characters' => sub {
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+
+    # Copy text with double-width CJK characters — should not crash
+    my $wide_text = "\x{4e16}\x{754c}";  # 世界 (CJK characters)
+    eval { $term->copy_to_clipboard($wide_text) };
+    is($@, '', 'No crash copying wide characters');
+
+    seek($out_fh, 0, 0);
+    my $output = do { local $/; <$out_fh> };
+
+    # Should contain OSC 52 with base64-encoded UTF-8 bytes
+    # "世界" in UTF-8 is \xe4\xb8\x96\xe7\x95\x8c, base64 is "5LiW55WM"
+    like($output, qr/\x1b\]52;c;5LiW55WM\x1b\\/, 'OSC 52 correct for wide chars');
+
+    # Also test emoji (multi-byte + wide display)
+    my ($out_fh2, $out_name2) = tempfile(UNLINK => 1);
+    my $term2 = Zepto::Terminal->new(out => $out_fh2);
+    eval { $term2->copy_to_clipboard("\x{1f600}") };  # 😀
+    is($@, '', 'No crash copying emoji');
+};
+
 subtest 'paste_from_clipboard returns string' => sub {
     my $term = Zepto::Terminal->new();
 

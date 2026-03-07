@@ -600,3 +600,10 @@ On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), pre
 On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.
 
 **Skipped — requires significant renderer architecture changes. Inline images interleaved with text need: (1) Markdown parser extension for `![alt](path)` tokens, (2) image row height calculation that displaces subsequent text rows, (3) per-image Kitty graphics ID management for multiple images on screen, (4) scroll-aware image repositioning. The P2 Kitty graphics fix handles whole-file image tabs, but inline images in flowing text is architecturally different. Recommend as a separate dedicated feature.**
+
+### ~~P0: [Crash] Copying double-width characters crashes editor~~ FIXED
+Copying text containing double-width characters (CJK, emoji) crashes with `Wide character in subroutine entry`. Reported crash in `copy_to_clipboard` when base64-encoding wide character strings for OSC 52.
+
+**Root cause:** `MIME::Base64::encode_base64()` expects raw bytes, but `copy_to_clipboard()` passed Perl's internal wide-character strings directly. The pipe write to clipboard commands (`print $pipe $text`) had the same issue.
+
+**Fix:** Added `utf8::encode()` to convert wide-character strings to UTF-8 bytes before passing to `encode_base64()` and the clipboard pipe. Added `binmode($pipe, ':raw')` on the clipboard command pipe. Added tests for CJK characters and emoji.

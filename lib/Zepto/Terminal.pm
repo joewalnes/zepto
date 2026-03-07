@@ -509,10 +509,15 @@ sub copy_to_clipboard {
     my ($self, $text) = @_;
     return unless defined $text && length $text;
 
+    # Encode to UTF-8 bytes — encode_base64 and pipe write expect bytes,
+    # not Perl's internal wide character strings
+    my $bytes = $text;
+    utf8::encode($bytes) if utf8::is_utf8($bytes);
+
     # Method 1: OSC 52 escape sequence
     # Works in modern terminals, through tmux (with set-clipboard on), over SSH
     require MIME::Base64;
-    my $encoded = MIME::Base64::encode_base64($text, '');
+    my $encoded = MIME::Base64::encode_base64($bytes, '');
     # OSC 52 ; c ; base64-data ST (ST = \x1b\\)
     $self->write("\x1b]52;c;${encoded}\x1b\\");
 
@@ -520,7 +525,8 @@ sub copy_to_clipboard {
     if ($self->{_clipboard_copy_cmd}) {
         my $pid = open(my $pipe, '|-', @{$self->{_clipboard_copy_cmd}});
         if ($pid) {
-            print $pipe $text;
+            binmode($pipe, ':raw');
+            print $pipe $bytes;
             close $pipe;
         }
     }
