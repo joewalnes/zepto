@@ -142,8 +142,10 @@ The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palett
 ### P3: [Documentation] DESIGN.md architecture diagram is stale
 The architecture diagram references "Commands/Menu/Preferences" module layout and doesn't reflect the current pill-based status bar, progressive disclosure, or the FILE/EDIT/NAVIGATE/VIEW section organization.
 
-### P3: [Documentation] Unverified "95%+ coverage" claim in DESIGN.md
+### ~~P3: [Documentation] Unverified "95%+ coverage" claim in DESIGN.md~~ FIXED
 DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. Several modules (`Config.pm`, VCS integration paths) have little or no direct test coverage.
+
+**Fix:** Replaced unsubstantiated "95%+ automated test coverage" with "comprehensive automated testing" — accurate without making a specific claim.
 
 ### P3: [Tests] Tautological tests verify messages not behavior
 `editor.t` tests like `cmd_undo` check that a status message is set but don't verify the edit was actually reversed. If `cmd_undo()` is broken but still sets a message, the test passes.

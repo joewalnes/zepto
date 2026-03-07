@@ -8,7 +8,7 @@ Technical decisions, architecture, and rationale.
 2. **Zero dependencies** — Perl standard library only. No CPAN, no external tools.
 3. **Instant startup** — Under 100ms to first render.
 4. **Predictable behavior** — No modes, no surprises. Works like every other text field you've used.
-5. **Testable architecture** — Clean separation allows 95%+ automated test coverage.
+5. **Testable architecture** — Clean separation enables comprehensive automated testing.
 
 ## Why Perl?
 
