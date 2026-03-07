@@ -490,15 +490,39 @@ sub clear_filter {
 
 # Build flat file list for fuzzy filter — capped at MAX_FILES to bound cost.
 # Called lazily on first filter activation, not at construction time.
+# Uses git ls-files when in a git repo (fast index lookup), falls back to walk.
 sub _build_all_files_list {
     my ($self) = @_;
     return if $self->{_all_files_loaded};
 
-    my %skip = Zepto::Config::skip_directories_hash();
     my $max = Zepto::Config::max_files();
-    my $max_depth = Zepto::Config::max_depth();
     my @files;
-    $self->_walk_for_files($self->{root_path}, \%skip, \@files, $max, 0, $max_depth);
+
+    # Try git ls-files first — uses pre-built index, much faster than walk
+    if (-d "$self->{root_path}/.git") {
+        my $pid = open my $fh, '-|';
+        if (defined $pid && $pid == 0) {
+            open STDERR, '>', '/dev/null';
+            exec 'git', '-C', $self->{root_path}, 'ls-files';
+            exit 1;
+        }
+        if ($fh) {
+            while (<$fh>) {
+                chomp;
+                push @files, $_;
+                last if @files >= $max;
+            }
+            close $fh;
+        }
+    }
+
+    # Fall back to recursive walk if git ls-files didn't work or not a git repo
+    if (!@files) {
+        my %skip = Zepto::Config::skip_directories_hash();
+        my $max_depth = Zepto::Config::max_depth();
+        $self->_walk_for_files($self->{root_path}, \%skip, \@files, $max, 0, $max_depth);
+    }
+
     $self->{_all_files} = \@files;
     $self->{_all_files_loaded} = 1;
 }

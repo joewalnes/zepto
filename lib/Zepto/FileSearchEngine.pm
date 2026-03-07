@@ -187,7 +187,7 @@ sub _start_subprocess_search {
 
     my @cmd;
     if ($backend eq 'git_grep') {
-        @cmd = ('git', '-C', $scope_dir, 'grep', '--untracked',
+        @cmd = ('git', '-C', $scope_dir, 'grep',
                 '-n', '--color=never', '-I');
         push @cmd, '-i' unless $self->{case_sensitive};
         push @cmd, $self->{use_regex} ? '-E' : '-F';
@@ -198,12 +198,18 @@ sub _start_subprocess_search {
                 '--with-filename');
         push @cmd, '-i' unless $self->{case_sensitive};
         push @cmd, '-F' unless $self->{use_regex};
+        for my $dir (Zepto::Config::skip_directories()) {
+            push @cmd, '--glob', "!$dir";
+        }
         push @cmd, '-e', $query, $scope_dir;
     }
     elsif ($backend eq 'grep') {
         @cmd = ('grep', '-rn', '--color=never', '-I');
         push @cmd, '-i' unless $self->{case_sensitive};
         push @cmd, $self->{use_regex} ? '-E' : '-F';
+        for my $dir (Zepto::Config::skip_directories()) {
+            push @cmd, "--exclude-dir=$dir";
+        }
         push @cmd, '-e', $query, $scope_dir;
     }
 
