@@ -651,7 +651,7 @@ sub _render_tab_bar {
     my ($class, $theme, $cols, $ui, $tree_width) = @_;
     $tree_width //= 0;
 
-    my $output = '';
+    my @_out;
 
     my $tab_cols = $cols - $tree_width;  # available width for tabs
     my $tabs = $ui->{tabs} // [];
@@ -731,20 +731,20 @@ sub _render_tab_bar {
     my $UL_OFF = "\e[24m";
 
     # Start row with underline enabled
-    $output .= $bar_bg . $UL_ON;
+    push @_out, $bar_bg . $UL_ON;
 
     my $x = 0;
     my @buttons;
 
     # Leading space (underlined)
-    $output .= ' ';
+    push @_out, ' ';
     $x++;
 
     # Left scroll indicator (clickable, underlined)
     if ($show_left_arrow) {
         my $arrow = Zepto::Chars->enabled() ? "\x{25c2}" : '<';  # ◂ or <
         my $arrow_start_x = $x;
-        $output .= $theme->color('tab_inactive_fg') . $arrow . ' ';
+        push @_out, $theme->color('tab_inactive_fg') . $arrow . ' ';
         $x += 2;
         push @buttons, {
             start => $arrow_start_x,
@@ -773,7 +773,7 @@ sub _render_tab_bar {
             : $theme->color('tab_inactive_edge');
 
         # Left triangle edge ◢ — underlined (part of bar territory)
-        $output .= $bar_bg . $edge_fg . $TAB_LEFT;
+        push @_out, $bar_bg . $edge_fg . $TAB_LEFT;
         $x++;
 
         # Tab interior
@@ -789,39 +789,39 @@ sub _render_tab_bar {
         # Active tab body: no underline (opens into ruler below)
         # Inactive tab body: underline continues (baseline runs through)
         if ($is_active) {
-            $output .= $UL_OFF . $tab_bg . $name_color;
+            push @_out, $UL_OFF . $tab_bg . $name_color;
         } else {
-            $output .= $tab_bg . $name_color;
+            push @_out, $tab_bg . $name_color;
         }
 
         # Space + name
-        $output .= " $name";
+        push @_out, " $name";
         $x += 1 + length($name);
 
         # Dirty indicator
         if ($is_dirty) {
-            $output .= ' ';
-            $output .= $theme->color('tab_modified_fg');
-            $output .= $modified_char;
-            $output .= $name_color;
+            push @_out, ' ';
+            push @_out, $theme->color('tab_modified_fg');
+            push @_out, $modified_char;
+            push @_out, $name_color;
             $x += 2;
         }
 
         # Shortcut hint for tabs 1-9 (⌥N = Alt+N to switch)
         if ($i < 9) {
-            $output .= ' ';
-            $output .= $theme->color('tab_shortcut_fg');
+            push @_out, ' ';
+            push @_out, $theme->color('tab_shortcut_fg');
             my $hint = "\x{2325}" . ($i + 1);  # ⌥N
-            $output .= $hint;
-            $output .= $name_color;
+            push @_out, $hint;
+            push @_out, $name_color;
             $x += 1 + length($hint);
         }
 
         # Close button
-        $output .= ' ';
+        push @_out, ' ';
         my $close_start_x = $x;
-        $output .= $theme->color('tab_close_fg');
-        $output .= $close_char;
+        push @_out, $theme->color('tab_close_fg');
+        push @_out, $close_char;
         $x += 2;
 
         push @buttons, {
@@ -833,9 +833,9 @@ sub _render_tab_bar {
 
         # Right triangle edge ◣ — re-enable underline (back to bar territory)
         if ($is_active) {
-            $output .= $UL_ON;
+            push @_out, $UL_ON;
         }
-        $output .= $bar_bg . $edge_fg . $TAB_RIGHT;
+        push @_out, $bar_bg . $edge_fg . $TAB_RIGHT;
         $x++;
 
         push @buttons, {
@@ -847,7 +847,7 @@ sub _render_tab_bar {
 
         # Gap between tabs (underlined)
         if ($vi < $last_visible) {
-            $output .= $bar_bg . ' ';
+            push @_out, $bar_bg . ' ';
             $x++;
         }
     }
@@ -856,7 +856,7 @@ sub _render_tab_bar {
     if ($show_right_arrow) {
         my $arrow = Zepto::Chars->enabled() ? "\x{25b8}" : '>';  # ▸ or >
         my $arrow_start_x = $x;
-        $output .= $bar_bg . ' ' . $theme->color('tab_inactive_fg') . $arrow;
+        push @_out, $bar_bg . ' ' . $theme->color('tab_inactive_fg') . $arrow;
         $x += 2;
         push @buttons, {
             start => $arrow_start_x,
@@ -875,14 +875,14 @@ sub _render_tab_bar {
 
     if ($remaining >= $hint_width) {
         my $fill = $remaining - $hint_width;
-        $output .= $bar_bg;
-        $output .= ' ' x $fill if $fill > 0;
-        $output .= ' ' . $theme->color('tab_shortcut_fg') . $hint_full . ' ';
+        push @_out, $bar_bg;
+        push @_out, ' ' x $fill if $fill > 0;
+        push @_out, ' ' . $theme->color('tab_shortcut_fg') . $hint_full . ' ';
     } elsif ($remaining > 0) {
-        $output .= $bar_bg;
-        $output .= ' ' x $remaining;
+        push @_out, $bar_bg;
+        push @_out, ' ' x $remaining;
     }
-    $output .= $UL_OFF . RESET;
+    push @_out, $UL_OFF . RESET;
 
     # Offset button positions by tree_width so mouse clicks map correctly
     if ($tree_width > 0) {
@@ -892,7 +892,7 @@ sub _render_tab_bar {
 
     $class->_set_tab_bar_buttons(\@buttons);
 
-    return $output;
+    return join('', @_out);
 }
 
 # Calculate the display width of a tab pill (not counting inter-tab gap)
@@ -1020,7 +1020,7 @@ sub _render_ruler_bar {
     my ($class, $theme, $cols, $gutter_width, $view, $doc, $tree_width, $ui) = @_;
     $tree_width //= 0;
 
-    my $output = '';
+    my @_out;
 
     # Get cursor position
     my $cursor_line = $view ? $view->cursor_line() : 0;
@@ -1046,8 +1046,8 @@ sub _render_ruler_bar {
     }
 
     # Start with gutter area (empty, matches gutter width)
-    $output .= $theme->color('ruler_bg') . $theme->color('ruler_fg');
-    $output .= ' ' x $gutter_width;
+    push @_out, $theme->color('ruler_bg') . $theme->color('ruler_fg');
+    push @_out, ' ' x $gutter_width;
 
     # Calculate ruler width (text area width, excluding tree)
     my $ruler_width = $cols - $tree_width - $gutter_width;
@@ -1087,21 +1087,21 @@ sub _render_ruler_bar {
         # Check if we're at the cursor badge position
         if ($i == $badge_start && $visible_cursor >= 0 && $badge_end <= $ruler_width) {
             # Render cursor badge: space + number + round right
-            $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg');
-            $output .= ' ' . $cursor_str;
-            $output .= $theme->color('ruler_bg') . $theme->color('ruler_cursor_edge') . $rr;
-            $output .= $theme->color('ruler_fg');
+            push @_out, $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg');
+            push @_out, ' ' . $cursor_str;
+            push @_out, $theme->color('ruler_bg') . $theme->color('ruler_cursor_edge') . $rr;
+            push @_out, $theme->color('ruler_fg');
             # Skip past the badge width in the source ruler
             $i += $badge_width;
         } else {
             # Regular ruler character
             my $ch = substr($ruler, $i, 1);
             if ($ch eq '|') {
-                $output .= $theme->color('ruler_mark');
-                $output .= $ch;
-                $output .= $theme->color('ruler_fg');
+                push @_out, $theme->color('ruler_mark');
+                push @_out, $ch;
+                push @_out, $theme->color('ruler_fg');
             } else {
-                $output .= $ch;
+                push @_out, $ch;
             }
             $i++;
         }
@@ -1113,9 +1113,9 @@ sub _render_ruler_bar {
         my $label_width = length($label);
         if ($label_width < $cols) {
             my $col_start = $cols - $label_width + 1;
-            $output .= _move_to(2, $col_start);
-            $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-            $output .= $label;
+            push @_out, _move_to(2, $col_start);
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+            push @_out, $label;
             push @ruler_buttons, {
                 x_start => $col_start,
                 x_end   => $col_start + $label_width - 1,
@@ -1125,10 +1125,10 @@ sub _render_ruler_bar {
     }
     $class->_set_ruler_buttons(\@ruler_buttons);
 
-    $output .= CLEAR_LINE;
-    $output .= RESET;
+    push @_out, CLEAR_LINE;
+    push @_out, RESET;
 
-    return $output;
+    return join('', @_out);
 }
 
 # Render the text area with line numbers
@@ -1365,7 +1365,7 @@ sub _render_text_area {
         my $entry = $entries[$screen_row];
 
         # Per-row output buffer (for differential rendering)
-        my $output = _move_to($screen_row + 3, $tree_width + 1);
+        my @_out = (_move_to($screen_row + 3, $tree_width + 1));
 
         # Handle old-line entries (expanded hunk base content)
         if ($entry && $entry->{type} eq 'old') {
@@ -1386,15 +1386,15 @@ sub _render_text_area {
             my $char_hl = (!$entry->{wrap_index})
                 ? $hunk_char_diffs{$hunk_idx}{old}{$entry->{base_line}}
                 : undef;
-            $output .= $class->_render_old_line_row(
+            push @_out, $class->_render_old_line_row(
                 $doc, $view, $theme, $width, $gutter_width,
                 $entry, $highlighter, \$base_highlighter, $char_hl
             );
-            $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+            push @_out, $class->_render_minimap_column($minimap_data, $screen_row, $theme)
                 if $minimap_width > 0;
-            $output .= CLEAR_LINE;
-            $output .= RESET;
-            push @text_rows, $output;
+            push @_out, CLEAR_LINE;
+            push @_out, RESET;
+            push @text_rows, join('', @_out);
             next;
         }
 
@@ -1426,16 +1426,16 @@ sub _render_text_area {
             my $indent_w = $entry->{indent_width} // 0;
             if ($indent_w == 0) {
                 # No hanging indent: VCS marker + padding + wrap indicator
-                $output .= $gutter_bg . $vcs_color . $vcs_char;
-                $output .= $theme->color('gutter_fg');
-                $output .= ' ' x ($gutter_width - 2);
-                $output .= $theme->color('wrap_indicator_fg');
-                $output .= Zepto::Chars->get('wrap_indicator');
+                push @_out, $gutter_bg . $vcs_color . $vcs_char;
+                push @_out, $theme->color('gutter_fg');
+                push @_out, ' ' x ($gutter_width - 2);
+                push @_out, $theme->color('wrap_indicator_fg');
+                push @_out, Zepto::Chars->get('wrap_indicator');
             } else {
                 # Has hanging indent: VCS marker + padding, ↪ goes in content indent area
-                $output .= $gutter_bg . $vcs_color . $vcs_char;
-                $output .= $theme->color('gutter_fg');
-                $output .= ' ' x ($gutter_width - 1);
+                push @_out, $gutter_bg . $vcs_color . $vcs_char;
+                push @_out, $theme->color('gutter_fg');
+                push @_out, ' ' x ($gutter_width - 1);
             }
         }
         # Line number gutter with VCS indicator (single column)
@@ -1499,7 +1499,7 @@ sub _render_text_area {
                 my $ar = Zepto::Chars->get('arrow_right');
 
                 # VCS indicator first (on gutter background)
-                $output .= $gutter_bg . $vcs_color . $vcs_char;
+                push @_out, $gutter_bg . $vcs_color . $vcs_char;
 
                 # Right-align: match the sprintf padding used in normal lines
                 # Normal line uses sprintf("%*d", gutter_width - 3, num) which right-aligns
@@ -1507,27 +1507,27 @@ sub _render_text_area {
                 my $padded_num = sprintf("%*d", $num_width, $doc_line + 1);
 
                 # Badge: rl + padded_num + ar
-                $output .= $gutter_bg . $theme->color('ruler_cursor_edge') . $rl;
-                $output .= $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
+                push @_out, $gutter_bg . $theme->color('ruler_cursor_edge') . $rl;
+                push @_out, $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
                 # Arrow right: badge color as fg, next area color as bg
                 my $next_bg = $is_hunk_line
                     ? $theme->color('diff_new_cursor_bg')
                     : $theme->color('cursor_line_bg');
-                $output .= $next_bg . $theme->color('ruler_cursor_edge') . $ar;
+                push @_out, $next_bg . $theme->color('ruler_cursor_edge') . $ar;
             } else {
                 # Normal line: [vcs][space][right-aligned digits][space]
                 # VCS indicator first
-                $output .= $gutter_bg . $vcs_color . $vcs_char;
+                push @_out, $gutter_bg . $vcs_color . $vcs_char;
                 # Rest of gutter
-                $output .= $gutter_bg . $theme->color('gutter_fg');
+                push @_out, $gutter_bg . $theme->color('gutter_fg');
                 # Use (gutter_width - 3) for digits: total = 1(vcs) + 1(space) + digits + 1(space) = gutter_width
                 my $line_num = sprintf("%*d", $gutter_width - 3, $doc_line + 1);
-                $output .= ' ' . $line_num . ' ';
+                push @_out, ' ' . $line_num . ' ';
             }
         }
         else {
-            $output .= $theme->color('gutter_bg') . $theme->color('gutter_fg');
-            $output .= ' ' x $gutter_width;
+            push @_out, $theme->color('gutter_bg') . $theme->color('gutter_fg');
+            push @_out, ' ' x $gutter_width;
         }
 
         # Background: cursor+hunk > cursor > hunk > normal
@@ -1541,7 +1541,7 @@ sub _render_text_area {
         } else {
             $line_bg = $theme->color('bg');
         }
-        $output .= $line_bg . $theme->color('fg');
+        push @_out, $line_bg . $theme->color('fg');
 
         # Text content
         if ($doc_line < $doc->line_count()) {
@@ -1703,13 +1703,13 @@ sub _render_text_area {
 
             # Emit wrap indicator prefix: [indent spaces] + ↪ for indented continuation rows
             if ($wrap_indicator_width > 0) {
-                $output .= $line_bg . (' ' x ($wrap_indicator_width - 1));
-                $output .= $theme->color('wrap_indicator_fg') . Zepto::Chars->get('wrap_indicator');
-                $output .= $line_bg . $theme->color('fg');
+                push @_out, $line_bg . (' ' x ($wrap_indicator_width - 1));
+                push @_out, $theme->color('wrap_indicator_fg') . Zepto::Chars->get('wrap_indicator');
+                push @_out, $line_bg . $theme->color('fg');
             }
 
             # Render with selection, syntax, match, and cursor highlighting
-            $output .= $class->_render_line_with_highlights(
+            push @_out, $class->_render_line_with_highlights(
                 $expanded_content, $doc_line, $effective_scroll_col, $avail_width,
                 $view, $theme, $cursor_line, $visual_cursor_col, $is_cursor_line, \@visual_tokens,
                 $full_line_content, \@visual_matches,
@@ -1747,32 +1747,32 @@ sub _render_text_area {
                         my $pre = $sel_left - $fill_start;
                         my $sel = $sel_right - $sel_left;
                         my $post = $fill_end - $sel_right;
-                        $output .= $fill_bg . (' ' x $pre) if $pre > 0;
-                        $output .= $col_sel_bg . (' ' x $sel) if $sel > 0;
-                        $output .= $fill_bg . (' ' x $post) if $post > 0;
+                        push @_out, $fill_bg . (' ' x $pre) if $pre > 0;
+                        push @_out, $col_sel_bg . (' ' x $sel) if $sel > 0;
+                        push @_out, $fill_bg . (' ' x $post) if $post > 0;
                     } else {
-                        $output .= $fill_bg . (' ' x $fill_remaining);
+                        push @_out, $fill_bg . (' ' x $fill_remaining);
                     }
                 } else {
-                    $output .= $fill_bg . (' ' x $fill_remaining);
+                    push @_out, $fill_bg . (' ' x $fill_remaining);
                 }
             } elsif ($fill_remaining > 0) {
-                $output .= $fill_bg . (' ' x $fill_remaining);
+                push @_out, $fill_bg . (' ' x $fill_remaining);
             }
         }
         else {
             # Empty line (beyond document)
             my $empty_bg = $theme->color('empty_line_bg');
-            $output .= $empty_bg . (' ' x $width);
+            push @_out, $empty_bg . (' ' x $width);
         }
 
         # Render minimap column for this row
-        $output .= $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+        push @_out, $class->_render_minimap_column($minimap_data, $screen_row, $theme)
             if $minimap_width > 0;
 
-        $output .= CLEAR_LINE;
-        $output .= RESET;
-        push @text_rows, $output;
+        push @_out, CLEAR_LINE;
+        push @_out, RESET;
+        push @text_rows, join('', @_out);
     }
 
     return \@text_rows;
@@ -1787,11 +1787,11 @@ sub _render_text_area {
 sub _render_minimap_column {
     my ($class, $minimap_data, $screen_row, $theme) = @_;
 
-    my $output = '';
+    my @_out;
     my $minimap_bg = $theme->color('minimap_bg');
 
     # Separator column (thin vertical line)
-    $output .= $minimap_bg . $theme->color('minimap_separator') . Zepto::Chars->get('minimap_sep');
+    push @_out, $minimap_bg . $theme->color('minimap_separator') . Zepto::Chars->get('minimap_sep');
 
     # Check if this row has minimap data
     my $row_data;
@@ -1803,9 +1803,9 @@ sub _render_minimap_column {
     if ($row_data && $row_data->{vcs}) {
         my $vcs_status = $row_data->{vcs};
         my $vcs_color = $theme->color("vcs_$vcs_status") // '';
-        $output .= $minimap_bg . $vcs_color . Zepto::Chars->get('minimap_vcs');
+        push @_out, $minimap_bg . $vcs_color . Zepto::Chars->get('minimap_vcs');
     } else {
-        $output .= $minimap_bg . ' ';
+        push @_out, $minimap_bg . ' ';
     }
 
     # Determine background: viewport highlight or normal minimap bg
@@ -1821,13 +1821,13 @@ sub _render_minimap_column {
     # Braille text density
     my $text_cols = MINIMAP_WIDTH - 2;  # Subtract separator + VCS column
     if ($row_data && $row_data->{braille}) {
-        $output .= $text_bg . $text_fg . $row_data->{braille};
+        push @_out, $text_bg . $text_fg . $row_data->{braille};
     } else {
         # Empty row (beyond document content)
-        $output .= $text_bg . (' ' x $text_cols);
+        push @_out, $text_bg . (' ' x $text_cols);
     }
 
-    return $output;
+    return join('', @_out);
 }
 
 # =============================================================================
@@ -1903,14 +1903,14 @@ sub _render_tree_panel {
         last if $row_idx >= $height;
         my $screen_row = $row_idx + 1;  # tree starts at row 1
 
-        my $output = _move_to($screen_row, 1);
-        $output .= $class->_render_tree_node_content(
+        my @_out = (_move_to($screen_row, 1));
+        push @_out, $class->_render_tree_node_content(
             $sticky, $content_width, $theme, 0, 1, $focused,
             $has_scrollbar, $row_idx, $sb, undef, []
         );
         # Border
-        $output .= $border_fg . $tree_bg . $border_char;
-        push @tree_rows, $output;
+        push @_out, $border_fg . $tree_bg . $border_char;
+        push @tree_rows, join('', @_out);
         $row_idx++;
     }
 
@@ -1923,7 +1923,7 @@ sub _render_tree_panel {
         my $flat_idx = $scroll + $i;
         my $screen_row = $row_idx + 1;
 
-        my $output = _move_to($screen_row, 1);
+        my @_out = (_move_to($screen_row, 1));
 
         if ($flat_idx <= $#$flat) {
             my $node = $flat->[$flat_idx];
@@ -1939,7 +1939,7 @@ sub _render_tree_panel {
                 push @guides_for_node, ($guide_active[$l] ? 1 : 0);
             }
 
-            $output .= $class->_render_tree_node_content(
+            push @_out, $class->_render_tree_node_content(
                 $node, $content_width, $theme, $is_cursor, 0, $focused,
                 $has_scrollbar, $row_idx, $sb, $node_is_last, \@guides_for_node,
                 $filter_active, $is_current
@@ -1950,15 +1950,15 @@ sub _render_tree_panel {
             $guide_active[$d] = $node_is_last ? 0 : 1;
         } else {
             # Empty row
-            $output .= $tree_bg . (' ' x $content_width);
+            push @_out, $tree_bg . (' ' x $content_width);
             if ($has_scrollbar) {
-                $output .= $tree_bg . ' ';
+                push @_out, $tree_bg . ' ';
             }
         }
 
         # Border
-        $output .= $border_fg . $tree_bg . $border_char;
-        push @tree_rows, $output;
+        push @_out, $border_fg . $tree_bg . $border_char;
+        push @tree_rows, join('', @_out);
         $row_idx++;
     }
 
@@ -1970,7 +1970,7 @@ sub _render_tree_node_content {
         $has_scrollbar, $row_idx, $sb, $is_last, $guides, $filter_active,
         $is_current) = @_;
 
-    my $output = '';
+    my @_out;
 
     # Choose background/foreground
     my ($bg, $fg);
@@ -1988,7 +1988,7 @@ sub _render_tree_node_content {
         $fg = $theme->color('tree_fg');
     }
 
-    $output .= $bg;
+    push @_out, $bg;
 
     # --- Flat filter mode: skip indent/icon, render full path with match highlight ---
     # Only use flat rendering when there's an actual query producing flat results;
@@ -1996,7 +1996,7 @@ sub _render_tree_node_content {
     if ($filter_active && !$node->{is_dir} && $node->{depth} == 0 && $node->{_filter_match_positions}) {
         my $path = $node->{name} // '';  # In flat mode, name == full path
         my $used = 1;  # leading space
-        $output .= ' ';
+        push @_out, ' ';
 
         # File type icon (based on filename, last path component)
         my ($filename) = $path =~ m{([^/]+)$};
@@ -2014,7 +2014,7 @@ sub _render_tree_node_content {
         }
 
         # Render icon
-        $output .= $name_fg . $bg . "$icon ";
+        push @_out, $name_fg . $bg . "$icon ";
         $used += 2;  # icon + space
 
         my $name_space = $width - $used;
@@ -2067,30 +2067,30 @@ sub _render_tree_node_content {
 
             my $base_fg = ($path_pos >= $filename_start_in_path) ? $file_fg : $dir_fg;
             if ($highlight_cols{$ci}) {
-                $output .= $match_fg . $bg . $ch;
+                push @_out, $match_fg . $bg . $ch;
             } else {
-                $output .= $base_fg . $bg . $ch;
+                push @_out, $base_fg . $bg . $ch;
             }
         }
 
         # Pad remainder
         my $pad = $width - $used - length($display_path);
-        $output .= $bg . (' ' x $pad) if $pad > 0;
+        push @_out, $bg . (' ' x $pad) if $pad > 0;
 
         # Reset bold/attributes before scrollbar and border
-        $output .= RESET if $is_current;
+        push @_out, RESET if $is_current;
 
         # Scrollbar column
         if ($has_scrollbar) {
             my $sb_bg = $theme->color('tree_scrollbar_bg');
             if ($row_idx >= $sb->{thumb_start} && $row_idx < $sb->{thumb_end}) {
-                $output .= $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";
+                push @_out, $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";
             } else {
-                $output .= $sb_bg . ' ';
+                push @_out, $sb_bg . ' ';
             }
         }
 
-        return $output;
+        return join('', @_out);
     }
 
     my $depth = $node->{depth} // 0;
@@ -2105,7 +2105,7 @@ sub _render_tree_node_content {
     my $ch_arrow_d  = Zepto::Chars->get('tree_arrow_down');  # ▾
 
     # === Left padding (1 space) ===
-    $output .= ' ';
+    push @_out, ' ';
     my $used = 1;
 
     if ($depth == 0) {
@@ -2113,23 +2113,23 @@ sub _render_tree_node_content {
         if ($node->{is_dir}) {
             my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_dir_fg');
             my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
-            $output .= $arrow_fg . $bg . $arrow . ' ';
+            push @_out, $arrow_fg . $bg . $arrow . ' ';
         } else {
-            $output .= $bg . '  ';
+            push @_out, $bg . '  ';
         }
         $used += 2;
     } elsif ($is_sticky) {
         # Sticky headers: indented to match original depth (spaces, no guide lines)
         my $indent_chars = 2 * $depth + 1;  # spaces before arrow/dash
-        $output .= $bg . (' ' x $indent_chars);
+        push @_out, $bg . (' ' x $indent_chars);
         $used += $indent_chars;
         # Arrow for dirs
         if ($node->{is_dir}) {
             my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_sticky_fg');
             my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
-            $output .= $arrow_fg . $bg . $arrow;
+            push @_out, $arrow_fg . $bg . $arrow;
         } else {
-            $output .= $ch_dash;
+            push @_out, $ch_dash;
         }
         $used += 1;
     } else {
@@ -2139,19 +2139,19 @@ sub _render_tree_node_content {
         # Guide char for ancestor level k sits at column 4+2*k, which is the
         # icon column of the depth-k directory ancestor.  The connector char
         # (├ or ╰) sits at column 2+2*depth (= icon column of the parent dir).
-        $output .= $indent_fg . $bg;
+        push @_out, $indent_fg . $bg;
 
         my $connector_col = 2 + 2 * $depth;
         for my $col (2 .. $connector_col - 1) {
             if ($col >= 4 && ($col - 4) % 2 == 0) {
                 my $guide_level = ($col - 4) / 2;
                 if ($guides && $guide_level < scalar @$guides && $guides->[$guide_level]) {
-                    $output .= $ch_vertical;
+                    push @_out, $ch_vertical;
                 } else {
-                    $output .= ' ';
+                    push @_out, ' ';
                 }
             } else {
-                $output .= ' ';
+                push @_out, ' ';
             }
         }
         $used += $connector_col - 2;
@@ -2160,15 +2160,15 @@ sub _render_tree_node_content {
             # Dirs: arrow replaces connector for a cleaner look
             my $arrow_fg = $is_cursor ? $fg : $theme->color('tree_dir_fg');
             my $arrow = $node->{expanded} ? $ch_arrow_d : $ch_arrow_r;
-            $output .= $arrow_fg . $bg . $arrow . ' ';
+            push @_out, $arrow_fg . $bg . $arrow . ' ';
         } else {
             # Files: connector (├ or ╰) + dash
             if ($is_last) {
-                $output .= $ch_last;
+                push @_out, $ch_last;
             } else {
-                $output .= $ch_branch;
+                push @_out, $ch_branch;
             }
-            $output .= $ch_dash;
+            push @_out, $ch_dash;
         }
         $used += 2;
     }
@@ -2218,9 +2218,9 @@ sub _render_tree_node_content {
 
     # Render icon
     if ($node->{is_dir}) {
-        $output .= $theme->color('tree_dir_fg') . $bg . $icon_str;
+        push @_out, $theme->color('tree_dir_fg') . $bg . $icon_str;
     } else {
-        $output .= $name_fg . $bg . $icon_str;
+        push @_out, $name_fg . $bg . $icon_str;
     }
 
     # Render name with potential filter match highlighting
@@ -2237,34 +2237,34 @@ sub _render_tree_node_content {
         my $match_fg = $theme->color('tree_match_fg');
         for my $ci (0 .. length($name) - 1) {
             if ($highlight_cols{$ci}) {
-                $output .= $match_fg . $bg . substr($name, $ci, 1);
+                push @_out, $match_fg . $bg . substr($name, $ci, 1);
             } else {
-                $output .= $name_fg . $bg . substr($name, $ci, 1);
+                push @_out, $name_fg . $bg . substr($name, $ci, 1);
             }
         }
     } else {
-        $output .= $name_fg . $bg . $name;
+        push @_out, $name_fg . $bg . $name;
     }
 
     # Pad remainder
     my $total_used = $used + length($name);
     my $pad = $width - $total_used;
-    $output .= $bg . (' ' x $pad) if $pad > 0;
+    push @_out, $bg . (' ' x $pad) if $pad > 0;
 
     # Reset bold/attributes before scrollbar and border
-    $output .= RESET if $is_current;
+    push @_out, RESET if $is_current;
 
     # Scrollbar column
     if ($has_scrollbar) {
         my $sb_bg = $theme->color('tree_scrollbar_bg');
         if ($row_idx >= $sb->{thumb_start} && $row_idx <= $sb->{thumb_end}) {
-            $output .= $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";  # █
+            push @_out, $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";  # █
         } else {
-            $output .= $sb_bg . ' ';
+            push @_out, $sb_bg . ' ';
         }
     }
 
-    return $output;
+    return join('', @_out);
 }
 
 # =============================================================================
@@ -2347,7 +2347,7 @@ sub _compute_hunk_highlights {
 sub _render_old_line_row {
     my ($class, $doc, $view, $theme, $width, $gutter_width, $entry, $highlighter, $base_hl_ref, $char_highlights) = @_;
 
-    my $output = '';
+    my @_out;
     my $base_line_idx = $entry->{base_line};
 
     # Gutter: use yellow (vcs_modified) for modified hunks, red for deleted hunks
@@ -2359,19 +2359,19 @@ sub _render_old_line_row {
         : $theme->color('vcs_deleted');
     if ($entry->{wrap_index} && $entry->{wrap_index} > 0) {
         # Wrap continuation: extend diff gutter background but no VCS indicator
-        $output .= $gutter_bg . $vcs_color . Zepto::Chars->get('vcs_expanded');
-        $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+        push @_out, $gutter_bg . $vcs_color . Zepto::Chars->get('vcs_expanded');
+        push @_out, $gutter_bg . ' ' x ($gutter_width - 1);
     } else {
         my $vcs_char = Zepto::Chars->get('vcs_expanded');  # Fat block for expanded lines
-        $output .= $gutter_bg . $vcs_color . $vcs_char;
+        push @_out, $gutter_bg . $vcs_color . $vcs_char;
         # Blank padding for the rest of the gutter
-        $output .= $gutter_bg . ' ' x ($gutter_width - 1);
+        push @_out, $gutter_bg . ' ' x ($gutter_width - 1);
     }
 
     # Line content from base
     my $line_bg = $theme->color('diff_old_bg');
     my $fg = $theme->color('fg');
-    $output .= $line_bg . $fg;
+    push @_out, $line_bg . $fg;
 
     my $base_lines = $doc->vcs_base_lines();
     my $line_content = '';
@@ -2511,18 +2511,18 @@ sub _render_old_line_row {
         my $char_fg = $syntax_fg[$i] // $fg;
         my $bg = ($i >= $vis_hl_start && $i < $vis_hl_end) ? $hl_bg : $line_bg;
         if ($bg ne $last_bg || $char_fg ne $last_fg) {
-            $output .= ATTR_RESET . $bg . $char_fg;
+            push @_out, ATTR_RESET . $bg . $char_fg;
             $last_bg = $bg;
             $last_fg = $char_fg;
         }
-        $output .= $char;
+        push @_out, $char;
     }
 
     # Fill rest with red background (use display width for correct padding)
     my $fill_cols = $width - $old_content_display_width;
-    $output .= $line_bg . (' ' x $fill_cols) if $fill_cols > 0;
+    push @_out, $line_bg . (' ' x $fill_cols) if $fill_cols > 0;
 
-    return $output;
+    return join('', @_out);
 }
 
 # Render a line with selection, syntax, match, and crosshair highlighting
@@ -2533,7 +2533,7 @@ sub _render_old_line_row {
 sub _render_line_with_highlights {
     my ($class, $content, $line_num, $scroll_col, $width, $view, $theme, $cursor_line, $cursor_col, $is_cursor_line, $tokens, $orig_content, $matches, $diff_mode, $char_highlight, $capture_regions, $is_wrap_cont) = @_;
 
-    my $output = '';
+    my @_out;
     my $len = length($content);
 
     # Background colors — use diff background when in expanded hunk
@@ -2745,31 +2745,31 @@ sub _render_line_with_highlights {
         # Only emit escape codes when style changes
         # ATTR_RESET clears bold/italic so syntax_bold/italic/heading work correctly
         if ($style_key ne $last_style) {
-            $output .= ATTR_RESET . $char_bg . $char_fg;
+            push @_out, ATTR_RESET . $char_bg . $char_fg;
             $last_style = $style_key;
         }
 
-        $output .= $char;
+        push @_out, $char;
     }
 
-    return $output;
+    return join('', @_out);
 }
 
 # Render the status bar with Nerd Font segments
 sub _render_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $status_hint, $hint_color) = @_;
 
-    my $output = '';
+    my @_out;
     my $ar = Zepto::Chars->get('arrow_right');
 
     # If there's a message, show it simply
     if ($message) {
-        $output .= $theme->color('status_bg') . $theme->color('warning_fg');
-        $output .= ' ' . $message;
+        push @_out, $theme->color('status_bg') . $theme->color('warning_fg');
+        push @_out, ' ' . $message;
         my $padding = $cols - length($message) - 1;
-        $output .= ' ' x $padding if $padding > 0;
-        $output .= CLEAR_LINE . RESET;
-        return $output;
+        push @_out, ' ' x $padding if $padding > 0;
+        push @_out, CLEAR_LINE . RESET;
+        return join('', @_out);
     }
 
     # Get file info — show relative path (tab bar shows filename, status bar shows path)
@@ -2795,14 +2795,14 @@ sub _render_status_bar {
 
     # Render: [file segment][arrow][col indicator?][arrow][middle fill][hint]
     # File segment
-    $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
-    $output .= " $display_path";
+    push @_out, $theme->color('status_file_bg') . $theme->color('status_file_fg');
+    push @_out, " $display_path";
     if ($is_dirty) {
-        $output .= $theme->color('status_modified_fg');
-        $output .= " " . Zepto::Chars->get('modified');
-        $output .= $theme->color('status_file_fg');
+        push @_out, $theme->color('status_modified_fg');
+        push @_out, " " . Zepto::Chars->get('modified');
+        push @_out, $theme->color('status_file_fg');
     }
-    $output .= ' ';
+    push @_out, ' ';
 
     # Column selection indicator segment
     my $col_text = '';
@@ -2828,41 +2828,41 @@ sub _render_status_bar {
     if (Zepto::Chars->enabled()) {
         if ($col_width > 0) {
             # file -> column indicator
-            $output .= $theme->color('column_indicator_bg') . $theme->color('status_file_edge');
-            $output .= $ar;
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('status_file_edge');
+            push @_out, $ar;
             # Column indicator text
-            $output .= $theme->color('column_indicator_fg') . $col_text;
+            push @_out, $theme->color('column_indicator_fg') . $col_text;
             # column indicator -> middle
-            $output .= $theme->color('status_bg') . $theme->color('column_indicator_edge');
-            $output .= $ar;
+            push @_out, $theme->color('status_bg') . $theme->color('column_indicator_edge');
+            push @_out, $ar;
         } else {
             # file -> middle
-            $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
-            $output .= $ar;
+            push @_out, $theme->color('status_bg') . $theme->color('status_file_edge');
+            push @_out, $ar;
         }
     } elsif ($col_width > 0) {
         # No nerd font, just show text
-        $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-        $output .= $col_text;
+        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+        push @_out, $col_text;
     }
 
     # Middle fill (account for column indicator width)
     my $middle = $cols - $file_width - $segment_overhead - $col_width - $hint_width;
     $middle = 0 if $middle < 0;
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
-    $output .= ' ' x $middle if $middle > 0;
+    push @_out, $theme->color('status_bg') . $theme->color('status_fg');
+    push @_out, ' ' x $middle if $middle > 0;
 
     # Hint (right-aligned, colored by hunk type)
     if ($hint_width > 0) {
-        $output .= $theme->color('status_bg');
-        $output .= $hint_color // $theme->color('gutter_fg');
-        $output .= $hint_text;
+        push @_out, $theme->color('status_bg');
+        push @_out, $hint_color // $theme->color('gutter_fg');
+        push @_out, $hint_text;
     }
 
-    $output .= CLEAR_LINE;
-    $output .= RESET;
+    push @_out, CLEAR_LINE;
+    push @_out, RESET;
 
-    return $output;
+    return join('', @_out);
 }
 
 # Store and retrieve status button positions for click handling
@@ -2897,7 +2897,7 @@ sub get_status_buttons { return @{$_status_buttons}; }
 sub _render_pill {
     my ($class, $theme, $icon, $label, $shortcut, $fg_key, $bg_key, $edge_key, $prev_bg_key) = @_;
 
-    my $output = '';
+    my @_out;
     my $rl = Zepto::Chars->get('round_left');
     my $rr = Zepto::Chars->get('round_right');
     my $nerd_font = Zepto::Chars->enabled();
@@ -2911,22 +2911,22 @@ sub _render_pill {
 
     if ($nerd_font) {
         # Nerd font pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
-        $output .= $theme->color($bg_key) . $theme->color($fg_key);
-        $output .= " $text ";
+        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
+        push @_out, " $text ";
         $width = length($text) + 2;  # spaces
     } else {
-        $output .= $theme->color($bg_key) . $theme->color($fg_key);
-        $output .= " $text ";
+        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
+        push @_out, " $text ";
         $width = length($text) + 2;
     }
 
-    return ($output, $width);
+    return (join('', @_out), $width);
 }
 
 sub _render_context_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active) = @_;
 
-    my $output = '';
+    my @_out;
     my @buttons;
     my $ar = Zepto::Chars->get('arrow_right');
     my $nerd_font = Zepto::Chars->enabled();
@@ -2934,13 +2934,13 @@ sub _render_context_status_bar {
     # If there's a message, show it simply
     if ($message) {
         my $fg = $message_is_error ? $theme->color('error_fg') : $theme->color('warning_fg');
-        $output .= $theme->color('status_bg') . $fg;
-        $output .= ' ' . $message;
+        push @_out, $theme->color('status_bg') . $fg;
+        push @_out, ' ' . $message;
         my $padding = $cols - length($message) - 1;
-        $output .= ' ' x $padding if $padding > 0;
-        $output .= CLEAR_LINE . RESET;
+        push @_out, ' ' x $padding if $padding > 0;
+        push @_out, CLEAR_LINE . RESET;
         $class->_set_status_buttons([]);
-        return $output;
+        return join('', @_out);
     }
 
     # Tree-focused: show simplified hint bar
@@ -2950,15 +2950,15 @@ sub _render_context_status_bar {
         my $node = $tree->cursor_node();
         my $node_path = $node ? $node->{path} : '';
 
-        $output .= $theme->color('status_file_bg') . $theme->color('status_file_fg');
+        push @_out, $theme->color('status_file_bg') . $theme->color('status_file_fg');
         my $left_text = " $cursor_icon $node_path ";
-        $output .= $left_text;
+        push @_out, $left_text;
         my $left_width = length($left_text);
 
         if ($nerd_font) {
             my $tree_round_r = Zepto::Chars->get('round_right');
-            $output .= $theme->color('status_bg') . $theme->color('status_file_edge');
-            $output .= $tree_round_r;
+            push @_out, $theme->color('status_bg') . $theme->color('status_file_edge');
+            push @_out, $tree_round_r;
             $left_width += 1;
         }
 
@@ -2994,38 +2994,38 @@ sub _render_context_status_bar {
             last if ($center_col - $left_width) + $pw > $available;
 
             if ($nerd_font) {
-                $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
-                $output .= $round_l;
+                push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+                push @_out, $round_l;
                 $center_col += 1;
             }
-            $output .= $theme->color($pill->{bg}) . $theme->color($pill->{fg});
-            $output .= " $pill->{text} ";
+            push @_out, $theme->color($pill->{bg}) . $theme->color($pill->{fg});
+            push @_out, " $pill->{text} ";
             $center_col += length($pill->{text}) + 2;
             if ($nerd_font) {
-                $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
-                $output .= $round_r;
+                push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+                push @_out, $round_r;
                 $center_col += 1;
             }
-            $output .= $theme->color('status_bg') . ' ';
+            push @_out, $theme->color('status_bg') . ' ';
             $center_col += 1;
         }
 
         # Fill remaining space
         my $remaining = $cols - $center_col - $right_width + 1;
         $remaining = 0 if $remaining < 0;
-        $output .= $theme->color('status_bg');
-        $output .= ' ' x $remaining if $remaining > 0;
+        push @_out, $theme->color('status_bg');
+        push @_out, ' ' x $remaining if $remaining > 0;
 
         # Open File pill
         if ($nerd_font) {
-            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $round_l;
+            push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            push @_out, $round_l;
         }
-        $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-        $output .= $open_text;
+        push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+        push @_out, $open_text;
         if ($nerd_font) {
-            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $round_r;
+            push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            push @_out, $round_r;
         }
         push @buttons, {
             x_start    => $cols - $right_width + 1,
@@ -3033,19 +3033,19 @@ sub _render_context_status_bar {
             command_id => 'open_file',
         };
 
-        $output .= $theme->color('status_bg') . ' ';  # gap between pills
+        push @_out, $theme->color('status_bg') . ' ';  # gap between pills
 
         # Palette trigger with rounded caps
         if ($nerd_font) {
-            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $round_l;
-            $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-            $output .= $palette_text;
-            $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-            $output .= $round_r;
+            push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            push @_out, $round_l;
+            push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+            push @_out, $palette_text;
+            push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+            push @_out, $round_r;
         } else {
-            $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-            $output .= $palette_text;
+            push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+            push @_out, $palette_text;
         }
         push @buttons, {
             x_start    => $cols - $palette_width + 1,
@@ -3053,9 +3053,9 @@ sub _render_context_status_bar {
             command_id => 'open_palette',
         };
 
-        $output .= CLEAR_LINE . RESET;
+        push @_out, CLEAR_LINE . RESET;
         $class->_set_status_buttons(\@buttons);
-        return $output;
+        return join('', @_out);
     }
 
     # === Document context: build pill-based status bar ===
@@ -3076,8 +3076,8 @@ sub _render_context_status_bar {
     my $pad_needed = $min_cursor_width - length($cursor_text);
     $cursor_text .= ' ' x $pad_needed if $pad_needed > 0;
 
-    $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
-    $output .= " $cursor_text ";
+    push @_out, $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
+    push @_out, " $cursor_text ";
     my $left_width = length($cursor_text) + 2;
     push @buttons, {
         x_start    => 1,
@@ -3096,8 +3096,8 @@ sub _render_context_status_bar {
         } else {
             $col_text = "COL";
         }
-        $output .= $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-        $output .= " $col_text ";
+        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+        push @_out, " $col_text ";
         $left_width += length($col_text) + 2;
     }
 
@@ -3105,8 +3105,8 @@ sub _render_context_status_bar {
     my $round_r = Zepto::Chars->get('round_right');
 
     if ($nerd_font) {
-        $output .= $theme->color('status_bg') . $theme->color('status_pos_edge');
-        $output .= $round_r;
+        push @_out, $theme->color('status_bg') . $theme->color('status_pos_edge');
+        push @_out, $round_r;
         $left_width += 1;
     }
 
@@ -3238,7 +3238,7 @@ sub _render_context_status_bar {
     # Add gap between cursor pill and first center pill (matching between-pill gaps)
     my $center_col = $left_width + 1;
     if (@pills_to_render) {
-        $output .= $theme->color('status_bg') . ' ';
+        push @_out, $theme->color('status_bg') . ' ';
         $center_col += 1;
     }
     for my $i (0 .. $#pills_to_render) {
@@ -3246,13 +3246,13 @@ sub _render_context_status_bar {
 
         if ($nerd_font) {
             # Left round cap
-            $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
-            $output .= $round_l;
+            push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+            push @_out, $round_l;
             $center_col += 1;
         }
 
-        $output .= $theme->color($pill->{bg}) . $theme->color($pill->{fg});
-        $output .= " $pill->{text} ";
+        push @_out, $theme->color($pill->{bg}) . $theme->color($pill->{fg});
+        push @_out, " $pill->{text} ";
         push @buttons, {
             x_start    => $center_col,
             x_end      => $center_col + $pill->{width} - 1,
@@ -3262,32 +3262,32 @@ sub _render_context_status_bar {
 
         if ($nerd_font) {
             # Right round cap
-            $output .= $theme->color('status_bg') . $theme->color($pill->{edge});
-            $output .= $round_r;
+            push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+            push @_out, $round_r;
             $center_col += 1;
         }
 
         # Gap between pills
-        $output .= $theme->color('status_bg') . ' ';
+        push @_out, $theme->color('status_bg') . ' ';
         $center_col += 1;
     }
 
     # Middle fill
     my $remaining = $cols - $center_col - $right_total_width + 1;
     $remaining = 0 if $remaining < 0;
-    $output .= $theme->color('status_bg');
-    $output .= ' ' x $remaining if $remaining > 0;
+    push @_out, $theme->color('status_bg');
+    push @_out, ' ' x $remaining if $remaining > 0;
 
     # Open File pill
     if ($nerd_font) {
-        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        $output .= $round_l;
+        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        push @_out, $round_l;
     }
-    $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-    $output .= $open_text;
+    push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+    push @_out, $open_text;
     if ($nerd_font) {
-        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        $output .= $round_r;
+        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        push @_out, $round_r;
     }
     push @buttons, {
         x_start    => $cols - $right_total_width + 1,
@@ -3295,18 +3295,18 @@ sub _render_context_status_bar {
         command_id => 'open_file',
     };
 
-    $output .= $theme->color('status_bg') . ' ';  # gap between pills
+    push @_out, $theme->color('status_bg') . ' ';  # gap between pills
 
     # Palette trigger pill (rightmost) with rounded caps
     if ($nerd_font) {
-        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        $output .= $round_l;
+        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        push @_out, $round_l;
     }
-    $output .= $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-    $output .= $palette_text;
+    push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
+    push @_out, $palette_text;
     if ($nerd_font) {
-        $output .= $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        $output .= $round_r;
+        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
+        push @_out, $round_r;
     }
     push @buttons, {
         x_start    => $cols - $palette_total_width + 1,
@@ -3314,17 +3314,17 @@ sub _render_context_status_bar {
         command_id => 'open_palette',
     };
 
-    $output .= CLEAR_LINE . RESET;
+    push @_out, CLEAR_LINE . RESET;
     $class->_set_status_buttons(\@buttons);
 
-    return $output;
+    return join('', @_out);
 }
 
 # Render dialog box
 sub _render_dialog {
     my ($class, $theme, $dialog, $total_rows, $total_cols) = @_;
 
-    my $output = '';
+    my @_out;
 
     my $title = $dialog->{title} // 'Dialog';
     my $prompt = $dialog->{prompt} // '';
@@ -3351,62 +3351,62 @@ sub _render_dialog {
     my $box_v = Zepto::Chars->get('box_v');
 
     # Draw dialog box
-    $output .= $theme->color('dialog_bg');
-    $output .= $theme->color('dialog_fg');
+    push @_out, $theme->color('dialog_bg');
+    push @_out, $theme->color('dialog_fg');
 
     # Top border
-    $output .= _move_to($y, $x);
-    $output .= $theme->color('dialog_border');
-    $output .= $box_tl;
-    $output .= $box_h x ($dialog_width - 2);
-    $output .= $box_tr;
+    push @_out, _move_to($y, $x);
+    push @_out, $theme->color('dialog_border');
+    push @_out, $box_tl;
+    push @_out, $box_h x ($dialog_width - 2);
+    push @_out, $box_tr;
 
     # Title row
-    $output .= _move_to($y + 1, $x);
-    $output .= $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    $output .= $box_v;
+    push @_out, _move_to($y + 1, $x);
+    push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
+    push @_out, $box_v;
     my $title_text = " $title ";
     my $title_pad = $dialog_width - 2 - length($title_text);
-    $output .= $title_text . (' ' x $title_pad);
-    $output .= $box_v;
+    push @_out, $title_text . (' ' x $title_pad);
+    push @_out, $box_v;
 
     # Prompt row
-    $output .= _move_to($y + 2, $x);
-    $output .= $box_v;
+    push @_out, _move_to($y + 2, $x);
+    push @_out, $box_v;
     my $prompt_text = " $prompt";
     if (length($prompt_text) > $dialog_width - 4) {
         $prompt_text = substr($prompt_text, 0, $dialog_width - 4);
     }
-    $output .= $prompt_text . (' ' x ($dialog_width - 2 - length($prompt_text)));
-    $output .= $box_v;
+    push @_out, $prompt_text . (' ' x ($dialog_width - 2 - length($prompt_text)));
+    push @_out, $box_v;
 
     # Input row
-    $output .= _move_to($y + 3, $x);
-    $output .= $box_v . " ";
-    $output .= $theme->color('dialog_input_bg');
-    $output .= $theme->color('dialog_input_fg');
+    push @_out, _move_to($y + 3, $x);
+    push @_out, $box_v . " ";
+    push @_out, $theme->color('dialog_input_bg');
+    push @_out, $theme->color('dialog_input_fg');
 
     my $input_width = $dialog_width - 4;
     my $display_value = $value;
     if (length($display_value) > $input_width) {
         $display_value = substr($display_value, length($display_value) - $input_width);
     }
-    $output .= $display_value;
-    $output .= ' ' x ($input_width - length($display_value));
+    push @_out, $display_value;
+    push @_out, ' ' x ($input_width - length($display_value));
 
-    $output .= $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    $output .= " " . $box_v;
+    push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
+    push @_out, " " . $box_v;
 
     # Bottom border
-    $output .= _move_to($y + 4, $x);
-    $output .= $theme->color('dialog_border');
-    $output .= $box_bl;
-    $output .= $box_h x ($dialog_width - 2);
-    $output .= $box_br;
+    push @_out, _move_to($y + 4, $x);
+    push @_out, $theme->color('dialog_border');
+    push @_out, $box_bl;
+    push @_out, $box_h x ($dialog_width - 2);
+    push @_out, $box_br;
 
-    $output .= RESET;
+    push @_out, RESET;
 
-    return $output;
+    return join('', @_out);
 }
 
 # Calculate screen position for cursor
@@ -3470,8 +3470,8 @@ sub _cursor_screen_pos {
 sub _render_footer_input {
     my ($class, $theme, $input, $cols) = @_;
 
-    my $output = '';
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    my @_out;
+    push @_out, $theme->color('status_bg') . $theme->color('status_fg');
 
     my $prompt = $input->{prompt} // '';
     my $widget = $input->{widget};
@@ -3482,16 +3482,16 @@ sub _render_footer_input {
     my $prompt_str;
     if ($input_id eq 'goto_line') {
         my $cursor_icon = Zepto::Chars->get('cursor_pos');
-        $output .= $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
+        push @_out, $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
         $prompt_str = " $cursor_icon ";
     } else {
         $prompt_str = ' ' . $prompt . ' ';
     }
-    $output .= $prompt_str;
+    push @_out, $prompt_str;
 
     # Input field with distinct background
-    $output .= $theme->color('dialog_input_bg');
-    $output .= $theme->color('dialog_input_fg');
+    push @_out, $theme->color('dialog_input_bg');
+    push @_out, $theme->color('dialog_input_fg');
 
     # Calculate width for input field
     my $prompt_len = length($prompt_str);
@@ -3521,37 +3521,37 @@ sub _render_footer_input {
         my $sel_bg   = $theme->color('selection_bg');
         my $sel_fg   = $theme->color('selection_fg');
         if ($sel_s > 0) {
-            $output .= substr($display_value, 0, $sel_s);
+            push @_out, substr($display_value, 0, $sel_s);
         }
-        $output .= $sel_bg . $sel_fg;
-        $output .= substr($display_value, $sel_s, $sel_e - $sel_s);
-        $output .= $input_bg . $input_fg;
+        push @_out, $sel_bg . $sel_fg;
+        push @_out, substr($display_value, $sel_s, $sel_e - $sel_s);
+        push @_out, $input_bg . $input_fg;
         if ($sel_e < length($display_value)) {
-            $output .= substr($display_value, $sel_e);
+            push @_out, substr($display_value, $sel_e);
         }
     } else {
-        $output .= $display_value;
+        push @_out, $display_value;
     }
 
     # Fill remaining input area
     my $fill = $input_width - length($display_value);
-    $output .= ' ' x $fill if $fill > 0;
+    push @_out, ' ' x $fill if $fill > 0;
 
     # Display hint in dimmed text
-    $output .= $theme->color('status_bg');
+    push @_out, $theme->color('status_bg');
     if ($hint) {
-        $output .= $theme->color('status_dim');
-        $output .= $hint_str;
+        push @_out, $theme->color('status_dim');
+        push @_out, $hint_str;
     }
 
     # Pad rest of status bar
     my $remaining = $cols - $prompt_len - $input_width - $hint_len;
-    $output .= ' ' x $remaining if $remaining > 0;
+    push @_out, ' ' x $remaining if $remaining > 0;
 
-    $output .= CLEAR_LINE;
-    $output .= RESET;
+    push @_out, CLEAR_LINE;
+    push @_out, RESET;
 
-    return $output;
+    return join('', @_out);
 }
 
 # =============================================================================
@@ -3563,7 +3563,7 @@ sub _render_footer_input {
 sub _colorize_find_input {
     my ($class, $theme, $text, $default_fg) = @_;
 
-    my $output = '';
+    my @_out;
     my $len = length($text);
     my $group_num = 0;       # Next group number to assign
     my @group_stack;         # Stack of active group numbers (for nesting)
@@ -3574,7 +3574,7 @@ sub _colorize_find_input {
 
         # Skip escaped characters
         if ($ch eq '\\' && $i + 1 < $len) {
-            $output .= substr($text, $i, 2);
+            push @_out, substr($text, $i, 2);
             $i += 2;
             next;
         }
@@ -3590,7 +3590,7 @@ sub _colorize_find_input {
                 $i++;
             }
             $i++ if $i < $len;  # Skip closing ]
-            $output .= substr($text, $start, $i - $start);
+            push @_out, substr($text, $start, $i - $start);
             next;
         }
 
@@ -3616,11 +3616,11 @@ sub _colorize_find_input {
                 my $color_idx = (($group_num - 1) % 4) + 1;
                 my $color = $theme->color("capture_group_$color_idx");
                 push @group_stack, { num => $group_num, color => $color };
-                $output .= $color . $ch;
+                push @_out, $color . $ch;
             } else {
                 # Non-capturing group: push placeholder
                 push @group_stack, { num => 0, color => undef };
-                $output .= $ch;
+                push @_out, $ch;
             }
             $i++;
             next;
@@ -3629,15 +3629,15 @@ sub _colorize_find_input {
         if ($ch eq ')' && @group_stack) {
             my $entry = pop @group_stack;
             if ($entry->{color}) {
-                $output .= $entry->{color} . $ch;
+                push @_out, $entry->{color} . $ch;
             } else {
-                $output .= $ch;
+                push @_out, $ch;
             }
             # Restore parent group color or default
             if (@group_stack && $group_stack[-1]{color}) {
-                $output .= $group_stack[-1]{color};
+                push @_out, $group_stack[-1]{color};
             } else {
-                $output .= $default_fg;
+                push @_out, $default_fg;
             }
             $i++;
             next;
@@ -3647,20 +3647,20 @@ sub _colorize_find_input {
         if (@group_stack && $group_stack[-1]{color}) {
             # Already in a colored group, color is set
         }
-        $output .= $ch;
+        push @_out, $ch;
         $i++;
     }
 
     # Restore default color
-    $output .= $default_fg;
-    return $output;
+    push @_out, $default_fg;
+    return join('', @_out);
 }
 
 # Colorize replace input: highlight $N tokens with capture group colors
 sub _colorize_replace_input {
     my ($class, $theme, $text, $default_fg, $capture_count) = @_;
 
-    my $output = '';
+    my @_out;
     my $len = length($text);
     my $i = 0;
 
@@ -3672,7 +3672,7 @@ sub _colorize_replace_input {
 
             if ($next eq '$') {
                 # $$ escape
-                $output .= '$$';
+                push @_out, '$$';
                 $i += 2;
                 next;
             }
@@ -3690,32 +3690,32 @@ sub _colorize_replace_input {
 
                 if ($num == 0) {
                     # $0 = full match, use dim color
-                    $output .= $theme->color('status_dim') . $token . $default_fg;
+                    push @_out, $theme->color('status_dim') . $token . $default_fg;
                 } elsif ($num <= $capture_count) {
                     # $N within range: use group color
                     my $color_idx = (($num - 1) % 4) + 1;
-                    $output .= $theme->color("capture_group_$color_idx") . $token . $default_fg;
+                    push @_out, $theme->color("capture_group_$color_idx") . $token . $default_fg;
                 } else {
                     # Beyond capture count: no special color
-                    $output .= $token;
+                    push @_out, $token;
                 }
                 $i = $j;
                 next;
             }
         }
 
-        $output .= $ch;
+        push @_out, $ch;
         $i++;
     }
 
-    return $output;
+    return join('', @_out);
 }
 
 sub _render_find_bar {
     my ($class, $theme, $find, $cols) = @_;
 
-    my $output = '';
-    $output .= $theme->color('status_bg') . $theme->color('status_fg');
+    my @_out;
+    push @_out, $theme->color('status_bg') . $theme->color('status_fg');
 
     my $value = $find->{value} // '';
     my $regex_on = $find->{regex} // 0;
@@ -3984,20 +3984,20 @@ sub _render_find_bar {
     $content .= $match_text;
     $content .= ' ';
 
-    $output .= $content;
-    $output .= CLEAR_LINE;
-    $output .= RESET;
+    push @_out, $content;
+    push @_out, CLEAR_LINE;
+    push @_out, RESET;
 
-    return $output;
+    return join('', @_out);
 }
 
 sub _render_prompt {
     my ($class, $theme, $prompt, $cols, $rows) = @_;
 
-    my $output = '';
+    my @_out;
     my $bg = $theme->color('prompt_bg');
     my $fg = $theme->color('prompt_fg');
-    $output .= $bg . $fg;
+    push @_out, $bg . $fg;
 
     my $text = $prompt->{text} // '';
     my @options = @{$prompt->{options} // []};
@@ -4008,7 +4008,7 @@ sub _render_prompt {
 
     # Warning icon + prompt text
     my $warn_icon = Zepto::Chars->get('warning');
-    $output .= " $warn_icon $text ";
+    push @_out, " $warn_icon $text ";
     my $x = 3 + length($text) + 1;  # icon(2) + space + text + space
 
     # Track button positions for click handling
@@ -4028,19 +4028,19 @@ sub _render_prompt {
         my $btn_start = $x;
 
         if ($nerd_font) {
-            $output .= $bg . $theme->color('prompt_pill_edge') . $rl;
+            push @_out, $bg . $theme->color('prompt_pill_edge') . $rl;
             $x++;
         }
-        $output .= $theme->color('prompt_pill_bg') . $theme->color('prompt_pill_fg');
+        push @_out, $theme->color('prompt_pill_bg') . $theme->color('prompt_pill_fg');
         # Render label then dimmed key
         if ($icon) {
-            $output .= " $icon $label ";
+            push @_out, " $icon $label ";
         } else {
-            $output .= " $label ";
+            push @_out, " $label ";
         }
-        $output .= $fg . $key . $theme->color('prompt_pill_fg') . ' ';
+        push @_out, $fg . $key . $theme->color('prompt_pill_fg') . ' ';
         if ($nerd_font) {
-            $output .= $bg . $theme->color('prompt_pill_edge') . $rr;
+            push @_out, $bg . $theme->color('prompt_pill_edge') . $rr;
             $x++;
         }
         $x += length($pill_text);
@@ -4052,20 +4052,20 @@ sub _render_prompt {
             y => $rows,
         };
 
-        $output .= $bg . $fg . ' ';
+        push @_out, $bg . $fg . ' ';
         $x++;
     }
 
     # Pad to fill status bar
     my $padding = $cols - $x;
-    $output .= $bg . ' ' x $padding if $padding > 0;
+    push @_out, $bg . ' ' x $padding if $padding > 0;
 
-    $output .= CLEAR_LINE;
-    $output .= RESET;
+    push @_out, CLEAR_LINE;
+    push @_out, RESET;
 
     $class->_set_prompt_buttons(\@buttons);
 
-    return $output;
+    return join('', @_out);
 }
 
 # =============================================================================
@@ -4079,7 +4079,7 @@ sub _render_prompt {
 sub _render_command_palette {
     my ($class, $theme, $palette, $total_rows, $total_cols) = @_;
 
-    my $output = '';
+    my @_out;
 
     my $query    = $palette->{query} // '';
     my $cursor   = $palette->{cursor} // 0;
@@ -4165,25 +4165,25 @@ sub _render_command_palette {
     my $border_right = $pal_width - 2 - $border_left - $title_len;
     $border_right = 0 if $border_right < 0;
 
-    $output .= _move_to($y, $x);
-    $output .= $bg . $border_fg;
-    $output .= $box_tl;
-    $output .= $box_h x $border_left;
-    $output .= $fg . $title;
-    $output .= $border_fg;
-    $output .= $box_h x $border_right;
-    $output .= $box_tr;
+    push @_out, _move_to($y, $x);
+    push @_out, $bg . $border_fg;
+    push @_out, $box_tl;
+    push @_out, $box_h x $border_left;
+    push @_out, $fg . $title;
+    push @_out, $border_fg;
+    push @_out, $box_h x $border_right;
+    push @_out, $box_tr;
 
     # === Filter input row ===
-    $output .= _move_to($y + 1, $x);
-    $output .= $bg . $border_fg . $box_v;
+    push @_out, _move_to($y + 1, $x);
+    push @_out, $bg . $border_fg . $box_v;
 
     my $filter_icon = Zepto::Chars->get('filter');
     my $inner_width = $pal_width - 2;  # inside the box borders
 
     # Input area: icon + space + query + padding
-    $output .= $bg . $fg;
-    $output .= " $filter_icon ";
+    push @_out, $bg . $fg;
+    push @_out, " $filter_icon ";
     my $input_area = $inner_width - 4;  # -4 for " icon space" + trailing space
     my ($display_query, $pal_sel_s, $pal_sel_e);
     if (my $w = $palette->{palette_widget}) {
@@ -4203,30 +4203,30 @@ sub _render_command_palette {
     if (defined $pal_sel_s) {
         my $sel_bg = $theme->color('selection_bg');
         my $sel_fg = $theme->color('selection_fg');
-        $output .= $input_fg;
-        $output .= substr($display_query, 0, $pal_sel_s) if $pal_sel_s > 0;
-        $output .= $sel_bg . $sel_fg;
-        $output .= substr($display_query, $pal_sel_s, $pal_sel_e - $pal_sel_s);
-        $output .= $bg . $input_fg;
-        $output .= substr($display_query, $pal_sel_e) if $pal_sel_e < length($display_query);
-        $output .= $fg;
+        push @_out, $input_fg;
+        push @_out, substr($display_query, 0, $pal_sel_s) if $pal_sel_s > 0;
+        push @_out, $sel_bg . $sel_fg;
+        push @_out, substr($display_query, $pal_sel_s, $pal_sel_e - $pal_sel_s);
+        push @_out, $bg . $input_fg;
+        push @_out, substr($display_query, $pal_sel_e) if $pal_sel_e < length($display_query);
+        push @_out, $fg;
     } else {
-        $output .= $input_fg;
-        $output .= $display_query;
-        $output .= $fg;
+        push @_out, $input_fg;
+        push @_out, $display_query;
+        push @_out, $fg;
     }
     my $qpad = $input_area - length($display_query);
-    $output .= ' ' x $qpad if $qpad > 0;
-    $output .= ' ';
+    push @_out, ' ' x $qpad if $qpad > 0;
+    push @_out, ' ';
 
-    $output .= $border_fg . $box_v;
+    push @_out, $border_fg . $box_v;
 
     # === Separator row ===
-    $output .= _move_to($y + 2, $x);
-    $output .= $bg . $border_fg;
-    $output .= "\x{251C}";  # ├
-    $output .= $box_h x ($pal_width - 2);
-    $output .= "\x{2524}";  # ┤
+    push @_out, _move_to($y + 2, $x);
+    push @_out, $bg . $border_fg;
+    push @_out, "\x{251C}";  # ├
+    push @_out, $box_h x ($pal_width - 2);
+    push @_out, "\x{2524}";  # ┤
 
     # === Item rows ===
     my @buttons;
@@ -4243,8 +4243,8 @@ sub _render_command_palette {
         my $item_idx = $scroll + $vi;
         my $row_y = $y + 3 + $vi;
 
-        $output .= _move_to($row_y, $x);
-        $output .= $bg . $border_fg . $box_v;
+        push @_out, _move_to($row_y, $x);
+        push @_out, $bg . $border_fg . $box_v;
 
         if ($item_idx < $item_count) {
             my $cmd = $filtered->[$item_idx];
@@ -4254,40 +4254,40 @@ sub _render_command_palette {
                 my $path_highlighted = ($selected_group_idx >= 0
                     && ($cmd->{_group_idx} // -2) == $selected_group_idx);
                 # Filenames: BOLD + themed color on normal bg
-                $output .= $bg;
+                push @_out, $bg;
                 if ($path_highlighted) {
-                    $output .= BOLD . $fsr_path_active_fg;
+                    push @_out, BOLD . $fsr_path_active_fg;
                 } else {
-                    $output .= BOLD . $fsr_path_fg;
+                    push @_out, BOLD . $fsr_path_fg;
                 }
-                $output .= "  ";
+                push @_out, "  ";
                 my $ficon = Zepto::Chars->file_icon($cmd->{_filename});
-                $output .= "$ficon ";
+                push @_out, "$ficon ";
                 my $path_label = $cmd->{label} // '';
                 my $max_path = $inner_width - 4;
                 if (length($path_label) > $max_path) {
                     $path_label = "\x{2026}" . substr($path_label, length($path_label) - $max_path + 1);
                 }
-                $output .= $path_label;
+                push @_out, $path_label;
                 my $ppad = $inner_width - 4 - length($path_label);
-                $output .= RESET . $bg;  # Clear BOLD before padding
-                $output .= ' ' x $ppad if $ppad > 0;
-                $output .= $border_fg . $box_v;
-                $output .= RESET;
+                push @_out, RESET . $bg;  # Clear BOLD before padding
+                push @_out, ' ' x $ppad if $ppad > 0;
+                push @_out, $border_fg . $box_v;
+                push @_out, RESET;
                 next;
             }
 
             # Section header row (commands mode)
             if ($cmd->{_is_header}) {
-                $output .= $bg . $shortcut_fg;
+                push @_out, $bg . $shortcut_fg;
                 my $header_label = "  \x{2500}\x{2500} " . $cmd->{label} . " ";
                 my $header_pad = $inner_width - length($header_label);
                 $header_pad = 0 if $header_pad < 0;
-                $output .= $header_label;
+                push @_out, $header_label;
                 # Fill remaining space with light horizontal line
-                $output .= "\x{2500}" x $header_pad if $header_pad > 0;
-                $output .= $border_fg . $box_v;
-                $output .= RESET;
+                push @_out, "\x{2500}" x $header_pad if $header_pad > 0;
+                push @_out, $border_fg . $box_v;
+                push @_out, RESET;
                 next;
             }
 
@@ -4295,9 +4295,9 @@ sub _render_command_palette {
 
             # Row background
             if ($is_selected) {
-                $output .= $sel_bg . $sel_fg;
+                push @_out, $sel_bg . $sel_fg;
             } else {
-                $output .= $bg . $fg;
+                push @_out, $bg . $fg;
             }
 
             # File search content row — tree branch + match highlighting
@@ -4311,8 +4311,8 @@ sub _render_command_palette {
                 my $tree_prefix = "  $branch$tree_dash_ch ";
                 my $tree_prefix_len = 5;
 
-                $output .= $row_bg . $tree_fg . $tree_prefix;
-                $output .= $row_fg;
+                push @_out, $row_bg . $tree_fg . $tree_prefix;
+                push @_out, $row_fg;
 
                 my $label = $cmd->{label} // '';
                 my $ms = $cmd->{_match_start} // -1;
@@ -4335,16 +4335,16 @@ sub _render_command_palette {
                     my $match  = substr($label, $ms, $end_pos - $ms);
                     my $after  = $end_pos < length($label) ? substr($label, $end_pos) : '';
 
-                    $output .= $before;
-                    $output .= $match_hl_bg . $match_hl_fg . $match;
-                    $output .= $row_bg . $row_fg . $after;
+                    push @_out, $before;
+                    push @_out, $match_hl_bg . $match_hl_fg . $match;
+                    push @_out, $row_bg . $row_fg . $after;
                 } else {
-                    $output .= $label;
+                    push @_out, $label;
                 }
 
                 my $rpad = $available_width - length($label);
-                $output .= $row_bg;
-                $output .= ' ' x $rpad if $rpad > 0;
+                push @_out, $row_bg;
+                push @_out, ' ' x $rpad if $rpad > 0;
 
                 push @buttons, {
                     y       => $row_y,
@@ -4358,7 +4358,7 @@ sub _render_command_palette {
 
                 # Selection indicator
                 my $prefix = $is_selected ? ($ar . ' ') : '  ';
-                $output .= $prefix;
+                push @_out, $prefix;
 
                 # Icon
                 my $icon;
@@ -4367,7 +4367,7 @@ sub _render_command_palette {
                 } else {
                     $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
                 }
-                $output .= "$icon ";
+                push @_out, "$icon ";
 
                 # Shortcut (truncate from start if too long, keeping the end)
                 my $shortcut = $cmd->{shortcut} // '';
@@ -4398,24 +4398,24 @@ sub _render_command_palette {
                     $label = substr($label, 0, $label_space - 1) . "\x{2026}";  # …
                 }
 
-                $output .= $label;
+                push @_out, $label;
                 my $label_pad = $label_space - length($label);
-                $output .= ' ' x $label_pad if $label_pad > 0;
-                $output .= ' ';
+                push @_out, ' ' x $label_pad if $label_pad > 0;
+                push @_out, ' ';
 
                 # Shortcut (dimmed unless selected)
                 if (!$is_selected) {
-                    $output .= $shortcut_fg;
+                    push @_out, $shortcut_fg;
                 }
-                $output .= $shortcut_display;
+                push @_out, $shortcut_display;
 
                 # Toggle state
                 if ($toggle_width > 0) {
-                    $output .= ' ';
+                    push @_out, ' ';
                     if ($is_selected) {
-                        $output .= $toggle_text;
+                        push @_out, $toggle_text;
                     } else {
-                        $output .= $shortcut_fg . $toggle_text;
+                        push @_out, $shortcut_fg . $toggle_text;
                     }
                 }
 
@@ -4423,11 +4423,11 @@ sub _render_command_palette {
                 my $content_len = 2 + 2 + length($label) + $label_pad + 1 + $shortcut_width + ($toggle_width > 0 ? 1 + $toggle_width : 0);
                 my $row_pad = $inner_width - $content_len;
                 if ($is_selected) {
-                    $output .= $sel_bg;
+                    push @_out, $sel_bg;
                 } else {
-                    $output .= $bg;
+                    push @_out, $bg;
                 }
-                $output .= ' ' x $row_pad if $row_pad > 0;
+                push @_out, ' ' x $row_pad if $row_pad > 0;
 
                 # Store button region for click handling
                 push @buttons, {
@@ -4439,19 +4439,19 @@ sub _render_command_palette {
             }
         } else {
             # Empty row (fixed-height palette may have unfilled rows)
-            $output .= $bg . (' ' x $inner_width);
+            push @_out, $bg . (' ' x $inner_width);
         }
 
-        $output .= $bg . $border_fg . $box_v;
-        $output .= RESET;
+        push @_out, $bg . $border_fg . $box_v;
+        push @_out, RESET;
     }
 
     # === Footer row with pill buttons (find_in_files only) ===
     my $footer_y;
     if ($has_footer_row) {
         $footer_y = $y + 3 + $visible_items;
-        $output .= _move_to($footer_y, $x);
-        $output .= $bg . $border_fg . $box_v;
+        push @_out, _move_to($footer_y, $x);
+        push @_out, $bg . $border_fg . $box_v;
 
         # Render pills inside the footer row using find bar style
         my $rl = Zepto::Chars->get('round_left');
@@ -4545,9 +4545,9 @@ sub _render_command_palette {
         $pill_content .= ' ' x $right_pad;
         $pill_content .= $shortcut_fg . $result_count_text . ' ';
 
-        $output .= $pill_content;
-        $output .= $bg . $border_fg . $box_v;
-        $output .= RESET;
+        push @_out, $pill_content;
+        push @_out, $bg . $border_fg . $box_v;
+        push @_out, RESET;
 
         # Store pill click regions
         push @buttons, {
@@ -4572,9 +4572,9 @@ sub _render_command_palette {
 
     # === Bottom border ===
     my $bottom_y = $y + 3 + $visible_items + $has_footer_row;
-    $output .= _move_to($bottom_y, $x);
-    $output .= $bg . $border_fg;
-    $output .= $box_bl;
+    push @_out, _move_to($bottom_y, $x);
+    push @_out, $bg . $border_fg;
+    push @_out, $box_bl;
 
     # Bottom border — clean (find_in_files shows counts in its footer row)
     my $count_text = '';
@@ -4583,14 +4583,14 @@ sub _render_command_palette {
     $bottom_border_avail = 0 if $bottom_border_avail < 0;
     my $bottom_border_left = int($bottom_border_avail / 2);
     my $bottom_border_right = $bottom_border_avail - $bottom_border_left;
-    $output .= $box_h x $bottom_border_left;
+    push @_out, $box_h x $bottom_border_left;
     if (length($count_text)) {
-        $output .= $fg . $count_text;
-        $output .= $border_fg;
+        push @_out, $fg . $count_text;
+        push @_out, $border_fg;
     }
-    $output .= $box_h x $bottom_border_right;
-    $output .= $box_br;
-    $output .= RESET;
+    push @_out, $box_h x $bottom_border_right;
+    push @_out, $box_br;
+    push @_out, RESET;
 
     $class->_set_palette_buttons(\@buttons);
     $class->_set_palette_geometry({
@@ -4600,7 +4600,7 @@ sub _render_command_palette {
         footer_row => $footer_y,
     });
 
-    return $output;
+    return join('', @_out);
 }
 
 1;
