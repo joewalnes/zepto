@@ -83,8 +83,10 @@ User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~
 ### P2: [Documentation] README.md lists zero features
 README.md is 32 lines with no feature list despite the editor having command palette, 52-language syntax highlighting, file tree, find/replace, git diff, minimap, tabs, etc. This violates CLAUDE.md Rule 7 which says to update README when features change.
 
-### P2: [Build] build.pl not in Makefile dependency list
+### ~~P2: [Build] build.pl not in Makefile dependency list~~ FIXED
 `Makefile` line ~53: `zepto: $(MODULES)` doesn't depend on `build.pl`. Changing the build script won't trigger a rebuild. Should be `zepto: $(MODULES) build.pl`.
+
+**Fix:** Added `build.pl` to the dependency list: `zepto: $(MODULES) build.pl`.
 
 ### P2: [Architecture] Editor is a 5800-line god object across 3 files
 `Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 157+ methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.

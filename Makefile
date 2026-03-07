@@ -50,7 +50,7 @@ build: zepto
 
 MODULES := $(shell find lib -name '*.pm')
 
-zepto: $(MODULES)
+zepto: $(MODULES) build.pl
 	@echo "Building single-file zepto..."
 	@perl build.pl > zepto
 	@chmod +x zepto
