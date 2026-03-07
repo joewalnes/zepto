@@ -89,12 +89,15 @@ sub load {
     if ($is_binary) {
         my $file_size = -s $path;
         my $size_str = defined $file_size ? _format_file_size($file_size) : 'unknown size';
+        my $is_image = ($path =~ /\.(png|jpe?g|gif|bmp|webp|svg|ico|tiff?)$/i) ? 1 : 0;
+        my $placeholder = $is_image ? "(Image file — $size_str)" : "(Binary file — $size_str)";
         my $doc = $class->new(
-            text => "(Binary file — $size_str)",
+            text => $placeholder,
             path => $path,
             ($opts{skip_vcs} ? (skip_vcs => 1) : ()),
         );
         $doc->{_is_binary} = 1;
+        $doc->{_is_image} = $is_image;
         $doc->{_truncated_preview} = 0;
         $doc->_capture_file_mtime();
         return $doc;

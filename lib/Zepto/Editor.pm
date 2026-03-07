@@ -699,6 +699,12 @@ EOF
 sub cleanup {
     my ($self) = @_;
 
+    # Clear any Kitty graphics images before leaving alt screen
+    if ($self->{_kitty_image_path}) {
+        $self->{terminal}->write(Zepto::Terminal->kitty_clear_image());
+        $self->{_kitty_image_path} = undef;
+    }
+
     $self->{terminal}->cleanup();
 
     # Clear SIGWINCH handler
@@ -3783,6 +3789,48 @@ sub render {
             $output .= $new_rows->[$i] if $new_rows->[$i] ne $prev->[$i];
         }
     }
+
+    # Kitty graphics protocol: display image for image file tabs
+    my $doc = $self->active_doc();
+    my $showing_image = $doc && $doc->{_is_image}
+        && Zepto::Terminal->supports_kitty_graphics()
+        && $self->{state} eq STATE_EDITING;
+
+    if ($showing_image) {
+        my $image_path = File::Spec->rel2abs($doc->{path});
+        # Calculate image area: text area starts at row 3 (after tab bar + ruler)
+        my $tree = ($self->{prefs}->show_tree() && $self->{file_tree}) ? $self->{file_tree} : undef;
+        my $tree_width = ($tree && $tree->panel_width() > 0) ? $tree->panel_width() + 1 : 0;
+        my $img_row = 3;  # 1-based, after tab bar and ruler
+        my $img_col = $tree_width + 1;
+        my $img_height = $rows - 3;  # text area height minus status bar
+        my $img_width = $cols - $tree_width;
+        $img_height = 1 if $img_height < 1;
+        $img_width = 1 if $img_width < 1;
+
+        my $img_id = 99;
+        # Clear previous image if path changed
+        if (($self->{_kitty_image_path} // '') ne $image_path
+            || ($self->{_kitty_image_size} // '') ne "${img_width}x${img_height}") {
+            $output .= Zepto::Terminal->kitty_clear_image($img_id);
+            $output .= Zepto::Terminal->kitty_display_image(
+                path   => $image_path,
+                row    => $img_row,
+                col    => $img_col,
+                width  => $img_width,
+                height => $img_height,
+                id     => $img_id,
+            );
+            $self->{_kitty_image_path} = $image_path;
+            $self->{_kitty_image_size} = "${img_width}x${img_height}";
+        }
+    } elsif ($self->{_kitty_image_path}) {
+        # Active tab is no longer an image — clear the image
+        $output .= Zepto::Terminal->kitty_clear_image(99);
+        $self->{_kitty_image_path} = undef;
+        $self->{_kitty_image_size} = undef;
+    }
+
     $output .= $frame->{cursor_seq};
 
     $self->{_prev_frame} = $new_rows;

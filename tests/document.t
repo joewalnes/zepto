@@ -508,6 +508,20 @@ subtest 'Binary file detection' => sub {
     my $txt_doc = Zepto::Document->load($txt_path);
     ok(!$txt_doc->{_is_binary}, 'Text file not detected as binary');
     is($txt_doc->text(), 'Hello, world!', 'Text content loaded normally');
+
+    # Create a binary file with image extension
+    my $img_path = "$dir/photo.png";
+    open $fh, '>:raw', $img_path or die;
+    print $fh "\x89PNG\r\n\x1a\n\x00\x00some image data";
+    close $fh;
+
+    my $img_doc = Zepto::Document->load($img_path);
+    ok($img_doc->{_is_binary}, 'Image file detected as binary');
+    ok($img_doc->{_is_image}, 'Image file flagged as image');
+    like($img_doc->text(), qr/Image file/, 'Image placeholder text');
+
+    # Non-image binary should not have _is_image flag
+    ok(!$doc->{_is_image}, 'Non-image binary not flagged as image');
 };
 
 done_testing();

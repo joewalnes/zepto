@@ -591,8 +591,10 @@ Binary files (images, executables, .o files, etc.) currently get previewed in th
 
 **Fix:** Added `_is_binary_file()` check in `Document::load()` that reads the first 8KB of raw bytes and looks for NUL characters. Binary files load a placeholder "(Binary file — size)" instead of the actual content. Insert and delete operations are blocked on binary documents. Save is blocked with "Cannot save binary file" error. Tree preview shows the placeholder. Pressing Enter on a binary file in the tree shows "Binary file — read only" status message. Added `_format_file_size()` helper for human-readable sizes.
 
-### P2: [Feature] Render images in terminal via Kitty graphics protocol
+### ~~P2: [Feature] Render images in terminal via Kitty graphics protocol~~ FIXED
 On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), previewing or opening an image file (PNG, JPEG, GIF, BMP, SVG, etc.) should render the image inline in the terminal instead of showing binary garbage or a "cannot preview" message. Detect protocol support via the `TERM`/`TERM_PROGRAM` env var or a DA1/graphics query. Fall back gracefully to a text placeholder on unsupported terminals.
+
+**Fix:** Added Kitty graphics protocol support to Terminal.pm: `supports_kitty_graphics()` detects support via `TERM_PROGRAM` (ghostty, kitty) and `TERM`/`KITTY_WINDOW_ID` env vars. `kitty_display_image()` transmits PNG/JPEG images using chunked base64 APC escape sequences (4096-byte chunks). `kitty_clear_image()` clears specific or all images. Image files are detected by extension (png, jpg, jpeg, gif, bmp, webp, svg, ico, tiff) on binary files. Editor renders images in the text area after the regular frame, with caching to avoid re-transmission when image/size hasn't changed. Images are cleared on tab switch and editor cleanup. Uses MIME::Base64 (Perl core module). Falls back to "(Image file — size)" placeholder on unsupported terminals.
 
 ### P3: [Feature] Inline image rendering in Markdown preview
 On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.

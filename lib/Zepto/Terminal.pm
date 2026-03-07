@@ -606,6 +606,83 @@ sub cleanup {
     $self->disable_raw_mode();
 }
 
+# =============================================================================
+# Kitty Graphics Protocol
+# =============================================================================
+
+{
+    my $_kitty_graphics_supported;
+
+    sub supports_kitty_graphics {
+        return $_kitty_graphics_supported if defined $_kitty_graphics_supported;
+        my $term_program = $ENV{TERM_PROGRAM} // '';
+        my $term = $ENV{TERM} // '';
+        $_kitty_graphics_supported = (
+            $term_program eq 'ghostty'
+            || $term_program eq 'kitty'
+            || $term =~ /kitty/i
+            || defined $ENV{KITTY_WINDOW_ID}
+        ) ? 1 : 0;
+        return $_kitty_graphics_supported;
+    }
+}
+
+# Display a PNG/JPEG image at a specific position using Kitty graphics protocol
+# Returns the escape sequence string to emit
+sub kitty_display_image {
+    my ($class, %args) = @_;
+    my $path   = $args{path};
+    my $row    = $args{row};     # 1-based terminal row
+    my $col    = $args{col};     # 1-based terminal column
+    my $width  = $args{width};   # display width in cells
+    my $height = $args{height};  # display height in cells
+    my $id     = $args{id} // 1; # image ID for later reference
+
+    require MIME::Base64;
+
+    # Read image data
+    open my $fh, '<:raw', $path or return '';
+    my $data = do { local $/; <$fh> };
+    close $fh;
+    return '' unless defined $data && length($data) > 0;
+
+    my $b64 = MIME::Base64::encode_base64($data, '');
+    my $chunk_size = 4096;
+
+    # Position cursor
+    my $output = "\x1b[${row};${col}H";
+
+    if (length($b64) <= $chunk_size) {
+        # Single chunk
+        $output .= sprintf("\x1b_Ga=T,f=100,i=%d,c=%d,r=%d,C=1,q=2;%s\x1b\\",
+            $id, $width, $height, $b64);
+    } else {
+        # Chunked transmission
+        my $first = substr($b64, 0, $chunk_size, '');
+        $output .= sprintf("\x1b_Ga=T,f=100,i=%d,c=%d,r=%d,C=1,q=2,m=1;%s\x1b\\",
+            $id, $width, $height, $first);
+
+        while (length($b64) > $chunk_size) {
+            my $chunk = substr($b64, 0, $chunk_size, '');
+            $output .= sprintf("\x1b_Gm=1;%s\x1b\\", $chunk);
+        }
+
+        # Final chunk
+        $output .= sprintf("\x1b_Gm=0;%s\x1b\\", $b64);
+    }
+
+    return $output;
+}
+
+# Clear a specific image or all images
+sub kitty_clear_image {
+    my ($class, $id) = @_;
+    if ($id) {
+        return sprintf("\x1b_Ga=d,d=I,i=%d\x1b\\", $id);
+    }
+    return "\x1b_Ga=d,d=A\x1b\\";  # clear all
+}
+
 # Destructor
 sub DESTROY {
     my ($self) = @_;
