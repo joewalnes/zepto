@@ -295,13 +295,98 @@ sub _filter_all_files {
     my $tree = $self->{file_tree};
     $tree->_build_all_files_list();
 
+    my $all_files = $tree->{_all_files};
+    my $root_path = $tree->{root_path};
+
+    # Build lowercased file list once (cached on the tree for reuse)
+    if (!$tree->{_all_files_lc} || scalar @{$tree->{_all_files_lc}} != scalar @$all_files) {
+        $tree->{_all_files_lc} = [ map { lc($_) } @$all_files ];
+    }
+    my $all_lc = $tree->{_all_files_lc};
+
+    # With a query, use incremental substring filtering.
+    # Each keystroke filters from the previous candidate set.
+    if (defined $query && length($query) > 0) {
+        my $q = lc($query);
+        my $prev_query = $self->{_file_filter_prev_query} // '';
+        my $prev_indices = $self->{_file_filter_prev_indices};
+
+        # Incremental: if the new query extends the previous one, filter from
+        # the previous candidate set instead of the full file list.
+        my @candidate_indices;
+        if (length($prev_query) > 0 && index($q, $prev_query) == 0 && $prev_indices) {
+            # New query starts with previous query — filter from cached subset
+            for my $i (@$prev_indices) {
+                push @candidate_indices, $i if index($all_lc->[$i], $q) >= 0;
+            }
+        } else {
+            # Full scan (first char typed, or query changed non-incrementally)
+            for my $i (0 .. $#$all_lc) {
+                push @candidate_indices, $i if index($all_lc->[$i], $q) >= 0;
+            }
+        }
+
+        # Cache for next incremental keystroke
+        $self->{_file_filter_prev_query} = $q;
+        $self->{_file_filter_prev_indices} = \@candidate_indices;
+
+        # Fuzzy-score candidates for ranking (capped to keep scoring fast)
+        my $max_to_score = 5000;
+        my @to_score = @candidate_indices;
+        splice @to_score, $max_to_score if @to_score > $max_to_score;
+
+        my @scored;
+        for my $i (@to_score) {
+            my $rel_path = $all_files->[$i];
+            my $filename = $rel_path;
+            $filename =~ s{.*/}{};
+            my $score = Zepto::CommandRegistry::_fuzzy_score($q, $all_lc->[$i]);
+            my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($filename));
+            $score = $name_score if $name_score > $score;
+            push @scored, { idx => $i, path => $rel_path, filename => $filename, score => $score };
+        }
+        @scored = sort { $b->{score} <=> $a->{score} } @scored;
+
+        # Cap displayed results
+        splice @scored, 1000 if @scored > 1000;
+
+        # Build palette items only for results
+        my @items;
+        for my $s (@scored) {
+            my $dir = $s->{path};
+            if ($dir =~ m{/}) {
+                $dir =~ s{/[^/]+$}{};
+            } else {
+                $dir = '';
+            }
+            push @items, {
+                label     => $s->{filename},
+                icon      => '_file_icon',
+                shortcut  => $dir,
+                type      => 'action',
+                _is_file  => 1,
+                _path     => File::Spec->rel2abs($s->{path}, $root_path),
+                _filename => $s->{filename},
+                _display  => $s->{path},
+            };
+        }
+        return @items;
+    }
+
+    # No query: clear incremental cache, show files (capped for display)
+    $self->{_file_filter_prev_query} = '';
+    $self->{_file_filter_prev_indices} = undef;
+
+    my $max_display = 10000;
+    my $count = scalar @$all_files;
+    $count = $max_display if $count > $max_display;
+
     my @items;
-    for my $rel_path (@{$tree->{_all_files}}) {
-        # Extract filename
+    for my $i (0 .. $count - 1) {
+        my $rel_path = $all_files->[$i];
         my $filename = $rel_path;
         $filename =~ s{.*/}{};
 
-        # Compute directory portion for shortcut display
         my $dir = $rel_path;
         if ($dir =~ m{/}) {
             $dir =~ s{/[^/]+$}{};
@@ -309,33 +394,16 @@ sub _filter_all_files {
             $dir = '';
         }
 
-        # Absolute path for opening
-        my $abs_path = File::Spec->rel2abs($rel_path, $tree->{root_path});
-
         push @items, {
             label     => $filename,
             icon      => '_file_icon',
             shortcut  => $dir,
             type      => 'action',
             _is_file  => 1,
-            _path     => $abs_path,
+            _path     => File::Spec->rel2abs($rel_path, $root_path),
             _filename => $filename,
             _display  => $rel_path,
         };
-    }
-
-    # Filter by query if provided
-    if (defined $query && length($query) > 0) {
-        my $q = lc($query);
-        my @scored;
-        for my $item (@items) {
-            my $score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_display}));
-            my $name_score = Zepto::CommandRegistry::_fuzzy_score($q, lc($item->{_filename}));
-            $score = $name_score if $name_score > $score;
-            push @scored, { item => $item, score => $score } if $score > 0;
-        }
-        @scored = sort { $b->{score} <=> $a->{score} } @scored;
-        @items = map { $_->{item} } @scored;
     }
 
     return @items;

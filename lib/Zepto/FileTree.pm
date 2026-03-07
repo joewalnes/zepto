@@ -488,17 +488,17 @@ sub clear_filter {
     $self->{scroll} = 0;
 }
 
-# Build flat file list for fuzzy filter — capped at MAX_FILES to bound cost.
+# Build flat file list for fuzzy filter.
 # Called lazily on first filter activation, not at construction time.
 # Uses git ls-files when in a git repo (fast index lookup), falls back to walk.
 sub _build_all_files_list {
     my ($self) = @_;
     return if $self->{_all_files_loaded};
 
-    my $max = Zepto::Config::max_files();
     my @files;
 
-    # Try git ls-files first — uses pre-built index, much faster than walk
+    # Try git ls-files first — uses pre-built index, much faster than walk.
+    # No cap: load all tracked files so every file is discoverable.
     if (-d "$self->{root_path}/.git") {
         my $pid = open my $fh, '-|';
         if (defined $pid && $pid == 0) {
@@ -510,15 +510,16 @@ sub _build_all_files_list {
             while (<$fh>) {
                 chomp;
                 push @files, $_;
-                last if @files >= $max;
             }
             close $fh;
         }
     }
 
-    # Fall back to recursive walk if git ls-files didn't work or not a git repo
+    # Fall back to recursive walk if git ls-files didn't work or not a git repo.
+    # Walk keeps the MAX_FILES cap since it's much slower than git ls-files.
     if (!@files) {
         my %skip = Zepto::Config::skip_directories_hash();
+        my $max = Zepto::Config::max_files();
         my $max_depth = Zepto::Config::max_depth();
         $self->_walk_for_files($self->{root_path}, \%skip, \@files, $max, 0, $max_depth);
     }
@@ -559,9 +560,16 @@ sub _apply_filter {
         return;
     }
 
-    # Score all files
-    my @matches;
+    # Pre-filter: fast substring check to avoid scoring every file
+    my $q = lc($query);
+    my @candidates;
     for my $file (@{$self->{_all_files}}) {
+        push @candidates, $file if index(lc($file), $q) >= 0;
+    }
+
+    # Score only pre-filtered candidates
+    my @matches;
+    for my $file (@candidates) {
         my ($score, $positions) = $self->_fuzzy_score_with_positions($query, $file);
         if ($score >= 0) {
             push @matches, { path => $file, score => $score, positions => $positions };
