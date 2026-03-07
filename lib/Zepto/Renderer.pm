@@ -276,6 +276,25 @@ sub visual_to_char_col {
     sub get_tab_bar_buttons { return @{$_tab_bar_buttons}; }
 }
 
+# Cache for tab bar rendering — avoid recalculating pill widths and truncation every frame
+{
+    my $_tab_bar_cache_key = '';
+    my $_tab_bar_cache_str = '';
+    my $_tab_bar_cache_buttons;
+    sub _tab_bar_cache_get {
+        my ($class, $key) = @_;
+        return undef unless $key eq $_tab_bar_cache_key;
+        $class->_set_tab_bar_buttons($_tab_bar_cache_buttons);
+        return $_tab_bar_cache_str;
+    }
+    sub _tab_bar_cache_set {
+        my ($class, $key, $str, $buttons) = @_;
+        $_tab_bar_cache_key = $key;
+        $_tab_bar_cache_str = $str;
+        $_tab_bar_cache_buttons = $buttons;
+    }
+}
+
 # Move cursor to row, col (1-indexed)
 sub _move_to {
     my ($row, $col) = @_;
@@ -651,12 +670,21 @@ sub _render_tab_bar {
     my ($class, $theme, $cols, $ui, $tree_width) = @_;
     $tree_width //= 0;
 
-    my @_out;
-
-    my $tab_cols = $cols - $tree_width;  # available width for tabs
     my $tabs = $ui->{tabs} // [];
     my $active_idx = $ui->{active_tab_index} // 0;
     my $tab_manager = $ui->{tab_manager};
+
+    # Build cache key from inputs that affect tab bar output
+    my $cache_key = join("\0",
+        $cols, $tree_width, $active_idx, scalar(@$tabs),
+        map { ($_->{display_name} // '') . ($_->{is_dirty} ? 'D' : '') . ($_->{has_vcs_changes} ? 'V' : '') } @$tabs
+    );
+    my $cached = $class->_tab_bar_cache_get($cache_key);
+    return $cached if defined $cached;
+
+    my @_out;
+
+    my $tab_cols = $cols - $tree_width;  # available width for tabs
 
     # Geometric triangle edges for tab shape:
     # ◢ (U+25E2) lower-right triangle: fg fills lower-right → left edge of tab
@@ -892,7 +920,9 @@ sub _render_tab_bar {
 
     $class->_set_tab_bar_buttons(\@buttons);
 
-    return join('', @_out);
+    my $result = join('', @_out);
+    $class->_tab_bar_cache_set($cache_key, $result, \@buttons);
+    return $result;
 }
 
 # Calculate the display width of a tab pill (not counting inter-tab gap)
@@ -1361,6 +1391,19 @@ sub _render_text_area {
     # Cache for per-hunk character-level diff highlights
     my %hunk_char_diffs;  # hunk_idx => { old => {base_line => [start, end]}, new => {doc_line => [start, end]} }
 
+    # Pre-build VCS status lookup for visible lines (avoids linear search per line)
+    my (%vcs_change, %vcs_deletion);
+    if ($doc->{_vcs_diff}) {
+        my $diff = $doc->{_vcs_diff};
+        for my $l (@{$diff->{added}})    { $vcs_change{$l} = 'added'; }
+        for my $l (@{$diff->{modified}}) { $vcs_change{$l} //= 'modified'; }
+        for my $l (@{$diff->{modified_whitespace} // []}) { $vcs_change{$l} //= 'modified_whitespace'; }
+        for my $l (@{$diff->{deleted}})  {
+            $vcs_deletion{$l} = 'below';
+            $vcs_deletion{$l + 1} = 'above' if !exists $vcs_deletion{$l + 1};
+        }
+    }
+
     for my $screen_row (0 .. $height - 1) {
         my $entry = $entries[$screen_row];
 
@@ -1407,7 +1450,7 @@ sub _render_text_area {
         # Diff gutter markers extend across all continuation lines
         if ($is_wrap_cont) {
             # Check VCS status for the underlying doc line
-            my $chg_status = $doc->vcs_change_status($doc_line);
+            my $chg_status = $vcs_change{$doc_line};
             my $vcs_char = ' ';
             my $vcs_color = $theme->color('gutter_fg');
             if ($chg_status) {
@@ -1444,8 +1487,8 @@ sub _render_text_area {
 
             # Get VCS indicator for this line (single column)
             # Due to our diff algorithm, deletions never overlap with adds/modifies
-            my $del_status = $doc->vcs_deletion_status($doc_line);
-            my $chg_status = $doc->vcs_change_status($doc_line);
+            my $del_status = $vcs_deletion{$doc_line};
+            my $chg_status = $vcs_change{$doc_line};
 
             my ($vcs_char, $vcs_color);
 
