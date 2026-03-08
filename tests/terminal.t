@@ -330,29 +330,10 @@ subtest 'Cleanup resets state' => sub {
 # Kitty Graphics Protocol
 # ============================================================================
 subtest 'Kitty graphics support detection' => sub {
-    # Save original env
-    my %saved;
-    for my $key (qw(TERM TERM_PROGRAM KITTY_WINDOW_ID)) {
-        $saved{$key} = $ENV{$key};
-    }
-
-    # Reset cached detection result by reimporting
-    # (the cache is in a closure, so we need to force re-eval)
-    # Instead, test the environment variable logic directly
-    local $ENV{TERM} = 'xterm-256color';
-    local $ENV{TERM_PROGRAM} = 'iTerm2';
-    delete $ENV{KITTY_WINDOW_ID};
-    # Can't easily test the cached result, so test the logic
-    ok(1, 'Kitty graphics detection exists');
-
-    # Restore env
-    for my $key (keys %saved) {
-        if (defined $saved{$key}) {
-            $ENV{$key} = $saved{$key};
-        } else {
-            delete $ENV{$key};
-        }
-    }
+    # Result is memoized, so we can only verify it returns a defined boolean
+    my $result = Zepto::Terminal->supports_kitty_graphics();
+    ok(defined $result, 'supports_kitty_graphics returns defined value');
+    ok($result == 0 || $result == 1, 'supports_kitty_graphics returns 0 or 1');
 };
 
 subtest 'Kitty graphics image display sequence' => sub {

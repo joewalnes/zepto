@@ -664,10 +664,10 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** `thumb_end` is computed as `thumb_start + thumb_size - 1` (inclusive), so `<=` is correct. Changed the filter-flat tree scrollbar path to use `<=` to match the normal tree path.
 
-### P3: [Tests] 3 tautological tests remain
-- `terminal.t:346` — `ok(1, 'Kitty graphics detection exists')` always passes. Should verify `supports_kitty_graphics()` returns defined value.
-- `syntax_samples.t:120` — `pass("Tokenization works...")` without checking token correctness.
-- `syntax_samples.t:195` — `pass("Expected tokens match...")` without actual assertion.
+### ~~P3: [Tests] Tautological test in terminal.t~~ FIXED
+`terminal.t:346` — `ok(1, 'Kitty graphics detection exists')` always passed regardless of actual behavior.
+
+**Fix:** Replaced with actual assertion: calls `supports_kitty_graphics()` and verifies it returns a defined 0/1 value. Note: `syntax_samples.t:120` and `syntax_samples.t:195` use `pass()` inside conditional branches (with `fail()` on the other branch) and are NOT tautological — the audit agent misidentified them.
 
 ### P3: [Tests] Config.pm has no dedicated test
 `Config.pm` has implicit coverage through Document loading but no direct test file. Discovery limits and default values are never explicitly verified.
