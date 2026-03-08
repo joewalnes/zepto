@@ -8,7 +8,29 @@ Priority scale:
 
 ---
 
+## Feature requests
+
+### P1: Multi-cursor editing
+`Ctrl+D` to select next occurrence of the current word/selection, then type/delete at all cursors simultaneously. Column selection mode exists but only covers rectangular cases — most real-world multi-edit needs are scattered occurrences of a symbol. No workaround exists; this saves minutes on tasks like renaming a variable in 15 places or restructuring data.
+
+### P2: Buffer word completion
+Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
+
+### P2: Session restore
+Reopen the editor and get back exactly where you were: same tabs, cursor positions, scroll positions. The recent files infrastructure already exists (`~/.config/zepto/recent_files`). Extending to full session state eliminates the re-navigation tax every time the editor is restarted. Especially important for a terminal editor that gets opened/closed frequently.
+
+### P2: Persistent config file
+Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
+
+### P3: Automatic dark/light mode
+Detect the system theme (dark/light) on startup and choose the matching editor theme. Detect when the system theme changes at runtime and automatically switch. Auto mode is optional — users can still manually set dark or light via `Ctrl+T` or config.
+
+---
+
 ## Existing bugs
+
+### P1: File tree doesn't always expand to opened file
+When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Currently this doesn't work reliably — the tree can show a stale selection or collapsed parent directories after opening a file via the file picker, recent files, or find-in-files.
 
 ### ~~P1: [Usability] Global shortcuts should work from any state~~ FIXED
 Several core shortcuts were swallowed when in find/replace (`⌃F`), footer input, or other modal states.
