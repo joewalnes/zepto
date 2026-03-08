@@ -629,30 +629,8 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Added `alarm(1)` (1-second SIGALRM) timeout around regex compilation in both `FindEngine::_compile_regex()` and `FileSearchEngine` startup. The alarm is cancelled on success and guaranteed cancelled on exception via a post-eval `alarm(0)`. Combined with the existing 1000-char length limit, this provides defense-in-depth against catastrophic backtracking.
 
-### P2: [Performance] Row buffer assembly uses string concatenation — SKIPPED
-`Renderer.pm:395-437` — top-level frame assembly uses `$row_buf[$i] .=` in loops.
-
-**Skipped — on inspection, each row gets only 1-2 concatenations (tree + content), not hundreds. The original "381 concat" bug was in render sub-methods (already fixed to use `push @_out`). Converting row_buf to array-per-row would require changing the return type, `_merge_into_rows`, and the differential rendering consumer in Editor.pm. Minimal performance gain for significant refactoring risk.**
-
-### P2: [Performance] Theme color lookups not cached (274 per frame) — SKIPPED
-`Renderer.pm` — 274 `$theme->color('name')` calls per frame across render methods.
-
-**Skipped — `$theme->color($role)` is already a direct hash lookup (`$self->{colors}{$role}`). The overhead is method dispatch only. Caching in local variables would require changing the signature of all 19 render sub-methods to accept a `%colors` hash. Micro-optimization with high refactoring cost.**
-
 ### P2: [Performance] `_render_line_with_highlights` rebuilds lookups every frame — SKIPPED
-`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame.
-
-**Skipped — requires designing a content-keyed cache with invalidation strategy across syntax tokens, search matches, and capture regions. High risk of visual stale-cache glitches. Better suited for a dedicated performance sprint with profiling.**
-
-### P2: [Performance] Palette filtering not throttled — SKIPPED
-`Palette.pm:185-224` — `_palette_update_filtered()` runs on every keystroke.
-
-**Skipped — on inspection, `_filter_all_files()` already has incremental substring filtering (only re-checks the previous candidate set when query extends), a 5000-item scoring cap, and 1000-result display cap. Commands mode filters ~33 items, recent files ~50. The existing optimizations are sufficient; adding render throttling would add complexity for marginal benefit.**
-
-### P2: [DRY] Cursor positioning duplicated 7 times in Renderer — SKIPPED
-`Renderer.pm:456-636` — nearly identical cursor positioning code appears 7 times for different UI modes.
-
-**Skipped — each cursor positioning block has mode-specific dimension calculations (palette width, dialog position, find bar layout, etc.) that make them only superficially similar. Extracting a helper would need to parameterize all the layout calculations, which are tightly coupled to each mode's rendering. High risk of cursor misplacement regressions across all UI modes. Not suitable for bug bash.**
+`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame. Requires designing a content-keyed cache with invalidation strategy. Better suited for a dedicated performance sprint with profiling.
 
 ### ~~P2: [DRY] Truncate-with-ellipsis duplicated 7+ times~~ FIXED
 `Renderer.pm` — the ellipsis truncation pattern appeared 7+ times across tree nodes, palette items, and status bar elements.
@@ -676,9 +654,6 @@ Bugs found by running `/scorecard` codebase audit.
 
 ### ~~P3: [Tests] Missing coverage for complex interactions~~ PARTIALLY FIXED
 Palette header-skipping navigation now tested (5 new subtests in command_palette.t). WrapMap invalidation already well-covered (wrapmap.t:269-406). Mouse coordinate mapping and file tree preview→open→tab transitions skipped — require full integration test setup, not suitable for bug bash.
-
-### P3: [DRY] File path relative conversion duplicated 3+ times — SKIPPED
-Only 2 instances of the exact `$cwd` pattern found (Palette.pm:234, Palette.pm:752). FileSearchEngine.pm has similar prefix-stripping but uses a different variable/context. Extracting a helper for 2 two-line occurrences in the same file provides minimal value.
 
 ### ~~P3: [Documentation] TabManager.pm missing from DESIGN.md module inventory~~ FIXED
 `DESIGN.md` module table omitted `TabManager.pm` and `FilePicker.pm`.
