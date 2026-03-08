@@ -176,6 +176,18 @@ sub _truncate_to_display_width {
     return ($str, $w);
 }
 
+# Truncate a string with ellipsis if it exceeds $max_width characters.
+# mode 'end' (default): truncate end, append ellipsis
+# mode 'start': truncate start, prepend ellipsis
+sub _ellipsis {
+    my ($str, $max_width, $mode) = @_;
+    return $str if length($str) <= $max_width;
+    if (($mode // 'end') eq 'start') {
+        return "\x{2026}" . substr($str, length($str) - $max_width + 1);
+    }
+    return substr($str, 0, $max_width - 1) . "\x{2026}";
+}
+
 # Expand tabs in a string to spaces, respecting tab stops
 # Also returns a mapping from original char positions to visual positions
 # Returns: ($expanded_string, \@char_to_visual)
@@ -2253,7 +2265,7 @@ sub _render_tree_node_content {
 
     if ($name_space > 0) {
         if (length($name) > $name_space) {
-            $name = substr($name, 0, $name_space - 1) . "\x{2026}";  # …
+            $name = _ellipsis($name, $name_space);
         }
     } else {
         $name = '';
@@ -4309,7 +4321,7 @@ sub _render_command_palette {
                 my $path_label = $cmd->{label} // '';
                 my $max_path = $inner_width - 4;
                 if (length($path_label) > $max_path) {
-                    $path_label = "\x{2026}" . substr($path_label, length($path_label) - $max_path + 1);
+                    $path_label = _ellipsis($path_label, $max_path, 'start');
                 }
                 push @_out, $path_label;
                 my $ppad = $inner_width - 4 - length($path_label);
@@ -4364,7 +4376,7 @@ sub _render_command_palette {
                 # Available width for label (tree prefix takes 5 chars)
                 my $available_width = $inner_width - $tree_prefix_len;
                 if (length($label) > $available_width) {
-                    $label = substr($label, 0, $available_width - 1) . "\x{2026}";
+                    $label = _ellipsis($label, $available_width);
                 }
 
                 # Render with match highlighting
@@ -4419,7 +4431,7 @@ sub _render_command_palette {
                 my $max_shortcut = int($inner_width / 2) - 4;
                 $max_shortcut = 8 if $max_shortcut < 8;
                 if ($shortcut_width > $max_shortcut) {
-                    $shortcut_display = "\x{2026}" . substr($shortcut, length($shortcut) - $max_shortcut + 1);
+                    $shortcut_display = _ellipsis($shortcut, $max_shortcut, 'start');
                     $shortcut_width = length($shortcut_display);
                 }
 
@@ -4438,7 +4450,7 @@ sub _render_command_palette {
                 $label_space = 4 if $label_space < 4;
 
                 if (length($label) > $label_space) {
-                    $label = substr($label, 0, $label_space - 1) . "\x{2026}";  # …
+                    $label = _ellipsis($label, $label_space);
                 }
 
                 push @_out, $label;

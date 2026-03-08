@@ -629,23 +629,35 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Added `alarm(1)` (1-second SIGALRM) timeout around regex compilation in both `FindEngine::_compile_regex()` and `FileSearchEngine` startup. The alarm is cancelled on success and guaranteed cancelled on exception via a post-eval `alarm(0)`. Combined with the existing 1000-char length limit, this provides defense-in-depth against catastrophic backtracking.
 
-### P2: [Performance] Row buffer assembly uses string concatenation
-`Renderer.pm:395-437` — top-level frame assembly uses `$row_buf[$i] .=` in loops. The `push @_out` + `join('', @_out)` pattern is already used in all 19 render sub-methods but was missed in the frame assembly. Each `.=` triggers Perl string reallocation.
+### P2: [Performance] Row buffer assembly uses string concatenation — SKIPPED
+`Renderer.pm:395-437` — top-level frame assembly uses `$row_buf[$i] .=` in loops.
 
-### P2: [Performance] Theme color lookups not cached (274 per frame)
-`Renderer.pm` — 274 `$theme->color('name')` calls per frame across render methods. Each is a hash key lookup. Fix: build a local `%colors` hash once at the top of `render()` and pass to sub-methods.
+**Skipped — on inspection, each row gets only 1-2 concatenations (tree + content), not hundreds. The original "381 concat" bug was in render sub-methods (already fixed to use `push @_out`). Converting row_buf to array-per-row would require changing the return type, `_merge_into_rows`, and the differential rendering consumer in Editor.pm. Minimal performance gain for significant refactoring risk.**
 
-### P2: [Performance] `_render_line_with_highlights` rebuilds lookups every frame
-`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame: O(regions × width + matches × width + tokens × width) per line. Not cached between frames for unchanged content. Fix: pre-compute token positions once per content change, cache by content hash (similar to WrapMap's content-keyed cache).
+### P2: [Performance] Theme color lookups not cached (274 per frame) — SKIPPED
+`Renderer.pm` — 274 `$theme->color('name')` calls per frame across render methods.
 
-### P2: [Performance] Palette filtering not throttled
-`Palette.pm:185-224` — `_palette_update_filtered()` re-scans the full file list and runs fuzzy scoring on every keystroke. Unlike FindEngine and FileSearchEngine (which have 100ms render throttling), palette filtering has no throttle. Noticeable on large directory trees.
+**Skipped — `$theme->color($role)` is already a direct hash lookup (`$self->{colors}{$role}`). The overhead is method dispatch only. Caching in local variables would require changing the signature of all 19 render sub-methods to accept a `%colors` hash. Micro-optimization with high refactoring cost.**
 
-### P2: [DRY] Cursor positioning duplicated 7 times in Renderer
-`Renderer.pm:456-636` — nearly identical cursor positioning code (`_move_to() + SHOW_CURSOR`) appears 7 times for palette input, dialog input, footer input, find mode (2 variants), tree focus, and editor cursor. Extract to `_position_cursor($mode, %params)`.
+### P2: [Performance] `_render_line_with_highlights` rebuilds lookups every frame — SKIPPED
+`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame.
 
-### P2: [DRY] Truncate-with-ellipsis duplicated 7+ times
-`Renderer.pm` at lines ~1700, ~2070, ~2256, ~3421, ~3436, ~4310, ~4367 — the pattern `if (length($label) > $width) { $label = substr($label, 0, $width - 1) . "\x{2026}" }` appears 7+ times. Extract to `_truncate_with_ellipsis($text, $max_width)`.
+**Skipped — requires designing a content-keyed cache with invalidation strategy across syntax tokens, search matches, and capture regions. High risk of visual stale-cache glitches. Better suited for a dedicated performance sprint with profiling.**
+
+### P2: [Performance] Palette filtering not throttled — SKIPPED
+`Palette.pm:185-224` — `_palette_update_filtered()` runs on every keystroke.
+
+**Skipped — on inspection, `_filter_all_files()` already has incremental substring filtering (only re-checks the previous candidate set when query extends), a 5000-item scoring cap, and 1000-result display cap. Commands mode filters ~33 items, recent files ~50. The existing optimizations are sufficient; adding render throttling would add complexity for marginal benefit.**
+
+### P2: [DRY] Cursor positioning duplicated 7 times in Renderer — SKIPPED
+`Renderer.pm:456-636` — nearly identical cursor positioning code appears 7 times for different UI modes.
+
+**Skipped — each cursor positioning block has mode-specific dimension calculations (palette width, dialog position, find bar layout, etc.) that make them only superficially similar. Extracting a helper would need to parameterize all the layout calculations, which are tightly coupled to each mode's rendering. High risk of cursor misplacement regressions across all UI modes. Not suitable for bug bash.**
+
+### ~~P2: [DRY] Truncate-with-ellipsis duplicated 7+ times~~ FIXED
+`Renderer.pm` — the ellipsis truncation pattern appeared 7+ times across tree nodes, palette items, and status bar elements.
+
+**Fix:** Extracted `_ellipsis($str, $max_width, $mode)` helper supporting both end-truncation (default) and start-truncation (`'start'` mode). Replaced 5 of 7 occurrences — 2 remain where the truncation is interleaved with other calculations (`$trim_offset` tracking, `$ELLIPSIS` constant in progressive tab name truncation).
 
 ### P3: [Bug] Scrollbar thumb boundary inconsistency
 `Renderer.pm:2303` uses `$row_idx <= $sb->{thumb_end}` but `Renderer.pm:2129` uses `$row_idx < $sb->{thumb_end}`. Inconsistent boundary check causes 1-pixel scrollbar thumb difference between normal and filter-flat tree rendering modes.
