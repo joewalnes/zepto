@@ -317,4 +317,102 @@ subtest 'Nonsense query returns empty filtered list' => sub {
     is(scalar @{$editor->{palette_filtered}}, 0, 'Nonsense query returns 0 results');
 };
 
+# =============================================================================
+# Header-skipping navigation (direct _palette_skip_headers tests)
+# =============================================================================
+
+subtest 'Arrow down skips section headers between items' => sub {
+    my $editor = make_editor();
+    $editor->cmd_open_palette();
+
+    # Build a controlled filtered list: [item, header, item, header, item]
+    $editor->{palette_filtered} = [
+        { id => 'a', label => 'A', method => sub {}, type => 'action' },
+        { _is_header => 1, label => 'Section 2' },
+        { id => 'b', label => 'B', method => sub {}, type => 'action' },
+        { _is_header => 1, label => 'Section 3' },
+        { id => 'c', label => 'C', method => sub {}, type => 'action' },
+    ];
+    $editor->{palette_cursor} = 0;
+    $editor->{palette_scroll} = 0;
+
+    # Move down from item 0 → should land on 1 (header) → skip to 2 (item)
+    $editor->_palette_move_cursor(1);
+    is($editor->{palette_cursor}, 2, 'Down from 0 skips header at 1, lands on 2');
+
+    # Move down again → should land on 3 (header) → skip to 4 (item)
+    $editor->_palette_move_cursor(1);
+    is($editor->{palette_cursor}, 4, 'Down from 2 skips header at 3, lands on 4');
+};
+
+subtest 'Arrow up skips section headers between items' => sub {
+    my $editor = make_editor();
+    $editor->cmd_open_palette();
+
+    $editor->{palette_filtered} = [
+        { id => 'a', label => 'A', method => sub {}, type => 'action' },
+        { _is_header => 1, label => 'Section 2' },
+        { id => 'b', label => 'B', method => sub {}, type => 'action' },
+    ];
+    $editor->{palette_cursor} = 2;
+    $editor->{palette_scroll} = 0;
+
+    # Move up from item 2 → lands on 1 (header) → skip back to 0 (item)
+    $editor->_palette_move_cursor(-1);
+    is($editor->{palette_cursor}, 0, 'Up from 2 skips header at 1, lands on 0');
+};
+
+subtest 'Navigation skips consecutive headers' => sub {
+    my $editor = make_editor();
+    $editor->cmd_open_palette();
+
+    # Two consecutive headers between items
+    $editor->{palette_filtered} = [
+        { id => 'a', label => 'A', method => sub {}, type => 'action' },
+        { _is_header => 1, label => 'H1' },
+        { _is_header => 1, label => 'H2' },
+        { id => 'b', label => 'B', method => sub {}, type => 'action' },
+    ];
+    $editor->{palette_cursor} = 0;
+    $editor->{palette_scroll} = 0;
+
+    # Down from 0 → 1 (header) → skip forward → 2 (header) → skip → 3 (item)
+    $editor->_palette_move_cursor(1);
+    is($editor->{palette_cursor}, 3, 'Down skips two consecutive headers');
+};
+
+subtest 'Header at start: cursor skips forward to first item' => sub {
+    my $editor = make_editor();
+    $editor->cmd_open_palette();
+
+    $editor->{palette_filtered} = [
+        { _is_header => 1, label => 'Section' },
+        { id => 'a', label => 'A', method => sub {}, type => 'action' },
+        { id => 'b', label => 'B', method => sub {}, type => 'action' },
+    ];
+    $editor->{palette_cursor} = 1;
+    $editor->{palette_scroll} = 0;
+
+    # Try moving up from item at 1 → lands on 0 (header) → reverses to 1
+    $editor->_palette_move_cursor(-1);
+    is($editor->{palette_cursor}, 1, 'Up past header at start reverses to first item');
+};
+
+subtest 'Header at end: cursor stays on last item' => sub {
+    my $editor = make_editor();
+    $editor->cmd_open_palette();
+
+    $editor->{palette_filtered} = [
+        { id => 'a', label => 'A', method => sub {}, type => 'action' },
+        { id => 'b', label => 'B', method => sub {}, type => 'action' },
+        { _is_header => 1, label => 'Trailing Section' },
+    ];
+    $editor->{palette_cursor} = 1;
+    $editor->{palette_scroll} = 0;
+
+    # Down from 1 → lands on 2 (header at end) → reverses to 1
+    $editor->_palette_move_cursor(1);
+    is($editor->{palette_cursor}, 1, 'Down into trailing header reverses to last item');
+};
+
 done_testing();

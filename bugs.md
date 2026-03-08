@@ -674,8 +674,8 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Added `tests/config.t` with 5 subtests covering `skip_directories()`, `skip_directories_hash()`, `max_files()`, `max_depth()`, and `picker_visible_rows()` — verifying both return types and default values.
 
-### P3: [Tests] Missing coverage for complex interactions
-No tests for: palette arrow-key navigation skipping section headers, WrapMap invalidation triggers (enter key, newline delete), mouse coordinate mapping in tab-aware layouts, file tree preview → open → tab creation state transitions.
+### ~~P3: [Tests] Missing coverage for complex interactions~~ PARTIALLY FIXED
+Palette header-skipping navigation now tested (5 new subtests in command_palette.t). WrapMap invalidation already well-covered (wrapmap.t:269-406). Mouse coordinate mapping and file tree preview→open→tab transitions skipped — require full integration test setup, not suitable for bug bash.
 
 ### P3: [DRY] File path relative conversion duplicated 3+ times
 `Palette.pm:234-236`, `Palette.pm:752-754`, and similar — the pattern `if (index($path, "$cwd/") == 0) { substr(...) }` to convert absolute paths to relative display paths appears 3+ times. Extract to shared helper.
