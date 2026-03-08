@@ -5,6 +5,7 @@ use Test::More;
 use File::Temp qw(tempdir);
 use File::Path qw(make_path);
 use File::Spec;
+use Cwd ();
 
 use lib 'lib';
 use Zepto::FileTree;
@@ -13,7 +14,7 @@ use Zepto::FileTree;
 # Test Setup - Create temporary directory structure
 # =============================================================================
 
-my $tmpdir = tempdir(CLEANUP => 1);
+my $tmpdir = Cwd::realpath(tempdir(CLEANUP => 1));
 
 # Create test file structure:
 #   lib/
@@ -664,6 +665,46 @@ subtest 'Natural sort ordering' => sub {
     is_deeply(\@names,
         [qw(file1.txt file2.txt file3.txt file10.txt file20.txt)],
         'files sorted in natural numeric order');
+};
+
+# ============================================================================
+# Symlink traversal protection
+# ============================================================================
+subtest 'Symlinks escaping root are excluded' => sub {
+    my $root = File::Temp::tempdir(CLEANUP => 1);
+    my $outside = File::Temp::tempdir(CLEANUP => 1);
+
+    # Create a real file inside root
+    open my $fh, '>', "$root/real.txt" or die;
+    print $fh "real file\n";
+    close $fh;
+
+    # Create a file outside root
+    open my $fh2, '>', "$outside/secret.txt" or die;
+    print $fh2 "secret\n";
+    close $fh2;
+
+    # Create a symlink inside root that points outside
+    symlink($outside, "$root/escape_link") or do {
+        plan skip_all => 'Cannot create symlinks on this system';
+        return;
+    };
+
+    # Also create a symlink that stays inside root
+    mkdir "$root/subdir";
+    open my $fh3, '>', "$root/subdir/inner.txt" or die;
+    print $fh3 "inner\n";
+    close $fh3;
+    symlink("$root/subdir", "$root/safe_link");
+
+    my $tree = Zepto::FileTree->new(root_path => $root);
+    my @names = map { $_->{name} } @{$tree->flat_list()};
+
+    # safe_link and subdir should appear, escape_link should NOT
+    ok(!grep({ $_ eq 'escape_link' } @names), 'Symlink escaping root is excluded');
+    ok(grep({ $_ eq 'safe_link' } @names), 'Symlink staying inside root is included');
+    ok(grep({ $_ eq 'subdir' } @names), 'Real directory is included');
+    ok(grep({ $_ eq 'real.txt' } @names), 'Real file is included');
 };
 
 done_testing();

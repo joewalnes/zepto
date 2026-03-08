@@ -619,8 +619,10 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Replaced `$visual_col++` with `$visual_col += _char_display_width($char)` in both `_char_to_visual_col()` and `visual_to_char_col()`. Both functions now correctly handle CJK characters (width 2) and emoji. Added 15 tests covering CJK, emoji, and mixed ASCII+wide content in both directions.
 
-### P2: [Security] Symlink traversal in FileTree and FilePicker
-`FileTree.pm:123-547`, `FilePicker.pm` — `-d` and `-f` operators follow symlinks without `realpath()` bounds checking. A symlink inside the project directory could point outside the project root (e.g. `/etc/passwd`). Documented as P3 in `SECURITY.md:103` but unresolved. Fix: validate `Cwd::realpath($full_path)` starts with `realpath($root_path)`.
+### ~~P2: [Security] Symlink traversal in FileTree and FilePicker~~ FIXED
+`FileTree.pm:123-547`, `FilePicker.pm` — `-d` and `-f` operators follow symlinks without `realpath()` bounds checking. A symlink inside the project directory could point outside the project root (e.g. `/etc/passwd`).
+
+**Fix:** Added `_path_within_root()` helper to FileTree.pm that resolves symlinks via `Cwd::realpath()` and verifies the resolved path starts with the root. Applied to both `_scan_dir_one_level()` and `_walk_for_files()`. FilePicker.pm gets the same check in its `_discover_files()` walk. Root paths are resolved with `realpath()` at construction time. Symlinks that stay within the project root are preserved. Added test with escape symlink and safe symlink.
 
 ### P2: [Security] ReDoS protection is length-only, no timeout
 `FindEngine.pm:455`, `FileSearchEngine.pm:296` — user regex patterns are compiled via `eval { qr/$pattern/ }` with a 1000-character length limit but no execution timeout. A short pattern like `(a+)+$` (15 chars) can still cause catastrophic backtracking. Fix: add `alarm(1)` timeout around regex compilation.

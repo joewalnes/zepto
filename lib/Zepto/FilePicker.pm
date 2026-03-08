@@ -10,6 +10,7 @@ package Zepto::FilePicker;
 
 use strict;
 use warnings;
+use Cwd ();
 use Zepto::Config;
 
 # Natural sort: "file2" before "file10", case-insensitive
@@ -37,6 +38,7 @@ sub new {
     my ($class, %opts) = @_;
 
     my $base_dir = $opts{base_dir} // '.';
+    $base_dir = Cwd::realpath($base_dir) // $base_dir;  # Resolve symlinks
 
     my $self = bless {
         base_dir    => $base_dir,
@@ -85,6 +87,13 @@ sub _discover_files {
             return if @files >= $max_files;
 
             my $path = "$dir/$entry";
+
+            # Skip symlinks that escape the base directory
+            if (-l $path) {
+                my $real = Cwd::realpath($path);
+                next unless defined $real
+                    && ($real eq $base || index($real, "$base/") == 0);
+            }
 
             if (-d $path) {
                 next if $skip{$entry};

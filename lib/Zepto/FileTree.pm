@@ -15,6 +15,7 @@ package Zepto::FileTree;
 use strict;
 use warnings;
 use File::Spec;
+use Cwd ();
 use Zepto::Config;
 
 # --- Constants ---
@@ -55,6 +56,7 @@ sub new {
 
     my $root = $opts{root_path} // '.';
     $root = File::Spec->rel2abs($root);
+    $root = Cwd::realpath($root) // $root;  # Resolve symlinks in root itself
 
     my $self = bless {
         root_path       => $root,
@@ -104,6 +106,15 @@ sub _build_tree {
     $self->{_all_files_loaded} = 0;
 }
 
+# Check if a path is within the tree root (prevents symlink escape)
+sub _path_within_root {
+    my ($self, $path) = @_;
+    my $real = Cwd::realpath($path);
+    return 0 unless defined $real;
+    my $root = $self->{root_path};
+    return ($real eq $root || index($real, "$root/") == 0) ? 1 : 0;
+}
+
 # Scan a single directory level — returns arrayref of nodes.
 # Directory nodes get children => undef (loaded lazily on expand).
 sub _scan_dir_one_level {
@@ -118,6 +129,10 @@ sub _scan_dir_one_level {
 
     for my $entry (@entries) {
         my $full_path = "$dir_path/$entry";
+
+        # Skip symlinks that escape the project root
+        next if -l $full_path && !$self->_path_within_root($full_path);
+
         my $rel_path = File::Spec->abs2rel($full_path, $self->{root_path});
 
         if (-d $full_path) {
@@ -540,6 +555,10 @@ sub _walk_for_files {
     for my $entry (@entries) {
         last if @$files >= $max;
         my $full = "$dir/$entry";
+
+        # Skip symlinks that escape the project root
+        next if -l $full && !$self->_path_within_root($full);
+
         if (-d $full) {
             next if $skip->{$entry};
             $self->_walk_for_files($full, $skip, $files, $max, $depth + 1, $max_depth);
