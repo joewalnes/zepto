@@ -29,6 +29,9 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 
 ## Existing bugs
 
+### P2: Binary file tab looks editable
+When opening a binary file, the tab shows placeholder text like `(Binary file — 1.2 MB)` in what appears to be a normal editable buffer. Edits are silently blocked (`Document::insert`/`delete` return early when `_is_binary` is set) and save throws an error, but the UI gives no visual indication that the file is read-only. The cursor blinks normally, the buffer looks like regular text, and there's no persistent status bar message or visual treatment to distinguish it from an editable file. Expected: clear visual signal that the file is read-only — e.g. a status bar indicator, dimmed/different background, or disabled cursor.
+
 ### ~~P1: Incorrect cursor placement in Open File dialog~~ FIXED
 When opening the file picker (`⌃O`), the terminal cursor was not aligned with the text input position. The cursor appeared offset from where typed characters actually rendered in the filter field.
 
@@ -669,8 +672,6 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Added `alarm(1)` (1-second SIGALRM) timeout around regex compilation in both `FindEngine::_compile_regex()` and `FileSearchEngine` startup. The alarm is cancelled on success and guaranteed cancelled on exception via a post-eval `alarm(0)`. Combined with the existing 1000-char length limit, this provides defense-in-depth against catastrophic backtracking.
 
-### P2: [Performance] `_render_line_with_highlights` rebuilds lookups every frame — SKIPPED
-`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame. Requires designing a content-keyed cache with invalidation strategy. Better suited for a dedicated performance sprint with profiling.
 
 ### ~~P2: [DRY] Truncate-with-ellipsis duplicated 7+ times~~ FIXED
 `Renderer.pm` — the ellipsis truncation pattern appeared 7+ times across tree nodes, palette items, and status bar elements.
