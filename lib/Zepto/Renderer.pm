@@ -221,7 +221,7 @@ sub _char_to_visual_col {
         if ($char eq "\t") {
             $visual_col += TAB_WIDTH - ($visual_col % TAB_WIDTH);
         } else {
-            $visual_col++;
+            $visual_col += _char_display_width($char);
         }
     }
 
@@ -251,7 +251,7 @@ sub visual_to_char_col {
         if ($char eq "\t") {
             $char_width = TAB_WIDTH - ($current_visual % TAB_WIDTH);
         } else {
-            $char_width = 1;
+            $char_width = _char_display_width($char);
         }
 
         # If the target visual column falls within this character's display width,

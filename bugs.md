@@ -614,8 +614,10 @@ Copying text containing double-width characters (CJK, emoji) crashes with `Wide 
 
 Bugs found by running `/scorecard` codebase audit.
 
-### P2: [Bug] `_char_to_visual_col()` doesn't handle wide characters
-`Renderer.pm:224` — increments `$visual_col` by 1 for all non-tab characters instead of calling `_char_display_width()`. Cursor positioning is wrong for lines containing CJK or emoji characters. Single-line fix: replace `$visual_col++` with `$visual_col += _char_display_width($char)`.
+### ~~P2: [Bug] `_char_to_visual_col()` doesn't handle wide characters~~ FIXED
+`Renderer.pm:224` — increments `$visual_col` by 1 for all non-tab characters instead of calling `_char_display_width()`. Cursor positioning is wrong for lines containing CJK or emoji characters.
+
+**Fix:** Replaced `$visual_col++` with `$visual_col += _char_display_width($char)` in both `_char_to_visual_col()` and `visual_to_char_col()`. Both functions now correctly handle CJK characters (width 2) and emoji. Added 15 tests covering CJK, emoji, and mixed ASCII+wide content in both directions.
 
 ### P2: [Security] Symlink traversal in FileTree and FilePicker
 `FileTree.pm:123-547`, `FilePicker.pm` — `-d` and `-f` operators follow symlinks without `realpath()` bounds checking. A symlink inside the project directory could point outside the project root (e.g. `/etc/passwd`). Documented as P3 in `SECURITY.md:103` but unresolved. Fix: validate `Cwd::realpath($full_path)` starts with `realpath($root_path)`.

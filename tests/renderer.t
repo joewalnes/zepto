@@ -1099,4 +1099,43 @@ subtest 'truncate to display width' => sub {
     is($w, 5, 'width = 5 (3 + 2)');
 };
 
+# ============================================================================
+# _char_to_visual_col and visual_to_char_col with wide characters
+# ============================================================================
+subtest '_char_to_visual_col handles wide characters' => sub {
+    # ASCII only
+    is(Zepto::Renderer::_char_to_visual_col("hello", 3), 3, 'ASCII: col 3 = visual 3');
+
+    # CJK: each char is display width 2
+    my $cjk = "\x{4e16}\x{754c}";  # 世界
+    is(Zepto::Renderer::_char_to_visual_col($cjk, 1), 2, 'CJK: after 1 char = visual 2');
+    is(Zepto::Renderer::_char_to_visual_col($cjk, 2), 4, 'CJK: after 2 chars = visual 4');
+
+    # Mixed: ASCII + CJK
+    my $mixed = "ab\x{4e16}cd";  # ab世cd
+    is(Zepto::Renderer::_char_to_visual_col($mixed, 2), 2, 'Mixed: after "ab" = visual 2');
+    is(Zepto::Renderer::_char_to_visual_col($mixed, 3), 4, 'Mixed: after "ab世" = visual 4');
+    is(Zepto::Renderer::_char_to_visual_col($mixed, 4), 5, 'Mixed: after "ab世c" = visual 5');
+
+    # Emoji (display width 2)
+    my $emoji = "a\x{1f600}b";  # a😀b
+    is(Zepto::Renderer::_char_to_visual_col($emoji, 1), 1, 'Emoji: after "a" = visual 1');
+    is(Zepto::Renderer::_char_to_visual_col($emoji, 2), 3, 'Emoji: after "a😀" = visual 3');
+    is(Zepto::Renderer::_char_to_visual_col($emoji, 3), 4, 'Emoji: after "a😀b" = visual 4');
+};
+
+subtest 'visual_to_char_col handles wide characters' => sub {
+    # CJK: visual col 2 falls within first char (width 2), visual col 3 is in second char
+    my $cjk = "\x{4e16}\x{754c}";  # 世界
+    is(Zepto::Renderer::visual_to_char_col($cjk, 1), 0, 'CJK: visual 1 = char 0 (inside 世)');
+    is(Zepto::Renderer::visual_to_char_col($cjk, 2), 1, 'CJK: visual 2 = char 1 (start of 界)');
+    is(Zepto::Renderer::visual_to_char_col($cjk, 3), 1, 'CJK: visual 3 = char 1 (inside 界)');
+    is(Zepto::Renderer::visual_to_char_col($cjk, 4), 2, 'CJK: visual 4 = char 2 (past end)');
+
+    # Mixed: ASCII + CJK
+    my $mixed = "ab\x{4e16}cd";  # ab世cd
+    is(Zepto::Renderer::visual_to_char_col($mixed, 3), 2, 'Mixed: visual 3 = char 2 (inside 世)');
+    is(Zepto::Renderer::visual_to_char_col($mixed, 4), 3, 'Mixed: visual 4 = char 3 (start of c)');
+};
+
 done_testing();
