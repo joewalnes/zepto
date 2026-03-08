@@ -5,6 +5,7 @@ use warnings;
 use Test::More;
 use lib 'lib';
 use File::Temp qw(tempfile tempdir);
+use Cwd ();
 
 use Zepto::Editor;
 use Zepto::Terminal;
@@ -2034,6 +2035,67 @@ subtest 'do_delete within line uses incremental wrap' => sub {
     ok(!$wm->{_dirty}, 'WrapMap not dirty after within-line delete');
     is($wm->{_last_content_version}, $doc->content_version(),
        'Version synced after delete');
+};
+
+# ============================================================================
+# File tree reveals opened file
+# ============================================================================
+
+subtest '_load_file updates file tree to reveal new file' => sub {
+    my $term = mock_terminal();
+    my $dir = Cwd::realpath(tempdir(CLEANUP => 1));
+
+    # Create nested file structure
+    mkdir "$dir/sub";
+    my $file1 = "$dir/first.txt";
+    my $file2 = "$dir/sub/second.txt";
+    open my $fh1, '>', $file1; print $fh1 "aaa\n"; close $fh1;
+    open my $fh2, '>', $file2; print $fh2 "bbb\n"; close $fh2;
+
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+
+    # Set up a file tree rooted at the temp dir
+    require Zepto::FileTree;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+
+    # Open a file — tree should update to show it
+    $editor->_load_file($file2);
+
+    # Resolve to match what FileTree stores (relative path)
+    my $rel = File::Spec->abs2rel($file2, $dir);
+    is($editor->{file_tree}->{current_file}, $rel,
+       'File tree current_file updated after _load_file');
+};
+
+subtest '_jump_to_location switches to existing tab and updates tree' => sub {
+    my $term = mock_terminal();
+    my $dir = Cwd::realpath(tempdir(CLEANUP => 1));
+
+    my $file1 = "$dir/a.txt";
+    my $file2 = "$dir/b.txt";
+    open my $fh1, '>', $file1; print $fh1 "aaa\n"; close $fh1;
+    open my $fh2, '>', $file2; print $fh2 "bbb\nline2\nline3\n"; close $fh2;
+
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    # Set up file tree
+    require Zepto::FileTree;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+
+    # Open two files in tabs
+    $editor->_load_file($file1);
+    $editor->_load_file($file2);
+    is($editor->active_file_path(), $file2, 'Active tab is file2');
+
+    # Jump back to file1 via _jump_to_location (simulates find-in-files)
+    $editor->_jump_to_location({ file => $file1, line => 0, col => 0 });
+    is($editor->active_file_path(), $file1,
+       '_jump_to_location switched to correct tab');
+
+    my $rel = File::Spec->abs2rel($file1, $dir);
+    is($editor->{file_tree}->{current_file}, $rel,
+       'File tree updated after _jump_to_location');
 };
 
 done_testing();

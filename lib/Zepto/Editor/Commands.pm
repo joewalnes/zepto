@@ -307,6 +307,12 @@ sub _load_file {
     if (defined $close_idx) {
         $self->{tab_manager}->remove_tab($close_idx);
     }
+
+    # Reveal the newly opened file in the file tree
+    if ($self->{file_tree} && !$self->{file_tree}->focused()) {
+        $self->{file_tree}->set_current_file($path);
+        $self->{file_tree}->expand_to_path($path);
+    }
 }
 
 # =============================================================================

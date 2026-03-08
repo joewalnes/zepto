@@ -345,7 +345,7 @@ sub _jump_to_location {
         my $found = 0;
         for my $i (0 .. $#$tabs) {
             if (($tabs->[$i]{file_path} // '') eq $loc->{file}) {
-                $self->{tab_manager}->switch_to($i);
+                $self->_switch_to_tab($i);
                 $found = 1;
                 last;
             }

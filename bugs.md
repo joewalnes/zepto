@@ -29,8 +29,12 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 
 ## Existing bugs
 
-### P1: File tree doesn't always expand to opened file
-When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Currently this doesn't work reliably — the tree can show a stale selection or collapsed parent directories after opening a file via the file picker, recent files, or find-in-files.
+### ~~P1: File tree doesn't always expand to opened file~~ FIXED
+When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Previously didn't work reliably — the tree showed stale selection or collapsed parents after opening a file via file picker, recent files, or find-in-files.
+
+**Root cause:** Two missing tree-update sites: (1) `_load_file()` in Commands.pm created new tabs via `add_tab()` without calling `set_current_file()`/`expand_to_path()`. (2) `_jump_to_location()` in Editor.pm called non-existent `switch_to()` on TabManager instead of using `_switch_to_tab()`, so find-in-files tab switching silently failed AND the tree never updated.
+
+**Fix:** Added `set_current_file()` + `expand_to_path()` after `add_tab()` in `_load_file()`. Changed `_jump_to_location()` to use `_switch_to_tab()` which already includes tree reveal logic. Added 2 tests verifying tree updates after both code paths.
 
 ### ~~P1: [Usability] Global shortcuts should work from any state~~ FIXED
 Several core shortcuts were swallowed when in find/replace (`⌃F`), footer input, or other modal states.
