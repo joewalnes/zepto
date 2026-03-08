@@ -472,7 +472,7 @@ sub render {
         my $palette = $ui->{palette};
         my $pal_mode = $palette->{mode} // 'commands';
         my $pal_width = $cols - 4;
-        if ($pal_mode eq 'find_in_files') {
+        if ($pal_mode eq 'find_in_files' || $pal_mode eq 'files' || $pal_mode eq 'recent_files') {
             $pal_width = 120 if $pal_width > 120;
         } elsif ($cols >= 120) {
             $pal_width = 80 if $pal_width > 80;

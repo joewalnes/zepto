@@ -29,8 +29,12 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 
 ## Existing bugs
 
-### P1: Incorrect cursor placement in Open File dialog
-When opening the file picker (`⌃O`), the terminal cursor is not aligned with the text input position. The cursor appears offset from where typed characters actually render in the filter field. Previous cursor placement fixes (P1 "Cursor off by one in palette filter", P1 "Incorrect cursor placement in command palette") addressed the command palette but may not have covered the file picker mode, which uses a wider palette width (120 cols vs 60/80 for command palette) and a different title/icon layout.
+### ~~P1: Incorrect cursor placement in Open File dialog~~ FIXED
+When opening the file picker (`⌃O`), the terminal cursor was not aligned with the text input position. The cursor appeared offset from where typed characters actually rendered in the filter field.
+
+**Root cause:** The cursor positioning code in `Renderer.pm` (line ~475) only applied the wide 120-column palette width for `find_in_files` mode, but the rendering code (line ~4139) applied it for `find_in_files`, `files`, AND `recent_files`. The file picker rendered at 120 columns wide while the cursor was positioned using the command palette width (60 or 80 depending on terminal width), causing a 20-40 column offset.
+
+**Fix:** Added `files` and `recent_files` to the wide-width condition in the cursor positioning code, matching the rendering code exactly.
 
 ### ~~P1: Editor becomes sluggish when opening large files~~ FIXED
 Opening a ~1MB / 13K+ line file caused the editor to become sluggish — slow tab opening, laggy cursor navigation, general unresponsiveness.
