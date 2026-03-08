@@ -607,3 +607,56 @@ Copying text containing double-width characters (CJK, emoji) crashes with `Wide 
 **Root cause:** `MIME::Base64::encode_base64()` expects raw bytes, but `copy_to_clipboard()` passed Perl's internal wide-character strings directly. The pipe write to clipboard commands (`print $pipe $text`) had the same issue.
 
 **Fix:** Added `utf8::encode()` to convert wide-character strings to UTF-8 bytes before passing to `encode_base64()` and the clipboard pipe. Added `binmode($pipe, ':raw')` on the clipboard command pipe. Added tests for CJK characters and emoji.
+
+---
+
+## Scorecard audit bugs (2026-03-06)
+
+Bugs found by running `/scorecard` codebase audit.
+
+### P2: [Bug] `_char_to_visual_col()` doesn't handle wide characters
+`Renderer.pm:224` — increments `$visual_col` by 1 for all non-tab characters instead of calling `_char_display_width()`. Cursor positioning is wrong for lines containing CJK or emoji characters. Single-line fix: replace `$visual_col++` with `$visual_col += _char_display_width($char)`.
+
+### P2: [Security] Symlink traversal in FileTree and FilePicker
+`FileTree.pm:123-547`, `FilePicker.pm` — `-d` and `-f` operators follow symlinks without `realpath()` bounds checking. A symlink inside the project directory could point outside the project root (e.g. `/etc/passwd`). Documented as P3 in `SECURITY.md:103` but unresolved. Fix: validate `Cwd::realpath($full_path)` starts with `realpath($root_path)`.
+
+### P2: [Security] ReDoS protection is length-only, no timeout
+`FindEngine.pm:455`, `FileSearchEngine.pm:296` — user regex patterns are compiled via `eval { qr/$pattern/ }` with a 1000-character length limit but no execution timeout. A short pattern like `(a+)+$` (15 chars) can still cause catastrophic backtracking. Fix: add `alarm(1)` timeout around regex compilation.
+
+### P2: [Performance] Row buffer assembly uses string concatenation
+`Renderer.pm:395-437` — top-level frame assembly uses `$row_buf[$i] .=` in loops. The `push @_out` + `join('', @_out)` pattern is already used in all 19 render sub-methods but was missed in the frame assembly. Each `.=` triggers Perl string reallocation.
+
+### P2: [Performance] Theme color lookups not cached (274 per frame)
+`Renderer.pm` — 274 `$theme->color('name')` calls per frame across render methods. Each is a hash key lookup. Fix: build a local `%colors` hash once at the top of `render()` and pass to sub-methods.
+
+### P2: [Performance] `_render_line_with_highlights` rebuilds lookups every frame
+`Renderer.pm:2604-2673` — three separate nested loops rebuild capture region, match, and syntax token lookup arrays for every visible line, every frame: O(regions × width + matches × width + tokens × width) per line. Not cached between frames for unchanged content. Fix: pre-compute token positions once per content change, cache by content hash (similar to WrapMap's content-keyed cache).
+
+### P2: [Performance] Palette filtering not throttled
+`Palette.pm:185-224` — `_palette_update_filtered()` re-scans the full file list and runs fuzzy scoring on every keystroke. Unlike FindEngine and FileSearchEngine (which have 100ms render throttling), palette filtering has no throttle. Noticeable on large directory trees.
+
+### P2: [DRY] Cursor positioning duplicated 7 times in Renderer
+`Renderer.pm:456-636` — nearly identical cursor positioning code (`_move_to() + SHOW_CURSOR`) appears 7 times for palette input, dialog input, footer input, find mode (2 variants), tree focus, and editor cursor. Extract to `_position_cursor($mode, %params)`.
+
+### P2: [DRY] Truncate-with-ellipsis duplicated 7+ times
+`Renderer.pm` at lines ~1700, ~2070, ~2256, ~3421, ~3436, ~4310, ~4367 — the pattern `if (length($label) > $width) { $label = substr($label, 0, $width - 1) . "\x{2026}" }` appears 7+ times. Extract to `_truncate_with_ellipsis($text, $max_width)`.
+
+### P3: [Bug] Scrollbar thumb boundary inconsistency
+`Renderer.pm:2303` uses `$row_idx <= $sb->{thumb_end}` but `Renderer.pm:2129` uses `$row_idx < $sb->{thumb_end}`. Inconsistent boundary check causes 1-pixel scrollbar thumb difference between normal and filter-flat tree rendering modes.
+
+### P3: [Tests] 3 tautological tests remain
+- `terminal.t:346` — `ok(1, 'Kitty graphics detection exists')` always passes. Should verify `supports_kitty_graphics()` returns defined value.
+- `syntax_samples.t:120` — `pass("Tokenization works...")` without checking token correctness.
+- `syntax_samples.t:195` — `pass("Expected tokens match...")` without actual assertion.
+
+### P3: [Tests] Config.pm has no dedicated test
+`Config.pm` has implicit coverage through Document loading but no direct test file. Discovery limits and default values are never explicitly verified.
+
+### P3: [Tests] Missing coverage for complex interactions
+No tests for: palette arrow-key navigation skipping section headers, WrapMap invalidation triggers (enter key, newline delete), mouse coordinate mapping in tab-aware layouts, file tree preview → open → tab creation state transitions.
+
+### P3: [DRY] File path relative conversion duplicated 3+ times
+`Palette.pm:234-236`, `Palette.pm:752-754`, and similar — the pattern `if (index($path, "$cwd/") == 0) { substr(...) }` to convert absolute paths to relative display paths appears 3+ times. Extract to shared helper.
+
+### P3: [Documentation] TabManager.pm missing from DESIGN.md module inventory
+`DESIGN.md` lists 22 core modules but omits `TabManager.pm`, which manages multi-tab state and is used by Editor.pm.
