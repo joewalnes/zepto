@@ -669,8 +669,10 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Replaced with actual assertion: calls `supports_kitty_graphics()` and verifies it returns a defined 0/1 value. Note: `syntax_samples.t:120` and `syntax_samples.t:195` use `pass()` inside conditional branches (with `fail()` on the other branch) and are NOT tautological — the audit agent misidentified them.
 
-### P3: [Tests] Config.pm has no dedicated test
-`Config.pm` has implicit coverage through Document loading but no direct test file. Discovery limits and default values are never explicitly verified.
+### ~~P3: [Tests] Config.pm has no dedicated test~~ FIXED
+`Config.pm` had implicit coverage through Document loading but no direct test file.
+
+**Fix:** Added `tests/config.t` with 5 subtests covering `skip_directories()`, `skip_directories_hash()`, `max_files()`, `max_depth()`, and `picker_visible_rows()` — verifying both return types and default values.
 
 ### P3: [Tests] Missing coverage for complex interactions
 No tests for: palette arrow-key navigation skipping section headers, WrapMap invalidation triggers (enter key, newline delete), mouse coordinate mapping in tab-aware layouts, file tree preview → open → tab creation state transitions.
