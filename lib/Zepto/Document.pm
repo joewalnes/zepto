@@ -16,7 +16,9 @@ use File::Basename qw(dirname);
 use constant UNDO_GROUP_TIMEOUT => 1.0;
 
 # VCS diff debounce delay in seconds
-use constant VCS_DIFF_DEBOUNCE => 0.3;
+use constant VCS_DIFF_DEBOUNCE      => 0.3;
+use constant VCS_DIFF_DEBOUNCE_LARGE => 1.0;  # For files > 5000 lines
+use constant LARGE_FILE_THRESHOLD    => 5000;  # Lines
 
 # How often to check if git HEAD has changed (file I/O), in seconds
 use constant VCS_HEAD_CHECK_INTERVAL => 2.0;
@@ -41,6 +43,8 @@ sub new {
         _vcs_provider   => undef,
         _vcs_base       => undef,  # Cached HEAD content
         _vcs_diff       => undef,  # { added => [], modified => [], deleted => [] }
+        _vcs_change_lookup   => {},  # line => 'added'|'modified'|'modified_whitespace'
+        _vcs_deletion_lookup => {},  # line => 'above'|'below'
         _vcs_dirty      => 0,      # Buffer changed since last diff
         _vcs_last_diff  => 0,      # Timestamp of last diff computation
         _vcs_last_head_check => 0, # Timestamp of last HEAD change check
@@ -603,6 +607,7 @@ sub _compute_vcs_diff {
         $self->{_vcs_diff} = undef;
         $self->{_vcs_dirty} = 0;
         $self->{_vcs_last_diff} = time();
+        $self->_rebuild_vcs_lookup();
         return;
     }
 
@@ -610,6 +615,9 @@ sub _compute_vcs_diff {
     $self->{_vcs_diff} = Zepto::Diff->diff($self->{_vcs_base}, $current_text);
     $self->{_vcs_dirty} = 0;
     $self->{_vcs_last_diff} = time();
+
+    # Rebuild O(1) lookup hashes (used by vcs_change_status/vcs_deletion_status)
+    $self->_rebuild_vcs_lookup();
 }
 
 # Update VCS diff if needed (debounced)
@@ -635,7 +643,9 @@ sub update_vcs_diff {
     return unless $self->{_vcs_dirty};
 
     $now = time();
-    if ($now - $self->{_vcs_last_diff} >= VCS_DIFF_DEBOUNCE) {
+    my $debounce = $self->line_count() > LARGE_FILE_THRESHOLD
+        ? VCS_DIFF_DEBOUNCE_LARGE : VCS_DIFF_DEBOUNCE;
+    if ($now - $self->{_vcs_last_diff} >= $debounce) {
         $self->_compute_vcs_diff();
         $perf->{vcs_diff} = 1 if $perf;
     }
@@ -648,52 +658,41 @@ sub refresh_vcs_diff {
     $self->_compute_vcs_diff();
 }
 
+# Rebuild O(1) VCS lookup hashes from diff arrays.
+# Called once per diff recomputation, not per frame.
+sub _rebuild_vcs_lookup {
+    my ($self) = @_;
+    my %change;
+    my %deletion;
+
+    if ($self->{_vcs_diff}) {
+        my $diff = $self->{_vcs_diff};
+        for my $l (@{$diff->{added}})    { $change{$l} = 'added'; }
+        for my $l (@{$diff->{modified}}) { $change{$l} //= 'modified'; }
+        for my $l (@{$diff->{modified_whitespace} // []}) { $change{$l} //= 'modified_whitespace'; }
+        for my $l (@{$diff->{deleted}})  {
+            $deletion{$l} = 'below';
+            $deletion{$l + 1} = 'above' if !exists $deletion{$l + 1};
+        }
+    }
+
+    $self->{_vcs_change_lookup}   = \%change;
+    $self->{_vcs_deletion_lookup} = \%deletion;
+}
+
 # Get VCS deletion status for a specific line (0-indexed)
 # Returns: 'above', 'below', or undef
 # Used for column 1 of the two-column VCS gutter
 sub vcs_deletion_status {
     my ($self, $line) = @_;
-    return undef unless $self->{_vcs_diff};
-
-    my $diff = $self->{_vcs_diff};
-
-    # deleted array contains line indices AFTER which deletions occurred
-    for my $l (@{$diff->{deleted}}) {
-        # Line $l has deletion after it (show lower block ▗)
-        return 'below' if $l == $line;
-        # Line $l+1 has deletion before it (show upper block ▝)
-        return 'above' if $l + 1 == $line;
-    }
-
-    return undef;
+    return $self->{_vcs_deletion_lookup}{$line};
 }
 
 # Get VCS change status for a specific line (0-indexed)
-# Returns: 'added', 'modified', or undef
+# Returns: 'added', 'modified', 'modified_whitespace', or undef
 sub vcs_change_status {
     my ($self, $line) = @_;
-    return undef unless $self->{_vcs_diff};
-
-    my $diff = $self->{_vcs_diff};
-
-    # Check if line is added
-    for my $l (@{$diff->{added}}) {
-        return 'added' if $l == $line;
-    }
-
-    # Check if line is modified
-    for my $l (@{$diff->{modified}}) {
-        return 'modified' if $l == $line;
-    }
-
-    # Check if line is whitespace-only modified
-    if ($diff->{modified_whitespace}) {
-        for my $l (@{$diff->{modified_whitespace}}) {
-            return 'modified_whitespace' if $l == $line;
-        }
-    }
-
-    return undef;
+    return $self->{_vcs_change_lookup}{$line};
 }
 
 # Legacy wrapper for compatibility - returns first applicable status

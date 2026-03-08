@@ -1403,18 +1403,9 @@ sub _render_text_area {
     # Cache for per-hunk character-level diff highlights
     my %hunk_char_diffs;  # hunk_idx => { old => {base_line => [start, end]}, new => {doc_line => [start, end]} }
 
-    # Pre-build VCS status lookup for visible lines (avoids linear search per line)
-    my (%vcs_change, %vcs_deletion);
-    if ($doc->{_vcs_diff}) {
-        my $diff = $doc->{_vcs_diff};
-        for my $l (@{$diff->{added}})    { $vcs_change{$l} = 'added'; }
-        for my $l (@{$diff->{modified}}) { $vcs_change{$l} //= 'modified'; }
-        for my $l (@{$diff->{modified_whitespace} // []}) { $vcs_change{$l} //= 'modified_whitespace'; }
-        for my $l (@{$diff->{deleted}})  {
-            $vcs_deletion{$l} = 'below';
-            $vcs_deletion{$l + 1} = 'above' if !exists $vcs_deletion{$l + 1};
-        }
-    }
+    # Use Document's cached O(1) VCS lookup hashes (rebuilt only when diff changes)
+    my $vcs_change  = $doc->{_vcs_change_lookup}   // {};
+    my $vcs_deletion = $doc->{_vcs_deletion_lookup} // {};
 
     for my $screen_row (0 .. $height - 1) {
         my $entry = $entries[$screen_row];
@@ -1462,7 +1453,7 @@ sub _render_text_area {
         # Diff gutter markers extend across all continuation lines
         if ($is_wrap_cont) {
             # Check VCS status for the underlying doc line
-            my $chg_status = $vcs_change{$doc_line};
+            my $chg_status = $vcs_change->{$doc_line};
             my $vcs_char = ' ';
             my $vcs_color = $theme->color('gutter_fg');
             if ($chg_status) {
@@ -1499,8 +1490,8 @@ sub _render_text_area {
 
             # Get VCS indicator for this line (single column)
             # Due to our diff algorithm, deletions never overlap with adds/modifies
-            my $del_status = $vcs_deletion{$doc_line};
-            my $chg_status = $vcs_change{$doc_line};
+            my $del_status = $vcs_deletion->{$doc_line};
+            my $chg_status = $vcs_change->{$doc_line};
 
             my ($vcs_char, $vcs_color);
 

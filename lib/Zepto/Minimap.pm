@@ -140,14 +140,14 @@ sub invalidate_cache {
 # line count changes, or minimap height changes.
 sub _cache_key {
     my ($doc, $height, $total_lines) = @_;
-    my $undo_size = scalar @{$doc->{undo_stack} // []};
-    my $redo_size = scalar @{$doc->{redo_stack} // []};
-    # Use VCS diff timestamp instead of _vcs_dirty flag.  _vcs_dirty flips
-    # on every keystroke, but _vcs_last_diff only changes when the debounced
-    # VCS diff actually runs (~every 0.3s), preventing needless cache misses
-    # during rapid typing.
+    # Use content_version (incremented on every edit) to detect content changes.
+    # Previous approach used undo/redo stack sizes which also change every keystroke
+    # but caused unnecessary cache misses since undo_size != content identity.
+    my $content_ver = $doc->content_version();
+    # VCS diff timestamp only changes when the debounced diff runs (~0.3-1s),
+    # preventing needless cache misses during rapid typing.
     my $vcs_diff_ver = int(($doc->{_vcs_last_diff} // 0) * 1000);
-    return "$total_lines:$height:$undo_size:$redo_size:$vcs_diff_ver";
+    return "$total_lines:$height:$content_ver:$vcs_diff_ver";
 }
 
 sub _get_cached_rows {

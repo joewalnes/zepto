@@ -32,8 +32,12 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 ### P1: Incorrect cursor placement in Open File dialog
 When opening the file picker (`⌃O`), the terminal cursor is not aligned with the text input position. The cursor appears offset from where typed characters actually render in the filter field. Previous cursor placement fixes (P1 "Cursor off by one in palette filter", P1 "Incorrect cursor placement in command palette") addressed the command palette but may not have covered the file picker mode, which uses a wider palette width (120 cols vs 60/80 for command palette) and a different title/icon layout.
 
-### P1: Editor becomes sluggish when opening large files
-Opening a ~1MB / 13K+ line file causes the editor to become sluggish. Symptoms: slow tab opening, laggy cursor navigation, general unresponsiveness. The file has moderate line lengths (max ~150 chars) so the issue is likely line count rather than line length. Likely hot paths: syntax highlighting tokenization on initial load, WrapMap computation for 13K+ lines, or VCS diff computation against a large base.
+### ~~P1: Editor becomes sluggish when opening large files~~ FIXED
+Opening a ~1MB / 13K+ line file caused the editor to become sluggish — slow tab opening, laggy cursor navigation, general unresponsiveness.
+
+**Root cause:** Three compounding bottlenecks: (1) `vcs_change_status()` and `vcs_deletion_status()` in Document.pm used O(n) linear array scans, called for every visible line every frame. (2) Renderer.pm rebuilt VCS lookup hashes from scratch every frame. (3) Minimap.pm cache key included `undo_size`/`redo_size` which change every keystroke, defeating the cache and causing full minimap recomputation on every frame.
+
+**Fix:** (1) Added `_rebuild_vcs_lookup()` in Document.pm that builds O(1) hash lookups once when the VCS diff is computed, not per-frame. `vcs_change_status()` and `vcs_deletion_status()` are now single hash lookups. (2) Renderer.pm now uses Document's cached hashrefs directly instead of rebuilding per-frame. (3) Minimap cache key uses `content_version` (incremented only on edits) instead of undo/redo sizes. Also added adaptive VCS diff debounce: 1.0s for files >5000 lines vs 0.3s for smaller files.
 
 ### ~~P1: File tree doesn't always expand to opened file~~ FIXED
 When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Previously didn't work reliably — the tree showed stale selection or collapsed parents after opening a file via file picker, recent files, or find-in-files.
