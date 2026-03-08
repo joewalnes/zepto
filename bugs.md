@@ -29,6 +29,12 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 
 ## Existing bugs
 
+### P1: Incorrect cursor placement in Open File dialog
+When opening the file picker (`⌃O`), the terminal cursor is not aligned with the text input position. The cursor appears offset from where typed characters actually render in the filter field. Previous cursor placement fixes (P1 "Cursor off by one in palette filter", P1 "Incorrect cursor placement in command palette") addressed the command palette but may not have covered the file picker mode, which uses a wider palette width (120 cols vs 60/80 for command palette) and a different title/icon layout.
+
+### P1: Editor becomes sluggish when opening large files
+Opening a ~1MB / 13K+ line file causes the editor to become sluggish. Symptoms: slow tab opening, laggy cursor navigation, general unresponsiveness. The file has moderate line lengths (max ~150 chars) so the issue is likely line count rather than line length. Likely hot paths: syntax highlighting tokenization on initial load, WrapMap computation for 13K+ lines, or VCS diff computation against a large base.
+
 ### ~~P1: File tree doesn't always expand to opened file~~ FIXED
 When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Previously didn't work reliably — the tree showed stale selection or collapsed parents after opening a file via file picker, recent files, or find-in-files.
 
