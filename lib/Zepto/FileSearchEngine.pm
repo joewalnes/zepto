@@ -300,8 +300,13 @@ sub _start_perl_search {
             return;
         }
         my $re = eval {
-            $self->{case_sensitive} ? qr/$query/ : qr/$query/i;
+            local $SIG{ALRM} = sub { die "regex_timeout\n" };
+            alarm(1);
+            my $compiled = $self->{case_sensitive} ? qr/$query/ : qr/$query/i;
+            alarm(0);
+            $compiled;
         };
+        alarm(0);  # Ensure alarm is cancelled even on exception
         if (!$re) {
             # Invalid regex — abort search
             $self->{done} = 1;

@@ -624,8 +624,10 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Added `_path_within_root()` helper to FileTree.pm that resolves symlinks via `Cwd::realpath()` and verifies the resolved path starts with the root. Applied to both `_scan_dir_one_level()` and `_walk_for_files()`. FilePicker.pm gets the same check in its `_discover_files()` walk. Root paths are resolved with `realpath()` at construction time. Symlinks that stay within the project root are preserved. Added test with escape symlink and safe symlink.
 
-### P2: [Security] ReDoS protection is length-only, no timeout
-`FindEngine.pm:455`, `FileSearchEngine.pm:296` — user regex patterns are compiled via `eval { qr/$pattern/ }` with a 1000-character length limit but no execution timeout. A short pattern like `(a+)+$` (15 chars) can still cause catastrophic backtracking. Fix: add `alarm(1)` timeout around regex compilation.
+### ~~P2: [Security] ReDoS protection is length-only, no timeout~~ FIXED
+`FindEngine.pm:455`, `FileSearchEngine.pm:296` — user regex patterns are compiled via `eval { qr/$pattern/ }` with a 1000-character length limit but no execution timeout.
+
+**Fix:** Added `alarm(1)` (1-second SIGALRM) timeout around regex compilation in both `FindEngine::_compile_regex()` and `FileSearchEngine` startup. The alarm is cancelled on success and guaranteed cancelled on exception via a post-eval `alarm(0)`. Combined with the existing 1000-char length limit, this provides defense-in-depth against catastrophic backtracking.
 
 ### P2: [Performance] Row buffer assembly uses string concatenation
 `Renderer.pm:395-437` — top-level frame assembly uses `$row_buf[$i] .=` in loops. The `push @_out` + `join('', @_out)` pattern is already used in all 19 render sub-methods but was missed in the frame assembly. Each `.=` triggers Perl string reallocation.

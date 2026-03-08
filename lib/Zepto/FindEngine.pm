@@ -452,7 +452,14 @@ sub _build_regex {
     my $flags = $self->{case_sensitive} ? '' : 'i';
     my $pattern = $self->{use_regex} ? $term : quotemeta($term);
 
-    my $re = eval { qr/(?$flags)$pattern/ };
+    my $re = eval {
+        local $SIG{ALRM} = sub { die "regex_timeout\n" };
+        alarm(1);
+        my $compiled = qr/(?$flags)$pattern/;
+        alarm(0);
+        $compiled;
+    };
+    alarm(0);  # Ensure alarm is cancelled even on exception
     return $re;
 }
 
