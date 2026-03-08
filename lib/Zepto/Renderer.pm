@@ -2138,7 +2138,7 @@ sub _render_tree_node_content {
         # Scrollbar column
         if ($has_scrollbar) {
             my $sb_bg = $theme->color('tree_scrollbar_bg');
-            if ($row_idx >= $sb->{thumb_start} && $row_idx < $sb->{thumb_end}) {
+            if ($row_idx >= $sb->{thumb_start} && $row_idx <= $sb->{thumb_end}) {
                 push @_out, $theme->color('tree_scrollbar_fg') . $sb_bg . "\x{2588}";
             } else {
                 push @_out, $sb_bg . ' ';

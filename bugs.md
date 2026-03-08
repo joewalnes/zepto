@@ -659,8 +659,10 @@ Bugs found by running `/scorecard` codebase audit.
 
 **Fix:** Extracted `_ellipsis($str, $max_width, $mode)` helper supporting both end-truncation (default) and start-truncation (`'start'` mode). Replaced 5 of 7 occurrences — 2 remain where the truncation is interleaved with other calculations (`$trim_offset` tracking, `$ELLIPSIS` constant in progressive tab name truncation).
 
-### P3: [Bug] Scrollbar thumb boundary inconsistency
-`Renderer.pm:2303` uses `$row_idx <= $sb->{thumb_end}` but `Renderer.pm:2129` uses `$row_idx < $sb->{thumb_end}`. Inconsistent boundary check causes 1-pixel scrollbar thumb difference between normal and filter-flat tree rendering modes.
+### ~~P3: [Bug] Scrollbar thumb boundary inconsistency~~ FIXED
+`Renderer.pm` — one scrollbar rendering path used `<` (exclusive) while another used `<=` (inclusive) for `thumb_end`.
+
+**Fix:** `thumb_end` is computed as `thumb_start + thumb_size - 1` (inclusive), so `<=` is correct. Changed the filter-flat tree scrollbar path to use `<=` to match the normal tree path.
 
 ### P3: [Tests] 3 tautological tests remain
 - `terminal.t:346` — `ok(1, 'Kitty graphics detection exists')` always passes. Should verify `supports_kitty_graphics()` returns defined value.
