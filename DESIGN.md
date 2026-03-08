@@ -89,6 +89,8 @@ it's the pragmatic choice.
 | **LineMap**          | Maps display rows to document lines (diff view)   | Pure function                |
 | **Minimap**          | Braille-based scrollbar/minimap computation       | Pure function                |
 | **Chars**            | Nerd Font / ASCII glyph abstraction               | Pure data                    |
+| **TabManager**       | Multi-tab state, ordering, MRU tracking           | Stateful                     |
+| **FilePicker**       | Fuzzy file finder with incremental scoring        | Stateful                     |
 | **Config**           | Global configuration constants                    | Pure data                    |
 
 ### Data Flow

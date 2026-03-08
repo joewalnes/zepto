@@ -677,8 +677,10 @@ Bugs found by running `/scorecard` codebase audit.
 ### ~~P3: [Tests] Missing coverage for complex interactions~~ PARTIALLY FIXED
 Palette header-skipping navigation now tested (5 new subtests in command_palette.t). WrapMap invalidation already well-covered (wrapmap.t:269-406). Mouse coordinate mapping and file tree preview→open→tab transitions skipped — require full integration test setup, not suitable for bug bash.
 
-### P3: [DRY] File path relative conversion duplicated 3+ times
-`Palette.pm:234-236`, `Palette.pm:752-754`, and similar — the pattern `if (index($path, "$cwd/") == 0) { substr(...) }` to convert absolute paths to relative display paths appears 3+ times. Extract to shared helper.
+### P3: [DRY] File path relative conversion duplicated 3+ times — SKIPPED
+Only 2 instances of the exact `$cwd` pattern found (Palette.pm:234, Palette.pm:752). FileSearchEngine.pm has similar prefix-stripping but uses a different variable/context. Extracting a helper for 2 two-line occurrences in the same file provides minimal value.
 
-### P3: [Documentation] TabManager.pm missing from DESIGN.md module inventory
-`DESIGN.md` lists 22 core modules but omits `TabManager.pm`, which manages multi-tab state and is used by Editor.pm.
+### ~~P3: [Documentation] TabManager.pm missing from DESIGN.md module inventory~~ FIXED
+`DESIGN.md` module table omitted `TabManager.pm` and `FilePicker.pm`.
+
+**Fix:** Added both TabManager and FilePicker to the Module Responsibilities table in DESIGN.md.
