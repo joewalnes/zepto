@@ -652,6 +652,11 @@ When pasting multiline text from an external program using the terminal's native
 
 **Expected:** Enable bracketed paste mode on terminal setup. Detect `\x1b[200~` (paste start) and `\x1b[201~` (paste end) sequences in the input reader. While inside a bracketed paste, suppress auto-indent in `do_enter()` and insert the pasted text verbatim.
 
+### P1: Pasting from system clipboard corrupts Unicode characters
+When pasting text containing non-ASCII characters (accented characters, CJK, emoji) via `⌃V`, the characters appear corrupted — multi-byte UTF-8 sequences are treated as individual bytes instead of proper characters.
+
+**Root cause:** `paste_from_clipboard()` in `Terminal.pm:539-554` reads raw bytes from the clipboard command pipe (`pbpaste`, `xclip`, etc.) with no UTF-8 decoding. The pipe filehandle has no `binmode($fh, ':encoding(UTF-8)')` and there's no `utf8::decode()` on the returned string. The copy direction (`copy_to_clipboard()`, line 514-515) correctly handles this with `utf8::encode()`, but the paste direction has no corresponding decode — creating an asymmetry where copied UTF-8 text round-trips incorrectly.
+
 ### P2: [Bug] YAML syntax highlighting matches literals inside bare words
 In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
 
