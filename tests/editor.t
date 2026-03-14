@@ -1463,6 +1463,45 @@ subtest 'Tab bar click unfocuses file tree' => sub {
     ok(!$editor->{file_tree}->focused(), 'Tree unfocused after tab bar click');
 };
 
+subtest 'Clicking document area confirms preview instead of dismissing' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    # Create a file to preview
+    my $filename = create_temp_file("preview content\nsecond line\n");
+    setup_editor_doc($editor, $filename);
+
+    # Set up file tree with a preview
+    require Zepto::FileTree;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    $editor->{file_tree}->set_focused(1);
+
+    # Simulate preview state: pretend a file was previewed as a new tab
+    my $preview_file = create_temp_file("previewed file content\n");
+    $editor->{file_tree}->{pre_preview_tab_index} = $editor->{tab_manager}->active_index();
+    # Load the preview file as a new tab (_load_file unfocuses tree, so re-focus after)
+    $editor->_load_file($preview_file);
+    $editor->{file_tree}->set_focused(1);
+    $editor->{file_tree}->{preview_active} = 1;
+    $editor->{file_tree}->{preview_path} = $preview_file;
+
+    ok($editor->{file_tree}->{preview_active}, 'Preview is active');
+    my $preview_tab_count = $editor->{tab_manager}->tab_count();
+
+    # Click in the document text area — x must be past the tree panel, y=4 for first text row
+    my $tree_w = $editor->{file_tree}->panel_width() + 1;
+    my $press = {
+        type => 'mouse', button => 0, action => 'press',
+        x => $tree_w + 10, y => 4, modifiers => [],
+    };
+    $editor->handle_mouse_event($press);
+
+    # Preview should be confirmed (tab stays), tree unfocused
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused after clicking document area');
+    ok(!$editor->{file_tree}->{preview_active}, 'Preview state cleared');
+    is($editor->{tab_manager}->tab_count(), $preview_tab_count, 'Preview tab preserved (not dismissed)');
+};
+
 # ============================================================================
 # Enter key / newline insertion
 # ============================================================================

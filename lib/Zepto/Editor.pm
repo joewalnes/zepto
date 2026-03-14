@@ -1206,7 +1206,29 @@ sub handle_mouse_event {
 
         # Clicking in the document area (gutter or text) unfocuses tree
         if ($self->{file_tree} && $self->{file_tree}->focused()) {
-            $self->_tree_unfocus();
+            my $tree = $self->{file_tree};
+            if ($tree->{preview_active}) {
+                # Confirm the preview: keep the tab, init VCS, clean up preview state
+                if ($self->active_doc()->{_is_binary}) {
+                    $self->show_message("Binary file — read only");
+                } elsif ($self->active_doc()->{_truncated_preview}) {
+                    my $path = $tree->{preview_path};
+                    $self->_close_preview_tab();
+                    $self->_load_file($path);
+                } else {
+                    $self->active_doc()->init_vcs();
+                }
+                my $close_idx = $self->_empty_untitled_tab_index($tree->{pre_preview_tab_index});
+                $tree->{preview_active} = 0;
+                $tree->{preview_path} = undef;
+                $tree->{pre_preview_tab_index} = undef;
+                if (defined $close_idx) {
+                    $self->{tab_manager}->remove_tab($close_idx);
+                }
+                $tree->set_focused(0);
+            } else {
+                $self->_tree_unfocus();
+            }
             # Refresh view reference — tab may have changed during unfocus
             $view = $self->active_view();
         }

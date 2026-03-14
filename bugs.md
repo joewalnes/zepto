@@ -659,12 +659,10 @@ When pasting text containing non-ASCII characters (accented characters, CJK, emo
 
 **Fix:** Added `binmode($fh, ':raw')` on the clipboard read pipe and `utf8::decode($text)` on the returned string, matching the encode/decode symmetry with `copy_to_clipboard()`. Added test verifying UTF-8 round-trip through the system clipboard (box drawing, emoji).
 
-### P1: Clicking previewed file content dismisses it instead of opening it
-When launching zepto with no args (`./zepto` or `./zepto .`), clicking a file in the tree shows a preview. Clicking the previewed content in the main editor area dismisses the preview and restores the previous tab instead of confirming the file for editing.
+### ~~P1: Clicking previewed file content dismisses it instead of opening it~~ FIXED
+When launching zepto with no args, clicking a file in the tree shows a preview. Clicking the previewed content in the main editor area dismissed the preview instead of confirming it.
 
-**Actual behavior:** Clicking the document area calls `_tree_unfocus()` (Editor.pm ~3510), which cancels the preview — closes the transient tab (line 3515-3516) and restores the original tab (line 3518-3522). The user sees the file disappear.
-
-**Expected behavior:** Clicking the previewed content should confirm the file (like pressing Enter), making it a permanent tab and transferring focus to the editor. The existing `_tree_open_selected()` (Editor.pm ~3555) already implements the correct confirm-preview logic — the document-area click handler should use that path instead of `_tree_unfocus()` when a preview is active.
+**Fix:** Changed the document-area click handler in `handle_mouse_event()` to check for `preview_active` on the tree. When a preview is active, the click now confirms the preview (initializes VCS, cleans up preview state, closes empty untitled pre-preview tab) instead of calling `_tree_unfocus()` which cancelled it. Added regression test.
 
 ### P2: [Bug] YAML syntax highlighting matches literals inside bare words
 In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
