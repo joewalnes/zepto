@@ -642,8 +642,10 @@ On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), pre
 ### P2: Syntax highlighting doesn't activate after Save As on new file
 Creating a new file (`⌃N`), typing code, then saving with a file extension (e.g. `script.py`) does not activate syntax highlighting. The buffer remains plain text. The highlighter is initialized with `set_file(undef)` when the untitled document is created in `_create_document_state()` (Editor.pm ~389-390). After Save As in `cmd_save()` (Commands.pm ~51-70), `$doc->set_path()` updates the document path but the highlighter's `set_file()` is never called with the new filename, so grammar detection never runs. Reopening the file works — highlighting activates because `_create_document_state()` gets the correct path on load.
 
-### P1: File picker (`⌃O`) doesn't find untracked files
-The Open File picker only shows git-tracked files. Files that exist on disk but aren't committed or staged (e.g. newly added images, scratch files) don't appear in search results. `FileTree::_build_all_files_list()` (FileTree.pm ~517-530) uses `git ls-files` as the sole source when a `.git` directory exists, and only falls back to a filesystem walk if `git ls-files` produces zero output. Untracked files like `example.png` in the repo root are invisible to the picker. Expected: `⌃O` should find all files in the project directory, including untracked ones.
+### ~~P1: File picker (`⌃O`) doesn't find untracked files~~ FIXED
+The Open File picker only showed git-tracked files. Untracked files (new images, scratch files) were invisible.
+
+**Fix:** Added a second `git ls-files --others --exclude-standard` call in `FileTree::_build_all_files_list()` alongside the existing `git ls-files` for tracked files. Both results are combined. The two commands produce non-overlapping sets by design (tracked vs untracked-but-not-ignored).
 
 ### P1: Native terminal paste (Cmd+V) causes cascading indentation
 When pasting multiline text from an external program using the terminal's native paste (Cmd+V on macOS), each line gets progressively more indented. The first pasted line is correct, the second gets one level of indentation, the third gets two, and so on — resulting in a staircase effect.

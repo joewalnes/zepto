@@ -513,20 +513,22 @@ sub _build_all_files_list {
     my @files;
 
     # Try git ls-files first — uses pre-built index, much faster than walk.
-    # No cap: load all tracked files so every file is discoverable.
+    # Include both tracked files and untracked (non-ignored) files.
     if (-d "$self->{root_path}/.git") {
-        my $pid = open my $fh, '-|';
-        if (defined $pid && $pid == 0) {
-            open STDERR, '>', '/dev/null';
-            exec 'git', '-C', $self->{root_path}, 'ls-files';
-            exit 1;
-        }
-        if ($fh) {
-            while (<$fh>) {
-                chomp;
-                push @files, $_;
+        for my $args (['ls-files'], ['ls-files', '--others', '--exclude-standard']) {
+            my $pid = open my $fh, '-|';
+            if (defined $pid && $pid == 0) {
+                open STDERR, '>', '/dev/null';
+                exec 'git', '-C', $self->{root_path}, @$args;
+                exit 1;
             }
-            close $fh;
+            if ($fh) {
+                while (<$fh>) {
+                    chomp;
+                    push @files, $_;
+                }
+                close $fh;
+            }
         }
     }
 
