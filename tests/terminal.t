@@ -310,6 +310,27 @@ subtest 'paste_from_clipboard returns string' => sub {
     ok(!ref($result), 'paste_from_clipboard returns scalar');
 };
 
+subtest 'paste_from_clipboard decodes UTF-8' => sub {
+    plan skip_all => 'Requires macOS pbcopy/pbpaste' unless $^O eq 'darwin';
+
+    my $term = Zepto::Terminal->new();
+
+    # Copy a unicode string via pbcopy, then paste it back
+    my $test_str = "box ─ drawing \x{2500} emoji \x{1f600}";
+    my $bytes = $test_str;
+    utf8::encode($bytes);
+    my $pid = open(my $pipe, '|-', 'pbcopy');
+    if ($pid) {
+        binmode($pipe, ':raw');
+        print $pipe $bytes;
+        close $pipe;
+    }
+
+    my $result = $term->paste_from_clipboard();
+    ok(utf8::is_utf8($result), 'Pasted text has UTF-8 flag set');
+    is($result, $test_str, 'UTF-8 round-trip through clipboard preserves characters');
+};
+
 # ============================================================================
 # Cleanup
 # ============================================================================

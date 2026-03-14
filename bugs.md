@@ -652,10 +652,12 @@ When pasting multiline text from an external program using the terminal's native
 
 **Expected:** Enable bracketed paste mode on terminal setup. Detect `\x1b[200~` (paste start) and `\x1b[201~` (paste end) sequences in the input reader. While inside a bracketed paste, suppress auto-indent in `do_enter()` and insert the pasted text verbatim.
 
-### P1: Pasting from system clipboard corrupts Unicode characters
+### ~~P1: Pasting from system clipboard corrupts Unicode characters~~ FIXED
 When pasting text containing non-ASCII characters (accented characters, CJK, emoji) via `⌃V`, the characters appear corrupted — multi-byte UTF-8 sequences are treated as individual bytes instead of proper characters.
 
-**Root cause:** `paste_from_clipboard()` in `Terminal.pm:539-554` reads raw bytes from the clipboard command pipe (`pbpaste`, `xclip`, etc.) with no UTF-8 decoding. The pipe filehandle has no `binmode($fh, ':encoding(UTF-8)')` and there's no `utf8::decode()` on the returned string. The copy direction (`copy_to_clipboard()`, line 514-515) correctly handles this with `utf8::encode()`, but the paste direction has no corresponding decode — creating an asymmetry where copied UTF-8 text round-trips incorrectly.
+**Root cause:** `paste_from_clipboard()` in `Terminal.pm:539-554` reads raw bytes from the clipboard command pipe (`pbpaste`, `xclip`, etc.) with no UTF-8 decoding. The copy direction (`copy_to_clipboard()`) correctly uses `utf8::encode()`, but the paste direction had no corresponding decode.
+
+**Fix:** Added `binmode($fh, ':raw')` on the clipboard read pipe and `utf8::decode($text)` on the returned string, matching the encode/decode symmetry with `copy_to_clipboard()`. Added test verifying UTF-8 round-trip through the system clipboard (box drawing, emoji).
 
 ### P1: Clicking previewed file content dismisses it instead of opening it
 When launching zepto with no args (`./zepto` or `./zepto .`), clicking a file in the tree shows a preview. Clicking the previewed content in the main editor area dismisses the preview and restores the previous tab instead of confirming the file for editing.

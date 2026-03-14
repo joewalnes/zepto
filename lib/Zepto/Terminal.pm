@@ -548,9 +548,12 @@ sub paste_from_clipboard {
         open(STDERR, '>', '/dev/null');
         exec(@cmd) or exit(127);
     }
+    binmode($fh, ':raw');
     my $text = do { local $/; <$fh> };
     close($fh);
-    return defined $text ? $text : '';
+    return '' unless defined $text;
+    utf8::decode($text);
+    return $text;
 }
 
 # Check if system clipboard is available
