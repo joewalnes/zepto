@@ -983,4 +983,32 @@ subtest 'HTML same-line <script>...</script>' => sub {
     is($state, 0, 'returns to normal for same-line script');
 };
 
+# =============================================================================
+# YAML: bare words should not match partial literals
+# =============================================================================
+subtest 'YAML bare words containing literal substrings' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.yaml');
+
+    # "name: region" — "on" inside "region" should NOT be highlighted as keyword
+    my ($tokens, $state) = $hl->tokenize_line('name: region', 0);
+    my @keywords = grep { $_->{type} eq 'keyword' } @$tokens;
+    is(scalar @keywords, 0, 'No keywords in "name: region" — "on" not matched inside bare word');
+
+    # "category: information" — "no" inside "information" should not match
+    ($tokens, $state) = $hl->tokenize_line('category: information', 0);
+    @keywords = grep { $_->{type} eq 'keyword' } @$tokens;
+    is(scalar @keywords, 0, 'No keywords in "category: information"');
+
+    # Standalone "on" should still match
+    ($tokens, $state) = $hl->tokenize_line('flag: on', 0);
+    @keywords = grep { $_->{type} eq 'keyword' } @$tokens;
+    is(scalar @keywords, 1, 'Standalone "on" still highlighted as keyword');
+
+    # "enabled: true" should still match
+    ($tokens, $state) = $hl->tokenize_line('enabled: true', 0);
+    @keywords = grep { $_->{type} eq 'keyword' } @$tokens;
+    is(scalar @keywords, 1, 'Standalone "true" still highlighted as keyword');
+};
+
 done_testing();

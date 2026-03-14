@@ -668,12 +668,10 @@ When launching zepto with no args, clicking a file in the tree shows a preview. 
 
 **Fix:** Changed the document-area click handler in `handle_mouse_event()` to check for `preview_active` on the tree. When a preview is active, the click now confirms the preview (initializes VCS, cleans up preview state, closes empty untitled pre-preview tab) instead of calling `_tree_unfocus()` which cancelled it. Added regression test.
 
-### P2: [Bug] YAML syntax highlighting matches literals inside bare words
-In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
+### ~~P2: [Bug] YAML syntax highlighting matches literals inside bare words~~ FIXED
+In YAML files, substrings like `on`, `no`, `off` were incorrectly highlighted as keyword literals when inside unquoted bare words (e.g. `region`, `information`).
 
-**Root cause:** The tokenizer in `Syntax/YAML.pm:114` checks `$LITERALS` against `$rest = substr($line, $pos)`. When no earlier rule matches, the `$pos++` fallback (line 148) advances one character at a time through bare words. Once it reaches a position where the remaining substring starts with a literal (e.g. `"on"` at the end of `"region"`), the `\b` word boundary in `$LITERALS` matches at the start/end of the substring — but it has lost the context that this position is mid-word in the original line. The literal is incorrectly tokenized as `TOKEN_KEYWORD`.
-
-**Expected:** Bare words in YAML values should not have internal substrings highlighted as keywords. Only standalone `on`, `off`, `true`, `false`, etc. (delimited by whitespace/punctuation) should match.
+**Fix:** Added a bare word consumer rule `[a-zA-Z_][a-zA-Z0-9_.-]*` before the `$pos++` fallback in `Syntax/YAML.pm`. This consumes entire bare words in one go, preventing the tokenizer from creating substrings that partially match literals. Standalone literals (`on`, `true`, `false`) are still correctly matched since the `$LITERALS` check comes earlier. Regenerated YAML expected tokens. Added regression tests.
 
 ### P3: [Feature] Inline image rendering in Markdown preview — SKIPPED
 On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.

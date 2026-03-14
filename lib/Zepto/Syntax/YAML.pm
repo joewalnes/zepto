@@ -145,6 +145,13 @@ sub tokenize {
             next;
         }
 
+        # Bare word — consume as a whole to avoid partial literal matches
+        # (e.g. "region" contains "on" but should not be highlighted as a keyword)
+        if ($rest =~ /^([a-zA-Z_][a-zA-Z0-9_.-]*)/) {
+            $pos += length($1);
+            next;
+        }
+
         $pos++;
     }
 
