@@ -2850,6 +2850,15 @@ sub _render_status_bar {
     }
     push @_out, ' ';
 
+    # Read-only indicator for binary files
+    my $ro_text = '';
+    my $ro_width = 0;
+    if ($doc && $doc->{_is_binary}) {
+        $ro_text = ' READ ONLY ';
+        $ro_width = length($ro_text);
+        $ro_width += $segment_overhead;  # Arrow char
+    }
+
     # Column selection indicator segment
     my $col_text = '';
     my $col_width = 0;
@@ -2870,30 +2879,39 @@ sub _render_status_bar {
         $col_width += $segment_overhead;  # Arrow char
     }
 
-    # Arrow transition: file -> column indicator or middle
+    # Arrow transition: file -> read-only indicator / column indicator / middle
+    my $prev_edge_color = 'status_file_edge';
     if (Zepto::Chars->enabled()) {
-        if ($col_width > 0) {
-            # file -> column indicator
-            push @_out, $theme->color('column_indicator_bg') . $theme->color('status_file_edge');
+        if ($ro_width > 0) {
+            # file -> read-only indicator
+            push @_out, $theme->color('column_indicator_bg') . $theme->color($prev_edge_color);
             push @_out, $ar;
-            # Column indicator text
-            push @_out, $theme->color('column_indicator_fg') . $col_text;
-            # column indicator -> middle
-            push @_out, $theme->color('status_bg') . $theme->color('column_indicator_edge');
-            push @_out, $ar;
-        } else {
-            # file -> middle
-            push @_out, $theme->color('status_bg') . $theme->color('status_file_edge');
-            push @_out, $ar;
+            push @_out, $theme->color('warning_fg') . $ro_text;
+            $prev_edge_color = 'column_indicator_edge';
         }
-    } elsif ($col_width > 0) {
-        # No nerd font, just show text
-        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-        push @_out, $col_text;
+        if ($col_width > 0) {
+            # prev -> column indicator
+            push @_out, $theme->color('column_indicator_bg') . $theme->color($prev_edge_color);
+            push @_out, $ar unless $ro_width > 0;  # Arrow already drawn if no RO segment
+            push @_out, $theme->color('column_indicator_fg') . $col_text;
+            $prev_edge_color = 'column_indicator_edge';
+        }
+        # final -> middle
+        push @_out, $theme->color('status_bg') . $theme->color($prev_edge_color);
+        push @_out, $ar;
+    } else {
+        if ($ro_width > 0) {
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('warning_fg');
+            push @_out, $ro_text;
+        }
+        if ($col_width > 0) {
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+            push @_out, $col_text;
+        }
     }
 
-    # Middle fill (account for column indicator width)
-    my $middle = $cols - $file_width - $segment_overhead - $col_width - $hint_width;
+    # Middle fill (account for indicator widths)
+    my $middle = $cols - $file_width - $segment_overhead - $ro_width - $col_width - $hint_width;
     $middle = 0 if $middle < 0;
     push @_out, $theme->color('status_bg') . $theme->color('status_fg');
     push @_out, ' ' x $middle if $middle > 0;

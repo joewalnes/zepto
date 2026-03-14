@@ -29,8 +29,10 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 
 ## Existing bugs
 
-### P2: Binary file tab looks editable
-When opening a binary file, the tab shows placeholder text like `(Binary file — 1.2 MB)` in what appears to be a normal editable buffer. Edits are silently blocked (`Document::insert`/`delete` return early when `_is_binary` is set) and save throws an error, but the UI gives no visual indication that the file is read-only. The cursor blinks normally, the buffer looks like regular text, and there's no persistent status bar message or visual treatment to distinguish it from an editable file. Expected: clear visual signal that the file is read-only — e.g. a status bar indicator, dimmed/different background, or disabled cursor.
+### ~~P2: Binary file tab looks editable~~ FIXED
+When opening a binary file, there was no visual indication that the file was read-only.
+
+**Fix:** Added a "READ ONLY" indicator segment in the status bar for binary files (Renderer.pm), styled with warning colors. The indicator renders as a pill between the file path and the middle fill area, using the same arrow-transition pattern as the column selection indicator. Added regression test.
 
 ### ~~P1: Incorrect cursor placement in Open File dialog~~ FIXED
 When opening the file picker (`⌃O`), the terminal cursor was not aligned with the text input position. The cursor appeared offset from where typed characters actually rendered in the filter field.

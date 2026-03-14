@@ -1138,4 +1138,15 @@ subtest 'visual_to_char_col handles wide characters' => sub {
     is(Zepto::Renderer::visual_to_char_col($mixed, 4), 3, 'Mixed: visual 4 = char 3 (start of c)');
 };
 
+subtest 'Status bar shows READ ONLY for binary files' => sub {
+    my $doc = Zepto::Document->new();
+    $doc->{_is_binary} = 1;
+    $doc->set_path('/tmp/image.png');
+    my $theme = Zepto::Theme->new('dark');
+    my $bar = Zepto::Renderer->_render_status_bar($doc, undef, $theme, 80, undef, undef, undef);
+    # Strip ANSI escape sequences to check text content
+    (my $plain = $bar) =~ s/\x1b\[[^m]*m//g;
+    like($plain, qr/READ ONLY/, 'Status bar contains READ ONLY for binary files');
+};
+
 done_testing();
