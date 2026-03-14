@@ -647,12 +647,10 @@ The Open File picker only showed git-tracked files. Untracked files (new images,
 
 **Fix:** Added a second `git ls-files --others --exclude-standard` call in `FileTree::_build_all_files_list()` alongside the existing `git ls-files` for tracked files. Both results are combined. The two commands produce non-overlapping sets by design (tracked vs untracked-but-not-ignored).
 
-### P1: Native terminal paste (Cmd+V) causes cascading indentation
-When pasting multiline text from an external program using the terminal's native paste (Cmd+V on macOS), each line gets progressively more indented. The first pasted line is correct, the second gets one level of indentation, the third gets two, and so on — resulting in a staircase effect.
+### ~~P1: Native terminal paste (Cmd+V) causes cascading indentation~~ FIXED
+When pasting multiline text from an external program using the terminal's native paste (Cmd+V), each line got progressively more indented due to auto-indent compounding.
 
-**Root cause:** Bracketed paste mode is not enabled. `Terminal.pm` defines `PASTE_MODE_ON` (`\x1b[?2004h`) and `PASTE_MODE_OFF` (`\x1b[?2004l`) constants but never sends them to the terminal. Without bracketed paste, the terminal sends pasted text character-by-character, indistinguishable from keyboard input. Each `\n` in the pasted text triggers `do_enter()` (Editor.pm ~2634), which applies auto-indent based on the current line's leading whitespace (Editor.pm ~2650-2657). Since each new line inherits the previous line's indentation, and the pasted content often has its own indentation, the indentation compounds line-over-line.
-
-**Expected:** Enable bracketed paste mode on terminal setup. Detect `\x1b[200~` (paste start) and `\x1b[201~` (paste end) sequences in the input reader. While inside a bracketed paste, suppress auto-indent in `do_enter()` and insert the pasted text verbatim.
+**Fix:** Enabled bracketed paste mode. Added `enable_bracketed_paste()` / `disable_bracketed_paste()` to Terminal.pm (using the existing PASTE_MODE_ON/OFF constants). Added `paste_start` / `paste_end` key event detection in InputParser.pm for `\x1b[200~` / `\x1b[201~` sequences. Editor.pm tracks `_bracketed_paste` flag — `do_enter()` skips auto-indent while the flag is set. Added tests for both the escape sequence parsing and the auto-indent suppression.
 
 ### ~~P1: Pasting from system clipboard corrupts Unicode characters~~ FIXED
 When pasting text containing non-ASCII characters (accented characters, CJK, emoji) via `⌃V`, the characters appear corrupted — multi-byte UTF-8 sequences are treated as individual bytes instead of proper characters.

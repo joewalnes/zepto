@@ -1550,6 +1550,31 @@ subtest 'Enter key works with word wrap enabled' => sub {
     is($view->cursor_col(), 0, 'With word wrap: cursor at col 0 after Enter');
 };
 
+subtest 'Bracketed paste suppresses auto-indent' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    # Type an indented line
+    $doc->insert(0, "    indented");
+    $view->set_cursor(0, 12);
+
+    # Normal enter should auto-indent
+    $editor->do_enter();
+    is($doc->get_line_content(1), '    ', 'Normal Enter auto-indents');
+
+    # Now simulate bracketed paste mode
+    $editor->{_bracketed_paste} = 1;
+    $view->set_cursor(1, 4);
+    $doc->insert($doc->line_col_to_offset(1, 4), "pasted");
+    $view->set_cursor(1, 10);
+    $editor->do_enter();
+    is($doc->get_line_content(2), '', 'Enter during bracketed paste does not auto-indent');
+    $editor->{_bracketed_paste} = 0;
+};
+
 # ============================================================================
 # Key event dispatch: Shift+Alt+Arrow = word select (not column select)
 # ============================================================================

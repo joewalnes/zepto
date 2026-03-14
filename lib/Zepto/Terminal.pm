@@ -227,6 +227,20 @@ sub disable_mouse {
 
 sub is_mouse_enabled { $_[0]->{_mouse_on} }
 
+# Bracketed paste mode — lets us detect terminal-level paste (Cmd+V)
+sub enable_bracketed_paste {
+    my ($self) = @_;
+    $self->write(PASTE_MODE_ON);
+    $self->{_bracketed_paste} = 1;
+}
+
+sub disable_bracketed_paste {
+    my ($self) = @_;
+    return unless $self->{_bracketed_paste};
+    $self->write(PASTE_MODE_OFF);
+    $self->{_bracketed_paste} = 0;
+}
+
 # =============================================================================
 # Terminal Size
 # =============================================================================
@@ -591,6 +605,9 @@ sub cleanup {
 
     # Disable mouse
     $self->disable_mouse() if $self->{_mouse_on};
+
+    # Disable bracketed paste
+    $self->disable_bracketed_paste();
 
     # Leave alternate screen
     $self->leave_alt_screen() if $self->{_alt_screen};

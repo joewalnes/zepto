@@ -43,6 +43,8 @@ use constant {
     KEY_F10       => 'f10',
     KEY_F11       => 'f11',
     KEY_F12       => 'f12',
+    KEY_PASTE_START => 'paste_start',
+    KEY_PASTE_END   => 'paste_end',
 };
 
 # Mouse actions
@@ -253,6 +255,9 @@ sub _decode_csi {
         if ($code eq '21') { return $self->_make_key_event(KEY_F10, $modifiers); }
         if ($code eq '23') { return $self->_make_key_event(KEY_F11, $modifiers); }
         if ($code eq '24') { return $self->_make_key_event(KEY_F12, $modifiers); }
+        # Bracketed paste
+        if ($code eq '200') { return $self->_make_key_event(KEY_PASTE_START, []); }
+        if ($code eq '201') { return $self->_make_key_event(KEY_PASTE_END, []); }
     }
 
     # CSI u (fixterms/kitty keyboard protocol): ESC [ codepoint ; modifiers u

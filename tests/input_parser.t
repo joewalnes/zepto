@@ -247,6 +247,26 @@ subtest 'Function keys (CSI)' => sub {
     is($events[0]->{key}, 'f12', 'F12');
 };
 
+subtest 'Bracketed paste sequences' => sub {
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[200~");
+    is(scalar @events, 1, 'paste_start parsed');
+    is($events[0]->{type}, 'key', 'paste_start is key event');
+    is($events[0]->{key}, 'paste_start', 'paste_start key value');
+
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[201~");
+    is(scalar @events, 1, 'paste_end parsed');
+    is($events[0]->{key}, 'paste_end', 'paste_end key value');
+
+    # Full paste sequence: start + content + end
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[200~hello\x1b[201~");
+    is($events[0]->{key}, 'paste_start', 'paste sequence starts');
+    is($events[-1]->{key}, 'paste_end', 'paste sequence ends');
+    ok(scalar @events > 2, 'paste content between delimiters');
+};
+
 subtest 'Function keys (SS3)' => sub {
     my $parser = Zepto::InputParser->new();
 

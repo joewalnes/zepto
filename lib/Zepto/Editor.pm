@@ -439,6 +439,7 @@ sub init {
     $term->enable_raw_mode();
     $term->enter_alt_screen();
     $term->enable_mouse() if $self->{prefs}->mouse_enabled();
+    $term->enable_bracketed_paste();
     $term->get_size();
 
     # Setup SIGWINCH handler for terminal resize
@@ -758,6 +759,18 @@ sub handle_event {
     my ($self, $event) = @_;
 
     return unless $event;
+
+    # Bracketed paste mode: track paste state to suppress auto-indent
+    if ($event->{type} eq 'key') {
+        if ($event->{key} eq 'paste_start') {
+            $self->{_bracketed_paste} = 1;
+            return;
+        }
+        if ($event->{key} eq 'paste_end') {
+            $self->{_bracketed_paste} = 0;
+            return;
+        }
+    }
 
     # Clear explicit scroll flag before processing any event.
     # Mouse scroll handlers will re-set it via scroll_up/scroll_down,
@@ -2660,8 +2673,9 @@ sub do_enter {
     );
 
     # Get indentation of current line for auto-indent
+    # Skip auto-indent during bracketed paste to prevent cascading indentation
     my $indent = '';
-    if ($self->{prefs}->auto_indent()) {
+    if ($self->{prefs}->auto_indent() && !$self->{_bracketed_paste}) {
         my $line_content = $doc->get_line_content($view->cursor_line());
         if ($line_content =~ /^(\s+)/) {
             $indent = $1;
