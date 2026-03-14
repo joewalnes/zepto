@@ -645,6 +645,13 @@ Creating a new file (`⌃N`), typing code, then saving with a file extension (e.
 ### P1: File picker (`⌃O`) doesn't find untracked files
 The Open File picker only shows git-tracked files. Files that exist on disk but aren't committed or staged (e.g. newly added images, scratch files) don't appear in search results. `FileTree::_build_all_files_list()` (FileTree.pm ~517-530) uses `git ls-files` as the sole source when a `.git` directory exists, and only falls back to a filesystem walk if `git ls-files` produces zero output. Untracked files like `example.png` in the repo root are invisible to the picker. Expected: `⌃O` should find all files in the project directory, including untracked ones.
 
+### P2: [Bug] YAML syntax highlighting matches literals inside bare words
+In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
+
+**Root cause:** The tokenizer in `Syntax/YAML.pm:114` checks `$LITERALS` against `$rest = substr($line, $pos)`. When no earlier rule matches, the `$pos++` fallback (line 148) advances one character at a time through bare words. Once it reaches a position where the remaining substring starts with a literal (e.g. `"on"` at the end of `"region"`), the `\b` word boundary in `$LITERALS` matches at the start/end of the substring — but it has lost the context that this position is mid-word in the original line. The literal is incorrectly tokenized as `TOKEN_KEYWORD`.
+
+**Expected:** Bare words in YAML values should not have internal substrings highlighted as keywords. Only standalone `on`, `off`, `true`, `false`, etc. (delimited by whitespace/punctuation) should match.
+
 ### P3: [Feature] Inline image rendering in Markdown preview — SKIPPED
 On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.
 
