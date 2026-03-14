@@ -645,6 +645,13 @@ Creating a new file (`⌃N`), typing code, then saving with a file extension (e.
 ### P1: File picker (`⌃O`) doesn't find untracked files
 The Open File picker only shows git-tracked files. Files that exist on disk but aren't committed or staged (e.g. newly added images, scratch files) don't appear in search results. `FileTree::_build_all_files_list()` (FileTree.pm ~517-530) uses `git ls-files` as the sole source when a `.git` directory exists, and only falls back to a filesystem walk if `git ls-files` produces zero output. Untracked files like `example.png` in the repo root are invisible to the picker. Expected: `⌃O` should find all files in the project directory, including untracked ones.
 
+### P1: Native terminal paste (Cmd+V) causes cascading indentation
+When pasting multiline text from an external program using the terminal's native paste (Cmd+V on macOS), each line gets progressively more indented. The first pasted line is correct, the second gets one level of indentation, the third gets two, and so on — resulting in a staircase effect.
+
+**Root cause:** Bracketed paste mode is not enabled. `Terminal.pm` defines `PASTE_MODE_ON` (`\x1b[?2004h`) and `PASTE_MODE_OFF` (`\x1b[?2004l`) constants but never sends them to the terminal. Without bracketed paste, the terminal sends pasted text character-by-character, indistinguishable from keyboard input. Each `\n` in the pasted text triggers `do_enter()` (Editor.pm ~2634), which applies auto-indent based on the current line's leading whitespace (Editor.pm ~2650-2657). Since each new line inherits the previous line's indentation, and the pasted content often has its own indentation, the indentation compounds line-over-line.
+
+**Expected:** Enable bracketed paste mode on terminal setup. Detect `\x1b[200~` (paste start) and `\x1b[201~` (paste end) sequences in the input reader. While inside a bracketed paste, suppress auto-indent in `do_enter()` and insert the pasted text verbatim.
+
 ### P2: [Bug] YAML syntax highlighting matches literals inside bare words
 In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
 
