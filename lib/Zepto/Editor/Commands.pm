@@ -61,6 +61,8 @@ sub cmd_save {
                         my $tab = $self->active_tab();
                         $tab->{file_path} = $filename;
                         $tab->{untitled_name} = undef;
+                        # Re-detect syntax highlighting for the new filename
+                        $self->active_highlighter()->set_file($filename);
                         $self->show_message("Saved: $filename");
                         # Refresh file tree to show newly saved file
                         if ($self->{file_tree}) {

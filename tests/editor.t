@@ -2162,4 +2162,32 @@ subtest '_jump_to_location switches to existing tab and updates tree' => sub {
        'File tree updated after _jump_to_location');
 };
 
+subtest 'Save As activates syntax highlighting for new filename' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+
+    # New file has no highlighter grammar
+    my $hl = $editor->active_highlighter();
+    ok(!$hl->{grammar}, 'New untitled file has no grammar');
+
+    # Simulate Save As: set path, save, update tab, call set_file
+    my $tmpfile = create_temp_file('');
+    my $py_file = $tmpfile . '.py';
+    rename $tmpfile, $py_file;
+
+    my $doc = $editor->active_doc();
+    $doc->set_path($py_file);
+    eval { $doc->save(); };
+    my $tab = $editor->active_tab();
+    $tab->{file_path} = $py_file;
+    $tab->{untitled_name} = undef;
+    $hl->set_file($py_file);
+
+    ok($hl->{grammar}, 'Grammar activated after set_file with .py extension');
+    like($hl->{grammar_class}, qr/Python/, 'Python grammar detected for .py file');
+
+    unlink $py_file;
+};
+
 done_testing();
