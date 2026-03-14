@@ -657,6 +657,13 @@ When pasting text containing non-ASCII characters (accented characters, CJK, emo
 
 **Root cause:** `paste_from_clipboard()` in `Terminal.pm:539-554` reads raw bytes from the clipboard command pipe (`pbpaste`, `xclip`, etc.) with no UTF-8 decoding. The pipe filehandle has no `binmode($fh, ':encoding(UTF-8)')` and there's no `utf8::decode()` on the returned string. The copy direction (`copy_to_clipboard()`, line 514-515) correctly handles this with `utf8::encode()`, but the paste direction has no corresponding decode — creating an asymmetry where copied UTF-8 text round-trips incorrectly.
 
+### P1: Clicking previewed file content dismisses it instead of opening it
+When launching zepto with no args (`./zepto` or `./zepto .`), clicking a file in the tree shows a preview. Clicking the previewed content in the main editor area dismisses the preview and restores the previous tab instead of confirming the file for editing.
+
+**Actual behavior:** Clicking the document area calls `_tree_unfocus()` (Editor.pm ~3510), which cancels the preview — closes the transient tab (line 3515-3516) and restores the original tab (line 3518-3522). The user sees the file disappear.
+
+**Expected behavior:** Clicking the previewed content should confirm the file (like pressing Enter), making it a permanent tab and transferring focus to the editor. The existing `_tree_open_selected()` (Editor.pm ~3555) already implements the correct confirm-preview logic — the document-area click handler should use that path instead of `_tree_unfocus()` when a preview is active.
+
 ### P2: [Bug] YAML syntax highlighting matches literals inside bare words
 In YAML files, substrings like `on`, `no`, `off`, `true`, etc. get incorrectly highlighted as keyword literals when they appear inside unquoted values. For example, `name: region` highlights the `on` in `region` as a boolean keyword. Same issue affects any bare word containing a literal substring: `category` (`no`), `officer` (`off`), `instruction` (`on`), etc.
 
