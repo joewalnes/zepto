@@ -19,10 +19,13 @@ package Zepto::Renderer;
 use strict;
 use warnings;
 use utf8;
+use File::Basename ();
+use File::Spec;
 use Zepto::Chars;
 use Zepto::CommandRegistry;
 use Zepto::FileTree;
 use Zepto::Minimap;
+use Zepto::Terminal;
 
 # Escape sequences
 use constant {
@@ -354,6 +357,7 @@ sub render {
     my $message_is_error = $args{message_is_error} // 0;
     my $highlighter = $args{highlighter};  # Optional syntax highlighter
     my $word_wrap_active = $args{word_wrap_active} // ($prefs ? $prefs->word_wrap() : 0);
+    my $cell_aspect    = $args{cell_aspect}    // 2.0;
 
     # Sync Chars module with prefs
     if ($prefs) {
@@ -385,10 +389,32 @@ sub render {
         }
     }
 
+    # Estimate image spacer rows for minimap visibility decision.
+    # Uses the NO-minimap text width to break the feedback loop:
+    # spacers computed at widest width → stable minimap decision.
+    my $spacer_estimate = 0;
+    my $no_minimap_text_width = $cols - $tree_width - $gutter_width;
+    $no_minimap_text_width = MIN_TEXT_WIDTH if $no_minimap_text_width < MIN_TEXT_WIDTH;
+    if ($doc && $view && Zepto::Terminal->supports_kitty_graphics()) {
+        my $est_start = $view->scroll_line();
+        my $est_end = $est_start + $text_height;
+        my $md_images = $class->_detect_markdown_images($doc, $est_start, $est_end);
+        for my $img (values %$md_images) {
+            if ($img->{width_px} && $img->{height_px}) {
+                my $r = int(0.5 + ($img->{height_px} / $img->{width_px}) * $no_minimap_text_width / $cell_aspect);
+                $r = 3 if $r < 3;
+                $r = 20 if $r > 20;
+                $spacer_estimate += $r;
+            } else {
+                $spacer_estimate += 8;
+            }
+        }
+    }
+
     # Determine minimap width (drops before file tree at narrow widths)
     my $show_minimap = $prefs && $prefs->show_minimap();
     my $minimap_width = 0;
-    if ($show_minimap && $doc && $line_count > $text_height) {
+    if ($show_minimap && $doc && ($line_count + $spacer_estimate) > $text_height) {
         my $tentative_text = $cols - $tree_width - $gutter_width - MINIMAP_WIDTH;
         if ($tentative_text >= MIN_TEXT_WIDTH) {
             $minimap_width = MINIMAP_WIDTH;
@@ -419,10 +445,11 @@ sub render {
         );
 
     # Render text area (rows 3..N-1 = index 2..N-2)
-    my $text_rows = $class->_render_text_area(
+    my ($text_rows, $inline_images, $cursor_image_offset, $spacer_row_count) = $class->_render_text_area(
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width, $highlighter,
-        $ui->{find_mode}, $minimap_width, $tree_width
+        $ui->{find_mode}, $minimap_width, $tree_width,
+        $cell_aspect
     );
     for my $i (0 .. $#$text_rows) {
         $row_buf[$i + 2] .= $text_rows->[$i];
@@ -643,13 +670,17 @@ sub render {
         my ($cursor_row, $cursor_col) = $class->_cursor_screen_pos(
             $view, $gutter_width, $doc, $tree_width
         );
+        # Offset cursor for inline image spacer rows above it
+        $cursor_row += ($cursor_image_offset // 0);
         $cursor_seq .= _move_to($cursor_row, $cursor_col);
         $cursor_seq .= SHOW_CURSOR;
     }
 
     return {
-        rows       => \@row_buf,
-        cursor_seq => $cursor_seq,
+        rows             => \@row_buf,
+        cursor_seq       => $cursor_seq,
+        inline_images    => $inline_images,
+        spacer_row_count => $spacer_row_count // 0,
     };
 }
 
@@ -1173,15 +1204,184 @@ sub _render_ruler_bar {
     return join('', @_out);
 }
 
+# =============================================================================
+# Inline Markdown Image Detection
+# =============================================================================
+
+# Image extensions considered renderable
+my %_IMAGE_EXT = map { $_ => 1 } qw(png jpg jpeg gif bmp webp tiff tif ico);
+
+# Cache for file existence checks: path => { exists => 0|1, time => epoch }
+my %_file_exists_cache;
+use constant FILE_EXISTS_CACHE_TTL => 5;  # seconds
+
+sub _file_exists_cached {
+    my ($path) = @_;
+    my $now = time();
+    if (my $entry = $_file_exists_cache{$path}) {
+        return $entry->{exists} if ($now - $entry->{time}) < FILE_EXISTS_CACHE_TTL;
+    }
+    my $exists = -f $path ? 1 : 0;
+    $_file_exists_cache{$path} = { exists => $exists, time => $now };
+    return $exists;
+}
+
+# Cache for image dimensions: path => [width, height] or path => undef (unreadable)
+my %_image_dims_cache;
+
+# Read pixel dimensions from PNG, JPEG, GIF, or BMP file headers.
+# Returns (width_px, height_px) on success, empty list on failure.
+sub _get_image_dimensions {
+    my ($path) = @_;
+
+    # Return cached result
+    if (exists $_image_dims_cache{$path}) {
+        my $cached = $_image_dims_cache{$path};
+        return $cached ? @$cached : ();
+    }
+
+    my ($w, $h);
+    eval {
+        open my $fh, '<:raw', $path or die "open: $!";
+
+        # Read enough bytes to detect any supported format
+        my $buf;
+        read($fh, $buf, 26) or die "read: $!";
+
+        if (length($buf) >= 24 && substr($buf, 0, 8) eq "\x89PNG\r\n\x1a\n") {
+            # PNG: width at bytes 16-19, height at bytes 20-23 (big-endian u32)
+            ($w, $h) = unpack('NN', substr($buf, 16, 8));
+        }
+        elsif (length($buf) >= 10 && substr($buf, 0, 3) eq 'GIF'
+               && substr($buf, 3, 3) =~ /^8[79]a$/) {
+            # GIF87a/GIF89a: width at bytes 6-7, height at bytes 8-9 (little-endian u16)
+            ($w, $h) = unpack('vv', substr($buf, 6, 4));
+        }
+        elsif (length($buf) >= 26 && substr($buf, 0, 2) eq 'BM') {
+            # BMP: width at bytes 18-21, height at bytes 22-25 (little-endian i32)
+            # Height can be negative (top-down bitmap), use abs
+            ($w, $h) = unpack('VV', substr($buf, 18, 8));
+            $h = unpack('l<', substr($buf, 22, 4));  # signed for negative heights
+            $h = abs($h) if defined $h;
+        }
+        elsif (length($buf) >= 2 && substr($buf, 0, 2) eq "\xFF\xD8") {
+            # JPEG: scan for SOF marker
+            seek($fh, 2, 0) or die "seek: $!";
+            my $max_scan = 65536;
+            my $scanned = 0;
+            while ($scanned < $max_scan) {
+                my $marker_buf;
+                read($fh, $marker_buf, 2) or last;
+                $scanned += 2;
+                my ($b1, $b2) = unpack('CC', $marker_buf);
+                last unless $b1 == 0xFF;
+
+                # SOF markers: 0xC0-0xCF except 0xC4 (DHT) and 0xC8 (JPG)
+                if ($b2 >= 0xC0 && $b2 <= 0xCF && $b2 != 0xC4 && $b2 != 0xC8) {
+                    my $sof_buf;
+                    read($fh, $sof_buf, 7) or last;
+                    if (length($sof_buf) >= 7) {
+                        # Bytes: 2 length + 1 precision + 2 height + 2 width
+                        $h = unpack('n', substr($sof_buf, 3, 2));
+                        $w = unpack('n', substr($sof_buf, 5, 2));
+                    }
+                    last;
+                }
+
+                # Skip this segment: read 2-byte length, advance
+                my $len_buf;
+                read($fh, $len_buf, 2) or last;
+                $scanned += 2;
+                my $seg_len = unpack('n', $len_buf);
+                last if $seg_len < 2;
+                seek($fh, $seg_len - 2, 1) or last;
+                $scanned += $seg_len - 2;
+            }
+        }
+
+        close $fh;
+    };
+
+    if (defined $w && defined $h && $w > 0 && $h > 0) {
+        $_image_dims_cache{$path} = [$w, $h];
+        return ($w, $h);
+    }
+
+    $_image_dims_cache{$path} = undef;
+    return ();
+}
+
+# Detect ![alt](path) image references in visible document lines.
+# Returns { doc_line => { path => abs_path, alt => text } } for valid, existing images.
+# Only runs for .md/.markdown files on Kitty-capable terminals.
+sub _detect_markdown_images {
+    my ($class, $doc, $visible_start, $visible_end) = @_;
+    my %images;
+
+    # Only for markdown files on Kitty-capable terminals
+    return \%images unless Zepto::Terminal->supports_kitty_graphics();
+
+    my $doc_path = $doc->{path};
+    return \%images unless $doc_path;
+    return \%images unless $doc_path =~ /\.(?:md|markdown)$/i;
+
+    my $doc_dir = File::Basename::dirname(File::Spec->rel2abs($doc_path));
+    my $line_count = $doc->line_count();
+
+    for my $line_num ($visible_start .. $visible_end - 1) {
+        last if $line_num >= $line_count;
+        my $content = $doc->get_line_content($line_num);
+
+        # Match ![alt](path) — skip URLs and data: URIs
+        while ($content =~ /!\[([^\]]*)\]\(([^)]+)\)/g) {
+            my ($alt, $img_path) = ($1, $2);
+
+            # Skip URLs and data URIs
+            next if $img_path =~ m{^(?:https?://|data:)};
+
+            # Check extension
+            my ($ext) = $img_path =~ /\.(\w+)$/;
+            next unless $ext && $_IMAGE_EXT{lc $ext};
+
+            # Resolve relative paths against the markdown file's directory
+            my $abs_path;
+            if (File::Spec->file_name_is_absolute($img_path)) {
+                $abs_path = $img_path;
+            } else {
+                $abs_path = File::Spec->catfile($doc_dir, $img_path);
+            }
+
+            # Check file exists (cached)
+            next unless _file_exists_cached($abs_path);
+
+            # Read pixel dimensions for aspect-ratio sizing (may be empty for
+            # unsupported formats like WebP/TIFF/ICO — spacer loop falls back
+            # to a default height in that case)
+            my ($width_px, $height_px) = _get_image_dimensions($abs_path);
+
+            my %img_entry = (path => $abs_path, alt => $alt);
+            if (defined $width_px) {
+                $img_entry{width_px}  = $width_px;
+                $img_entry{height_px} = $height_px;
+            }
+            $images{$line_num} = \%img_entry;
+            last;  # Only first image per line
+        }
+    }
+
+    return \%images;
+}
+
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width, $cell_aspect) = @_;
     $minimap_width //= 0;
     $tree_width //= 0;
+    $cell_aspect    //= 2.0;
 
     my @text_rows;
 
-    return \@text_rows unless $doc && $view;
+    return (\@text_rows, [], 0) unless $doc && $view;
 
     my $scroll_line = $view->scroll_line();
     my $visible_start = $scroll_line;
@@ -1280,6 +1480,68 @@ sub _render_text_area {
     } else {
         for my $i (0 .. $height - 1) {
             push @entries, { type => 'doc', line => $scroll_line + $i };
+        }
+    }
+
+    # Insert image spacer entries for inline Markdown images
+    my @image_placements;
+    my $cursor_image_offset = 0;
+    {
+        my $md_images = $class->_detect_markdown_images($doc, $visible_start, $visible_end);
+        if (%$md_images) {
+            my $cursor_line = $view->cursor_line();
+            my @new_entries;
+            for my $entry (@entries) {
+                push @new_entries, $entry;
+                next unless $entry && ($entry->{type} // '') eq 'doc';
+                next unless defined $entry->{line};
+                my $img = $md_images->{$entry->{line}};
+                next unless $img;
+                # Only insert spacers for first wrap segment
+                next if ($entry->{wrap_index} // 0) != 0;
+                # Compute aspect-ratio-correct row count (default 8 if dimensions unknown)
+                my $spacer_rows;
+                my $place_width = $width;  # default: full content area
+                if ($img->{width_px} && $img->{height_px}) {
+                    my $avail_cols = $width;
+                    my $natural_rows = ($img->{height_px} / $img->{width_px}) * $avail_cols / $cell_aspect;
+                    $spacer_rows = int(0.5 + $natural_rows);
+                    if ($spacer_rows > 20) {
+                        # Reduce width proportionally to maintain aspect ratio
+                        $place_width = int(0.5 + $avail_cols * 20 / $natural_rows);
+                        $place_width = 1 if $place_width < 1;
+                        $spacer_rows = 20;
+                    }
+                    $spacer_rows = 3  if $spacer_rows < 3;
+                } else {
+                    $spacer_rows = 8;
+                }
+                for my $si (0 .. $spacer_rows - 1) {
+                    push @new_entries, {
+                        type         => 'image_spacer',
+                        image_path   => $img->{path},
+                        spacer_idx   => $si,
+                        spacer_rows  => $spacer_rows,
+                        source_line  => $entry->{line},
+                        place_width  => $place_width,
+                    };
+                }
+            }
+            # Truncate to screen height
+            splice(@new_entries, $height) if @new_entries > $height;
+            # Pad with undef to fill screen
+            while (@new_entries < $height) {
+                push @new_entries, undef;
+            }
+            @entries = @new_entries;
+
+            # Count spacer rows before cursor for offset correction
+            for my $entry (@entries) {
+                last unless $entry;
+                last if ($entry->{type} // '') eq 'doc' && ($entry->{line} // -1) >= $cursor_line
+                    && ($entry->{wrap_index} // 0) == 0;
+                $cursor_image_offset++ if ($entry->{type} // '') eq 'image_spacer';
+            }
         }
     }
 
@@ -1441,6 +1703,41 @@ sub _render_text_area {
             push @_out, CLEAR_LINE;
             push @_out, RESET;
             push @text_rows, join('', @_out);
+            next;
+        }
+
+        # Handle image spacer entries (blank rows for inline Markdown images)
+        if ($entry && ($entry->{type} // '') eq 'image_spacer') {
+            my $bg = $theme->color('editor_bg');
+            my $gutter_bg = $theme->color('gutter_bg');
+            # Blank gutter
+            push @_out, $gutter_bg . (' ' x $gutter_width);
+            # Blank text area
+            push @_out, $bg . (' ' x $width);
+            # Minimap column
+            push @_out, $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+                if $minimap_width > 0;
+            push @_out, CLEAR_LINE;
+            push @_out, RESET;
+            push @text_rows, join('', @_out);
+            # Record placement on first spacer row
+            if ($entry->{spacer_idx} == 0) {
+                # Count actual spacer rows visible on screen (may be truncated)
+                my $actual_rows = 1;  # this row
+                for my $look ($screen_row + 1 .. $height - 1) {
+                    my $e = $entries[$look];
+                    last unless $e && ($e->{type} // '') eq 'image_spacer'
+                        && ($e->{image_path} // '') eq $entry->{image_path};
+                    $actual_rows++;
+                }
+                push @image_placements, {
+                    path        => $entry->{image_path},
+                    screen_row  => $screen_row + 3,  # 1-based, after tab+ruler
+                    col         => $tree_width + $gutter_width + 1,
+                    width       => $entry->{place_width} // $width,
+                    height_rows => $actual_rows,
+                };
+            }
             next;
         }
 
@@ -1821,7 +2118,13 @@ sub _render_text_area {
         push @text_rows, join('', @_out);
     }
 
-    return \@text_rows;
+    # Count total spacer rows in visible entries for minimap visibility
+    my $total_spacer_rows = 0;
+    for my $entry (@entries) {
+        $total_spacer_rows++ if $entry && ($entry->{type} // '') eq 'image_spacer';
+    }
+
+    return (\@text_rows, \@image_placements, $cursor_image_offset, $total_spacer_rows);
 }
 
 # =============================================================================

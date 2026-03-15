@@ -1148,5 +1148,631 @@ subtest 'Status bar shows READ ONLY for binary files' => sub {
     (my $plain = $bar) =~ s/\x1b\[[^m]*m//g;
     like($plain, qr/READ ONLY/, 'Status bar contains READ ONLY for binary files');
 };
+# ============================================================================
+# Inline Markdown image detection
+# ============================================================================
+
+subtest '_detect_markdown_images' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a real image file (1x1 PNG)
+    my $img_path = File::Spec->catfile($tmpdir, 'test.png');
+    open my $ifh, '>:raw', $img_path or die "Cannot write $img_path: $!";
+    # Minimal valid PNG (1x1 transparent pixel)
+    print $ifh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $ifh;
+
+    # Create a JPEG file (SOI + APP0/JFIF + SOF0 with 1x1 dimensions + EOI)
+    my $jpg_path = File::Spec->catfile($tmpdir, 'photo.jpg');
+    open my $jfh, '>:raw', $jpg_path or die "Cannot write $jpg_path: $!";
+    print $jfh pack('H*', 'ffd8ffe000104a46494600010100000100010000' .
+        'ffc0000b080001000101011100' .  # SOF0: 1x1, 8-bit, 1 component
+        'ffd9');
+    close $jfh;
+
+    subtest 'detects relative image path' => sub {
+        my $md_path = File::Spec->catfile($tmpdir, 'test.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "# Hello\n";
+        print $fh "![Alt text](test.png)\n";
+        print $fh "Some more text\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        # Reset the cached value
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 3);
+        ok(exists $result->{1}, 'Image detected on line 1');
+        is($result->{1}{path}, $img_path, 'Absolute path resolved correctly');
+        is($result->{1}{alt}, 'Alt text', 'Alt text extracted');
+    };
+
+    subtest 'detects absolute image path' => sub {
+        my $md_path = File::Spec->catfile($tmpdir, 'abs.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "![photo]($jpg_path)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 1);
+        ok(exists $result->{0}, 'Image detected on line 0');
+        is($result->{0}{path}, $jpg_path, 'Absolute path preserved');
+    };
+
+    subtest 'skips missing files' => sub {
+        my $md_path = File::Spec->catfile($tmpdir, 'missing.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "![missing](nonexistent.png)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 1);
+        ok(!%$result, 'No images detected for missing files');
+    };
+
+    subtest 'skips URLs' => sub {
+        my $md_path = File::Spec->catfile($tmpdir, 'urls.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "![web](https://example.com/image.png)\n";
+        print $fh "![data](data:image/png;base64,abc)\n";
+        print $fh "![http](http://example.com/photo.jpg)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 3);
+        ok(!%$result, 'URLs are skipped');
+    };
+
+    subtest 'returns empty for non-markdown files' => sub {
+        my $txt_path = File::Spec->catfile($tmpdir, 'test.txt');
+        open my $fh, '>', $txt_path or die;
+        print $fh "![image](test.png)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($txt_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 1);
+        ok(!%$result, 'Non-markdown files return empty');
+    };
+
+    subtest 'returns empty on non-Kitty terminal' => sub {
+        my $md_path = File::Spec->catfile($tmpdir, 'kitty.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "![image](test.png)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'xterm';
+        local $ENV{TERM} = 'xterm-256color';
+        delete local $ENV{KITTY_WINDOW_ID};
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 1);
+        ok(!%$result, 'Non-Kitty terminal returns empty');
+    };
+
+    subtest 'skips non-image extensions' => sub {
+        my $txt_file = File::Spec->catfile($tmpdir, 'readme.txt');
+        open my $fh2, '>', $txt_file or die;
+        print $fh2 "hello";
+        close $fh2;
+        my $md_path = File::Spec->catfile($tmpdir, 'ext.md');
+        open my $fh, '>', $md_path or die;
+        print $fh "![doc](readme.txt)\n";
+        close $fh;
+        my $doc = Zepto::Document->load($md_path);
+        local $ENV{TERM_PROGRAM} = 'ghostty';
+        Zepto::Terminal->_reset_kitty_cache();
+        my $result = Zepto::Renderer->_detect_markdown_images($doc, 0, 1);
+        ok(!%$result, 'Non-image extensions are skipped');
+    };
+};
+
+# ============================================================================
+# Image spacer insertion
+# ============================================================================
+
+subtest 'Image spacer insertion in render' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a real image file
+    my $img_path = File::Spec->catfile($tmpdir, 'photo.png');
+    open my $ifh, '>:raw', $img_path or die;
+    print $ifh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $ifh;
+
+    my $md_path = File::Spec->catfile($tmpdir, 'test.md');
+    open my $fh, '>', $md_path or die;
+    print $fh "# Title\n";
+    print $fh "![photo](photo.png)\n";
+    print $fh "After image\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    ok(defined $frame->{inline_images}, 'Frame contains inline_images');
+    is(scalar @{$frame->{inline_images}}, 1, 'One image placement');
+    is($frame->{inline_images}[0]{path}, $img_path, 'Image path is correct');
+    ok($frame->{inline_images}[0]{screen_row} > 0, 'Screen row is positive');
+    ok($frame->{inline_images}[0]{width} > 0, 'Width is positive');
+    cmp_ok($frame->{inline_images}[0]{height_rows}, '>=', 3, 'Height is at least 3 rows');
+    cmp_ok($frame->{inline_images}[0]{height_rows}, '<=', 20, 'Height is at most 20 rows');
+};
+
+subtest 'Image spacer respects cell_aspect parameter' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a 200x40 PNG (wide, short image that won't hit min/max row caps)
+    # _get_image_dimensions reads width/height from bytes 16-23 of PNG header
+    # CRC is not validated, so we can construct arbitrary dimensions
+    my $img_path = File::Spec->catfile($tmpdir, 'wide.png');
+    open my $ifh, '>:raw', $img_path or die;
+    my $png_header = "\x89PNG\r\n\x1a\n";  # PNG signature (8 bytes)
+    $png_header .= pack('N', 13);           # IHDR length
+    $png_header .= 'IHDR';                  # IHDR type
+    $png_header .= pack('NN', 200, 40);     # width=200, height=40
+    $png_header .= pack('CCCCC', 8, 2, 0, 0, 0); # 8-bit RGB
+    $png_header .= pack('N', 0);            # CRC placeholder
+    $png_header .= pack('H*', '0000000049454e44ae426082'); # IEND
+    print $ifh $png_header;
+    close $ifh;
+
+    # Verify our PNG is readable
+    my ($w, $h) = Zepto::Renderer::_get_image_dimensions($img_path);
+    is($w, 200, 'Test image width is 200');
+    is($h, 40, 'Test image height is 40');
+
+    my $md_path = File::Spec->catfile($tmpdir, 'aspect.md');
+    open my $fh, '>', $md_path or die;
+    print $fh "![wide](wide.png)\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    # Render with default cell_aspect (2.0) — same as old * 0.5
+    my $frame_default = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 40,
+        cols     => 80,
+    );
+
+    # Render with cell_aspect = 1.0 (square cells)
+    my $view2 = Zepto::View->new(document => $doc);
+    my $frame_square = Zepto::Renderer->render(
+        document    => $doc,
+        view        => $view2,
+        theme       => $theme,
+        rows        => 40,
+        cols        => 80,
+        cell_aspect => 1.0,
+    );
+
+    ok(defined $frame_default->{inline_images}, 'Default: has inline images');
+    ok(defined $frame_square->{inline_images}, 'Square: has inline images');
+
+    if (@{$frame_default->{inline_images}} && @{$frame_square->{inline_images}}) {
+        my $h_default = $frame_default->{inline_images}[0]{height_rows};
+        my $h_square  = $frame_square->{inline_images}[0]{height_rows};
+        # With aspect=1.0 (square cells), more rows are needed to display the
+        # image because each cell is as wide as tall. With aspect=2.0, cells
+        # are twice as tall, so fewer rows suffice. 200x40 image with ~75 avail
+        # cols gives ~8 rows (aspect=2.0) vs ~15 rows (aspect=1.0).
+        cmp_ok($h_square, '>', $h_default,
+            "Square cells (aspect=1.0) need more rows ($h_square) than tall cells (aspect=2.0, $h_default)");
+    }
+};
+
+subtest 'Image placement width reduces when row clamp fires' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a tall image that will hit the 20-row max at wide terminals
+    # 200x800: aspect ratio 4:1 (tall). At 200 cols with aspect=2.0:
+    # natural_rows = (800/200) * 200 / 2.0 = 400, clamped to 20
+    # place_width should be reduced proportionally
+    my $img_path = File::Spec->catfile($tmpdir, 'tall.png');
+    open my $ifh, '>:raw', $img_path or die;
+    my $png_header = "\x89PNG\r\n\x1a\n";
+    $png_header .= pack('N', 13);
+    $png_header .= 'IHDR';
+    $png_header .= pack('NN', 200, 800);
+    $png_header .= pack('CCCCC', 8, 2, 0, 0, 0);
+    $png_header .= pack('N', 0);
+    $png_header .= pack('H*', '0000000049454e44ae426082');
+    print $ifh $png_header;
+    close $ifh;
+
+    my $md_path = File::Spec->catfile($tmpdir, 'ratio.md');
+    open my $fh, '>', $md_path or die;
+    print $fh "![tall](tall.png)\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $theme = Zepto::Theme->dark_theme();
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    # Render at narrow width (spacers might not hit clamp)
+    my $view1 = Zepto::View->new(document => $doc);
+    my $frame_narrow = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view1,
+        theme    => $theme,
+        rows     => 30,
+        cols     => 30,
+    );
+
+    # Render at wide width (spacers will hit 20-row clamp, width should reduce)
+    my $view2 = Zepto::View->new(document => $doc);
+    my $frame_wide = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view2,
+        theme    => $theme,
+        rows     => 30,
+        cols     => 200,
+    );
+
+    if (@{$frame_narrow->{inline_images}} && @{$frame_wide->{inline_images}}) {
+        my $narrow = $frame_narrow->{inline_images}[0];
+        my $wide   = $frame_wide->{inline_images}[0];
+
+        # Both should have height_rows = 20 (clamped)
+        is($wide->{height_rows}, 20, 'Wide: height clamped to 20');
+
+        # Wide placement width should NOT be the full available width
+        # (it should be reduced to maintain aspect ratio)
+        # gutter_width ≈ 4 (1 line), text_width = 200 - 4 = 196
+        cmp_ok($wide->{width}, '<', 196,
+            "Wide: placement width reduced (got $wide->{width})");
+
+        # Aspect ratios (height/width) should be approximately equal
+        my $ratio_narrow = $narrow->{height_rows} / $narrow->{width};
+        my $ratio_wide   = $wide->{height_rows} / $wide->{width};
+        my $diff = abs($ratio_narrow - $ratio_wide);
+        cmp_ok($diff, '<', 0.15,
+            "Aspect ratios similar: narrow=$ratio_narrow wide=$ratio_wide diff=$diff");
+    }
+};
+
+# ============================================================================
+# Image dimension reading
+# ============================================================================
+
+subtest '_get_image_dimensions' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    subtest 'reads PNG dimensions' => sub {
+        my $png_path = File::Spec->catfile($tmpdir, 'dim.png');
+        open my $fh, '>:raw', $png_path or die;
+        # 1x1 PNG
+        print $fh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+            '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+            '6c0000000049454e44ae426082');
+        close $fh;
+
+        my ($w, $h) = Zepto::Renderer::_get_image_dimensions($png_path);
+        is($w, 1, 'PNG width is 1');
+        is($h, 1, 'PNG height is 1');
+    };
+
+    subtest 'reads GIF dimensions' => sub {
+        my $gif_path = File::Spec->catfile($tmpdir, 'dim.gif');
+        open my $fh, '>:raw', $gif_path or die;
+        # Minimal GIF89a: 2x3 pixels
+        print $fh "GIF89a";
+        print $fh pack('vv', 2, 3);  # width=2, height=3 (little-endian)
+        print $fh pack('CCC', 0, 0, 0);  # flags, bg, aspect
+        close $fh;
+
+        my ($w, $h) = Zepto::Renderer::_get_image_dimensions($gif_path);
+        is($w, 2, 'GIF width is 2');
+        is($h, 3, 'GIF height is 3');
+    };
+
+    subtest 'reads BMP dimensions' => sub {
+        my $bmp_path = File::Spec->catfile($tmpdir, 'dim.bmp');
+        open my $fh, '>:raw', $bmp_path or die;
+        # Minimal BMP header: "BM" + 16 padding bytes + width(4) + height(4)
+        print $fh "BM";
+        print $fh "\x00" x 16;  # file header padding to reach offset 18
+        print $fh pack('VV', 10, 7);  # width=10, height=7 (little-endian u32)
+        close $fh;
+
+        my ($w, $h) = Zepto::Renderer::_get_image_dimensions($bmp_path);
+        is($w, 10, 'BMP width is 10');
+        is($h, 7, 'BMP height is 7');
+    };
+
+    subtest 'returns empty for non-image file' => sub {
+        my $txt_path = File::Spec->catfile($tmpdir, 'not_an_image.txt');
+        open my $fh, '>', $txt_path or die;
+        print $fh "hello world\n";
+        close $fh;
+
+        my @dims = Zepto::Renderer::_get_image_dimensions($txt_path);
+        is(scalar @dims, 0, 'Non-image returns empty list');
+    };
+
+    subtest 'returns empty for missing file' => sub {
+        my @dims = Zepto::Renderer::_get_image_dimensions('/nonexistent/path.png');
+        is(scalar @dims, 0, 'Missing file returns empty list');
+    };
+};
+
+# ============================================================================
+# Image height clamping near screen bottom
+# ============================================================================
+
+subtest 'Image near screen bottom has clamped height_rows' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a tall image (200x800) that would need many spacer rows
+    my $img_path = File::Spec->catfile($tmpdir, 'tall.png');
+    open my $ifh, '>:raw', $img_path or die;
+    my $png_header = "\x89PNG\r\n\x1a\n";
+    $png_header .= pack('N', 13);
+    $png_header .= 'IHDR';
+    $png_header .= pack('NN', 200, 800);  # tall image
+    $png_header .= pack('CCCCC', 8, 2, 0, 0, 0);
+    $png_header .= pack('N', 0);
+    $png_header .= pack('H*', '0000000049454e44ae426082');
+    print $ifh $png_header;
+    close $ifh;
+
+    # Image on last line of a short document — spacers will get truncated
+    my $md_path = File::Spec->catfile($tmpdir, 'bottom.md');
+    open my $fh, '>', $md_path or die;
+    # Put several lines before the image so it's near the screen bottom
+    for my $i (1..8) {
+        print $fh "Line $i\n";
+    }
+    print $fh "![tall](tall.png)\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    # Small screen: rows=15, text_height=12 (15 - 3 chrome)
+    # Image on line 8, after 8 text lines + 1 image-line = row 9 of text area
+    # Only 3 rows left for spacers (12 - 9 = 3)
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 15,
+        cols     => 80,
+    );
+
+    ok(defined $frame->{inline_images}, 'Frame has inline images');
+    if (@{$frame->{inline_images}}) {
+        my $img = $frame->{inline_images}[0];
+        # The image would want 20 rows (capped max), but only a few fit on screen
+        cmp_ok($img->{height_rows}, '<', 20,
+            "Image height clamped to fit screen (got $img->{height_rows})");
+        cmp_ok($img->{height_rows}, '>=', 1, 'Height is at least 1');
+    }
+};
+
+# ============================================================================
+# spacer_row_count in render frame
+# ============================================================================
+
+subtest 'spacer_row_count returned from render frame' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    my $img_path = File::Spec->catfile($tmpdir, 'photo.png');
+    open my $ifh, '>:raw', $img_path or die;
+    print $ifh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $ifh;
+
+    # Markdown with an image
+    my $md_path = File::Spec->catfile($tmpdir, 'spacer.md');
+    open my $fh, '>', $md_path or die;
+    print $fh "# Title\n";
+    print $fh "![photo](photo.png)\n";
+    print $fh "After image\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    ok(exists $frame->{spacer_row_count}, 'Frame has spacer_row_count');
+    cmp_ok($frame->{spacer_row_count}, '>', 0, 'spacer_row_count is positive when images present');
+
+    # Without images (plain text)
+    my $txt_path = File::Spec->catfile($tmpdir, 'plain.txt');
+    open my $fh2, '>', $txt_path or die;
+    print $fh2 "Just text\n";
+    close $fh2;
+
+    my $doc2 = Zepto::Document->load($txt_path);
+    my $view2 = Zepto::View->new(document => $doc2);
+
+    my $frame2 = Zepto::Renderer->render(
+        document => $doc2,
+        view     => $view2,
+        theme    => $theme,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    is($frame2->{spacer_row_count}, 0, 'spacer_row_count is 0 without images');
+};
+
+# ============================================================================
+# Minimap visibility with image spacers
+# ============================================================================
+
+subtest 'Minimap visible when images push content beyond viewport' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    # Create a tall image so spacer rows push content past viewport
+    my $img_path = File::Spec->catfile($tmpdir, 'tall.png');
+    open my $ifh, '>:raw', $img_path or die;
+    my $png_header = "\x89PNG\r\n\x1a\n";
+    $png_header .= pack('N', 13);
+    $png_header .= 'IHDR';
+    $png_header .= pack('NN', 200, 800);  # tall image → 20 spacer rows
+    $png_header .= pack('CCCCC', 8, 2, 0, 0, 0);
+    $png_header .= pack('N', 0);
+    $png_header .= pack('H*', '0000000049454e44ae426082');
+    print $ifh $png_header;
+    close $ifh;
+
+    # 10 lines of text + 1 image = 11 doc lines, but spacers add ~20 visual rows
+    # With rows=24, text_height=21, 11 lines < 21 but 11 + 20 = 31 > 21
+    my $md_path = File::Spec->catfile($tmpdir, 'minimap.md');
+    open my $fh, '>', $md_path or die;
+    for my $i (1..9) {
+        print $fh "Line $i\n";
+    }
+    print $fh "![tall](tall.png)\n";
+    print $fh "After image\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        prefs    => $prefs,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # Minimap should appear because image spacers push content past viewport
+    my $output = join('', @{$frame->{rows}});
+    like($output, qr/[\x{2800}-\x{28FF}]/, 'Minimap appears when images push content beyond viewport');
+};
+
+subtest 'Minimap stable across consecutive renders (no oscillation)' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    my $img_path = File::Spec->catfile($tmpdir, 'photo.png');
+    open my $ifh, '>:raw', $img_path or die;
+    my $png_header = "\x89PNG\r\n\x1a\n";
+    $png_header .= pack('N', 13);
+    $png_header .= 'IHDR';
+    $png_header .= pack('NN', 200, 800);
+    $png_header .= pack('CCCCC', 8, 2, 0, 0, 0);
+    $png_header .= pack('N', 0);
+    $png_header .= pack('H*', '0000000049454e44ae426082');
+    print $ifh $png_header;
+    close $ifh;
+
+    my $md_path = File::Spec->catfile($tmpdir, 'stable.md');
+    open my $fh, '>', $md_path or die;
+    for my $i (1..9) {
+        print $fh "Line $i\n";
+    }
+    print $fh "![photo](photo.png)\n";
+    print $fh "After\n";
+    close $fh;
+
+    my $doc = Zepto::Document->load($md_path);
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    # Render twice — minimap decision should be stable (no oscillation)
+    my $has_minimap_1;
+    my $has_minimap_2;
+    for my $i (1..2) {
+        my $view = Zepto::View->new(document => $doc);
+        my $frame = Zepto::Renderer->render(
+            document => $doc,
+            view     => $view,
+            theme    => $theme,
+            prefs    => $prefs,
+            rows     => 24,
+            cols     => 80,
+        );
+        my $output = join('', @{$frame->{rows}});
+        my $has = ($output =~ /[\x{2800}-\x{28FF}]/) ? 1 : 0;
+        if ($i == 1) { $has_minimap_1 = $has; }
+        else         { $has_minimap_2 = $has; }
+    }
+
+    is($has_minimap_1, $has_minimap_2, 'Minimap decision stable across renders');
+};
 
 done_testing();

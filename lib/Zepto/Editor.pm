@@ -706,6 +706,16 @@ sub cleanup {
         $self->{_kitty_image_path} = undef;
     }
 
+    # Clear inline Markdown images
+    if (my $inline = $self->{_kitty_inline_images}) {
+        my $clear_output = '';
+        for my $i (0 .. $#$inline) {
+            $clear_output .= Zepto::Terminal->kitty_clear_image(100 + $i);
+        }
+        $self->{terminal}->write($clear_output) if length($clear_output);
+        $self->{_kitty_inline_images} = undef;
+    }
+
     $self->{terminal}->cleanup();
 
     # Clear SIGWINCH handler
@@ -3763,6 +3773,7 @@ sub render {
         message_is_error => $self->{message_is_error},
         highlighter => $self->active_highlighter(),
         word_wrap_active => $word_wrap_active,
+        cell_aspect    => $self->{terminal}->cell_aspect_ratio(),
         ui          => {
             editor => $self,
             dialog => $self->{dialog},
@@ -3839,10 +3850,30 @@ sub render {
         my $tree_width = ($tree && $tree->panel_width() > 0) ? $tree->panel_width() + 1 : 0;
         my $img_row = 3;  # 1-based, after tab bar and ruler
         my $img_col = $tree_width + 1;
-        my $img_height = $rows - 3;  # text area height minus status bar
-        my $img_width = $cols - $tree_width;
-        $img_height = 1 if $img_height < 1;
-        $img_width = 1 if $img_width < 1;
+        my $avail_height = $rows - 3;  # text area height minus status bar
+        my $avail_width = $cols - $tree_width;
+        $avail_height = 1 if $avail_height < 1;
+        $avail_width = 1 if $avail_width < 1;
+
+        # Fit image within available area preserving aspect ratio
+        # Use actual terminal cell aspect ratio (falls back to 2.0 heuristic)
+        my $cell_aspect = $self->{terminal}->cell_aspect_ratio();
+        my $img_width = $avail_width;
+        my $img_height = $avail_height;
+        my ($wpx, $hpx) = Zepto::Renderer::_get_image_dimensions($image_path);
+        if (defined $wpx && $wpx > 0 && $hpx > 0) {
+            # Compute rows needed if we use full available width
+            my $fit_rows = int(0.5 + ($hpx / $wpx) * $avail_width / $cell_aspect);
+            if ($fit_rows <= $avail_height) {
+                # Image fits width-first
+                $img_height = $fit_rows < 1 ? 1 : $fit_rows;
+            } else {
+                # Image is too tall; fit height-first
+                my $fit_cols = int(0.5 + ($wpx / $hpx) * $avail_height * $cell_aspect);
+                $img_width = $fit_cols < 1 ? 1 : ($fit_cols > $avail_width ? $avail_width : $fit_cols);
+            }
+
+        }
 
         my $img_id = 99;
         # Clear previous image if path changed
@@ -3865,6 +3896,60 @@ sub render {
         $output .= Zepto::Terminal->kitty_clear_image(99);
         $self->{_kitty_image_path} = undef;
         $self->{_kitty_image_size} = undef;
+    }
+
+    # Kitty graphics protocol: inline images in Markdown files
+    # Smart diffing: compare old vs new placements slot-by-slot to avoid flicker
+    my $new_inline = $frame->{inline_images} // [];
+    my $old_inline = $self->{_kitty_inline_images} // [];
+    my $max_slots = @$new_inline > @$old_inline ? scalar @$new_inline : scalar @$old_inline;
+    $max_slots = 10 if $max_slots > 10;  # IDs 100-109
+    if ($max_slots > 0) {
+        my @displayed;
+        for my $i (0 .. $max_slots - 1) {
+            my $old = $i < @$old_inline ? $old_inline->[$i] : undef;
+            my $new = $i < @$new_inline ? $new_inline->[$i] : undef;
+
+            # Clamp new image height to avoid bleeding into status bar
+            my $display_height;
+            if ($new) {
+                my $max_h = $rows - 1 - $new->{screen_row} + 1;
+                $display_height = $new->{height_rows} <= $max_h ? $new->{height_rows} : $max_h;
+                if ($display_height < 1) {
+                    $new = undef;  # skip — no room
+                }
+            }
+
+            # Check if placement is identical (skip both clear and draw)
+            if ($old && $new
+                && $old->{path} eq $new->{path}
+                && $old->{screen_row} == $new->{screen_row}
+                && $old->{col} == $new->{col}
+                && $old->{width} == $new->{width}
+                && ($old->{_display_height} // $old->{height_rows}) == $display_height) {
+                push @displayed, { %$new, _display_height => $display_height };
+                next;
+            }
+
+            # Clear old if it existed
+            if ($old) {
+                $output .= Zepto::Terminal->kitty_clear_image(100 + $i);
+            }
+
+            # Draw new if present
+            if ($new) {
+                $output .= Zepto::Terminal->kitty_display_image(
+                    path   => $new->{path},
+                    row    => $new->{screen_row},
+                    col    => $new->{col},
+                    width  => $new->{width},
+                    height => $display_height,
+                    id     => 100 + $i,
+                );
+                push @displayed, { %$new, _display_height => $display_height };
+            }
+        }
+        $self->{_kitty_inline_images} = \@displayed;
     }
 
     $output .= $frame->{cursor_seq};
