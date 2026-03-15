@@ -43,8 +43,10 @@ use Zepto::FileTree;
 use Zepto::InputWidget;
 use Zepto::Completion::Controller;
 use Zepto::Completion::KeywordProvider;
-use Zepto::Completion::BufferWordProvider;
+use Zepto::Completion::CrossBufferWordProvider;
 use Zepto::Completion::PathProvider;
+use Zepto::Completion::SnippetProvider;
+use Zepto::Completion::RecentProvider;
 
 # Editor states
 use constant {
@@ -169,9 +171,15 @@ sub new {
     # Initialize completion controller with providers
     {
         my $ctrl = Zepto::Completion::Controller->new();
+        my $recent = Zepto::Completion::RecentProvider->new();
         $ctrl->add_provider(Zepto::Completion::KeywordProvider->new());
-        $ctrl->add_provider(Zepto::Completion::BufferWordProvider->new());
+        $ctrl->add_provider(Zepto::Completion::CrossBufferWordProvider->new(
+            tab_manager => $self->{tab_manager},
+        ));
+        $ctrl->add_provider(Zepto::Completion::SnippetProvider->new());
         $ctrl->add_provider(Zepto::Completion::PathProvider->new());
+        $ctrl->add_provider($recent);
+        $ctrl->set_recent_provider($recent);
         $self->{_completion} = $ctrl;
     }
 
@@ -914,12 +922,8 @@ sub handle_editing_event {
         my $_comp = $self->{_completion};
         if ($_comp && $_comp->is_active()) {
             if ($key eq 'tab' && !$shift) {
-                my $suffix = $_comp->accept();
-                if (length $suffix) {
-                    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
-                    $doc->insert($offset, $suffix);
-                    for (1 .. length($suffix)) { $view->move_right(); }
-                }
+                my $result = $_comp->accept();
+                $self->_apply_completion_accept($result);
                 return;
             }
             elsif ($key eq 'escape') {
@@ -936,21 +940,14 @@ sub handle_editing_event {
                     return;
                 }
                 elsif ($key eq 'enter') {
-                    my $suffix = $_comp->accept();
-                    if (length $suffix) {
-                        my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
-                        $doc->insert($offset, $suffix);
-                        for (1 .. length($suffix)) { $view->move_right(); }
-                    }
+                    my $result = $_comp->accept();
+                    $self->_apply_completion_accept($result);
                     return;
                 }
             }
             elsif ($_comp->is_ghost() && $key eq 'right' && !$ctrl && !$shift && !$alt) {
-                my $suffix = $_comp->accept();
-                if (length $suffix) {
-                    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
-                    $doc->insert($offset, $suffix);
-                    for (1 .. length($suffix)) { $view->move_right(); }
+                my $result = $_comp->accept();
+                if ($self->_apply_completion_accept($result)) {
                     return;
                 }
             }
@@ -2670,6 +2667,80 @@ sub _apply_replace_preview {
 # =============================================================================
 
 # =============================================================================
+# Completion Accept Helper
+# =============================================================================
+
+# Handle accept result from Controller: plain suffix string or snippet hashref
+sub _apply_completion_accept {
+    my ($self, $accept_result) = @_;
+
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    # Snippet: hashref with body for multi-line expansion
+    if (ref($accept_result) eq 'HASH' && $accept_result->{kind} eq 'snippet') {
+        my $body = $accept_result->{body};
+        my $prefix = $accept_result->{prefix};
+
+        # Delete the prefix that was already typed
+        my $cursor_offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+        my $prefix_start = $cursor_offset - length($prefix);
+        $doc->delete($prefix_start, length($prefix));
+
+        # Recalculate offset after deletion
+        my ($line, $col) = $doc->offset_to_line_col($prefix_start);
+        $view->set_cursor($line, $col);
+
+        # Get current line's indentation for multi-line body
+        my $line_content = $doc->get_line_content($line);
+        my $indent = '';
+        if ($line_content =~ /^(\s+)/) {
+            $indent = $1;
+        }
+
+        # Apply indentation to each line of the body (except the first)
+        my @body_lines = split(/\n/, $body, -1);
+        my $indented_body = $body_lines[0];
+        for my $i (1 .. $#body_lines) {
+            $indented_body .= "\n" . $indent . $body_lines[$i];
+        }
+
+        # Insert the body
+        my $insert_offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+        $doc->insert($insert_offset, $indented_body);
+
+        # Move cursor to end of inserted text
+        my $end_offset = $insert_offset + length($indented_body);
+        my ($end_line, $end_col) = $doc->offset_to_line_col($end_offset);
+        $view->set_cursor($end_line, $end_col);
+        $view->invalidate_wrap_map();
+
+        return 1;
+    }
+
+    # Plain suffix string
+    my $suffix = $accept_result;
+    if (length $suffix) {
+        my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+        $doc->insert($offset, $suffix);
+        for (1 .. length($suffix)) { $view->move_right(); }
+        return 1;
+    }
+
+    return 0;
+}
+
+# =============================================================================
+# Bracket/Quote Auto-Pairing
+# =============================================================================
+
+my %AUTO_PAIRS = ('(' => ')', '[' => ']', '{' => '}', '"' => '"', "'" => "'", '`' => '`');
+my %CLOSE_PAIRS = reverse %AUTO_PAIRS;
+
+# Check if a character is a quote (symmetric pair)
+sub _is_quote { $_[0] eq '"' || $_[0] eq "'" || $_[0] eq '`' }
+
+# =============================================================================
 # Editing Commands
 # =============================================================================
 
@@ -2691,6 +2762,18 @@ sub do_insert_char {
         $self->delete_selection();
     }
 
+    # Auto-pair: skip-over closing bracket if char matches char at cursor
+    if ($self->{prefs}->get('auto_pairs') && exists $CLOSE_PAIRS{$char} && !_is_quote($char)) {
+        my $cursor_line = $view->cursor_line();
+        my $cursor_col = $view->cursor_col();
+        my $line_content = $doc->get_line_content($cursor_line);
+        if ($cursor_col < length($line_content) && substr($line_content, $cursor_col, 1) eq $char) {
+            # Skip over the existing closing bracket
+            $view->move_right();
+            return;
+        }
+    }
+
     my $offset = $doc->line_col_to_offset(
         $view->cursor_line(),
         $view->cursor_col()
@@ -2703,6 +2786,38 @@ sub do_insert_char {
     $view->invalidate_wrap_line($view->cursor_line()) unless $had_selection;
 
     $view->move_right();
+
+    # Auto-pair: insert closing bracket/quote after cursor
+    if ($self->{prefs}->get('auto_pairs') && exists $AUTO_PAIRS{$char}) {
+        my $close = $AUTO_PAIRS{$char};
+        my $should_pair = 1;
+
+        if (_is_quote($char)) {
+            # Smart quote: only pair if previous char is NOT \w and
+            # char at cursor is whitespace, EOL, or closing bracket
+            my $cursor_line = $view->cursor_line();
+            my $cursor_col = $view->cursor_col();
+            my $line_content = $doc->get_line_content($cursor_line);
+
+            # Check char before the opening quote (2 positions back: before quote)
+            if ($cursor_col >= 2) {
+                my $before = substr($line_content, $cursor_col - 2, 1);
+                $should_pair = 0 if $before =~ /\w/;
+            }
+
+            # Check char at cursor position (after the quote we just inserted)
+            if ($should_pair && $cursor_col < length($line_content)) {
+                my $after = substr($line_content, $cursor_col, 1);
+                $should_pair = 0 unless $after =~ /[\s\)\]\}\,\;]/ || $after eq $close;
+            }
+        }
+
+        if ($should_pair) {
+            my $new_offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+            $doc->insert($new_offset, $close);
+            # Don't move cursor — stay between the pair
+        }
+    }
 
     # Completion: trigger on word chars, dismiss on non-word
     if ($self->{_completion} && $self->{prefs}->auto_complete()) {
@@ -2735,6 +2850,26 @@ sub do_backspace {
     my $col = $view->cursor_col();
 
     return if $line == 0 && $col == 0;
+
+    # Auto-pair: delete both chars of an empty pair (e.g., cursor between () )
+    if ($self->{prefs}->get('auto_pairs') && $col > 0) {
+        my $line_content = $doc->get_line_content($line);
+        if ($col < length($line_content)) {
+            my $before = substr($line_content, $col - 1, 1);
+            my $after = substr($line_content, $col, 1);
+            if (exists $AUTO_PAIRS{$before} && $AUTO_PAIRS{$before} eq $after) {
+                # Delete both: move left, delete 2 chars
+                $view->move_left();
+                my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                $doc->delete($offset, 2);
+                $view->invalidate_wrap_line($view->cursor_line());
+                if ($self->{_completion} && $self->{_completion}->is_active()) {
+                    $self->{_completion_pending_at} = time();
+                }
+                return;
+            }
+        }
+    }
 
     my $joins_lines = ($col == 0);  # Will delete newline at end of prev line
 
@@ -2822,14 +2957,37 @@ sub do_enter {
         }
     }
 
-    $doc->insert($offset, "\n" . $indent);
+    # Auto-pair: expand {|} to {\n  |\n} on Enter
+    my $between_pair = 0;
+    if ($self->{prefs}->get('auto_pairs') && !$self->{_bracketed_paste}) {
+        my $cursor_line = $view->cursor_line();
+        my $cursor_col = $view->cursor_col();
+        my $line_content = $doc->get_line_content($cursor_line);
+        if ($cursor_col > 0 && $cursor_col < length($line_content)) {
+            my $before = substr($line_content, $cursor_col - 1, 1);
+            my $after = substr($line_content, $cursor_col, 1);
+            if (($before eq '{' && $after eq '}') ||
+                ($before eq '(' && $after eq ')') ||
+                ($before eq '[' && $after eq ']')) {
+                $between_pair = 1;
+            }
+        }
+    }
 
-    # Invalidate wrap map so move_down() sees the updated line count
-    $view->invalidate_wrap_map();
-
-    # Move cursor to start of new line (after auto-indent)
-    my $new_line = $view->cursor_line() + 1;
-    $view->set_cursor($new_line, length($indent));
+    if ($between_pair) {
+        my $extra_indent = $indent . $self->{prefs}->tab_string();
+        # Insert: \n<extra_indent>\n<indent>
+        $doc->insert($offset, "\n" . $extra_indent . "\n" . $indent);
+        $view->invalidate_wrap_map();
+        # Place cursor on the middle line with extra indent
+        my $new_line = $view->cursor_line() + 1;
+        $view->set_cursor($new_line, length($extra_indent));
+    } else {
+        $doc->insert($offset, "\n" . $indent);
+        $view->invalidate_wrap_map();
+        my $new_line = $view->cursor_line() + 1;
+        $view->set_cursor($new_line, length($indent));
+    }
 }
 
 sub do_indent {

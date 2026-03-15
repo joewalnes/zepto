@@ -25,12 +25,13 @@ sub new {
     return bless {
         state       => STATE_IDLE,
         providers   => [],
-        results     => [],       # Current completion candidates [{text, score, kind}, ...]
+        results     => [],       # Current completion candidates [{text, score, kind, body?}, ...]
         prefix      => '',       # Current word prefix being completed
         ghost_index => 0,        # Which result is shown as ghost text
         menu_index  => 0,        # Selected item in dropdown menu
         menu_scroll => 0,        # Scroll offset in menu
         _max_menu_visible => 8,  # Max visible items in dropdown
+        _recent_provider => undef,  # RecentProvider ref for recording acceptances
     }, $class;
 }
 
@@ -38,6 +39,12 @@ sub new {
 sub add_provider {
     my ($self, $provider) = @_;
     push @{$self->{providers}}, $provider;
+}
+
+# Set the RecentProvider reference for recording accepted completions
+sub set_recent_provider {
+    my ($self, $provider) = @_;
+    $self->{_recent_provider} = $provider;
 }
 
 # =============================================================================
@@ -89,11 +96,22 @@ sub trigger {
         push @all_results, @$results;
     }
 
-    # Deduplicate by text (keep highest score)
-    my %seen;
+    # Deduplicate by text (keep highest score, but preserve snippet body)
+    my %seen;     # text => index in @unique
     my @unique;
     for my $r (sort { $b->{score} <=> $a->{score} } @all_results) {
-        next if $seen{$r->{text}}++;
+        if (exists $seen{$r->{text}}) {
+            # If this duplicate has a snippet body and the kept one doesn't, merge it
+            if ($r->{kind} eq 'snippet' && defined $r->{body}) {
+                my $kept = $unique[$seen{$r->{text}}];
+                if (!defined $kept->{body}) {
+                    $kept->{body} = $r->{body};
+                    $kept->{kind} = 'snippet';
+                }
+            }
+            next;
+        }
+        $seen{$r->{text}} = scalar @unique;
         push @unique, $r;
     }
 
@@ -141,7 +159,8 @@ sub dismiss {
 # Accept / Navigate
 # =============================================================================
 
-# Returns the suffix text to insert (the part after the prefix)
+# Returns the suffix text to insert, or a hashref for snippets:
+#   { suffix => '...', body => '...', kind => 'snippet', prefix => '...' }
 sub accept {
     my ($self) = @_;
 
@@ -154,7 +173,26 @@ sub accept {
         $result = $self->{results}[$self->{ghost_index}];
     }
 
-    my $suffix = substr($result->{text}, length($self->{prefix}));
+    # Record acceptance for RecentProvider
+    if ($self->{_recent_provider} && $result->{text}) {
+        $self->{_recent_provider}->record($result->{text});
+    }
+
+    my $prefix = $self->{prefix};
+
+    # Snippet: return hashref with body for multi-line expansion
+    if ($result->{kind} eq 'snippet' && defined $result->{body}) {
+        my $info = {
+            suffix => substr($result->{text}, length($prefix)),
+            body   => $result->{body},
+            kind   => 'snippet',
+            prefix => $prefix,
+        };
+        $self->dismiss();
+        return $info;
+    }
+
+    my $suffix = substr($result->{text}, length($prefix));
     $self->dismiss();
     return $suffix;
 }

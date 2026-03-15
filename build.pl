@@ -44,10 +44,12 @@ my %priority = (
     # Highlighter needs all Syntax modules loaded
     'lib/Zepto/Highlighter.pm' => 100,
     # Completion modules (between Highlighter and Renderer)
-    'lib/Zepto/Completion/Controller.pm'       => 105,
-    'lib/Zepto/Completion/KeywordProvider.pm'   => 106,
-    'lib/Zepto/Completion/BufferWordProvider.pm' => 107,
-    'lib/Zepto/Completion/PathProvider.pm'      => 108,
+    'lib/Zepto/Completion/Controller.pm'              => 105,
+    'lib/Zepto/Completion/KeywordProvider.pm'          => 106,
+    'lib/Zepto/Completion/CrossBufferWordProvider.pm'  => 107,
+    'lib/Zepto/Completion/RecentProvider.pm'           => 107.5,
+    'lib/Zepto/Completion/SnippetProvider.pm'          => 108,
+    'lib/Zepto/Completion/PathProvider.pm'             => 109,
     # Renderer needs Highlighter
     'lib/Zepto/Renderer.pm'    => 110,
     # CommandRegistry must come before Editor (Palette references its constants)

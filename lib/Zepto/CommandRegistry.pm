@@ -413,6 +413,17 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_toggle_autocomplete',
     },
+    {
+        id       => 'toggle_auto_pairs',
+        label    => 'Auto Pairs',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'toggle',
+        pref     => 'auto_pairs',
+        priority => 0,
+        method   => 'cmd_toggle_auto_pairs',
+    },
 
     # === DIAGNOSTICS section ===
     {

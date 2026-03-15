@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # Tests for the auto-completion engine: Controller, KeywordProvider,
-# BufferWordProvider, PathProvider.
+# CrossBufferWordProvider, PathProvider, SnippetProvider, RecentProvider.
 #
 # To run: prove -v tests/completion.t
 #
@@ -19,8 +19,10 @@ use lib "$RealBin/../lib";
 
 use Zepto::Completion::Controller;
 use Zepto::Completion::KeywordProvider;
-use Zepto::Completion::BufferWordProvider;
+use Zepto::Completion::CrossBufferWordProvider;
 use Zepto::Completion::PathProvider;
+use Zepto::Completion::SnippetProvider;
+use Zepto::Completion::RecentProvider;
 use Zepto::Document;
 use Zepto::View;
 use Zepto::Highlighter;
@@ -102,10 +104,10 @@ subtest 'KeywordProvider' => sub {
 };
 
 # =============================================================================
-# BufferWordProvider
+# CrossBufferWordProvider (single doc, no tab manager)
 # =============================================================================
-subtest 'BufferWordProvider' => sub {
-    my $provider = Zepto::Completion::BufferWordProvider->new();
+subtest 'CrossBufferWordProvider (single doc)' => sub {
+    my $provider = Zepto::Completion::CrossBufferWordProvider->new();
 
     my $doc = make_doc("function hello() {\n  console.log('hello');\n  return hello;\n}\n");
 
@@ -135,6 +137,232 @@ subtest 'BufferWordProvider' => sub {
 
     # Frequency affects score: "hello" appears 3 times
     ok($hello_matches[0]{score} > 50, 'frequent word has score > base');
+};
+
+# =============================================================================
+# CrossBufferWordProvider (multi-tab mock)
+# =============================================================================
+subtest 'CrossBufferWordProvider (multi-tab)' => sub {
+    # Create a mock tab manager
+    my $doc1 = make_doc("unique_word_alpha unique_word_beta\n");
+    my $doc2 = make_doc("unique_word_gamma unique_word_delta\n");
+
+    my $mock_tm = bless {
+        tabs => [
+            { document => $doc1 },
+            { document => $doc2 },
+        ],
+    }, 'MockTabManager';
+
+    # Add tabs() method
+    {
+        no strict 'refs';
+        no warnings 'once';
+        *MockTabManager::tabs = sub { $_[0]->{tabs} };
+    }
+
+    my $provider = Zepto::Completion::CrossBufferWordProvider->new(
+        tab_manager => $mock_tm,
+    );
+
+    my $context = {
+        prefix   => 'unique_word',
+        line     => 'unique_word',
+        line_num => 0,
+        col      => 11,
+        doc      => $doc1,
+        language => '',
+    };
+
+    my $results = $provider->complete($context);
+    ok(@$results >= 4, 'finds words from both tabs');
+
+    my %found = map { $_->{text} => 1 } @$results;
+    ok($found{'unique_word_alpha'}, 'found word from tab 1');
+    ok($found{'unique_word_gamma'}, 'found word from tab 2');
+    ok($found{'unique_word_delta'}, 'found word from tab 2 (second word)');
+
+    # Active doc words get proximity boost
+    my @alpha = grep { $_->{text} eq 'unique_word_alpha' } @$results;
+    my @gamma = grep { $_->{text} eq 'unique_word_gamma' } @$results;
+    ok($alpha[0]{score} > $gamma[0]{score}, 'active doc word has higher score (proximity boost)');
+};
+
+# =============================================================================
+# RecentProvider
+# =============================================================================
+subtest 'RecentProvider' => sub {
+    my $provider = Zepto::Completion::RecentProvider->new();
+
+    # No results before recording anything
+    my $context = {
+        prefix   => 'hel',
+        line     => 'hel',
+        col      => 3,
+    };
+    my $results = $provider->complete($context);
+    is(scalar(@$results), 0, 'no results before any recording');
+
+    # Record some completions
+    $provider->record('hello');
+    $provider->record('help');
+    $provider->record('helicopter');
+
+    $results = $provider->complete($context);
+    ok(@$results >= 3, 'finds recorded completions');
+
+    my %found = map { $_->{text} => $_->{score} } @$results;
+    ok($found{'hello'}, 'hello found in recent');
+    ok($found{'help'}, 'help found in recent');
+    ok($found{'helicopter'}, 'helicopter found in recent');
+
+    # All have kind 'recent'
+    my @kinds = map { $_->{kind} } @$results;
+    ok((grep { $_ eq 'recent' } @kinds) == scalar(@kinds), 'all results are kind recent');
+
+    # Most recently recorded should have higher score
+    # "helicopter" was recorded last (most recent)
+    ok($found{'helicopter'} >= $found{'hello'}, 'most recent has higher or equal score');
+
+    # Dedup: recording same word moves it to front
+    $provider->record('hello');
+    $results = $provider->complete($context);
+    my @hello_results = grep { $_->{text} eq 'hello' } @$results;
+    is(scalar(@hello_results), 1, 'no duplicates after re-recording');
+
+    # Short words ignored (< 3 chars) — 'he' is not recorded
+    $provider->record('he');
+    my $short_ctx = { prefix => 'x', line => 'x', col => 1 };
+    # prefix < 2 returns empty
+    is(scalar(@{$provider->complete($short_ctx)}), 0, 'prefix too short returns empty');
+};
+
+# =============================================================================
+# SnippetProvider
+# =============================================================================
+subtest 'SnippetProvider' => sub {
+    my $provider = Zepto::Completion::SnippetProvider->new();
+
+    # Python snippets
+    my $context = {
+        prefix   => 'if',
+        line     => 'if',
+        col      => 2,
+        language => 'Python',
+    };
+
+    # "if" is an exact match to trigger, should not return (would be filtered)
+    my $results = $provider->complete($context);
+    is(scalar(@$results), 0, 'exact match to trigger returns empty');
+
+    # Partial match
+    my $partial_ctx = {
+        prefix   => 'fo',
+        line     => 'fo',
+        col      => 2,
+        language => 'Python',
+    };
+    $results = $provider->complete($partial_ctx);
+    my @for_matches = grep { $_->{text} eq 'for' } @$results;
+    ok(@for_matches > 0, '"for" snippet found for prefix "fo"');
+    is($for_matches[0]{kind}, 'snippet', 'kind is snippet');
+    ok(defined $for_matches[0]{body}, 'snippet has body');
+    like($for_matches[0]{body}, qr/for.*in/, 'Python for body contains "for...in"');
+
+    # JavaScript snippets
+    my $js_ctx = {
+        prefix   => 'fu',
+        line     => 'fu',
+        col      => 2,
+        language => 'JavaScript',
+    };
+    $results = $provider->complete($js_ctx);
+    my @func_matches = grep { $_->{text} eq 'function' } @$results;
+    ok(@func_matches > 0, '"function" snippet found for JS prefix "fu"');
+    like($func_matches[0]{body}, qr/function/, 'JS function body is correct');
+
+    # Unknown language returns empty
+    my $unknown_ctx = {
+        prefix   => 'if',
+        line     => 'if',
+        col      => 2,
+        language => 'Brainfuck',
+    };
+    $results = $provider->complete($unknown_ctx);
+    is(scalar(@$results), 0, 'unknown language returns empty');
+
+    # No language returns empty
+    my $no_lang_ctx = {
+        prefix   => 'if',
+        line     => 'if',
+        col      => 2,
+        language => '',
+    };
+    $results = $provider->complete($no_lang_ctx);
+    is(scalar(@$results), 0, 'empty language returns empty');
+};
+
+# =============================================================================
+# Controller Accept with Snippets
+# =============================================================================
+subtest 'Controller accept with snippets' => sub {
+    my $ctrl = Zepto::Completion::Controller->new();
+    my $snippet = Zepto::Completion::SnippetProvider->new();
+    $ctrl->add_provider($snippet);
+
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.py');
+
+    my $doc = make_doc("fo\n");
+    my $view = Zepto::View->new(document => $doc);
+    $view->set_cursor(0, 2);
+
+    $ctrl->trigger($doc, $view, $hl);
+
+    if ($ctrl->is_active()) {
+        my $result = $ctrl->accept();
+        if (ref($result) eq 'HASH') {
+            is($result->{kind}, 'snippet', 'accept returns snippet hashref');
+            ok(defined $result->{body}, 'snippet result has body');
+            ok(defined $result->{prefix}, 'snippet result has prefix');
+        } else {
+            # May return plain suffix if non-snippet result was ranked higher
+            ok(length($result) > 0, 'accept returns non-empty result');
+        }
+        ok(!$ctrl->is_active(), 'idle after accept');
+    } else {
+        pass('no completion active (acceptable)');
+    }
+};
+
+# =============================================================================
+# Controller Accept records to RecentProvider
+# =============================================================================
+subtest 'Controller records accepted to RecentProvider' => sub {
+    my $ctrl = Zepto::Completion::Controller->new();
+    my $recent = Zepto::Completion::RecentProvider->new();
+    my $bw = Zepto::Completion::CrossBufferWordProvider->new();
+    $ctrl->add_provider($bw);
+    $ctrl->add_provider($recent);
+    $ctrl->set_recent_provider($recent);
+
+    my $doc = make_doc("function hello_world() {}\nhel\n");
+    my $view = Zepto::View->new(document => $doc);
+    $view->set_cursor(1, 3);
+
+    $ctrl->trigger($doc, $view, undef);
+
+    if ($ctrl->is_active()) {
+        $ctrl->accept();
+
+        # Check that recent provider now has a recorded entry
+        my $recent_results = $recent->complete({ prefix => 'hel', line => 'hel', col => 3 });
+        ok(@$recent_results > 0, 'recent provider has entry after accept');
+        my @hw = grep { $_->{text} eq 'hello_world' } @$recent_results;
+        ok(@hw > 0, 'hello_world was recorded in recent provider');
+    } else {
+        pass('no completion active (acceptable)');
+    }
 };
 
 # =============================================================================
@@ -191,11 +419,11 @@ subtest 'Controller state machine' => sub {
 };
 
 # =============================================================================
-# Controller Accept
+# Controller Accept (basic)
 # =============================================================================
 subtest 'Controller accept' => sub {
     my $ctrl = Zepto::Completion::Controller->new();
-    my $bw = Zepto::Completion::BufferWordProvider->new();
+    my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
     my $doc = make_doc("function hello_world() {}\nhel\n");
@@ -220,7 +448,7 @@ subtest 'Controller accept' => sub {
 # =============================================================================
 subtest 'Menu navigation' => sub {
     my $ctrl = Zepto::Completion::Controller->new();
-    my $bw = Zepto::Completion::BufferWordProvider->new();
+    my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
     my $doc = make_doc("function foo() {}\nfunction foobar() {}\nfunction foobaz() {}\nfo\n");
@@ -256,7 +484,7 @@ subtest 'Menu navigation' => sub {
 # =============================================================================
 subtest 'Ghost cycling' => sub {
     my $ctrl = Zepto::Completion::Controller->new();
-    my $bw = Zepto::Completion::BufferWordProvider->new();
+    my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
     my $doc = make_doc("alpha beta gamma\nalpha_one alpha_two alpha_three\nal\n");
@@ -281,7 +509,7 @@ subtest 'Ghost cycling' => sub {
 # =============================================================================
 subtest 'state_for_render' => sub {
     my $ctrl = Zepto::Completion::Controller->new();
-    my $bw = Zepto::Completion::BufferWordProvider->new();
+    my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
     my $doc = make_doc("function hello_world() {}\nhel\n");

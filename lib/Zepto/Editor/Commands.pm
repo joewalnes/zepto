@@ -1016,6 +1016,13 @@ sub cmd_toggle_autocomplete {
     $self->{message} = "Auto Complete: " . ($new ? "ON" : "OFF");
 }
 
+sub cmd_toggle_auto_pairs {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->auto_pairs();
+    $self->{prefs}->set_auto_pairs($new);
+    $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
+}
+
 sub cmd_toggle_word_wrap {
     my ($self) = @_;
     my $current = $self->_effective_word_wrap();

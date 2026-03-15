@@ -77,6 +77,51 @@ When you find a bug (even while working on something else), add it to `bugs.md` 
 
 **Do this BEFORE `make test`, not after.** Running unit tests first creates a false sense of completion that makes it easy to skip the interactive step. The order is: build → interact → then run tests.
 
+### Using `hangon` (preferred)
+
+`hangon` is a persistent session manager that makes interactive TUI testing scriptable. Use it instead of raw tmux commands.
+
+```bash
+make build
+
+# Start zepto in a session
+hangon start process --name zepto -- ./zepto /tmp/testfile.txt
+
+# Wait for it to load, then inspect the screen
+sleep 1
+hangon screen zepto
+
+# Type text, send keys, observe results
+hangon send zepto "hello world"
+hangon keys zepto "enter"
+hangon keys zepto "ctrl-s"
+hangon screen zepto                # see current screen state
+
+# Clean up
+hangon keys zepto "ctrl-q"
+hangon stop zepto
+```
+
+Key `hangon` commands:
+- `hangon start process --name NAME -- ./zepto FILE` — start a session
+- `hangon screen NAME` — capture current terminal screen as text
+- `hangon send NAME "text"` — type literal characters
+- `hangon sendline NAME "text"` — type text + Enter
+- `hangon keys NAME "ctrl-z"` — send special keys (ctrl-a..z, enter, tab, escape, backspace, up, down, left, right, home, end, f1..f12)
+- `hangon expect NAME "pattern"` — wait for regex to appear in output
+- `hangon stop NAME` — stop the session
+- `hangon stopall` — stop all sessions
+
+Tips:
+- Always `hangon stopall` before starting a new test session to avoid stale sessions
+- Use `sleep 0.3` or `sleep 0.5` after send/keys before `screen` to let the editor render
+- Chain independent sends with `&&` for efficiency
+- Use `--name` to run multiple sessions in parallel (e.g., testing cross-tab features)
+
+### Using raw tmux (fallback)
+
+If `hangon` is not available, use tmux directly:
+
 ```bash
 make build
 tmux new-session -d -s test -x 200 -y 50
@@ -94,10 +139,10 @@ tmux send-keys -t test "C-q"          # Ctrl+Q quit
 tmux capture-pane -t test -p          # see screen state
 ```
 
-Rules:
+### Rules (apply to both methods)
+
 - Always `make build` first
-- Always use a fresh tmux session (`tmux new-session -d`) — never reuse a running one
-- Capture the pane after each interaction to see what actually happened
+- Capture the screen after each interaction to see what actually happened
 - Clean up test files after — don't leave scratch files in the repo
 - Never infer behavior from code alone — observe it in the running editor
 
@@ -116,7 +161,7 @@ Before every commit, verify each rule in order:
 | # | Rule | How to verify |
 |---|------|---------------|
 | 1 | Build integrity | `make check && make build` — must succeed cleanly |
-| 2 | UI discoverability | **Run interactively in tmux** (see Testing Workflow above). Do this before `make test`. Any change to key handling, commands, or rendering counts. "It's just a bug fix" is not an exemption. |
+| 2 | UI discoverability | **Run interactively via `hangon`** (see Testing Workflow above). Do this before `make test`. Any change to key handling, commands, or rendering counts. "It's just a bug fix" is not an exemption. |
 | 3 | Tests pass, no noise | `make test` — must pass (or pre-existing failures explicitly acknowledged and user-approved) |
 | 4 | Security | If file I/O, shell exec, or rendering changed: flag it and confirm it was reviewed against `docs/SECURITY.md` |
 | 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
