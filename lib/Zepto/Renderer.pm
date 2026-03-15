@@ -719,7 +719,7 @@ sub _render_tab_bar {
 
     # Build cache key from inputs that affect tab bar output
     my $cache_key = join("\0",
-        $cols, $tree_width, $active_idx, scalar(@$tabs),
+        $theme->name(), $cols, $tree_width, $active_idx, scalar(@$tabs),
         map { ($_->{display_name} // '') . ($_->{is_dirty} ? 'D' : '') . ($_->{has_vcs_changes} ? 'V' : '') } @$tabs
     );
     my $cached = $class->_tab_bar_cache_get($cache_key);

@@ -735,7 +735,9 @@ Palette header-skipping navigation now tested (5 new subtests in command_palette
 
 **Fix:** Added both TabManager and FilePicker to the Module Responsibilities table in DESIGN.md.
 
-### P2: [Bug] Light mode: tab bar stays dark after theme switch
+### ~~P2: [Bug] Light mode: tab bar stays dark after theme switch~~ FIXED
 Switching from dark to light mode with `⌃T` leaves the tab bar rendered with dark theme colors. The tab bar appears visually dark against the light editor background.
 
 **Root cause:** The tab bar cache in `Renderer.pm` (line ~722) builds its cache key from `$cols`, `$tree_width`, `$active_idx`, tab count, and per-tab state (display name, dirty flag, VCS changes) — but does not include the current theme. When the user toggles themes, the cache key is unchanged, so `_tab_bar_cache_get()` returns the stale dark-themed rendering.
+
+**Fix:** Added `$theme->name()` as the first component of the tab bar cache key. Theme changes now cause a cache miss, triggering a full re-render with the correct theme colors. Added regression test verifying dark and light theme tab bars produce different output.

@@ -1775,4 +1775,23 @@ subtest 'Minimap stable across consecutive renders (no oscillation)' => sub {
     is($has_minimap_1, $has_minimap_2, 'Minimap decision stable across renders');
 };
 
+# ============================================================================
+# Tab bar cache invalidation on theme change
+# ============================================================================
+subtest 'Tab bar cache invalidates on theme change' => sub {
+    my $dark_theme = Zepto::Theme->dark_theme();
+    my $light_theme = Zepto::Theme->light_theme();
+    my $cols = 80;
+    my $ui = {
+        tabs => [{ display_name => 'test.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $dark_output = Zepto::Renderer->_render_tab_bar($dark_theme, $cols, $ui, 0);
+    my $light_output = Zepto::Renderer->_render_tab_bar($light_theme, $cols, $ui, 0);
+
+    isnt($dark_output, $light_output, 'Tab bar output differs between dark and light themes');
+};
+
 done_testing();
