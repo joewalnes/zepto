@@ -7,7 +7,7 @@ all: test build check loc
 
 # Run all tests (fast, parallel)
 test:
-	@prove -l tests/*.t
+	@PERL_UNICODE=S prove -l tests/*.t
 
 # Run tests with verbose output
 test-verbose:
