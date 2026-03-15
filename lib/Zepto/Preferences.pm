@@ -36,6 +36,9 @@ my %DEFAULTS = (
     search_regex     => 0,
     search_wrap      => 1,        # Wrap around at end of document
 
+    # Completion
+    auto_complete        => 1,        # Auto-completion (ghost text + menu)
+
     # Behavior
     confirm_quit_unsaved => 1,    # Confirm before closing unsaved
     mouse_enabled    => 1,
@@ -193,6 +196,9 @@ sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
 
 sub word_wrap { $_[0]->get('word_wrap') }
 sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
+
+sub auto_complete { $_[0]->get('auto_complete') }
+sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }
 
 # Extensions that default to word wrap on (prose file types)
 my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);

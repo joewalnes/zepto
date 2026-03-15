@@ -38,6 +38,32 @@ my $BUILTINS = qr/\b(?:
     exit | abort | assert | perror
 )\b/x;
 
+sub keyword_list {
+    return [qw(
+        auto break case const continue default do else
+        enum extern for goto if inline register restrict
+        return sizeof static struct switch typedef union
+        volatile while
+        _Alignas _Alignof _Atomic _Bool _Complex _Generic
+        _Imaginary _Noreturn _Static_assert _Thread_local
+        alignas alignof bool complex imaginary noreturn
+        static_assert thread_local true false NULL
+
+        void char short int long float double signed unsigned
+        int8_t int16_t int32_t int64_t
+        uint8_t uint16_t uint32_t uint64_t
+        size_t ssize_t ptrdiff_t intptr_t uintptr_t
+        FILE va_list wchar_t wint_t
+
+        printf fprintf sprintf snprintf scanf fscanf sscanf
+        malloc calloc realloc free
+        memcpy memmove memset memcmp
+        strcpy strncpy strcat strncat strcmp strncmp strlen
+        fopen fclose fread fwrite fgets fputs fseek ftell
+        exit abort assert perror
+    )];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

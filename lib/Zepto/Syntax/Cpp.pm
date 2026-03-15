@@ -59,6 +59,52 @@ my $BUILTINS = qr/\b(?:
     static_cast | dynamic_cast | const_cast | reinterpret_cast
 )\b/x;
 
+sub keyword_list {
+    return [qw(
+        alignas alignof and and_eq asm auto bitand bitor
+        bool break case catch char char8_t char16_t char32_t
+        class compl concept const consteval constexpr constinit
+        const_cast continue co_await co_return co_yield
+        decltype default delete do double dynamic_cast
+        else enum explicit export extern false float for
+        friend goto if inline int long mutable namespace
+        new noexcept not not_eq nullptr operator or or_eq
+        private protected public register reinterpret_cast
+        requires return short signed sizeof static static_assert
+        static_cast struct switch template this thread_local
+        throw true try typedef typeid typename union unsigned
+        using virtual void volatile wchar_t while xor xor_eq
+        NULL override final
+
+        void char short int long float double signed unsigned
+        bool wchar_t char8_t char16_t char32_t auto
+        int8_t int16_t int32_t int64_t
+        uint8_t uint16_t uint32_t uint64_t
+        size_t ssize_t ptrdiff_t intptr_t uintptr_t
+        string wstring string_view
+        vector list deque array forward_list
+        set multiset map multimap
+        unordered_set unordered_multiset unordered_map unordered_multimap
+        stack queue priority_queue
+        pair tuple optional variant any
+        unique_ptr shared_ptr weak_ptr
+        function bind reference_wrapper
+        thread mutex condition_variable future promise
+        istream ostream iostream ifstream ofstream fstream
+        stringstream istringstream ostringstream
+
+        std cout cerr cin endl flush
+        printf fprintf sprintf snprintf scanf
+        malloc calloc realloc free
+        new delete
+        memcpy memmove memset memcmp
+        strcpy strncpy strcat strcmp strlen
+        move forward swap make_unique make_shared
+        begin end size empty front back push_back pop_back
+        static_cast dynamic_cast const_cast reinterpret_cast
+    )];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

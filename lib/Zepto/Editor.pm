@@ -41,6 +41,10 @@ use Zepto::WrapMap;
 use Zepto::Editor::TabManager;
 use Zepto::FileTree;
 use Zepto::InputWidget;
+use Zepto::Completion::Controller;
+use Zepto::Completion::KeywordProvider;
+use Zepto::Completion::BufferWordProvider;
+use Zepto::Completion::PathProvider;
 
 # Editor states
 use constant {
@@ -153,10 +157,23 @@ sub new {
         # Performance profiling
         _perf      => {},   # Subsystem flags set during each frame
         _perf_log  => [],   # Top 20 slowest frames (sorted descending by total_ms)
+
+        # Completion state
+        _completion            => undef,  # Completion::Controller
+        _completion_pending_at => 0,      # Debounce timer (Time::HiRes timestamp)
     }, $class;
 
     # Initialize theme
     $self->{theme} = Zepto::Theme->get_theme($self->{prefs}->theme());
+
+    # Initialize completion controller with providers
+    {
+        my $ctrl = Zepto::Completion::Controller->new();
+        $ctrl->add_provider(Zepto::Completion::KeywordProvider->new());
+        $ctrl->add_provider(Zepto::Completion::BufferWordProvider->new());
+        $ctrl->add_provider(Zepto::Completion::PathProvider->new());
+        $self->{_completion} = $ctrl;
+    }
 
     return $self;
 }
@@ -519,10 +536,11 @@ sub run {
         my $last_search_render = 0;  # Track last render during search
 
         while ($self->{state} ne STATE_QUIT) {
-            # Use shorter timeout when background search is active
+            # Use shorter timeout when background search or completion debounce is active
             my $searching = ($self->active_find_engine() && $self->active_find_engine()->is_searching)
                          || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
-            my $timeout = $searching ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
+            my $completion_pending = $self->{_completion_pending_at} && $self->{_completion_pending_at} > 0;
+            my $timeout = ($searching || $completion_pending) ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
 
             # Read input with timeout
             my $input = $self->{terminal}->read_blocking($timeout);
@@ -550,6 +568,20 @@ sub run {
                 # (ESC alone becomes Escape key; ESC+char within timeout is Alt+char)
                 if ($self->flush_pending_input()) {
                     $needs_render = 1;
+                }
+
+                # Completion debounce: fire trigger after 100ms pause
+                if ($self->{_completion_pending_at} && $self->{_completion_pending_at} > 0) {
+                    if ((time() - $self->{_completion_pending_at}) >= 0.1) {
+                        my $doc = $self->active_doc();
+                        my $view = $self->active_view();
+                        my $hl = $self->active_highlighter();
+                        if ($doc && $view && $self->{_completion}) {
+                            $self->{_completion}->trigger($doc, $view, $hl);
+                        }
+                        $self->{_completion_pending_at} = 0;
+                        $needs_render = 1;
+                    }
                 }
 
                 # Deferred tree VCS: run on first idle after initial render
@@ -878,6 +910,56 @@ sub handle_editing_event {
         my $shift = Zepto::InputParser::has_modifier($event, 'shift');
         my $alt = Zepto::InputParser::has_modifier($event, 'alt');
 
+        # Completion key routing — intercept keys when completion is active
+        my $_comp = $self->{_completion};
+        if ($_comp && $_comp->is_active()) {
+            if ($key eq 'tab' && !$shift) {
+                my $suffix = $_comp->accept();
+                if (length $suffix) {
+                    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                    $doc->insert($offset, $suffix);
+                    for (1 .. length($suffix)) { $view->move_right(); }
+                }
+                return;
+            }
+            elsif ($key eq 'escape') {
+                $_comp->dismiss();
+                return;
+            }
+            elsif ($_comp->is_menu()) {
+                if ($key eq 'up') {
+                    $_comp->menu_up();
+                    return;
+                }
+                elsif ($key eq 'down') {
+                    $_comp->menu_down();
+                    return;
+                }
+                elsif ($key eq 'enter') {
+                    my $suffix = $_comp->accept();
+                    if (length $suffix) {
+                        my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                        $doc->insert($offset, $suffix);
+                        for (1 .. length($suffix)) { $view->move_right(); }
+                    }
+                    return;
+                }
+            }
+            elsif ($_comp->is_ghost() && $key eq 'right' && !$ctrl && !$shift && !$alt) {
+                my $suffix = $_comp->accept();
+                if (length $suffix) {
+                    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                    $doc->insert($offset, $suffix);
+                    for (1 .. length($suffix)) { $view->move_right(); }
+                    return;
+                }
+            }
+            # Any other key with active completion: dismiss and fall through
+            if ($key ne 'backspace') {
+                $_comp->dismiss() unless $key eq 'left' || $key eq 'right';
+            }
+        }
+
         # Navigation / Line movement
         # When column mode is active (toggled via ⌥C), arrows extend the
         # column selection rectangle instead of normal cursor movement.
@@ -1014,8 +1096,29 @@ sub handle_ctrl_char {
     # Comment toggle
     elsif ($char eq '/') { $self->cmd_toggle_comment(); }
 
-    # Command palette
-    elsif ($char eq ' ') { $self->cmd_open_palette(); }
+    # Command palette / completion menu
+    elsif ($char eq ' ') {
+        # Context-sensitive: if cursor is mid-word, open completion menu instead
+        my $_view = $self->active_view();
+        my $_doc = $self->active_doc();
+        if ($_view && $_doc && $self->{_completion}) {
+            my $_line_num = $_view->cursor_line();
+            my $_col = $_view->cursor_col();
+            if ($_col > 0 && $_line_num < $_doc->line_count()) {
+                my $_line = $_doc->get_line_content($_line_num);
+                my $_char_before = substr($_line, $_col - 1, 1);
+                if ($_char_before =~ /\w/) {
+                    # Trigger completion and open menu
+                    my $_hl = $self->active_highlighter();
+                    $self->{_completion}->trigger($_doc, $_view, $_hl);
+                    $self->{_completion}->open_menu() if $self->{_completion}->is_active();
+                    $self->{_completion_pending_at} = 0;
+                    return;
+                }
+            }
+        }
+        $self->cmd_open_palette();
+    }
 
     # Reset quit pending for any other command
     $self->{quit_pending} = 0 unless $char eq 'q';
@@ -1059,6 +1162,18 @@ sub handle_alt_char {
     # Location history (Alt+- back, Alt+= forward)
     elsif ($char eq '-') { $self->cmd_go_back(); }
     elsif ($char eq '=') { $self->cmd_go_forward(); }
+
+    # Ghost text cycling
+    elsif ($char eq ']') {
+        if ($self->{_completion} && $self->{_completion}->is_ghost()) {
+            $self->{_completion}->cycle_next();
+        }
+    }
+    elsif ($char eq '[') {
+        if ($self->{_completion} && $self->{_completion}->is_ghost()) {
+            $self->{_completion}->cycle_prev();
+        }
+    }
 
     # Tab switching (Alt+1 through Alt+9)
     elsif ($char ge '1' && $char le '9') {
@@ -2588,6 +2703,16 @@ sub do_insert_char {
     $view->invalidate_wrap_line($view->cursor_line()) unless $had_selection;
 
     $view->move_right();
+
+    # Completion: trigger on word chars, dismiss on non-word
+    if ($self->{_completion} && $self->{prefs}->auto_complete()) {
+        if ($char =~ /\w/) {
+            $self->{_completion_pending_at} = time();
+        } else {
+            $self->{_completion}->dismiss();
+            $self->{_completion_pending_at} = 0;
+        }
+    }
 }
 
 sub do_backspace {
@@ -2627,6 +2752,11 @@ sub do_backspace {
         $view->invalidate_wrap_map();
     } else {
         $view->invalidate_wrap_line($view->cursor_line());
+    }
+
+    # Completion: re-trigger after backspace (prefix shortened)
+    if ($self->{_completion} && $self->{_completion}->is_active()) {
+        $self->{_completion_pending_at} = time();
     }
 }
 
@@ -3819,6 +3949,9 @@ sub render {
                 replace_progress => $self->{_replace_progress} // 0,
                 replace_total  => $self->{_replace_total} // 0,
             } : undef,
+            completion => ($self->{_completion} && $self->{_completion}->is_active())
+                ? $self->{_completion}->state_for_render($self->active_view(), $self->active_doc())
+                : undef,
         },
     );
 

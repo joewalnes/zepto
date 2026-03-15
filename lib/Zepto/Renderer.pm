@@ -449,7 +449,7 @@ sub render {
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width, $highlighter,
         $ui->{find_mode}, $minimap_width, $tree_width,
-        $cell_aspect
+        $cell_aspect, $ui->{completion}
     );
     for my $i (0 .. $#$text_rows) {
         $row_buf[$i + 2] .= $text_rows->[$i];
@@ -489,6 +489,14 @@ sub render {
             $theme, $ui->{palette}, $rows, $cols
         );
         $class->_merge_into_rows(\@row_buf, $palette_output, $rows);
+    }
+
+    # Render completion menu overlay (dropdown)
+    if ($ui->{completion} && $ui->{completion}{state} && $ui->{completion}{state} == 2) {
+        my $menu_output = $class->_render_completion_menu(
+            $theme, $ui->{completion}, $rows, $cols, $gutter_width, $tree_width, $text_height
+        );
+        $class->_merge_into_rows(\@row_buf, $menu_output, $rows);
     }
 
     # Build cursor positioning sequence (separate from row content)
@@ -706,6 +714,116 @@ sub _merge_into_rows {
             $row_buf->[$row_idx] .= $part if $row_idx >= 0 && $row_idx < $max_rows;
         }
     }
+}
+
+# Render completion dropdown menu overlay
+# Returns ANSI string with cursor positioning for overlay compositing
+sub _render_completion_menu {
+    my ($class, $theme, $completion, $rows, $cols, $gutter_width, $tree_width, $text_height) = @_;
+
+    my $items = $completion->{menu_items} // [];
+    return '' unless @$items;
+
+    my $menu_index = $completion->{menu_index} // 0;
+    my $menu_scroll = $completion->{menu_scroll} // 0;
+    my $max_visible = $completion->{menu_max_visible} // 8;
+    my $cursor_line = $completion->{cursor_line} // 0;
+    my $cursor_col = $completion->{cursor_col} // 0;
+    my $prefix_len = length($completion->{prefix} // '');
+
+    # Calculate menu position
+    # Menu appears below cursor line, or above if near bottom
+    my $menu_row = $cursor_line + 3 + 1;  # +3 for tab+ruler+1-index, +1 below cursor
+    # Account for scroll: cursor_line is doc line, but we need screen position
+    # The menu_row here is approximate — we position relative to cursor
+
+    my $visible_count = scalar(@$items) < $max_visible ? scalar(@$items) : $max_visible;
+    my $menu_height = $visible_count + 2;  # +2 for top/bottom border
+
+    # Flip above cursor if near bottom
+    if ($menu_row + $menu_height > $rows) {
+        $menu_row = $cursor_line + 3 - $menu_height;  # Above cursor
+        $menu_row = 3 if $menu_row < 3;  # Don't go above text area
+    }
+
+    # Calculate menu width from item lengths
+    my $max_item_len = 0;
+    for my $item (@$items) {
+        my $len = length($item->{text}) + 4;  # kind_char + space + text + padding
+        $max_item_len = $len if $len > $max_item_len;
+    }
+    my $menu_width = $max_item_len + 2;  # +2 for borders
+    $menu_width = 50 if $menu_width > 50;
+    $menu_width = 15 if $menu_width < 15;
+
+    # Position menu at cursor column (aligned to prefix start)
+    my $menu_col = $tree_width + $gutter_width + ($cursor_col - $prefix_len) + 1;
+    $menu_col = $tree_width + $gutter_width + 1 if $menu_col < $tree_width + $gutter_width + 1;
+    # Don't overflow right edge
+    if ($menu_col + $menu_width > $cols) {
+        $menu_col = $cols - $menu_width;
+        $menu_col = 1 if $menu_col < 1;
+    }
+
+    my $menu_bg = $theme->color('completion_menu_bg');
+    my $menu_fg = $theme->color('completion_menu_fg');
+    my $sel_bg = $theme->color('completion_selected_bg');
+    my $sel_fg = $theme->color('completion_selected_fg');
+    my $kind_fg = $theme->color('completion_kind_fg');
+    my $border_fg = $theme->color('completion_border_fg');
+
+    my $inner_width = $menu_width - 2;
+
+    my @out;
+
+    # Top border
+    push @out, _move_to($menu_row, $menu_col);
+    push @out, $menu_bg . $border_fg;
+    push @out, BOX_TOP_LEFT . (BOX_HORIZONTAL x $inner_width) . BOX_TOP_RIGHT;
+
+    # Menu items
+    for my $vi (0 .. $visible_count - 1) {
+        my $idx = $menu_scroll + $vi;
+        last if $idx >= @$items;
+        my $item = $items->[$idx];
+        my $is_selected = ($idx == $menu_index);
+
+        my $row_bg = $is_selected ? $sel_bg : $menu_bg;
+        my $row_fg = $is_selected ? $sel_fg : $menu_fg;
+
+        # Kind icon: K=keyword, W=word, P=path
+        my $kind = $item->{kind} // 'word';
+        my $kind_char = $kind eq 'keyword' ? 'K' : $kind eq 'path' ? 'P' : 'W';
+
+        my $text = $item->{text};
+        my $display = $kind_char . ' ' . $text;
+        # Truncate to fit
+        if (length($display) > $inner_width) {
+            $display = substr($display, 0, $inner_width);
+        }
+        # Pad
+        my $padding = $inner_width - length($display);
+
+        push @out, _move_to($menu_row + 1 + $vi, $menu_col);
+        push @out, $menu_bg . $border_fg . BOX_VERTICAL;
+        push @out, $row_bg;
+        if ($is_selected) {
+            push @out, $row_fg . $display . (' ' x $padding);
+        } else {
+            push @out, $kind_fg . $kind_char . $row_fg . ' ' . $text;
+            my $text_padding = $inner_width - length($display);
+            push @out, ' ' x $text_padding if $text_padding > 0;
+        }
+        push @out, $menu_bg . $border_fg . BOX_VERTICAL;
+    }
+
+    # Bottom border
+    push @out, _move_to($menu_row + $visible_count + 1, $menu_col);
+    push @out, $menu_bg . $border_fg;
+    push @out, BOX_BOTTOM_LEFT . (BOX_HORIZONTAL x $inner_width) . BOX_BOTTOM_RIGHT;
+    push @out, RESET;
+
+    return join('', @out);
 }
 
 # Render the tab bar showing open file tabs
@@ -1374,7 +1492,7 @@ sub _detect_markdown_images {
 
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width, $cell_aspect) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width, $cell_aspect, $completion) = @_;
     $minimap_width //= 0;
     $tree_width //= 0;
     $cell_aspect    //= 2.0;
@@ -2100,7 +2218,23 @@ sub _render_text_area {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
                 }
             } elsif ($fill_remaining > 0) {
-                push @_out, $fill_bg . (' ' x $fill_remaining);
+                # Ghost text: render inline completion hint on cursor line
+                if ($is_cursor_line && $completion && $completion->{ghost_text}
+                    && length($completion->{ghost_text}) > 0
+                    && !$is_wrap_cont) {
+                    my $ghost = $completion->{ghost_text};
+                    my $ghost_len = length($ghost);
+                    if ($ghost_len > $fill_remaining) {
+                        $ghost = substr($ghost, 0, $fill_remaining);
+                        $ghost_len = $fill_remaining;
+                    }
+                    my $ghost_fg = $theme->color('completion_ghost_fg');
+                    push @_out, $ghost_fg . $ghost . RESET . $fill_bg;
+                    my $after = $fill_remaining - $ghost_len;
+                    push @_out, ' ' x $after if $after > 0;
+                } else {
+                    push @_out, $fill_bg . (' ' x $fill_remaining);
+                }
             }
         }
         else {

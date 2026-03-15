@@ -34,6 +34,29 @@ my $COMMANDS = qr/\b(?:
     tar | touch | tr | wc | wget | xargs
 )\b/x;
 
+sub keyword_list {
+    return [
+        # Keywords
+        qw(if then else elif fi
+           case esac in
+           for while until do done
+           function return exit
+           break continue
+           select time coproc
+           true false),
+        # Builtins
+        qw(alias bg cd echo eval exec export fg getopts
+           hash help history jobs kill let local popd
+           printf pushd pwd read readonly set shift shopt
+           source test trap type typeset ulimit umask unalias
+           unset wait),
+        # Commands
+        qw(awk cat chmod cp curl cut diff find grep gzip
+           head ls make mkdir mv rm sed sort ssh tail
+           tar touch tr wc wget xargs),
+    ];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

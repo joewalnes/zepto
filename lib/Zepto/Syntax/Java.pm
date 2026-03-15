@@ -28,6 +28,22 @@ my $COMMON_TYPES = qr/\b(?:
     HashMap | List | Map | Set | Optional | Stream
 )\b/x;
 
+sub keyword_list {
+    return [qw(
+        abstract assert break case catch class const
+        continue default do else enum extends final
+        finally for goto if implements import instanceof
+        interface native new package private protected
+        public return static strictfp super switch
+        synchronized this throw throws transient try
+        volatile while true false null
+        boolean byte char double float int long short void
+        String Object Class System Integer Long Double
+        Float Boolean Exception RuntimeException ArrayList
+        HashMap List Map Set Optional Stream
+    )];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

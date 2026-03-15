@@ -37,6 +37,32 @@ my $BUILTINS = qr/\b(?:
     todo | unimplemented | unreachable
 )\b/x;
 
+sub keyword_list {
+    return [
+        # Keywords
+        qw(as async await break const continue crate dyn
+           else enum extern false fn for if impl in
+           let loop match mod move mut pub ref return
+           self Self static struct super trait true type
+           unsafe use where while
+           abstract become box do final macro override
+           priv try typeof unsized virtual yield),
+        # Types
+        qw(bool char str
+           i8 i16 i32 i64 i128 isize
+           u8 u16 u32 u64 u128 usize
+           f32 f64
+           String Vec Box Rc Arc Cell RefCell
+           Option Result Some None Ok Err
+           HashMap HashSet BTreeMap BTreeSet),
+        # Builtins / macros
+        qw(drop panic print println eprint eprintln
+           format vec assert assert_eq assert_ne
+           debug_assert debug_assert_eq debug_assert_ne
+           todo unimplemented unreachable),
+    ];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

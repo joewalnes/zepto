@@ -54,6 +54,37 @@ my $BUILTINS = qr/\b(?:
     module | exports | require | Buffer
 )\b/x;
 
+# Returns all keywords, types, and builtins as a flat list for external consumers
+sub keyword_list {
+    return [qw(
+        async await break case catch class const continue
+        debugger default delete do else export extends
+        finally for function if import in instanceof
+        let new of return static super switch this
+        throw try typeof var void while with yield
+        true false null undefined NaN Infinity
+
+        abstract as asserts declare enum implements
+        interface is keyof namespace never override
+        private protected public readonly type unknown
+        infer satisfies module require global using
+
+        any bigint boolean number object
+        string symbol
+        Partial Required Readonly Record Pick Omit
+        Exclude Extract NonNullable Parameters ReturnType
+        InstanceType ThisType Awaited
+
+        Array Boolean Date Error Function JSON Map Math
+        Number Object Promise Proxy Reflect RegExp Set String Symbol
+        WeakMap WeakSet BigInt ArrayBuffer DataView
+        Int8Array Uint8Array Int16Array Uint16Array
+        Int32Array Uint32Array Float32Array Float64Array
+        console document window globalThis process
+        exports Buffer
+    )];
+}
+
 # JSX/TSX: Check if we're likely in JSX context
 sub _is_jsx_context {
     my ($before) = @_;

@@ -67,6 +67,55 @@ my $BUILTINS = qr/\b(?:
     wait | waitpid | wantarray | warn | write
 )\b/x;
 
+sub keyword_list {
+    return [
+        # Keywords
+        qw(sub my our local state
+           use require no package
+           if elsif else unless
+           while until for foreach loop
+           given when default
+           return last next redo goto
+           do eval
+           and or not xor
+           eq ne lt gt le ge cmp
+           BEGIN END CHECK INIT UNITCHECK
+           __END__ __DATA__ __FILE__ __LINE__ __PACKAGE__),
+        # Builtins
+        qw(abs accept alarm atan2 bind binmode bless
+           caller chdir chmod chomp chop chown chr chroot close closedir
+           connect cos crypt
+           dbmclose dbmopen defined delete die dump
+           each endgrent endhostent endnetent endprotoent endpwent endservent
+           eof eval exec exists exit exp
+           fcntl fileno flock fork format formline
+           getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname gethostent
+           getlogin getnetbyaddr getnetbyname getnetent getpeername getpgrp getppid
+           getpriority getprotobyname getprotobynumber getprotoent getpwent getpwnam
+           getpwuid getservbyname getservbyport getservent getsockname getsockopt glob gmtime grep goto
+           hex
+           import index int ioctl
+           join keys kill
+           last lc lcfirst length link listen local localtime log lstat
+           map mkdir msgctl msgget msgrcv msgsnd
+           next
+           oct open opendir ord
+           pack pipe pop pos print printf prototype push
+           quotemeta
+           rand read readdir readline readlink readpipe recv redo ref rename
+           reset return reverse rewinddir rindex rmdir
+           say scalar seek seekdir select semctl semget semop send setgrent
+           sethostent setnetent setpgrp setpriority setprotoent setpwent setservent
+           setsockopt shift shmctl shmget shmread shmwrite shutdown sin sleep
+           socket socketpair sort splice split sprintf sqrt srand stat study
+           substr symlink syscall sysopen sysread sysseek system syswrite
+           tell telldir tie tied time times truncate
+           uc ucfirst umask undef unlink unpack unshift untie utime
+           values vec
+           wait waitpid wantarray warn write),
+    ];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

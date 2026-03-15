@@ -29,6 +29,18 @@ my $BUILTINS = qr/\b(?:
     make | new | panic | print | println | real | recover
 )\b/x;
 
+sub keyword_list {
+    return [qw(break case chan const continue default defer
+        else fallthrough for func go goto if import
+        interface map package range return select struct
+        switch type var true false nil iota
+        bool byte complex64 complex128 error float32 float64
+        int int8 int16 int32 int64 rune string
+        uint uint8 uint16 uint32 uint64 uintptr any comparable
+        append cap close complex copy delete imag len
+        make new panic print println real recover)];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

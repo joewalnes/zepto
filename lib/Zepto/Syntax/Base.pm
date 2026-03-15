@@ -283,6 +283,10 @@ sub comment_style {
     return { prefix => $prefix };
 }
 
+# Return list of keywords/builtins for auto-completion.
+# Override in subclasses to provide language-specific keywords.
+sub keyword_list { return [] }
+
 # =============================================================================
 # Common Patterns (for reference - copy into your grammar)
 # =============================================================================

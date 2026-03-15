@@ -25,6 +25,22 @@ my $BUILTINS = qr/\b(?:
     raise | fail | catch | throw | lambda | proc | loop
 )\b/x;
 
+sub keyword_list {
+    return [
+        # Keywords
+        qw(BEGIN END alias and begin break case class def
+           do else elsif end ensure false for if in
+           module next nil not or redo rescue retry
+           return self super then true undef unless until
+           when while yield),
+        # Builtins
+        qw(attr_accessor attr_reader attr_writer
+           private protected public
+           require require_relative include extend prepend
+           raise fail catch throw lambda proc loop),
+    ];
+}
+
 sub tokenize {
     my ($self, $line, $state) = @_;
     my @tokens;

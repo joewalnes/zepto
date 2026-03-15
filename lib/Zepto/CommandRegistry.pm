@@ -402,6 +402,18 @@ my @COMMANDS = (
         priority => 4,
         method   => 'cmd_toggle_theme',
     },
+    {
+        id       => 'toggle_autocomplete',
+        label    => 'Auto Complete',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'toggle',
+        pref     => 'auto_complete',
+        priority => 0,
+        method   => 'cmd_toggle_autocomplete',
+    },
+
     # === DIAGNOSTICS section ===
     {
         id       => 'show_perf_log',

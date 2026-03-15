@@ -321,6 +321,15 @@ sub dark_theme {
         syntax_underline   => UNDERLINE . fg_rgb(192, 202, 245),  # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(130, 140, 170),  # Strikethrough dimmed
         syntax_highlight   => bg_rgb(120, 100, 30) . fg_rgb(255, 255, 220),  # Yellow highlighter pen
+
+        # Completion (ghost text + dropdown menu)
+        completion_ghost_fg     => DIM . fg_rgb(100, 110, 150),   # DIM + muted blue-gray
+        completion_menu_bg      => bg_rgb(36, 40, 59),
+        completion_menu_fg      => fg_rgb(169, 177, 214),
+        completion_selected_bg  => bg_rgb(52, 79, 138),
+        completion_selected_fg  => fg_rgb(255, 255, 255),
+        completion_kind_fg      => fg_rgb(125, 207, 255),
+        completion_border_fg    => fg_rgb(61, 66, 91),
     });
 }
 
@@ -571,6 +580,15 @@ sub light_theme {
         syntax_underline   => UNDERLINE . fg_rgb(76, 79, 105),   # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(120, 125, 140),  # Strikethrough dimmed
         syntax_highlight   => bg_rgb(255, 235, 120) . fg_rgb(50, 40, 10),   # Yellow highlighter pen
+
+        # Completion (ghost text + dropdown menu)
+        completion_ghost_fg     => DIM . fg_rgb(160, 165, 180),   # DIM + muted gray
+        completion_menu_bg      => bg_rgb(235, 237, 243),
+        completion_menu_fg      => fg_rgb(76, 79, 105),
+        completion_selected_bg  => bg_rgb(114, 135, 253),
+        completion_selected_fg  => fg_rgb(255, 255, 255),
+        completion_kind_fg      => fg_rgb(30, 102, 245),
+        completion_border_fg    => fg_rgb(172, 176, 190),
     });
 }
 

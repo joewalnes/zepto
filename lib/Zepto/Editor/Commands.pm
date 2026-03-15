@@ -1006,6 +1006,16 @@ sub cmd_toggle_minimap {
     $self->{prefs}->set_show_minimap($current ? 0 : 1);
 }
 
+sub cmd_toggle_autocomplete {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->auto_complete();
+    $self->{prefs}->set_auto_complete($new);
+    if (!$new && $self->{_completion}) {
+        $self->{_completion}->dismiss();
+    }
+    $self->{message} = "Auto Complete: " . ($new ? "ON" : "OFF");
+}
+
 sub cmd_toggle_word_wrap {
     my ($self) = @_;
     my $current = $self->_effective_word_wrap();
