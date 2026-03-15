@@ -17,6 +17,7 @@ use strict;
 use warnings;
 use POSIX qw(TCSANOW);
 use IO::Select;
+use Zepto::ImageConverter;
 
 # Escape sequences for terminal control
 use constant {
@@ -77,6 +78,8 @@ sub new {
         _alt_screen => 0,
         _rows       => DEFAULT_ROWS,
         _cols       => DEFAULT_COLS,
+        _xpixel     => 0,
+        _ypixel     => 0,
         _output_buf => '',
         _clipboard_copy_cmd  => undef,
         _clipboard_paste_cmd => undef,
@@ -252,14 +255,25 @@ sub get_size {
     my ($rows, $cols);
 
     # Method 1: ioctl TIOCGWINSZ (may not work on all systems)
+    my $got_ioctl;
     eval {
         local $SIG{__DIE__};  # Don't let outer handlers see this
         require 'sys/ioctl.ph';
         my $winsize = '';
         if (ioctl($self->{out_fh}, &TIOCGWINSZ, $winsize)) {
-            ($rows, $cols) = unpack('S!S!', $winsize);
+            ($rows, $cols, my $xpx, my $ypx) = unpack('S!S!S!S!', $winsize);
+            $self->{_xpixel} = $xpx || 0;
+            $self->{_ypixel} = $ypx || 0;
+            $got_ioctl = 1;
         }
     };
+
+    # If rows/cols need a fallback source, pixel values from ioctl would be
+    # inconsistent — reset them to avoid stale cell-size calculations
+    if (!$rows || !$cols) {
+        $self->{_xpixel} = 0;
+        $self->{_ypixel} = 0;
+    }
 
     # Method 2: Environment variables
     if (!$rows || !$cols) {
@@ -296,6 +310,28 @@ sub get_size {
 
 sub rows { $_[0]->{_rows} }
 sub cols { $_[0]->{_cols} }
+sub xpixel { $_[0]->{_xpixel} }
+sub ypixel { $_[0]->{_ypixel} }
+
+sub cell_width_px {
+    my ($self) = @_;
+    return 0 unless $self->{_xpixel} && $self->{_cols};
+    return $self->{_xpixel} / $self->{_cols};
+}
+
+sub cell_height_px {
+    my ($self) = @_;
+    return 0 unless $self->{_ypixel} && $self->{_rows};
+    return $self->{_ypixel} / $self->{_rows};
+}
+
+sub cell_aspect_ratio {
+    my ($self) = @_;
+    my $cw = $self->cell_width_px();
+    my $ch = $self->cell_height_px();
+    return 2.0 unless $cw > 0 && $ch > 0;
+    return $ch / $cw;
+}
 
 # Refresh size (call on SIGWINCH)
 sub refresh_size {
@@ -625,6 +661,9 @@ sub cleanup {
     # Show cursor
     $self->show_cursor();
 
+    # Clean up converted image temp files
+    Zepto::ImageConverter::cleanup();
+
     # Flush any pending output
     $self->flush();
 
@@ -651,10 +690,17 @@ sub cleanup {
         ) ? 1 : 0;
         return $_kitty_graphics_supported;
     }
+
+    # Reset cache (for testing with different TERM_PROGRAM values)
+    sub _reset_kitty_cache {
+        $_kitty_graphics_supported = undef;
+    }
 }
 
-# Display a PNG/JPEG image at a specific position using Kitty graphics protocol
-# Returns the escape sequence string to emit
+# Display an image at a specific position using Kitty graphics protocol.
+# Sends image data inline as base64-encoded PNG.
+# Non-PNG images are converted via sips (macOS) or convert (ImageMagick).
+# Returns empty string if image cannot be rendered.
 sub kitty_display_image {
     my ($class, %args) = @_;
     my $path   = $args{path};
@@ -665,6 +711,10 @@ sub kitty_display_image {
     my $id     = $args{id} // 1; # image ID for later reference
 
     require MIME::Base64;
+
+    # Ensure we have a PNG (convert if necessary)
+    $path = Zepto::ImageConverter->ensure_png($path);
+    return '' unless $path;
 
     # Read image data
     open my $fh, '<:raw', $path or return '';

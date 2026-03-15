@@ -31,6 +31,7 @@ my %priority = (
     'lib/Zepto/InputParser.pm'  => 16,
     'lib/Zepto/Theme.pm'        => 17,
     'lib/Zepto/Preferences.pm'  => 18,
+    'lib/Zepto/ImageConverter.pm' => 18.5,  # Before Terminal (which uses it)
     'lib/Zepto/Terminal.pm'     => 19,
     'lib/Zepto/Config.pm'       => 20,
     'lib/Zepto/Chars.pm'        => 21,

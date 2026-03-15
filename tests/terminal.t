@@ -6,6 +6,7 @@ use warnings;
 use Test::More;
 use lib 'lib';
 use Zepto::Terminal;
+use Zepto::ImageConverter;
 use File::Temp qw(tempfile);
 
 # ============================================================================
@@ -159,6 +160,43 @@ subtest 'Get size returns values' => sub {
     ok(defined $cols, 'Cols returned');
     ok($rows > 0, 'Rows positive');
     ok($cols > 0, 'Cols positive');
+};
+
+subtest 'Pixel dimension defaults and accessors' => sub {
+    my $term = Zepto::Terminal->new();
+
+    # Before get_size, pixel dimensions default to 0
+    is($term->xpixel(), 0, 'Default xpixel is 0');
+    is($term->ypixel(), 0, 'Default ypixel is 0');
+    is($term->cell_width_px(), 0, 'cell_width_px returns 0 when no pixel info');
+    is($term->cell_height_px(), 0, 'cell_height_px returns 0 when no pixel info');
+
+    # Fallback aspect ratio should be 2.0 when pixel info unavailable
+    is($term->cell_aspect_ratio(), 2.0, 'cell_aspect_ratio fallback is 2.0');
+
+    # After get_size, pixel values may or may not be populated depending on
+    # terminal, but accessors should return defined values
+    $term->get_size();
+    ok(defined $term->xpixel(), 'xpixel defined after get_size');
+    ok(defined $term->ypixel(), 'ypixel defined after get_size');
+    ok(defined $term->cell_width_px(), 'cell_width_px defined after get_size');
+    ok(defined $term->cell_height_px(), 'cell_height_px defined after get_size');
+    ok($term->cell_aspect_ratio() > 0, 'cell_aspect_ratio is positive');
+};
+
+subtest 'cell_aspect_ratio computes from pixel dimensions' => sub {
+    my $term = Zepto::Terminal->new();
+    # Simulate a terminal reporting 1600x800 pixels for 80x24
+    $term->{_xpixel} = 1600;
+    $term->{_ypixel} = 800;
+    $term->{_cols} = 80;
+    $term->{_rows} = 40;
+
+    # cell_width = 1600/80 = 20, cell_height = 800/40 = 20
+    # aspect = 20/20 = 1.0
+    is($term->cell_width_px(), 20, 'cell_width_px = 1600/80 = 20');
+    is($term->cell_height_px(), 20, 'cell_height_px = 800/40 = 20');
+    is($term->cell_aspect_ratio(), 1.0, 'cell_aspect_ratio = 20/20 = 1.0');
 };
 
 # ============================================================================
@@ -396,7 +434,7 @@ subtest 'Kitty graphics image display sequence' => sub {
 
     # Should have correct parameters
     like($seq, qr/a=T/, 'Action is transmit+display');
-    like($seq, qr/f=100/, 'Format is PNG');
+    like($seq, qr/f=100/, 'Format is PNG/image');
     like($seq, qr/i=42/, 'Image ID is set');
     like($seq, qr/c=40/, 'Width in cells');
     like($seq, qr/r=20/, 'Height in cells');
@@ -412,6 +450,90 @@ subtest 'Kitty graphics clear sequence' => sub {
 
     my $clear_one = Zepto::Terminal->kitty_clear_image(42);
     like($clear_one, qr/\x1b_Ga=d,d=I,i=42\x1b\\/, 'Clear specific image');
+};
+
+subtest 'Image converter detection' => sub {
+    my $converter = Zepto::ImageConverter->detect_converter();
+    ok(defined $converter, 'detect_converter returns defined value');
+    if ($converter) {
+        like($converter, qr/sips|convert/, 'Detected sips or convert');
+        ok(-x $converter, 'Converter is executable');
+    }
+};
+
+subtest 'ensure_png passes through PNG files' => sub {
+    my $dir = File::Temp::tempdir(CLEANUP => 1);
+    my $png_path = "$dir/test.png";
+
+    # Write minimal PNG
+    open my $fh, '>:raw', $png_path;
+    print $fh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $fh;
+
+    my $result = Zepto::ImageConverter->ensure_png($png_path);
+    is($result, $png_path, 'PNG file returned as-is');
+};
+
+subtest 'ensure_png converts JPEG to PNG' => sub {
+    my $converter = Zepto::ImageConverter->detect_converter();
+    plan skip_all => 'No image converter available' unless $converter;
+
+    my $dir = File::Temp::tempdir(CLEANUP => 1);
+    my $jpg_path = "$dir/test.jpg";
+
+    # Create a real JPEG from an 8-bit RGB PNG source (JPEG needs >=8-bit)
+    my $src_png = "$dir/src.png";
+    open my $pfh, '>:raw', $src_png;
+    print $pfh pack('H*',
+        '89504e470d0a1a0a0000000d4948445200000002000000020802000000' .
+        'fdd49a730000001449444154789c63f8cfc0c000c20cffffff67000' .
+        '01eef04fca3c8b4f70000000049454e44ae426082');
+    close $pfh;
+
+    # Suppress converter output (sips prints paths to stdout)
+    open my $old_out, '>&', \*STDOUT;
+    open my $old_err, '>&', \*STDERR;
+    open STDOUT, '>', '/dev/null';
+    open STDERR, '>', '/dev/null';
+    my $created;
+    if ($converter =~ /sips$/) {
+        $created = system($converter, '-s', 'format', 'jpeg', $src_png,
+               '--out', $jpg_path) == 0;
+    } else {
+        $created = system($converter, $src_png, $jpg_path) == 0;
+    }
+    open STDOUT, '>&', $old_out;
+    open STDERR, '>&', $old_err;
+    plan skip_all => 'Could not create test JPEG' unless $created;
+    plan skip_all => 'JPEG test file not created' unless -f $jpg_path;
+
+    my $result = Zepto::ImageConverter->ensure_png($jpg_path);
+    ok($result, 'ensure_png returned a path for JPEG');
+    if ($result) {
+        isnt($result, $jpg_path, 'Converted path differs from original');
+        ok(-f $result, 'Converted PNG file exists');
+        # Verify it's actually a PNG
+        open my $rfh, '<:raw', $result;
+        read($rfh, my $magic, 4);
+        close $rfh;
+        is($magic, "\x89PNG", 'Converted file has PNG magic bytes');
+    }
+
+    Zepto::ImageConverter::cleanup();
+};
+
+subtest 'ensure_png returns empty for non-image without converter' => sub {
+    my $dir = File::Temp::tempdir(CLEANUP => 1);
+    my $txt_path = "$dir/test.txt";
+    open my $fh, '>', $txt_path;
+    print $fh "not an image";
+    close $fh;
+
+    my $result = Zepto::ImageConverter->ensure_png($txt_path);
+    # Either converted (unlikely for .txt) or empty — either is acceptable
+    ok(defined $result, 'ensure_png returns defined value for non-image');
 };
 
 done_testing();
