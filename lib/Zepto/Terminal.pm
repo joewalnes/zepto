@@ -85,6 +85,10 @@ sub new {
         _clipboard_paste_cmd => undef,
     }, $class;
 
+    # Ensure output handle is in raw/bytes mode — Terminal encodes
+    # UTF-8 manually before syswrite, so :utf8 layers must be removed
+    binmode($self->{out_fh}, ':raw');
+
     # Detect platform clipboard commands
     $self->_detect_clipboard_commands();
 
