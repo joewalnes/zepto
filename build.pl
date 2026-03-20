@@ -3,6 +3,13 @@
 use strict;
 use warnings;
 use File::Find;
+use POSIX qw(strftime);
+
+# Build version: env override > git tag > CalVer date
+my $VERSION = $ENV{ZEPTO_VERSION}
+    || `git describe --tags --exact-match 2>/dev/null` =~ s/\s+$//r
+    || strftime('%Y.%m.%d', localtime);
+chomp $VERSION;
 
 # Recursively find all .pm files under lib/
 my @all_modules;
@@ -126,6 +133,10 @@ for my $file (@modules) {
     # Strip comment-only lines (lines starting with #)
     $content =~ s/^[ \t]*#.*\n//gm;
 
+    # Inject build version into Editor module
+    $content =~ s/our \$VERSION = 'dev';/our \$VERSION = '$VERSION';/
+        if $file =~ m{Editor\.pm$};
+
     # Add section header (handle nested modules like Editor/Commands)
     my ($pkg) = $file =~ m{lib/Zepto/(.+)\.pm$};
     $pkg =~ s{/}{::}g;
@@ -148,6 +159,174 @@ print <<'MAIN';
 # Main
 # =============================================================================
 package main;
+use Cwd ();
+use File::Copy ();
+use File::Path ();
+use File::Basename ();
+
+# -----------------------------------------------------------------------------
+# --version
+# -----------------------------------------------------------------------------
+if (grep { $_ eq '--version' || $_ eq '-v' } @ARGV) {
+    print "zepto $Zepto::Editor::VERSION\n";
+    exit 0;
+}
+
+# -----------------------------------------------------------------------------
+# --install [path]
+# -----------------------------------------------------------------------------
+if (grep { $_ eq '--install' } @ARGV) {
+    _zepto_install();
+    exit 0;
+}
+
+sub _zepto_install {
+    binmode(STDOUT, ':utf8');
+    my $use_color = !$ENV{NO_COLOR} && -t STDOUT && ($ENV{TERM} || '') ne 'dumb';
+    my $BOLD  = $use_color ? "\e[1m"    : '';
+    my $DIM   = $use_color ? "\e[2m"    : '';
+    my $GREEN = $use_color ? "\e[32m"   : '';
+    my $YELLOW= $use_color ? "\e[33m"   : '';
+    my $RED   = $use_color ? "\e[31m"   : '';
+    my $CYAN  = $use_color ? "\e[36m"   : '';
+    my $RESET = $use_color ? "\e[0m"    : '';
+    my $CHECK = $use_color ? "${GREEN}\x{2713}${RESET}" : 'ok';
+    my $WARN  = $use_color ? "${YELLOW}\x{25b2}${RESET}" : '!!';
+    my $FAIL  = $use_color ? "${RED}\x{2717}${RESET}" : 'FAIL';
+
+    my $_step = sub { printf "  %-22s %s\n", $_[0], $_[1] };
+
+    # Parse --install [path] from @ARGV
+    my $custom_path;
+    for my $i (0 .. $#ARGV) {
+        if ($ARGV[$i] eq '--install' && defined $ARGV[$i+1] && $ARGV[$i+1] !~ /^-/) {
+            $custom_path = $ARGV[$i+1];
+            last;
+        }
+    }
+
+    my $dest;
+    if (defined $custom_path) {
+        # If path is a directory, append /zepto; otherwise use as-is
+        $dest = (-d $custom_path) ? "$custom_path/zepto" : $custom_path;
+    } else {
+        $dest = "$ENV{HOME}/.local/bin/zepto";
+    }
+
+    # Resolve ~ just in case
+    $dest =~ s{^~}{$ENV{HOME}};
+
+    my $dest_dir = File::Basename::dirname($dest);
+    my $display_dest = $dest;
+    $display_dest =~ s{^\Q$ENV{HOME}\E}{~};
+    my $display_dir = $dest_dir;
+    $display_dir =~ s{^\Q$ENV{HOME}\E}{~};
+
+    # Banner
+    print "\n";
+    print "  ${BOLD}zepto installer${RESET}\n";
+    print "  ${DIM}A modern terminal text editor${RESET}\n";
+    print "\n";
+
+    # 1. Check Perl version
+    my $perl_v = sprintf('%vd', $^V);
+    if ($^V ge v5.10.0) {
+        $_step->("Checking Perl...", "v${perl_v} ${CHECK}");
+    } else {
+        $_step->("Checking Perl...", "v${perl_v} ${FAIL}");
+        print "\n  ${RED}Perl 5.10+ required.${RESET}\n\n";
+        exit 1;
+    }
+
+    # 2. Read our own source
+    my $source_path = $0;
+    if (!-f $source_path || !-r $source_path) {
+        $_step->("Reading source...", "${FAIL}");
+        print "\n  ${RED}Cannot read $0. Run with a file path, not a pipe.${RESET}\n";
+        print "  ${DIM}Use: perl zepto --install${RESET}\n\n";
+        exit 1;
+    }
+
+    open(my $src_fh, '<:raw', $source_path)
+        or do { $_step->("Reading source...", "${FAIL} $!"); exit 1 };
+    my $source = do { local $/; <$src_fh> };
+    close $src_fh;
+
+    # 3. Create destination directory
+    if (!-d $dest_dir) {
+        eval { File::Path::make_path($dest_dir) };
+        if ($@) {
+            $_step->("Creating ${display_dir}...", "${FAIL}");
+            print "  ${RED}$@${RESET}\n";
+            exit 1;
+        }
+        $_step->("Creating ${display_dir}...", "${CHECK}");
+    }
+
+    # 4. Write to destination
+    my $updating = -f $dest;
+    open(my $dst_fh, '>:raw', $dest)
+        or do { $_step->("Installing to ${display_dest}...", "${FAIL} $!"); exit 1 };
+    print $dst_fh $source;
+    close $dst_fh;
+    chmod 0755, $dest;
+    my $verb = $updating ? "Updated" : "Installed to";
+    $_step->("${verb} ${display_dest}...", "${CHECK}");
+
+    # 5. Check if destination dir is in PATH
+    my $in_path = 0;
+    my $abs_dest_dir = Cwd::abs_path($dest_dir) || $dest_dir;
+    for my $p (split /:/, $ENV{PATH} || '') {
+        my $abs_p = Cwd::abs_path($p) || $p;
+        if ($abs_p eq $abs_dest_dir) {
+            $in_path = 1;
+            last;
+        }
+    }
+
+    if ($in_path) {
+        $_step->("Checking PATH...", "in PATH ${CHECK}");
+    } else {
+        $_step->("Checking PATH...", "${display_dir} not in PATH ${WARN}");
+        print "\n";
+        my $shell = $ENV{SHELL} || '/bin/sh';
+        my $shell_name = File::Basename::basename($shell);
+        my $rc_file;
+        if    ($shell_name eq 'zsh')  { $rc_file = '~/.zshrc' }
+        elsif ($shell_name eq 'bash') { $rc_file = '~/.bashrc' }
+        elsif ($shell_name eq 'fish') { $rc_file = '~/.config/fish/config.fish' }
+        else                          { $rc_file = '~/.profile' }
+
+        if ($shell_name eq 'fish') {
+            print "  Add to ${BOLD}${rc_file}${RESET}:\n";
+            print "  ${CYAN}set -gx PATH ${dest_dir} \$PATH${RESET}\n";
+        } else {
+            print "  Add to ${BOLD}${rc_file}${RESET}:\n";
+            print "  ${CYAN}export PATH=\"${dest_dir}:\$PATH\"${RESET}\n";
+        }
+        print "\n  Then: ${DIM}source ${rc_file}${RESET}\n";
+        print "\n";
+    }
+
+    # 6. Self-check: run the installed copy
+    my $check_output = `"$dest" --version 2>&1`;
+    chomp $check_output if defined $check_output;
+    if ($? == 0 && defined $check_output && $check_output =~ /^zepto\s/) {
+        $_step->("Self-check...", "${check_output} ${CHECK}");
+    } else {
+        $_step->("Self-check...", "${FAIL}");
+        print "  ${RED}Installed binary did not respond to --version${RESET}\n";
+    }
+
+    # Done
+    print "\n";
+    if ($in_path) {
+        print "  ${GREEN}${BOLD}Ready!${RESET} Run: ${BOLD}zepto myfile.txt${RESET}\n";
+    } else {
+        print "  ${GREEN}${BOLD}Ready!${RESET} Run: ${BOLD}${dest} myfile.txt${RESET}\n";
+    }
+    print "\n";
+}
 
 # Parse command line options
 my @files;
@@ -165,6 +344,8 @@ for my $arg (@ARGV) {
     } elsif ($arg eq '--help' || $arg eq '-h') {
         print "Usage: zepto [options] [file ...]\n";
         print "Options:\n";
+        print "  --install [path]    Install zepto (default: ~/.local/bin/zepto)\n";
+        print "  --version, -v       Show version\n";
         print "  --no-nerd-font, -P  Disable Nerd Font glyphs\n";
         print "  --tree              Show file tree on startup\n";
         print "  --no-tree           Hide file tree on startup\n";

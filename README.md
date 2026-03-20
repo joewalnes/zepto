@@ -22,13 +22,16 @@ A modern, intuitive, terminal text editor. Single file. No dependencies. No conf
 ## Install
 
 ```bash
-mkdir -p ~/.local/bin && \
-  curl -fsSL https://github.com/joewalnes/zepto/releases/download/latest/zepto \
-    -o ~/.local/bin/zepto && \
-  chmod +x ~/.local/bin/zepto
+curl -fsSL https://zepto.now/get | sh
 ```
 
-Then run `zepto myfile.txt`. Or [download manually](https://github.com/joewalnes/zepto/releases/download/latest/zepto).
+Or install to a custom location:
+
+```bash
+curl -fsSL https://zepto.now/get | sh -s -- /usr/local/bin/zepto
+```
+
+Or [download manually](https://github.com/joewalnes/zepto/releases/download/latest/zepto) and run `zepto --install`.
 
 ## Requirements
 

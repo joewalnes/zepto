@@ -24,8 +24,7 @@ use Time::HiRes qw(time);
 use Exporter 'import';
 our @EXPORT_OK = qw(STATE_EDITING STATE_PALETTE STATE_DIALOG STATE_PROMPT STATE_FOOTER_INPUT STATE_FIND STATE_QUIT);
 
-# Version for crash reports
-our $VERSION = '0.1.0';
+our $VERSION = 'dev'; # replaced at build time by build.pl
 
 use Zepto::Document;
 use Zepto::View;
