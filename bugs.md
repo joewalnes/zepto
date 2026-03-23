@@ -777,3 +777,10 @@ Right arrow accepted the entire ghost text suggestion at once, which was unexpec
 After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not reappear.
 
 **Fix:** Added `_retrigger_completion_if_word()` helper that checks if the cursor is at a word character and sets `_completion_pending_at` to trigger the debounced completion. Called after both `cmd_undo()` and `cmd_redo()`. Ghost text now reappears after undo if the cursor position warrants it.
+
+### ~~P0: [Bug] Perl warning on undo/redo near end-of-line~~ FIXED
+`Use of uninitialized value $char_before in pattern match` printed to stderr after undo when cursor was at/past the line length boundary.
+
+**Root cause:** `_retrigger_completion_if_word()` did not check that the cursor column was within the actual line length before calling `substr()`.
+
+**Fix:** Added `return unless $col <= length($line)` guard and `defined $char_before` check.

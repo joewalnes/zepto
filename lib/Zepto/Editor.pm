@@ -2885,8 +2885,9 @@ sub _retrigger_completion_if_word {
     my $col = $view->cursor_col();
     return unless $col > 0 && $line_num < $doc->line_count();
     my $line = $doc->get_line_content($line_num);
+    return unless $col <= length($line);
     my $char_before = substr($line, $col - 1, 1);
-    if ($char_before =~ /\w/) {
+    if (defined $char_before && $char_before =~ /\w/) {
         $self->{_completion_pending_at} = time();
     }
 }
