@@ -3168,8 +3168,42 @@ sub _render_line_with_highlights {
         }
     }
 
+    # Build multi-cursor selection ranges for this line
+    my @multi_cursor_sel;  # column → 1 if inside a multi-cursor selection
+    my @multi_cursor_pos;  # column → 1 if a multi-cursor is at this position
+    if ($view->has_multi_cursors()) {
+        for my $mc (@{$view->multi_cursors()}) {
+            # Check if this cursor is on this line
+            if ($mc->{line} == $line_num) {
+                my $vcol = _char_to_visual_col($orig_content, $mc->{col}) - $scroll_col;
+                $multi_cursor_pos[$vcol] = 1 if $vcol >= 0 && $vcol < $len;
+            }
+            # Check if this cursor has a selection that covers this line
+            if (defined $mc->{anchor_line}) {
+                my ($msl, $msc, $mel, $mec);
+                if ($mc->{anchor_line} > $mc->{line}
+                    || ($mc->{anchor_line} == $mc->{line} && $mc->{anchor_col} > $mc->{col})) {
+                    ($msl, $msc, $mel, $mec) = ($mc->{line}, $mc->{col}, $mc->{anchor_line}, $mc->{anchor_col});
+                } else {
+                    ($msl, $msc, $mel, $mec) = ($mc->{anchor_line}, $mc->{anchor_col}, $mc->{line}, $mc->{col});
+                }
+                if ($line_num >= $msl && $line_num <= $mel) {
+                    my $ms = 0;
+                    my $me = $len;
+                    $ms = _char_to_visual_col($orig_content, $msc) - $scroll_col if $line_num == $msl;
+                    $me = _char_to_visual_col($orig_content, $mec) - $scroll_col if $line_num == $mel;
+                    $ms = 0 if $ms < 0;
+                    $me = $len if $me > $len;
+                    for my $c ($ms .. $me - 1) {
+                        $multi_cursor_sel[$c] = 1 if $c >= 0 && $c < $len;
+                    }
+                }
+            }
+        }
+    }
+
     # Render character by character with appropriate backgrounds and foregrounds
-    # Priority: current_match > other_match > selection > cursor_line/col > syntax > default
+    # Priority: current_match > other_match > multi_cursor_sel > selection > cursor_line/col > syntax > default
     my $last_style = '';
     for (my $i = 0; $i < $len; $i++) {
         my $char = substr($content, $i, 1);
@@ -3205,6 +3239,12 @@ sub _render_line_with_highlights {
                     $style_key = "match";
                 }
             }
+        }
+        # Check if in a multi-cursor selection (secondary cursor highlights)
+        elsif ($multi_cursor_sel[$i]) {
+            $char_bg = $sel_bg_color;
+            $char_fg = $syntax_fg[$i] // $fg;
+            $style_key = "mcsel:" . ($syntax_fg[$i] // 'def');
         }
         # Check if in selection (linear or column)
         elsif ($sel_start >= 0 && $i >= $sel_start && $i < $sel_end) {
@@ -3606,6 +3646,15 @@ sub _render_context_status_bar {
         push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
         push @_out, " $col_text ";
         $left_width += length($col_text) + 2;
+    }
+
+    # Multi-cursor indicator
+    if ($view && $view->has_multi_cursors()) {
+        my $mc_count = $view->cursor_count();
+        my $mc_text = "${mc_count} cursors";
+        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+        push @_out, " $mc_text ";
+        $left_width += length($mc_text) + 2;
     }
 
     my $round_l = Zepto::Chars->get('round_left');

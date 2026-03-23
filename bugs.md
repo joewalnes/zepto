@@ -10,8 +10,10 @@ Priority scale:
 
 ## Feature requests
 
-### P1: Multi-cursor editing
-`Ctrl+D` to select next occurrence of the current word/selection, then type/delete at all cursors simultaneously. Column selection mode exists but only covers rectangular cases — most real-world multi-edit needs are scattered occurrences of a symbol. No workaround exists; this saves minutes on tasks like renaming a variable in 15 places or restructuring data.
+### ~~P1: Multi-cursor editing~~ FIXED
+`Ctrl+D` to select next occurrence of the current word/selection, then type/delete at all cursors simultaneously.
+
+**Fix:** Added full multi-cursor editing support. First `⌃D` selects word under cursor. Subsequent presses add the next occurrence as a secondary cursor. All typing and backspace affects all cursors simultaneously, processed in reverse document order for offset stability. Same-line cursor position adjustment handles multiple occurrences on one line. Escape clears multi-cursors; arrow keys also exit multi-cursor mode. Status bar shows cursor count indicator. Data model: `_multi_cursors` array in View.pm, editing via `_multi_cursor_insert_char`/`_multi_cursor_backspace` in Editor.pm with undo grouping. Duplicate Line Down moved to palette-only (was `⌃D`). Added `cmd_select_next_occurrence` to CommandRegistry. 9 tests added.
 
 ### P2: Buffer word completion
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.

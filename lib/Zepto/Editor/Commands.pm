@@ -541,6 +541,91 @@ sub cmd_select_all {
 }
 
 # =============================================================================
+# Multi-Cursor Commands
+# =============================================================================
+
+sub cmd_select_next_occurrence {
+    my ($self) = @_;
+
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
+    return unless $view && $doc;
+
+    # If no selection, select word under cursor first
+    if (!$view->has_selection()) {
+        $view->select_word();
+        return unless $view->has_selection();
+        # Store the search term for subsequent presses
+        $self->{_multi_cursor_term} = $view->selected_text();
+        return;
+    }
+
+    # Get the selected text (this is what we're searching for)
+    my $term = $view->selected_text();
+    return unless length($term);
+
+    # If the term changed (user manually selected something different), reset
+    if (!defined $self->{_multi_cursor_term} || $self->{_multi_cursor_term} ne $term) {
+        $self->{_multi_cursor_term} = $term;
+        $view->clear_multi_cursors();
+    }
+
+    # Find the next occurrence after the last cursor position
+    my $text = $doc->text();
+    my $term_len = length($term);
+    my $term_quoted = quotemeta($term);
+
+    # Collect all existing cursor end positions to find where to search from
+    my @cursors = $view->all_cursors_sorted();
+    my $last = $cursors[-1];
+    my $search_from_offset = $doc->line_col_to_offset($last->{line}, $last->{col});
+
+    # Search forward from the last cursor, wrapping around
+    my $found_offset = index($text, $term, $search_from_offset);
+    if ($found_offset < 0) {
+        # Wrap to beginning
+        $found_offset = index($text, $term, 0);
+    }
+
+    if ($found_offset >= 0) {
+        my ($found_line, $found_col) = $doc->offset_to_line_col($found_offset);
+        my $end_col = $found_col + $term_len;
+
+        # Handle match spanning line boundary (term contains newline) — skip
+        # For simplicity, only handle single-line matches
+        my $line_content = $doc->get_line_content($found_line);
+        if ($found_col + $term_len <= length($line_content)) {
+            # Check if this position already has a cursor
+            if (!$view->has_cursor_at($found_line, $end_col)) {
+                # Save the current primary cursor as a secondary cursor
+                $view->add_multi_cursor(
+                    line        => $view->cursor_line(),
+                    col         => $view->cursor_col(),
+                    anchor_line => $view->{selection_anchor_line},
+                    anchor_col  => $view->{selection_anchor_col},
+                );
+
+                # Move primary cursor to the new occurrence
+                $view->{selection_anchor_line} = $found_line;
+                $view->{selection_anchor_col}  = $found_col;
+                $view->{cursor_line} = $found_line;
+                $view->{cursor_col}  = $end_col;
+                $view->{_preferred_col} = $end_col;
+
+                # Ensure the new cursor is visible
+                $view->ensure_cursor_visible();
+
+                my $count = $view->cursor_count();
+                $self->show_message("$count cursors");
+            } else {
+                $self->show_message("All occurrences selected");
+            }
+        }
+    } else {
+        $self->show_message("No more occurrences");
+    }
+}
+
 # Search Commands
 # =============================================================================
 
