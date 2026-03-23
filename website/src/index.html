@@ -644,18 +644,42 @@
     activate(isMac ? 'brew' : 'curl');
   })();
 
-  // Track install command copy
+  // Track install actions
   (function () {
     var fired = {};
-    document.querySelectorAll('.install-panel pre').forEach(function (el) {
-      el.addEventListener('copy', function () {
-        var method = el.closest('.install-panel').dataset.panel;
-        if (!fired[method]) {
-          fired[method] = true;
-          plausible('Install Command Copy', { props: { method: method } });
-        }
+    function trackOnce(event, props) {
+      var key = event + ':' + (props && props.props && props.props.method || '');
+      if (fired[key]) return;
+      fired[key] = true;
+      plausible(event, props);
+    }
+
+    // Track brew command copy
+    var brewEl = document.getElementById('install-cmd-brew');
+    if (brewEl) {
+      brewEl.addEventListener('copy', function () {
+        trackOnce('Install: Brew Copy', { props: { method: 'brew' } });
       });
-    });
+    }
+
+    // Track curl command copy
+    var curlEl = document.getElementById('install-cmd-curl');
+    if (curlEl) {
+      curlEl.addEventListener('copy', function () {
+        trackOnce('Install: Curl Copy', { props: { method: 'curl' } });
+      });
+    }
+
+    // Track manual download link click or copy
+    var manualLink = document.querySelector('.install-panel[data-panel="manual"] a[href]');
+    if (manualLink) {
+      manualLink.addEventListener('click', function () {
+        trackOnce('Install: Manual Download', { props: { method: 'manual', action: 'click' } });
+      });
+      manualLink.addEventListener('copy', function () {
+        trackOnce('Install: Manual Download', { props: { method: 'manual', action: 'copy' } });
+      });
+    }
   })();
 
   // iOS autoplay fallback
