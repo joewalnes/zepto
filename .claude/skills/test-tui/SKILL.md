@@ -1,146 +1,139 @@
 ---
 name: test-tui
-description: Perform hands-on TUI usability testing of the Zepto editor using hangon (or raw tmux as fallback). Explores the UI naturally as a real user would, performs common editing tasks, tests code completion UX, logs bugs, and produces a discoverability assessment.
-user-invocable: true
-argument-hint: "[focus-area]"
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, TodoWrite
+description: Perform hands-on TUI usability testing of the Zepto editor using hangon or tmux. Use when the user wants to test the editor interactively, verify UI behavior, explore features, or run regression testing on the TUI.
+argument-hint: [focus-area]
+allowed-tools: Read, Glob, Grep, Bash, Edit, Write, Agent
 ---
 
 # TUI Usability Testing Skill
 
-You are performing hands-on TUI usability testing of the Zepto editor. Your goal is to use the editor as a real user would — discovering features from UI hints, not from reading code.
+Perform interactive TUI testing of the Zepto editor as a real user would. Build the editor, launch it in a terminal session, and interact with it to verify behavior.
+
+## Focus Area
+
+If a focus area is specified: $ARGUMENTS
+
+If no focus area is specified, perform a general exploratory test covering: basic editing, find/replace, file navigation, tabs, completion, auto-pairs, and any features visible in the status bar and command palette.
 
 ## Setup
 
-1. `make build` to ensure the latest binary is ready.
-2. Try `hangon` first. If not installed, try `npm install -g hangon` or clone from `git@github.com:joewalnes/hangon.git`. If unavailable, fall back to raw tmux:
-   ```bash
-   tmux new-session -d -s test -x 120 -y 40
-   tmux send-keys -t test "./zepto <file>" Enter
-   sleep 1.5
-   tmux capture-pane -t test -p
-   ```
+1. Build the editor: `make build`
+2. Create test files in `/tmp/zepto-test/` as needed
+3. Prefer `hangon` for session management. If unavailable, fall back to raw `tmux`:
 
-### hangon commands (preferred)
+### Using hangon (preferred)
+
 ```bash
 hangon stopall
-hangon start process --name zepto -- ./zepto <file>
+hangon start process --name zepto -- ./zepto /tmp/zepto-test/testfile.txt
 sleep 1
-hangon screen zepto              # capture screen
-hangon send zepto "text"         # type text
-hangon keys zepto "ctrl-s"       # send special keys
-hangon expect zepto "pattern"    # wait for regex
-hangon stop zepto
+hangon screen zepto           # capture screen
+hangon send zepto "text"      # type text
+hangon keys zepto "ctrl-s"    # send special keys
+hangon stop zepto             # clean up
 ```
 
-### tmux commands (fallback)
+### Using tmux (fallback)
+
 ```bash
-tmux send-keys -t test "text"    # type text
-tmux send-keys -t test C-s       # Ctrl+S
-tmux send-keys -t test M-z       # Alt+Z
-tmux send-keys -t test Enter     # Enter
-tmux send-keys -t test S-Down    # Shift+Down
-tmux send-keys -t test Escape    # Escape
-tmux capture-pane -t test -p     # capture screen
+tmux kill-server 2>/dev/null
+tmux new-session -d -s test -x 120 -y 40
+tmux send-keys -t test "./zepto /tmp/zepto-test/testfile.txt" Enter
+sleep 1.5
+tmux capture-pane -t test -p   # capture screen
+tmux send-keys -t test "text"  # type text
+tmux send-keys -t test C-s     # Ctrl+S
+tmux send-keys -t test M-z     # Alt+Z
+tmux send-keys -t test Escape  # Escape
+tmux send-keys -t test S-End   # Shift+End
 ```
 
-**Always `sleep 0.3`–`0.5` after sending keys before capturing the screen** to let the editor render.
+## Testing Protocol
 
-## Phase 1: Natural Discovery (do NOT read code/docs first)
+For each feature or behavior being tested:
 
-Open a test file and explore the UI. Discover features from:
-- Status bar pills and their keyboard shortcuts
-- Command palette (`Ctrl+Space`) — scroll through all entries
-- Tab bar hints
-- Prompt hints in dialogs
+1. **Capture the screen** before and after each interaction
+2. **Wait after sending keys** (`sleep 0.3` to `sleep 0.5`) before capturing — let the editor render
+3. **Verify actual behavior** against expected behavior
+4. **Check cursor position** in the status bar (line:col indicator)
+5. **Check for unexpected side effects** (modified indicator, wrong text, etc.)
 
-For each feature discovered, note:
-- What is it?
-- How did you find it?
-- Was it intuitive to use?
+## Key Areas to Test
 
-### Features to try organically
-- Basic text editing (type, delete, undo/redo)
-- Navigation (arrows, Home/End, Page Up/Down, Ctrl+Home/End, Go to Line)
-- Find/Replace — test Enter behavior carefully (it may do Replace All!)
-- File operations (Open, Save, New, Close, Recent Files)
-- Tab management (switch, close, reorder)
-- File tree sidebar
-- Word wrap, column mode, diff view toggles
-- Theme toggle
-- Transform via Shell
-- Find in Files
-- Any other features visible in the palette
+### Basic Editing
+- Type text, delete with Backspace/Delete
+- Undo (`Ctrl+Z`) and Redo (`Ctrl+Y`)
+- Selection with Shift+arrows, Shift+Home/End
+- Cut/Copy/Paste (`Ctrl+X/C/V`)
+- Copy with no selection (should copy whole line)
 
-## Phase 2: Code Completion UX Testing
+### Navigation
+- Go to Line (`Ctrl+G`) — test `line`, `line:col`, `:col` formats
+- Smart Home (alternates between col 0 and first non-whitespace)
+- Word movement (`Alt+Left/Right`)
+- Page Up/Down, Ctrl+Home/End
+- Go Back/Forward (`Alt+-`/`Alt+=`)
 
-Create or open a code file with enough context for completions to work (reuse variable names, function names). Test:
+### Find/Replace
+- Open Find (`Ctrl+F`)
+- Type search term, verify live highlighting
+- Navigate matches with Up/Down arrows
+- Toggle regex (`Ctrl+R`) and case sensitivity (`Ctrl+C`)
+- Tab to Replace field, type replacement
+- **CAUTION**: Enter triggers Replace All — test carefully
 
-1. **Ghost text appearance**: Type 2+ characters and wait. Does ghost text appear? How quickly?
-2. **Ghost text acceptance**: Press Tab to accept. Does it work?
-3. **Ghost text dismissal**: Press Escape, type non-matching char, press space. Does ghost dismiss correctly?
-4. **Right arrow with ghost**: Does it accept the whole ghost text? (This may feel unexpected)
-5. **Popup menu**: Press Ctrl+Space while typing to open the completion dropdown. Navigate with Up/Down. Accept with Tab/Enter.
-6. **Auto-pairs**: Type `(`, `[`, `{`, `"`, `'`. Do matching pairs auto-insert? Does typing the closing character skip over the auto-inserted one?
-7. **Quote skip-over specifically**: Type `"hello"` — does it produce `"hello"` or `"hello""`?
+### File Operations
+- Open File (`Ctrl+O`) — test fuzzy search
+- Recent Files (`Ctrl+E`)
+- New File (`Ctrl+N`)
+- Save (`Ctrl+S`)
+- Close Tab (`Ctrl+W`) — test save confirmation with unsaved changes
+- File Tree (`Ctrl+B`) — navigate, fold/unfold, open files
 
-If `$ARGUMENTS` specifies a focus area, concentrate testing there.
+### Tabs
+- Switch tabs (`Alt+1`-`Alt+9`, `Alt+,`/`Alt+.`)
+- Verify modified indicator (`●`)
+- Close with unsaved changes (Y/N/C prompt)
 
-## Phase 3: Real Editing Tasks
+### Code Editing
+- Auto-pairs: type `(`, `{`, `"`, `'` — verify matching char inserted
+- Auto-pair skip-over: type closing char when cursor is before auto-inserted one
+- Toggle Comment (`Ctrl+/`) — verify language-aware
+- Indent/Unindent with Tab/Shift+Tab on selected lines
+- Move Line Up/Down (`Alt+Up/Down`)
+- Duplicate Line (`Ctrl+D`)
 
-Perform realistic editing operations:
-- Open a real source file from the project
-- Navigate to a function, read it, make a small edit, undo
-- Use Find/Replace to rename something (carefully — Enter may replace all!)
-- Use Transform via Shell to transform selected text
-- Use the file tree to navigate the project
-- Open multiple tabs and switch between them
-- Test the diff view on a modified git-tracked file
+### Completion
+- Ghost text: type 2+ chars and wait for inline suggestion
+- Accept with Tab, dismiss with Escape
+- Right arrow behavior (currently accepts entire ghost)
+- Popup menu: `Ctrl+Space` while typing to show dropdown
+- Navigate popup with Up/Down, accept with Tab/Enter
 
-## Phase 4: Code & Docs Review
+### View Features
+- Word Wrap toggle (`Alt+Z`)
+- Column Mode (`Alt+C`)
+- Diff View (`Alt+D`) — edit a git-tracked file first
+- Minimap toggle (`Alt+M`)
+- Theme toggle (`Ctrl+T`)
+- Command Palette (`Ctrl+Space`) — verify all features listed
 
-After completing interactive testing, read:
-- `FEATURES.md` — full feature list
-- `docs/UI_GUIDELINES.md` — UI standards
-- `docs/FIND_REPLACE_SPEC.md` — find/replace specification
-- `bugs.md` — known bugs (avoid duplicates)
-- Source code for any features that seemed broken
+### Transform via Shell
+- Select text, press `Alt+T`
+- Pipe through a command (e.g., `tr 'a-z' 'A-Z'`, `sort`, `wc -l`)
 
-Identify features you did NOT discover naturally.
+## Reporting
 
-## Phase 5: Report & Log Bugs
-
-### Output format
-
-Produce a structured report with:
-
-1. **Features discovered organically** — table with: feature, how discovered, ease of discovery, intuitiveness rating
-2. **What worked well** — top 5-10 things that felt polished
-3. **What could be improved** — issues ranked by impact
-4. **Features NOT discovered** — list of features found only by reading code/docs
-5. **Honest assessment** — overall discoverability verdict
-
-### Log bugs in `bugs.md`
-
-For each bug found, append to `bugs.md` under a new section header with today's date:
-
-```markdown
-### P[0-3]: [Category] Short description
-Detailed description of the bug, how to reproduce, and what was expected vs actual behavior.
-
-**Root cause:** (if you investigated the code)
-
-**Suggested fix:** (if you have one)
-```
-
-Priority levels:
-- **P0**: Data loss, crash, or fundamentally wrong behavior
-- **P1**: Significant usability issue — feature works but is confusing or misleading
-- **P2**: Polish issue — inconsistency, visual glitch, or minor misbehavior
-- **P3**: Cosmetic / edge case — low impact, fix when convenient
+After testing, report:
+1. **Bugs found** — add to `bugs.md` with priority (P0-P3), description, root cause if identifiable, and suggested fix
+2. **Features tested** — list with pass/fail status
+3. **UX observations** — anything that felt unintuitive, slow, or surprising
 
 ## Cleanup
 
-- Undo any edits to project files before closing
-- Kill tmux sessions: `tmux kill-session -t test` or `hangon stopall`
-- Remove test files: `rm -rf /tmp/zepto-test`
+Always clean up after testing:
+```bash
+hangon stopall 2>/dev/null
+tmux kill-server 2>/dev/null
+rm -rf /tmp/zepto-test
+```
