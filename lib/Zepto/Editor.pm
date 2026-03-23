@@ -945,8 +945,13 @@ sub handle_editing_event {
                 }
             }
             elsif ($_comp->is_ghost() && $key eq 'right' && !$ctrl && !$shift && !$alt) {
-                my $result = $_comp->accept();
-                if ($self->_apply_completion_accept($result)) {
+                # Accept one character at a time (like GitHub Copilot)
+                my $char = $_comp->accept_char();
+                if (length($char)) {
+                    my $_doc = $self->active_doc();
+                    my $_offset = $_doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                    $_doc->insert($_offset, $char);
+                    $view->move_right();
                     return;
                 }
             }
@@ -1989,7 +1994,7 @@ sub handle_footer_input_event {
 # =============================================================================
 
 sub enter_find_mode {
-    my ($self) = @_;
+    my ($self, %opts) = @_;
     # Column selection is incompatible with find mode — clear it
     my $view = $self->active_view();
     if ($view && $view->column_select()) {
@@ -1998,20 +2003,27 @@ sub enter_find_mode {
     $self->{state} = STATE_FIND;
     $self->{find_widget}         = Zepto::InputWidget->new(value => $self->{search_term});
     $self->{find_replace_widget} = Zepto::InputWidget->new(value => $self->{search_replace});
-    $self->{find_replace_active} = 1;  # Always show replace field
-    $self->{find_focus} = 'find';
+    $self->{find_replace_active} = $opts{replace} ? 1 : 0;
+    $self->{find_focus} = $opts{replace} ? 'replace' : 'find';
     $self->{find_replace_preview} = undef;  # Virtual preview data
     $self->{find_replaced} = [];      # Clear replaced highlights
+    # Pre-select all text in the find field so typing replaces it (like VS Code)
+    if (length($self->{search_term})) {
+        $self->{find_widget}->{sel_start} = 0;
+        $self->{find_widget}->{sel_end}   = length($self->{search_term});
+        $self->{find_widget}->{cursor}    = length($self->{search_term});
+    }
     $self->_update_find_matches();
 }
 
 sub exit_find_mode {
-    my ($self, $keep_changes) = @_;
+    my ($self, $mode) = @_;
+    # $mode: 0 = cancel, 'dismiss' = exit keeping cursor on match, 'replace' = do replacement
 
     my $engine = $self->active_find_engine();
 
-    # If keeping changes and we have matches to replace, apply them now
-    if ($keep_changes && $self->{find_replace_active} && $self->{find_replace_all}) {
+    # Only replace when explicitly requested (not on simple dismiss)
+    if ($mode eq 'replace' && $self->{find_replace_active} && $self->{find_replace_all}) {
         # Complete background search first to get all matches
         while ($engine->is_searching) {
             $engine->tick(100);  # Finish quickly
@@ -2048,17 +2060,17 @@ sub handle_find_event {
         my $shift = Zepto::InputParser::has_modifier($event, 'shift');
 
         if ($key eq 'enter') {
-            if ($self->{find_replace_active}) {
+            if ($self->{find_replace_active} && $self->{find_focus} eq 'replace') {
                 if ($self->{find_replace_all}) {
-                    # In replace-all mode, Enter confirms and exits
-                    $self->exit_find_mode(1);
+                    # In replace-all mode, Enter confirms replacement and exits
+                    $self->exit_find_mode('replace');
                 } else {
                     # In replace-one mode, Enter replaces current and moves to next
                     $self->_replace_current() if @{$self->{find_matches}};
                 }
             } else {
-                # Exit find mode, keep cursor at current match
-                $self->exit_find_mode(1);
+                # Find-only mode or focus in find field: dismiss, keep cursor on match
+                $self->exit_find_mode('dismiss');
             }
         }
         elsif ($key eq 'escape') {
@@ -2177,15 +2189,21 @@ sub handle_find_bar_click {
     my $current = $self->{find_current} // 0;
     my $match_text = $match_count == 0
         ? (length($self->{find_widget}->value()) ? 'No matches' : '')
-        : (($current + 1) . ' of ' . $match_count);
+        : ("\x{2191}\x{2193} " . ($current + 1) . ' of ' . $match_count);
     my $match_text_len = length($match_text);
 
     # Right side width (same formula as renderer)
+    my $replace_active = $self->{find_replace_active};
     my $right_side_width = 45 + $match_text_len;
 
     # Input field width (same formula as renderer)
-    my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
-    my $input_width = int($available / 2);
+    my $available;
+    if ($replace_active) {
+        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
+    } else {
+        $available = $cols - 2 - 5 - $right_side_width;
+    }
+    my $input_width = $replace_active ? int($available / 2) : $available;
     $input_width = 8 if $input_width < 8;
     $input_width = 40 if $input_width > 40;
 
@@ -2194,8 +2212,11 @@ sub handle_find_bar_click {
     $pos++;
     my $find_start = $pos + 5;  # After "Find:"
     my $find_end = $find_start + $input_width - 1;
-    my $replace_start = $find_end + 1 + 1 + 8;  # space + "Replace:"
-    my $replace_end = $replace_start + $input_width - 1;
+    my ($replace_start, $replace_end);
+    if ($replace_active) {
+        $replace_start = $find_end + 1 + 1 + 8;  # space + "Replace:"
+        $replace_end = $replace_start + $input_width - 1;
+    }
 
     # Check which region was clicked
     if ($x >= $find_start && $x <= $find_end) {
@@ -2203,16 +2224,15 @@ sub handle_find_bar_click {
         my $char_offset = $x - $find_start;
         $self->{find_widget}->handle_mouse_click($char_offset);
     }
-    elsif ($x >= $replace_start && $x <= $replace_end) {
+    elsif ($replace_active && $x >= $replace_start && $x <= $replace_end) {
         $self->{find_focus} = 'replace';
         my $char_offset = $x - $replace_start;
         $self->{find_replace_widget}->handle_mouse_click($char_offset);
     }
     else {
         # For buttons on the right side, scan from the right
-        # Layout after replace field: " " + ".* ^R" + " " + "Aa ^C" + " " + "X Esc" + " " + "✓ Enter"
         # Pill widths: regex = 9, case = 9, cancel = 9, ok = 11
-        my $button_start = $replace_end + 2;  # space after replace field
+        my $button_start = ($replace_active ? $replace_end : $find_end) + 2;
 
         my $regex_start = $button_start;
         my $regex_end = $regex_start + 8;  # 9 chars
@@ -2240,7 +2260,11 @@ sub handle_find_bar_click {
             $self->exit_find_mode(0);
         }
         elsif ($x >= $ok_start && $x <= $ok_end) {
-            $self->exit_find_mode(1);
+            if ($self->{find_replace_active}) {
+                $self->exit_find_mode('replace');
+            } else {
+                $self->exit_find_mode('dismiss');
+            }
         }
     }
 }
@@ -2251,20 +2275,26 @@ sub _handle_find_bar_drag {
     my ($rows, $cols) = $self->{terminal}->get_size();
 
     # Recompute field positions (same as handle_find_bar_click)
+    my $replace_active = $self->{find_replace_active};
     my $match_count = $self->active_find_engine() ? $self->active_find_engine()->match_count() : 0;
     my $match_text  = $match_count == 0
         ? (length($self->{find_widget}->value()) ? 'No matches' : '')
-        : (($self->{find_current} // 0) + 1) . ' of ' . $match_count;
+        : ("\x{2191}\x{2193} " . (($self->{find_current} // 0) + 1) . ' of ' . $match_count);
     my $right_side_width = 45 + length($match_text);
-    my $available   = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
-    my $input_width = int($available / 2);
+    my $available;
+    if ($replace_active) {
+        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
+    } else {
+        $available = $cols - 2 - 5 - $right_side_width;
+    }
+    my $input_width = $replace_active ? int($available / 2) : $available;
     $input_width = 8  if $input_width < 8;
     $input_width = 40 if $input_width > 40;
 
     my $find_start    = 7;  # " " + " Find:" = 7
     my $find_end      = $find_start + $input_width - 1;
-    my $replace_start = $find_end + 1 + 1 + 8;
-    my $replace_end   = $replace_start + $input_width - 1;
+    my $replace_start = $replace_active ? $find_end + 1 + 1 + 8 : 0;
+    my $replace_end   = $replace_active ? $replace_start + $input_width - 1 : 0;
 
     my $in_replace = $self->{find_replace_active} && $self->{find_focus} eq 'replace';
     if ($in_replace && $x >= $replace_start && $x <= $replace_end) {
@@ -2761,15 +2791,29 @@ sub do_insert_char {
         $self->delete_selection();
     }
 
-    # Auto-pair: skip-over closing bracket if char matches char at cursor
-    if ($self->{prefs}->get('auto_pairs') && exists $CLOSE_PAIRS{$char} && !_is_quote($char)) {
+    # Auto-pair: skip-over closing bracket/quote if char matches char at cursor
+    if ($self->{prefs}->get('auto_pairs') && exists $CLOSE_PAIRS{$char}) {
         my $cursor_line = $view->cursor_line();
         my $cursor_col = $view->cursor_col();
         my $line_content = $doc->get_line_content($cursor_line);
         if ($cursor_col < length($line_content) && substr($line_content, $cursor_col, 1) eq $char) {
-            # Skip over the existing closing bracket
-            $view->move_right();
-            return;
+            # For quotes: only skip if we're inside a matching pair
+            # (i.e., the character before the cursor's opening quote matches)
+            if (_is_quote($char)) {
+                # Skip if there's content between an opening quote and cursor
+                # Heuristic: check if the matching opening quote is nearby on the same line
+                my $before = substr($line_content, 0, $cursor_col);
+                # Count occurrences of this quote before cursor — odd means we're inside a string
+                my $count = ($before =~ s/\Q$char\E//g) // 0;
+                if ($count % 2 == 1) {
+                    $view->move_right();
+                    return;
+                }
+            } else {
+                # Brackets: always skip over
+                $view->move_right();
+                return;
+            }
         }
     }
 
@@ -2826,6 +2870,24 @@ sub do_insert_char {
             $self->{_completion}->dismiss();
             $self->{_completion_pending_at} = 0;
         }
+    }
+}
+
+# Re-trigger completion if the cursor is currently at a word character.
+# Used after undo/redo to restore ghost text suggestions.
+sub _retrigger_completion_if_word {
+    my ($self) = @_;
+    return unless $self->{_completion} && $self->{prefs}->auto_complete();
+    my $view = $self->active_view();
+    my $doc = $self->active_doc();
+    return unless $view && $doc;
+    my $line_num = $view->cursor_line();
+    my $col = $view->cursor_col();
+    return unless $col > 0 && $line_num < $doc->line_count();
+    my $line = $doc->get_line_content($line_num);
+    my $char_before = substr($line, $col - 1, 1);
+    if ($char_before =~ /\w/) {
+        $self->{_completion_pending_at} = time();
     }
 }
 

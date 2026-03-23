@@ -197,6 +197,37 @@ sub accept {
     return $suffix;
 }
 
+# Accept only the first character of the ghost text suffix.
+# Returns the single character, or '' if nothing to accept.
+# Keeps the completion active with updated prefix for remaining text.
+sub accept_char {
+    my ($self) = @_;
+
+    return '' unless $self->{state} == STATE_GHOST && @{$self->{results}};
+
+    my $result = $self->{results}[$self->{ghost_index}];
+    my $prefix = $self->{prefix};
+    my $suffix = substr($result->{text}, length($prefix));
+
+    return '' unless length($suffix);
+
+    my $char = substr($suffix, 0, 1);
+
+    # Advance the prefix by one character so the ghost shows the remaining text
+    $self->{prefix} = $prefix . $char;
+
+    # If no more suffix remains, dismiss
+    if (length($suffix) <= 1) {
+        # Record acceptance for RecentProvider
+        if ($self->{_recent_provider} && $result->{text}) {
+            $self->{_recent_provider}->record($result->{text});
+        }
+        $self->dismiss();
+    }
+
+    return $char;
+}
+
 # Open dropdown menu from ghost state (or trigger + open)
 sub open_menu {
     my ($self) = @_;

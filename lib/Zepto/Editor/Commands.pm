@@ -325,6 +325,8 @@ sub cmd_undo {
     my ($self) = @_;
     if ($self->active_doc()->undo()) {
         $self->show_message("Undo");
+        # Re-trigger completion if cursor is now at a word character
+        $self->_retrigger_completion_if_word();
     }
     else {
         $self->show_message("Nothing to undo");
@@ -335,6 +337,7 @@ sub cmd_redo {
     my ($self) = @_;
     if ($self->active_doc()->redo()) {
         $self->show_message("Redo");
+        $self->_retrigger_completion_if_word();
     }
     else {
         $self->show_message("Nothing to redo");
@@ -544,6 +547,11 @@ sub cmd_select_all {
 sub cmd_find {
     my ($self) = @_;
     $self->enter_find_mode();
+}
+
+sub cmd_find_replace {
+    my ($self) = @_;
+    $self->enter_find_mode(replace => 1);
 }
 
 sub cmd_find_next {
