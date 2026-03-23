@@ -575,19 +575,26 @@ sub cmd_select_next_occurrence {
     my $term_len = length($term);
     my $term_quoted = quotemeta($term);
 
+    # Use word-boundary matching if the term is a whole word (all \w chars)
+    my $pattern = ($term =~ /^\w+$/) ? "\\b${term_quoted}\\b" : $term_quoted;
+    my $re = eval { qr/$pattern/ };
+    return unless $re;
+
     # Collect all existing cursor end positions to find where to search from
     my @cursors = $view->all_cursors_sorted();
     my $last = $cursors[-1];
     my $search_from_offset = $doc->line_col_to_offset($last->{line}, $last->{col});
 
     # Search forward from the last cursor, wrapping around
-    my $found_offset = index($text, $term, $search_from_offset);
-    if ($found_offset < 0) {
+    my $found_offset;
+    if (substr($text, $search_from_offset) =~ /$re/) {
+        $found_offset = $search_from_offset + $-[0];
+    } elsif (substr($text, 0, $search_from_offset) =~ /$re/) {
         # Wrap to beginning
-        $found_offset = index($text, $term, 0);
+        $found_offset = $-[0];
     }
 
-    if ($found_offset >= 0) {
+    if (defined $found_offset) {
         my ($found_line, $found_col) = $doc->offset_to_line_col($found_offset);
         my $end_col = $found_col + $term_len;
 
