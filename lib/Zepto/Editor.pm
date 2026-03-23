@@ -966,6 +966,12 @@ sub handle_editing_event {
         # column selection rectangle instead of normal cursor movement.
         my $col_mode = $view->column_select();
 
+        if ($key eq 'up' || $key eq 'down' || $key eq 'left' || $key eq 'right'
+            || $key eq 'home' || $key eq 'end' || $key eq 'pageup' || $key eq 'pagedown') {
+            # Clear multi-cursors on navigation (multi-cursor persists only during editing)
+            $view->clear_multi_cursors() if $view->has_multi_cursors();
+        }
+
         if ($key eq 'up') {
             if ($col_mode) { $self->do_column_select_up(); }
             elsif ($alt) { $self->do_move_line_up(); }
@@ -1016,7 +1022,11 @@ sub handle_editing_event {
 
         # Escape - cancel/dismiss active mode
         elsif ($key eq 'escape') {
-            if ($view->column_select()) {
+            if ($view->has_multi_cursors()) {
+                $view->clear_multi_cursors();
+                # Keep primary cursor's selection
+            }
+            elsif ($view->column_select()) {
                 $view->exit_column_mode();
             }
             elsif ($view->has_selection()) {
@@ -1080,7 +1090,7 @@ sub handle_ctrl_char {
     elsif ($char eq 'v') { $self->cmd_paste(); }
     elsif ($char eq 'a') { $self->cmd_select_all(); }
     elsif ($char eq 'u') { $self->do_duplicate_line_up(); }
-    elsif ($char eq 'd') { $self->do_duplicate_line_down(); }
+    elsif ($char eq 'd') { $self->cmd_select_next_occurrence(); }
 
     # Search operations
     elsif ($char eq 'f') { $self->cmd_find(); }
@@ -2779,6 +2789,12 @@ sub do_insert_char {
     my $doc = $self->active_doc();
     my $view = $self->active_view();
 
+    # Multi-cursor: insert at all cursors
+    if ($view->has_multi_cursors()) {
+        $self->_multi_cursor_insert_char($char);
+        return;
+    }
+
     # Column selection: insert on each line
     if ($view->column_select() && $view->has_selection()) {
         $self->_column_insert_char($char);
@@ -2897,6 +2913,11 @@ sub do_backspace {
 
     my $doc = $self->active_doc();
     my $view = $self->active_view();
+
+    if ($view->has_multi_cursors()) {
+        $self->_multi_cursor_backspace();
+        return;
+    }
 
     if ($view->column_select() && $view->has_selection()) {
         $self->_column_backspace();
@@ -3436,6 +3457,171 @@ sub _column_delete_selection {
     $view->{cursor_col} = $left;
     $view->{_preferred_col} = $left;
     $view->ensure_cursor_visible();
+}
+
+# =============================================================================
+# Multi-Cursor Editing
+# =============================================================================
+
+# Insert a character at all cursor positions (primary + secondary).
+# Processes in reverse document order to maintain offset stability.
+sub _multi_cursor_insert_char {
+    my ($self, $char) = @_;
+
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my @cursors = reverse $view->all_cursors_sorted();
+    my $char_len = length($char);
+
+    $doc->begin_undo_group();
+
+    for my $idx (0 .. $#cursors) {
+        my $c = $cursors[$idx];
+        my $delta = 0;  # Net column shift from this edit
+
+        # Delete selection at this cursor if any
+        if (defined $c->{anchor_line}) {
+            my ($sl, $sc, $el, $ec) = _normalize_selection(
+                $c->{anchor_line}, $c->{anchor_col}, $c->{line}, $c->{col});
+            my $start_off = $doc->line_col_to_offset($sl, $sc);
+            my $end_off = $doc->line_col_to_offset($el, $ec);
+            my $del_len = $end_off - $start_off;
+            $doc->delete($start_off, $del_len) if $del_len > 0;
+            $delta -= ($ec - $sc) if $sl == $el;  # Same-line deletion shifts columns
+            $c->{line} = $sl;
+            $c->{col} = $sc;
+        }
+
+        # Insert character
+        my $offset = $doc->line_col_to_offset($c->{line}, $c->{col});
+        $doc->insert($offset, $char);
+        $c->{col} += $char_len;
+        $delta += $char_len;
+        $c->{anchor_line} = undef;
+        $c->{anchor_col} = undef;
+
+        # Adjust previously-processed cursors on the same line (they're at higher columns)
+        if ($delta != 0) {
+            for my $prev_idx (0 .. $idx - 1) {
+                if ($cursors[$prev_idx]->{line} == $c->{line}) {
+                    $cursors[$prev_idx]->{col} += $delta;
+                }
+            }
+        }
+    }
+
+    $doc->end_undo_group();
+
+    $self->_write_back_multi_cursors(\@cursors);
+    $view->invalidate_wrap_map();
+}
+
+# Delete one character before each cursor (backspace at all cursors).
+sub _multi_cursor_backspace {
+    my ($self) = @_;
+
+    my $doc = $self->active_doc();
+    my $view = $self->active_view();
+
+    my @cursors = reverse $view->all_cursors_sorted();
+
+    $doc->begin_undo_group();
+
+    for my $idx (0 .. $#cursors) {
+        my $c = $cursors[$idx];
+        my $delta = 0;
+
+        # If selection exists, delete it
+        if (defined $c->{anchor_line}) {
+            my ($sl, $sc, $el, $ec) = _normalize_selection(
+                $c->{anchor_line}, $c->{anchor_col}, $c->{line}, $c->{col});
+            my $start_off = $doc->line_col_to_offset($sl, $sc);
+            my $end_off = $doc->line_col_to_offset($el, $ec);
+            $doc->delete($start_off, $end_off - $start_off) if $end_off > $start_off;
+            $delta = -($ec - $sc) if $sl == $el;
+            $c->{line} = $sl;
+            $c->{col} = $sc;
+            $c->{anchor_line} = undef;
+            $c->{anchor_col} = undef;
+        }
+        # No selection: delete one char before cursor
+        elsif ($c->{line} == 0 && $c->{col} == 0) {
+            # Nothing to delete
+        }
+        elsif ($c->{col} > 0) {
+            my $offset = $doc->line_col_to_offset($c->{line}, $c->{col});
+            $doc->delete($offset - 1, 1);
+            $c->{col}--;
+            $delta = -1;
+        } else {
+            # At start of line — join with previous line
+            my $prev_len = $doc->line_length($c->{line} - 1);
+            my $offset = $doc->line_col_to_offset($c->{line}, 0);
+            $doc->delete($offset - 1, 1);
+            $c->{line}--;
+            $c->{col} = $prev_len;
+            # Line join: adjust previously-processed cursors on lines after this
+            for my $prev_idx (0 .. $idx - 1) {
+                if ($cursors[$prev_idx]->{line} > $c->{line}) {
+                    $cursors[$prev_idx]->{line}--;
+                }
+            }
+            next;  # Skip same-line delta adjustment for line joins
+        }
+
+        # Adjust previously-processed cursors on the same line
+        if ($delta != 0) {
+            for my $prev_idx (0 .. $idx - 1) {
+                if ($cursors[$prev_idx]->{line} == $c->{line}) {
+                    $cursors[$prev_idx]->{col} += $delta;
+                }
+            }
+        }
+    }
+
+    $doc->end_undo_group();
+
+    $self->_write_back_multi_cursors(\@cursors);
+    $view->invalidate_wrap_map();
+}
+
+# Helper: normalize selection to (start_line, start_col, end_line, end_col)
+sub _normalize_selection {
+    my ($al, $ac, $cl, $cc) = @_;
+    if ($al > $cl || ($al == $cl && $ac > $cc)) {
+        return ($cl, $cc, $al, $ac);
+    }
+    return ($al, $ac, $cl, $cc);
+}
+
+# Write processed cursor positions back to the view.
+# @cursors is in reverse document order; re-sort and split into primary + secondary.
+sub _write_back_multi_cursors {
+    my ($self, $cursors_ref) = @_;
+    my $view = $self->active_view();
+
+    # Re-sort in ascending order
+    my @sorted = sort { $a->{line} <=> $b->{line} || $a->{col} <=> $b->{col} } @$cursors_ref;
+
+    # The last one becomes the primary cursor (most recently added)
+    my $primary = pop @sorted;
+    $view->{cursor_line} = $primary->{line};
+    $view->{cursor_col}  = $primary->{col};
+    $view->{_preferred_col} = $primary->{col};
+    $view->{selection_anchor_line} = $primary->{anchor_line};
+    $view->{selection_anchor_col}  = $primary->{anchor_col};
+
+    # Rest become secondary cursors
+    $view->{_multi_cursors} = [];
+    for my $c (@sorted) {
+        $view->add_multi_cursor(
+            line        => $c->{line},
+            col         => $c->{col},
+            anchor_line => $c->{anchor_line},
+            anchor_col  => $c->{anchor_col},
+        );
+    }
 }
 
 # Insert a character at each line in the column selection

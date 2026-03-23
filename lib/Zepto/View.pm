@@ -66,6 +66,11 @@ sub new {
 
         # Column (rectangular) selection mode
         column_select => 0,
+
+        # Multi-cursor: array of secondary cursors (primary is the main cursor/selection)
+        # Each entry: { line => N, col => N, anchor_line => N, anchor_col => N }
+        # anchor_line/col are for selection at that cursor (undef = no selection)
+        _multi_cursors => [],
     }, $class;
 
     return $self;
@@ -702,6 +707,74 @@ sub select_line {
         $self->{cursor_col} = $self->{document}->line_length($line);
     }
     $self->{_preferred_col} = $self->{cursor_col};
+}
+
+# ============================================================================
+# Multi-cursor support
+# ============================================================================
+
+sub has_multi_cursors { scalar @{$_[0]->{_multi_cursors}} > 0 }
+sub multi_cursors     { $_[0]->{_multi_cursors} }
+
+# Total number of cursors (primary + secondary)
+sub cursor_count { 1 + scalar @{$_[0]->{_multi_cursors}} }
+
+sub clear_multi_cursors {
+    my ($self) = @_;
+    $self->{_multi_cursors} = [];
+}
+
+# Add a secondary cursor with optional selection (anchor).
+sub add_multi_cursor {
+    my ($self, %opts) = @_;
+    push @{$self->{_multi_cursors}}, {
+        line        => $opts{line},
+        col         => $opts{col},
+        anchor_line => $opts{anchor_line},
+        anchor_col  => $opts{anchor_col},
+    };
+}
+
+# Return all cursor positions sorted by document order (primary + secondary).
+# Each entry: { line, col, anchor_line, anchor_col, is_primary }
+# Sorted in ascending document order (by line, then col).
+sub all_cursors_sorted {
+    my ($self) = @_;
+    my @all;
+
+    # Primary cursor
+    push @all, {
+        line        => $self->{cursor_line},
+        col         => $self->{cursor_col},
+        anchor_line => $self->{selection_anchor_line},
+        anchor_col  => $self->{selection_anchor_col},
+        is_primary  => 1,
+    };
+
+    # Secondary cursors
+    for my $mc (@{$self->{_multi_cursors}}) {
+        push @all, {
+            line        => $mc->{line},
+            col         => $mc->{col},
+            anchor_line => $mc->{anchor_line},
+            anchor_col  => $mc->{anchor_col},
+            is_primary  => 0,
+        };
+    }
+
+    # Sort by line, then col (ascending)
+    @all = sort { $a->{line} <=> $b->{line} || $a->{col} <=> $b->{col} } @all;
+    return @all;
+}
+
+# Check if a position already has a cursor (to avoid duplicates).
+sub has_cursor_at {
+    my ($self, $line, $col) = @_;
+    return 1 if $self->{cursor_line} == $line && $self->{cursor_col} == $col;
+    for my $mc (@{$self->{_multi_cursors}}) {
+        return 1 if $mc->{line} == $line && $mc->{col} == $col;
+    }
+    return 0;
 }
 
 # ============================================================================
