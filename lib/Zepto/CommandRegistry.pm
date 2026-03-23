@@ -246,13 +246,23 @@ my @COMMANDS = (
     # === NAVIGATE section ===
     {
         id       => 'find',
-        label    => 'Find/Replace',
+        label    => 'Find',
         icon     => 'search',
         shortcut => SYM_CTRL . 'F',
         section  => 'NAVIGATE',
         type     => 'action',
         priority => 3,
         method   => 'cmd_find',
+    },
+    {
+        id       => 'find_replace',
+        label    => 'Find and Replace',
+        icon     => 'search',
+        shortcut => '',
+        section  => 'NAVIGATE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_find_replace',
     },
     {
         id       => 'goto_line',

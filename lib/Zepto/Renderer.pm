@@ -602,23 +602,29 @@ sub render {
         } elsif ($match_count == 0) {
             $match_text = length($value) ? 'No matches' : '';
         } else {
-            $match_text = ($current + 1) . ' of ' . $match_count;
+            $match_text = "\x{2191}\x{2193} " . ($current + 1) . ' of ' . $match_count;
             $match_text .= '...' if $is_searching;
         }
         # Account for capture hint width (must match _render_find_bar)
         my $capture_count = $find->{capture_count} // 0;
         my $regex_on = $find->{regex} // 0;
         my $capture_hint = '';
-        if ($regex_on) {
+        if ($regex_on && $capture_count > 0) {
             $capture_hint = '$0';
             for my $i (1 .. $capture_count) {
                 $capture_hint .= " \$$i";
             }
         }
         my $capture_hint_width = length($capture_hint) ? length($capture_hint) + 1 : 0;
+        my $replace_active = $find->{replace_active} // 0;
         my $right_side_width = 45 + length($match_text) + $capture_hint_width;
-        my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
-        my $input_width = int($available / 2);
+        my $available;
+        if ($replace_active) {
+            $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
+        } else {
+            $available = $cols - 2 - 5 - $right_side_width;
+        }
+        my $input_width = $replace_active ? int($available / 2) : $available;
         $input_width = 8 if $input_width < 8;
         $input_width = 40 if $input_width > 40;
 
@@ -4223,6 +4229,7 @@ sub _render_find_bar {
     my $case_on = $find->{case} // 0;
     my $replace_value = $find->{replace_value} // '';
     my $replace_all = $find->{replace_all} // 1;
+    my $replace_active = $find->{replace_active} // 0;
     my $focus = $find->{focus} // 'find';
     my $is_replacing = $find->{is_replacing} // 0;
     my $replace_progress = $find->{replace_progress} // 0;
@@ -4239,7 +4246,8 @@ sub _render_find_bar {
     } elsif ($match_count == 0) {
         $match_text = length($value) ? 'No matches' : '';
     } else {
-        $match_text = ($current + 1) . ' of ' . $match_count;
+        # Show navigation hint with match position
+        $match_text = "\x{2191}\x{2193} " . ($current + 1) . ' of ' . $match_count;
         $match_text .= '...' if $is_searching;
     }
 
@@ -4248,8 +4256,9 @@ sub _render_find_bar {
     my $rr = Zepto::Chars->get('round_right');
 
     # Build capture hint string (e.g. "$0 $1 $2") for status bar
+    # Only show when regex mode is on AND the pattern actually has capture groups
     my $capture_hint = '';
-    if ($regex_on) {
+    if ($regex_on && $capture_count > 0) {
         $capture_hint = '$0';
         for my $i (1 .. $capture_count) {
             $capture_hint .= " \$$i";
@@ -4262,8 +4271,13 @@ sub _render_find_bar {
     my $right_side_width = 45 + length($match_text) + $capture_hint_width;
 
     # Calculate input field widths
-    my $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
-    my $input_width = int($available / 2);
+    my $available;
+    if ($replace_active) {
+        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
+    } else {
+        $available = $cols - 2 - 5 - $right_side_width;  # " Find:" only
+    }
+    my $input_width = $replace_active ? int($available / 2) : $available;
     $input_width = 8 if $input_width < 8;
     $input_width = 40 if $input_width > 40;  # Cap at reasonable width
 
@@ -4322,52 +4336,55 @@ sub _render_find_bar {
     $content .= ' ';
     $x++;
 
-    # Replace label
-    $content .= 'Replace:';
-    $x += 8;
-
-    # Replace input field (clickable)
     my $replace_field_start = $x;
-    my $replace_bg_color = ($focus eq 'replace')
-        ? $theme->color('dialog_input_bg') : $theme->color('menu_pill_bg');
-    my $replace_fg_color = ($focus eq 'replace')
-        ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
-    $content .= $replace_bg_color . $replace_fg_color;
-    my ($replace_display, $rep_sel_s, $rep_sel_e);
-    if (my $w = $find->{replace_widget}) {
-        my $vp = $w->viewport($input_width);
-        $replace_display = $vp->{display_text};
-        $rep_sel_s       = $vp->{sel_start_in_view};
-        $rep_sel_e       = $vp->{sel_end_in_view};
-    } else {
-        $replace_display = $replace_value;
-        if (length($replace_display) > $input_width) {
-            $replace_display = substr($replace_display, length($replace_display) - $input_width);
-        }
-        $rep_sel_s = undef;
-        $rep_sel_e = undef;
-    }
-    if (defined $rep_sel_s) {
-        my $sel_bg = $theme->color('selection_bg');
-        my $sel_fg = $theme->color('selection_fg');
-        $content .= substr($replace_display, 0, $rep_sel_s) if $rep_sel_s > 0;
-        $content .= $sel_bg . $sel_fg;
-        $content .= substr($replace_display, $rep_sel_s, $rep_sel_e - $rep_sel_s);
+    if ($replace_active) {
+        # Replace label
+        $content .= 'Replace:';
+        $x += 8;
+
+        # Replace input field (clickable)
+        $replace_field_start = $x;
+        my $replace_bg_color = ($focus eq 'replace')
+            ? $theme->color('dialog_input_bg') : $theme->color('menu_pill_bg');
+        my $replace_fg_color = ($focus eq 'replace')
+            ? $theme->color('dialog_input_fg') : $theme->color('menu_pill_text');
         $content .= $replace_bg_color . $replace_fg_color;
-        $content .= substr($replace_display, $rep_sel_e) if $rep_sel_e < length($replace_display);
-    } elsif ($regex_on && $capture_count > 0) {
-        # Color $N tokens in the replace input
-        $content .= $class->_colorize_replace_input(
-            $theme, $replace_display, $replace_fg_color, $capture_count);
-    } else {
-        $content .= $replace_display;
+        my ($replace_display, $rep_sel_s, $rep_sel_e);
+        if (my $w = $find->{replace_widget}) {
+            my $vp = $w->viewport($input_width);
+            $replace_display = $vp->{display_text};
+            $rep_sel_s       = $vp->{sel_start_in_view};
+            $rep_sel_e       = $vp->{sel_end_in_view};
+        } else {
+            $replace_display = $replace_value;
+            if (length($replace_display) > $input_width) {
+                $replace_display = substr($replace_display, length($replace_display) - $input_width);
+            }
+            $rep_sel_s = undef;
+            $rep_sel_e = undef;
+        }
+        if (defined $rep_sel_s) {
+            my $sel_bg = $theme->color('selection_bg');
+            my $sel_fg = $theme->color('selection_fg');
+            $content .= substr($replace_display, 0, $rep_sel_s) if $rep_sel_s > 0;
+            $content .= $sel_bg . $sel_fg;
+            $content .= substr($replace_display, $rep_sel_s, $rep_sel_e - $rep_sel_s);
+            $content .= $replace_bg_color . $replace_fg_color;
+            $content .= substr($replace_display, $rep_sel_e) if $rep_sel_e < length($replace_display);
+        } elsif ($regex_on && $capture_count > 0) {
+            # Color $N tokens in the replace input
+            $content .= $class->_colorize_replace_input(
+                $theme, $replace_display, $replace_fg_color, $capture_count);
+        } else {
+            $content .= $replace_display;
+        }
+        $content .= $replace_bg_color . $replace_fg_color;
+        $content .= ' ' x ($input_width - length($replace_display));
+        $x += $input_width;
+
+        $content .= $theme->color('status_bg') . $theme->color('status_fg');
+        $content .= ' ';
     }
-    $content .= $replace_bg_color . $replace_fg_color;
-    $content .= ' ' x ($input_width - length($replace_display));
-    $x += $input_width;
-    
-    $content .= $theme->color('status_bg') . $theme->color('status_fg');
-    $content .= ' ';
     $x++;
 
     # Get icons for buttons

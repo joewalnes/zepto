@@ -69,7 +69,7 @@ subtest 'Exit find mode saves search term' => sub {
     $editor->enter_find_mode();
     $editor->{find_widget}->set_value('Hello');
 
-    $editor->exit_find_mode(1);
+    $editor->exit_find_mode('dismiss');
 
     is($editor->{state}, Zepto::Editor::STATE_EDITING, 'State is editing');
     is($editor->{search_term}, 'Hello', 'Search term saved');
@@ -294,14 +294,14 @@ subtest 'Enter find mode loads previous replace' => sub {
 
     $editor->enter_find_mode();
 
-    is($editor->{find_replace_active}, 1, 'Replace is always active (unified find/replace)');
+    is($editor->{find_replace_active}, 0, 'Find-only mode by default');
     is($editor->{find_replace_widget}->value(), 'Universe', 'Pre-filled with previous replace');
     is($editor->{find_focus}, 'find', 'Focus starts on find field');
 };
 
 subtest 'Replace current match' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('foo');
     $editor->{find_replace_widget}->set_value('XXX');
     $editor->_update_find_matches();
@@ -317,7 +317,7 @@ subtest 'Replace current match' => sub {
 
 subtest 'Replace all matches' => sub {
     my $editor = create_editor_with_content("foo bar foo baz foo\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('foo');
     $editor->{find_replace_widget}->set_value('YYY');
     $editor->_update_find_matches();
@@ -333,7 +333,7 @@ subtest 'Replace all matches' => sub {
 
 subtest 'Replace with empty string' => sub {
     my $editor = create_editor_with_content("foo bar foo\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('foo');
     $editor->{find_replace_widget}->set_value('');
     $editor->_update_find_matches();
@@ -346,7 +346,7 @@ subtest 'Replace with empty string' => sub {
 
 subtest 'Replace preserves case with regex' => sub {
     my $editor = create_editor_with_content("The cat sat on the mat.\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('at');
     $editor->{find_replace_widget}->set_value('og');
     $editor->_update_find_matches();
@@ -362,19 +362,20 @@ subtest 'Tab toggles focus in combined find/replace' => sub {
     $editor->enter_find_mode();
     $editor->{find_widget}->set_value('foo');
 
-    # Replace is always active now (unified find/replace)
-    is($editor->{find_replace_active}, 1, 'Replace always active');
+    # Find-only mode by default
+    is($editor->{find_replace_active}, 0, 'Find-only mode by default');
     is($editor->{find_focus}, 'find', 'Focus starts on find field');
 
-    # Simulate Tab press - should move to replace
+    # Simulate Tab press - should activate replace and move focus
     $editor->handle_find_event({ type => 'key', key => 'tab' });
 
+    is($editor->{find_replace_active}, 1, 'Tab activates replace field');
     is($editor->{find_focus}, 'replace', 'Tab moves focus to replace');
 };
 
 subtest 'Tab toggles focus between fields' => sub {
     my $editor = create_editor_with_content("test\n");
-    $editor->enter_find_mode(1);  # with replace
+    $editor->enter_find_mode(replace => 1);  # with replace
     $editor->{find_focus} = 'find';
 
     $editor->handle_find_event({ type => 'key', key => 'tab' });
@@ -524,7 +525,7 @@ subtest 'Expand replacement with capture references' => sub {
 # ============================================================================
 subtest 'Replace current with capture groups' => sub {
     my $editor = create_editor_with_content("John Smith\nJane Doe\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('(\w+) (\w+)');
     $editor->{find_regex} = 1;
     $editor->{find_replace_widget}->set_value('$2, $1');
@@ -541,7 +542,7 @@ subtest 'Replace current with capture groups' => sub {
 
 subtest 'Replace all with capture groups' => sub {
     my $editor = create_editor_with_content("John Smith\nJane Doe\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('(\w+) (\w+)');
     $editor->{find_regex} = 1;
     $editor->{find_replace_widget}->set_value('$2, $1');
@@ -555,7 +556,7 @@ subtest 'Replace all with capture groups' => sub {
 
 subtest 'Replace with $0 (full match reference)' => sub {
     my $editor = create_editor_with_content("foo bar baz\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('\w+');
     $editor->{find_regex} = 1;
     $editor->{find_replace_widget}->set_value('[$0]');
@@ -569,7 +570,7 @@ subtest 'Replace with $0 (full match reference)' => sub {
 
 subtest 'Literal mode ignores capture references' => sub {
     my $editor = create_editor_with_content("foo bar foo\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('foo');
     $editor->{find_regex} = 0;  # Literal mode
     $editor->{find_replace_widget}->set_value('$1');
@@ -583,7 +584,7 @@ subtest 'Literal mode ignores capture references' => sub {
 
 subtest 'Dollar sign escape in replacement' => sub {
     my $editor = create_editor_with_content("foo\n");
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('foo');
     $editor->{find_regex} = 1;
     $editor->{find_replace_widget}->set_value('$$100');
@@ -616,7 +617,7 @@ subtest 'Replace all with captures on many matches' => sub {
     # Test the _replace_all fast path (string concatenation) for >3 matches
     my $content = join("\n", map { "item_$_" } 1..5) . "\n";
     my $editor = create_editor_with_content($content);
-    $editor->enter_find_mode(1);
+    $editor->enter_find_mode(replace => 1);
     $editor->{find_widget}->set_value('item_(\d+)');
     $editor->{find_regex} = 1;
     $editor->{find_replace_widget}->set_value('thing[$1]');

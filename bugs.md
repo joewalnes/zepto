@@ -748,40 +748,32 @@ Switching from dark to light mode with `⌃T` leaves the tab bar rendered with d
 
 Bugs found during hands-on TUI usability testing via tmux session.
 
-### P1: [Usability] Enter in Find mode triggers Replace All — no separate find-only mode
-When opening Find with `⌃F`, the Replace field is always visible and `find_replace_active` is set to `1` unconditionally (`Editor.pm:2001`). Combined with `find_replace_all` defaulting to `1`, pressing Enter always executes Replace All. This means:
-- Pressing Enter with an empty Replace field **deletes all matches** with no confirmation
-- There is no way to press Enter to simply dismiss find and stay on the current match (as the spec in `FIND_REPLACE_SPEC.md` line 13 describes)
-- Users coming from any other editor expect Enter in a search bar to navigate to the next match or dismiss the bar, not to destructively replace text
-- Match navigation requires Up/Down arrows, which is non-obvious since the spec mentions it but the status bar hints only show "Enter" and "Esc"
+### ~~P1: [Usability] Enter in Find mode triggers Replace All — no separate find-only mode~~ FIXED
+When opening Find with `⌃F`, the Replace field was always visible and pressing Enter always executed Replace All.
 
-**Root cause:** `enter_find_mode()` always sets `find_replace_active = 1` (line 2001), bypassing the find-only mode described in the spec. The spec says Tab should switch from Find to Replace mode, but the code skips this distinction.
+**Fix:** Restored find-only vs find-and-replace mode distinction per the spec. `⌃F` now opens find-only mode (no Replace field). Enter dismisses find and keeps cursor on current match. Tab activates the Replace field. Only when in Replace mode does Enter trigger Replace All. Added `↑↓` navigation hint to match count display. Added "Find and Replace" as separate command in palette. Updated renderer to conditionally show/hide Replace field and adjusted all click region calculations.
 
-**Suggested fix:** Restore the find/replace mode distinction. In find-only mode (default from `⌃F`), Enter should dismiss find with the cursor on the current match. Tab should activate the Replace field. Only when in Replace mode should Enter trigger Replace All. Additionally, show "↑↓ navigate" in the find bar hints so users know how to move between matches.
+### ~~P2: [Bug] Auto-pair quote skip-over is disabled — typing closing quote adds duplicate~~ FIXED
+Typing `"hello"` produced `"hello""` because quote skip-over was explicitly disabled.
 
-### P2: [Bug] Auto-pair quote skip-over is disabled — typing closing quote adds duplicate
-When auto-pairs is enabled, typing an opening `"` (or `'` or `` ` ``) correctly auto-inserts the matching closing quote. However, typing the closing quote does NOT skip over the auto-inserted one — instead it inserts a second closing quote. For example, typing `"hello"` produces `"hello""` instead of `"hello"`.
+**Fix:** Removed the `!_is_quote($char)` exclusion from the skip-over logic. For quotes, uses an odd-count heuristic: counts occurrences of the same quote character before the cursor on the current line. If the count is odd (cursor is inside an unclosed string), the closing quote is skipped over. If even (cursor is outside a string), a new quote is inserted normally. Brackets continue to always skip over.
 
-**Root cause:** `Editor.pm:2765` — the skip-over logic explicitly excludes quotes with `!_is_quote($char)`. Bracket skip-over (`)`, `]`, `}`) works correctly. The exclusion was presumably added because quotes are symmetric (same char opens and closes), making it ambiguous whether the user wants to open a new string or close the current one. But in the common case of typing a closing quote immediately after content inside an auto-paired pair, the intent is clearly to close.
+### ~~P2: [Usability] Find bar text field doesn't clear or select-all on reopen~~ FIXED
+Reopening `⌃F` kept previous text but didn't select it, requiring manual deletion before typing a new search.
 
-**Suggested fix:** Track whether the character at the cursor position was auto-inserted (e.g., via a per-line flag or by checking if the cursor is immediately inside an auto-paired pair). When the character at cursor matches the typed closing quote AND was auto-inserted, skip over it. When ambiguous (e.g., cursor not inside a pair), insert normally.
+**Fix:** `enter_find_mode()` now pre-selects all text in the find widget when reopening with a previous search term. Typing immediately replaces the selection (like VS Code).
 
-### P2: [Usability] Find bar text field doesn't clear or select-all on reopen
-When reopening `⌃F`, the previous search term persists in the Find field (which is good — same as VS Code). However, the text is NOT pre-selected, so the user must manually delete it character-by-character with Backspace before typing a new search. In most editors, the previous text is selected on open, so typing immediately replaces it.
+### ~~P3: [Cosmetic] Find bar "$0" label: shown when regex off, and capture group replacement not discoverable~~ PARTIALLY FIXED
+`$0` label appeared even when regex mode was off and there were no capture groups.
 
-**Impact:** Requires multiple Backspace presses or manual selection before each new search. This adds friction to the most common search workflow.
+**Fix:** Capture group hints (`$0 $1 $2...`) now only appear when regex mode is ON AND the search pattern contains capture groups. Updated both the cursor positioning code and `_render_find_bar` in Renderer.pm. The hints use color-coded `$N` tokens matching the capture group colors in the find input. **Remaining:** A more explicit tooltip explaining how to use `$1` in the replace field would improve discoverability further.
 
-### P3: [Cosmetic] Find bar shows "$0" label that is unexplained
-When the Find bar is open and regex mode is OFF, a `$0` label appears in the status hints area. This is not explained anywhere in the UI and its meaning is unclear. When regex mode is ON, the `$0` disappears. It likely relates to capture group display but its presence in non-regex mode is confusing.
+### ~~P2: [Usability] Right arrow accepts entire ghost text completion — unexpected behavior~~ FIXED
+Right arrow accepted the entire ghost text suggestion at once, which was unexpected (VS Code dismisses ghost text on Right arrow).
 
-### P2: [Usability] Right arrow accepts entire ghost text completion — unexpected behavior
-When ghost text completion is showing (e.g., "us" + ghost "ername"), pressing the Right arrow key accepts the ENTIRE ghost text and moves the cursor to the end of the completed word. In VS Code and most modern editors, Right arrow dismisses the ghost text and moves the cursor one position right as normal. Only Tab (or a specific accept key) should accept ghost text.
+**Fix:** Changed Right arrow from accepting the entire ghost text to accepting one character at a time (like GitHub Copilot). Added `accept_char()` method to `Completion::Controller` that advances the prefix by one character while keeping the ghost active for the remaining text. When the last character is accepted, the completion is dismissed and recorded for RecentProvider. Tab continues to accept the full suggestion.
 
-**Root cause:** `Editor.pm:947` — `elsif ($_comp->is_ghost() && $key eq 'right' && !$ctrl && !$shift && !$alt)` explicitly intercepts the Right key to call `$_comp->accept()`.
+### ~~P3: [Usability] Ghost text completion does not re-trigger after undo~~ FIXED
+After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not reappear.
 
-**Impact:** Users who press Right arrow to continue editing find their text unexpectedly modified. This is especially jarring when the ghost suggestion is long or undesired. The Right arrow is one of the most frequently pressed keys during editing.
-
-**Suggested fix:** Remove the Right arrow acceptance behavior. Keep only Tab as the primary acceptance mechanism (and Enter in the dropdown menu). Alternatively, if some form of partial acceptance is desired, consider using Right arrow to accept one character of the ghost text at a time (like GitHub Copilot) rather than the entire suggestion.
-
-### P3: [Usability] Ghost text completion does not re-trigger after undo
-When typing triggers ghost text completion, accepting it, then pressing `⌃Z` to undo, the ghost text does not reappear. The user must type another character (and potentially undo again) to re-trigger the completion. Minor friction but noticeable during exploration of completion candidates.
+**Fix:** Added `_retrigger_completion_if_word()` helper that checks if the cursor is at a word character and sets `_completion_pending_at` to trigger the debounced completion. Called after both `cmd_undo()` and `cmd_redo()`. Ghost text now reappears after undo if the cursor position warrants it.
