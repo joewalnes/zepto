@@ -1038,7 +1038,8 @@ sub handle_editing_event {
             $self->{quit_pending} = 0;
         }
 
-        # Function keys (if any special handling needed)
+        # Function keys
+        elsif ($key eq 'f1') { $self->cmd_doc_tutorial(); }
     }
     elsif ($type eq 'char') {
         my $char = $event->{char};
@@ -4598,9 +4599,12 @@ sub _check_external_file_changes {
 
 # Open a new untitled tab with the given text content
 sub _open_content_tab {
-    my ($self, $content, $name) = @_;
+    my ($self, $content, $name, %opts) = @_;
     my $doc = Zepto::Document->new(text => $content);
     my $highlighter = Zepto::Highlighter->new();
+    if ($opts{syntax} && $opts{syntax} eq 'markdown') {
+        $highlighter->set_file('doc.md');
+    }
     my ($rows, $cols) = $self->{terminal}->get_size();
     my $gutter_width = Zepto::Renderer->get_gutter_width($doc->line_count());
     my $text_width = $cols - $gutter_width;
