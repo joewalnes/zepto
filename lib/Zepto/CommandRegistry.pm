@@ -445,6 +445,48 @@ my @COMMANDS = (
         method   => 'cmd_toggle_auto_pairs',
     },
 
+    # === DOCUMENTATION section ===
+    {
+        id       => 'doc_about',
+        label    => 'About Zepto',
+        icon     => 'palette',
+        shortcut => '',
+        section  => 'DOCUMENTATION',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_doc_about',
+    },
+    {
+        id       => 'doc_tutorial',
+        label    => 'Tutorial',
+        icon     => 'keyboard',
+        shortcut => 'F1',
+        section  => 'DOCUMENTATION',
+        type     => 'action',
+        priority => 5,
+        method   => 'cmd_doc_tutorial',
+    },
+    {
+        id       => 'doc_changelog',
+        label    => 'Changelog',
+        icon     => 'clock',
+        shortcut => '',
+        section  => 'DOCUMENTATION',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_doc_changelog',
+    },
+    {
+        id       => 'doc_license',
+        label    => 'License & Credits',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'DOCUMENTATION',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_doc_license',
+    },
+
     # === DIAGNOSTICS section ===
     {
         id       => 'show_perf_log',
@@ -462,7 +504,7 @@ my @COMMANDS = (
 my %BY_ID = map { $_->{id} => $_ } @COMMANDS;
 
 # Section ordering for palette display
-my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'DIAGNOSTICS');
+my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'DOCUMENTATION', 'DIAGNOSTICS');
 
 # =============================================================================
 # Public API

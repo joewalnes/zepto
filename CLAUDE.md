@@ -185,3 +185,16 @@ If any rule is not satisfied:
 | `docs/SECURITY.md` | New security concerns or mitigations |
 | `docs/UI_GUIDELINES.md` | New UI standards or design decisions |
 | `README.md` | Features added or removed |
+| `docs/help/changelog.md` | Every commit — add user-visible changes to the changelog |
+
+### Embedded Help Docs
+
+Built-in documentation lives in `docs/help/*.md` and is embedded into the zepto binary by `build.pl`. These docs are accessible from the command palette under the DOCUMENTATION section, and the Tutorial is bound to F1.
+
+When committing, update `docs/help/changelog.md` with any user-visible changes. Group entries by date, keep bullets short and readable. Only include things an end-user would care about.
+
+To add a new help doc:
+1. Create `docs/help/newdoc.md`
+2. Add entry to `%DOCS` and `@DOC_ORDER` in `lib/Zepto/HelpDocs.pm`
+3. Add command entry in `lib/Zepto/CommandRegistry.pm` under DOCUMENTATION section
+4. Add handler method in `lib/Zepto/Editor/Commands.pm` (call `_open_help_doc`)

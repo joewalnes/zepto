@@ -1302,4 +1302,22 @@ sub cmd_show_perf_log {
     $self->_open_content_tab($content, 'Performance Log');
 }
 
+# =============================================================================
+# Documentation Commands
+# =============================================================================
+
+use Zepto::HelpDocs;
+
+sub _open_help_doc {
+    my ($self, $doc_id) = @_;
+    my $label = Zepto::HelpDocs->doc_label($doc_id);
+    my $content = Zepto::HelpDocs->doc_content($doc_id);
+    $self->_open_content_tab($content, $label, syntax => 'markdown');
+}
+
+sub cmd_doc_about     { $_[0]->_open_help_doc('about') }
+sub cmd_doc_tutorial  { $_[0]->_open_help_doc('tutorial') }
+sub cmd_doc_changelog { $_[0]->_open_help_doc('changelog') }
+sub cmd_doc_license   { $_[0]->_open_help_doc('license') }
+
 1;

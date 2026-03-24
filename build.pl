@@ -2,8 +2,11 @@
 # Build script: assembles single-file zepto from modules
 use strict;
 use warnings;
+use utf8;
 use File::Find;
 use POSIX qw(strftime);
+
+binmode(STDOUT, ':utf8');
 
 # Build version: env override > git tag > CalVer date
 my $VERSION = $ENV{ZEPTO_VERSION}
@@ -59,6 +62,8 @@ my %priority = (
     'lib/Zepto/Completion/PathProvider.pm'             => 109,
     # Renderer needs Highlighter
     'lib/Zepto/Renderer.pm'    => 110,
+    # HelpDocs before CommandRegistry (doc commands reference it)
+    'lib/Zepto/HelpDocs.pm'        => 114,
     # CommandRegistry must come before Editor (Palette references its constants)
     'lib/Zepto/CommandRegistry.pm' => 115,
     # Editor needs everything above
@@ -132,6 +137,23 @@ for my $file (@modules) {
 
     # Strip comment-only lines (lines starting with #)
     $content =~ s/^[ \t]*#.*\n//gm;
+
+    # Embed help docs into HelpDocs module (after comment stripping, since
+    # heredoc content contains # lines that must be preserved)
+    if ($file =~ m{HelpDocs\.pm$}) {
+        my $embed_code = '';
+        for my $doc_file (sort glob('docs/help/*.md')) {
+            open my $dfh, '<:utf8', $doc_file or die "Cannot open $doc_file: $!";
+            my $doc_content = do { local $/; <$dfh> };
+            close $dfh;
+            (my $doc_id = $doc_file) =~ s{^docs/help/(.+)\.md$}{$1};
+            $embed_code .= "\$EMBEDDED{'$doc_id'} = <<'__END_DOC_${doc_id}__';\n";
+            $embed_code .= $doc_content;
+            $embed_code .= "__END_DOC_${doc_id}__\n";
+        }
+        # The marker was stripped as a comment; inject after %EMBEDDED declaration
+        $content =~ s/(my %EMBEDDED;\n)/$1$embed_code/;
+    }
 
     # Inject build version into Editor module
     $content =~ s/our \$VERSION = 'dev';/our \$VERSION = '$VERSION';/
