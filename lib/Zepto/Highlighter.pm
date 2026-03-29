@@ -159,6 +159,7 @@ my %EXTENSION_MAP = (
     xsl      => 'Zepto::Syntax::XML',
     xslt     => 'Zepto::Syntax::XML',
     svg      => 'Zepto::Syntax::XML',
+    plist    => 'Zepto::Syntax::XML',
 
     # CSS
     css      => 'Zepto::Syntax::CSS',
