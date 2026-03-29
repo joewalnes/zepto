@@ -183,10 +183,12 @@ sub tokenize {
             next;
         }
 
-        if ($rest =~ /^(-[a-zA-Z]+)\b/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_OPERATOR);
-            $pos += length($1);
-            next;
+        if ($pos == 0 || substr($line, $pos - 1, 1) =~ /\s/) {
+            if ($rest =~ /^(-[\w-]+)/) {
+                push @tokens, _token($pos, $pos + length($1), TOKEN_OPERATOR);
+                $pos += length($1);
+                next;
+            }
         }
 
         if ($rest =~ /^(\[\[|\]\]|\[|\])/) {
@@ -195,12 +197,14 @@ sub tokenize {
             next;
         }
 
-        if ($rest =~ /^(\w+)(=)/) {
-            push @tokens, _token($pos, $pos + length($1), TOKEN_VARIABLE);
-            $pos += length($1);
-            push @tokens, _token($pos, $pos + 1, TOKEN_OPERATOR);
-            $pos += 1;
-            next;
+        if ($pos == 0 || substr($line, $pos - 1, 1) !~ /[\w-]/) {
+            if ($rest =~ /^([\w-]+)(=)/) {
+                push @tokens, _token($pos, $pos + length($1), TOKEN_VARIABLE);
+                $pos += length($1);
+                push @tokens, _token($pos, $pos + 1, TOKEN_OPERATOR);
+                $pos += 1;
+                next;
+            }
         }
 
         my $before = $pos > 0 ? substr($line, 0, $pos) : '';
