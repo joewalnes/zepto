@@ -3,6 +3,12 @@
 # Format: <TYPE>text</TYPE> where TYPE is the token type
 
 <COMMENT>#!/usr/bin/env python3</COMMENT>
+<HEADING># /// script</HEADING>
+<ATTRIBUTE>#</ATTRIBUTE> <VARIABLE>requires-python</VARIABLE> <OPERATOR>=</OPERATOR> <STRING>"&gt;=3.10"</STRING>
+<ATTRIBUTE>#</ATTRIBUTE> <VARIABLE>dependencies</VARIABLE> <OPERATOR>=</OPERATOR> <PUNCTUATION>[</PUNCTUATION>
+<ATTRIBUTE>#</ATTRIBUTE>     <STRING>"requests&gt;=2.28.0"</STRING><PUNCTUATION>,</PUNCTUATION>
+<ATTRIBUTE>#</ATTRIBUTE> <PUNCTUATION>]</PUNCTUATION>
+<HEADING># ///</HEADING>
 <STRING>"""A complete Python program demonstrating various syntax elements."""</STRING>
 
 <COMMENT># This is a very long comment that extends well beyond the typical terminal width of eighty columns to test word wrap behavior in code files. When wrap is toggled on with Alt+Z, this line should break at word boundaries and display a continuation indicator on wrapped rows.</COMMENT>

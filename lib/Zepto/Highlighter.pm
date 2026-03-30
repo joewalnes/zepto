@@ -408,6 +408,7 @@ my %SHEBANG_MAP = (
     zsh      => 'Zepto::Syntax::Shell',
     ksh      => 'Zepto::Syntax::Shell',
     dash     => 'Zepto::Syntax::Shell',
+    uv       => 'Zepto::Syntax::Python',
     fish     => 'Zepto::Syntax::Fish',
     php      => 'Zepto::Syntax::PHP',
     lua      => 'Zepto::Syntax::Lua',

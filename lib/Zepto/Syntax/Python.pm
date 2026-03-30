@@ -66,6 +66,79 @@ sub tokenize {
     my $pos = 0;
     my $len = length($line);
 
+    # Continue PEP 723 inline script metadata (# /// script ... # ///)
+    if ($state == 12) {
+        # Closing delimiter
+        if ($line =~ /^(\s*#\s*\/\/\/)$/) {
+            push @tokens, _token(0, $len, TOKEN_HEADING);
+            return (\@tokens, STATE_NORMAL);
+        }
+        # Content line — highlight # prefix, then parse TOML innards
+        if ($line =~ /^(\s*#)(.*)/) {
+            my $prefix_len = length($1);
+            push @tokens, _token(0, $prefix_len, TOKEN_ATTRIBUTE);
+            my $toml = $2;
+            my $tpos = $prefix_len;
+            my $tlen = $len;
+            while ($tpos < $tlen) {
+                my $trest = substr($line, $tpos);
+
+                if ($trest =~ /^(\s+)/) { $tpos += length($1); next; }
+
+                # Strings
+                if ($trest =~ /^("(?:[^"\\]|\\.)*")/) {
+                    push @tokens, _token($tpos, $tpos + length($1), TOKEN_STRING);
+                    $tpos += length($1);
+                    next;
+                }
+                if ($trest =~ /^('(?:[^'])*')/) {
+                    push @tokens, _token($tpos, $tpos + length($1), TOKEN_STRING);
+                    $tpos += length($1);
+                    next;
+                }
+
+                # Booleans
+                if ($trest =~ /^(true|false)\b/) {
+                    push @tokens, _token($tpos, $tpos + length($1), TOKEN_KEYWORD);
+                    $tpos += length($1);
+                    next;
+                }
+
+                # Numbers
+                if ($trest =~ /^(\d[\d_]*\.?[\d_]*(?:e[+-]?[\d_]+)?)/) {
+                    push @tokens, _token($tpos, $tpos + length($1), TOKEN_NUMBER);
+                    $tpos += length($1);
+                    next;
+                }
+
+                # Key before =
+                if ($trest =~ /^([\w-]+(?:\.[\w-]+)*)(\s*=)/) {
+                    push @tokens, _token($tpos, $tpos + length($1), TOKEN_VARIABLE);
+                    $tpos += length($1);
+                    $trest = substr($line, $tpos);
+                    if ($trest =~ /^(\s*)(=)/) {
+                        $tpos += length($1);
+                        push @tokens, _token($tpos, $tpos + 1, TOKEN_OPERATOR);
+                        $tpos += 1;
+                    }
+                    next;
+                }
+
+                # Brackets and commas
+                if ($trest =~ /^([\[\],])/) {
+                    push @tokens, _token($tpos, $tpos + 1, TOKEN_PUNCTUATION);
+                    $tpos += 1;
+                    next;
+                }
+
+                $tpos++;
+            }
+            return (\@tokens, 12);
+        }
+        # Non-comment line ends the block (malformed, but recover)
+        $state = STATE_NORMAL;
+    }
+
     # Continue triple-quoted string
     if ($state == 10) {
         if ($line =~ /^(.*?)"""/) {
@@ -92,6 +165,12 @@ sub tokenize {
         my $rest = substr($line, $pos);
 
         if ($rest =~ /^(\s+)/) { $pos += length($1); next; }
+
+        # PEP 723 inline script metadata: # /// script
+        if ($pos == 0 && $line =~ /^(\s*#\s*\/\/\/\s+script\s*)$/) {
+            push @tokens, _token(0, $len, TOKEN_HEADING);
+            return (\@tokens, 12);
+        }
 
         # Comment
         if ($rest =~ /^(#.*)/) {
