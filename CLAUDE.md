@@ -77,12 +77,25 @@ When you find a bug (even while working on something else), add it to `bugs.md` 
 
 **Do this BEFORE `make test`, not after.** Running unit tests first creates a false sense of completion that makes it easy to skip the interactive step. The order is: build → interact → then run tests.
 
-### Using `hangon` (preferred)
+### Using `hangon` (required)
 
-`hangon` is a persistent session manager that makes interactive TUI testing scriptable. Use it instead of raw tmux commands.
+`hangon` is a persistent session manager that makes interactive TUI testing scriptable. **Always use `hangon` for interactive testing — do not use raw tmux commands.**
+
+`hangon` should already be installed and available in PATH. If not, install it:
+
+```bash
+brew install joewalnes/tap/hangon
+```
+
+Or see https://github.com/joewalnes/hangon for other installation methods (binary download, from source).
+
+#### Example workflow
 
 ```bash
 make build
+
+# Clean up any stale sessions first
+hangon stopall
 
 # Start zepto in a session
 hangon start process --name zepto -- ./zepto /tmp/testfile.txt
@@ -95,6 +108,7 @@ hangon screen zepto
 hangon send zepto "hello world"
 hangon keys zepto "enter"
 hangon keys zepto "ctrl-s"
+sleep 0.3
 hangon screen zepto                # see current screen state
 
 # Clean up
@@ -102,44 +116,30 @@ hangon keys zepto "ctrl-q"
 hangon stop zepto
 ```
 
-Key `hangon` commands:
-- `hangon start process --name NAME -- ./zepto FILE` — start a session
-- `hangon screen NAME` — capture current terminal screen as text
-- `hangon send NAME "text"` — type literal characters
-- `hangon sendline NAME "text"` — type text + Enter
-- `hangon keys NAME "ctrl-z"` — send special keys (ctrl-a..z, enter, tab, escape, backspace, up, down, left, right, home, end, f1..f12)
-- `hangon expect NAME "pattern"` — wait for regex to appear in output
-- `hangon stop NAME` — stop the session
-- `hangon stopall` — stop all sessions
+#### Command reference
 
-Tips:
+| Command | Description |
+|---------|-------------|
+| `hangon start process --name NAME -- ./zepto FILE` | Start a session |
+| `hangon screen NAME` | Capture current terminal screen as text |
+| `hangon send NAME "text"` | Type literal characters |
+| `hangon sendline NAME "text"` | Type text + Enter |
+| `hangon keys NAME "ctrl-z"` | Send special keys (ctrl-a..z, enter, tab, escape, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1..f12) |
+| `hangon expect NAME "pattern"` | Wait for regex to appear in output |
+| `hangon screenshot NAME file.png` | Capture screen as SVG/PNG image |
+| `hangon alive NAME` | Check if process is running (exit 0=yes, 1=no) |
+| `hangon stop NAME` | Stop a session |
+| `hangon stopall` | Stop all sessions |
+
+#### Tips
+
 - Always `hangon stopall` before starting a new test session to avoid stale sessions
 - Use `sleep 0.3` or `sleep 0.5` after send/keys before `screen` to let the editor render
 - Chain independent sends with `&&` for efficiency
 - Use `--name` to run multiple sessions in parallel (e.g., testing cross-tab features)
+- Use `hangon expect` instead of `sleep` when waiting for specific output — it's faster and more reliable
 
-### Using raw tmux (fallback)
-
-If `hangon` is not available, use tmux directly:
-
-```bash
-make build
-tmux new-session -d -s test -x 200 -y 50
-tmux send-keys -t test "./zepto testfile.txt" Enter
-sleep 2
-tmux capture-pane -t test -p
-```
-
-Interact and observe:
-
-```bash
-tmux send-keys -t test "some text"    # type text
-tmux send-keys -t test "C-s"          # Ctrl+S save
-tmux send-keys -t test "C-q"          # Ctrl+Q quit
-tmux capture-pane -t test -p          # see screen state
-```
-
-### Rules (apply to both methods)
+### Rules
 
 - Always `make build` first
 - Capture the screen after each interaction to see what actually happened
