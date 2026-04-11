@@ -61,7 +61,7 @@ my @COMMANDS = (
     },
     {
         id       => 'close_tab',
-        label    => 'Close Tab',
+        label    => 'Save and Close Tab',
         icon     => 'times',
         shortcut => SYM_CTRL . 'W',
         section  => 'FILE',

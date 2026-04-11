@@ -92,38 +92,13 @@ sub cmd_close_tab {
 
     my $doc = $self->active_doc();
 
+    # Save if dirty, then close. No prompt — Ctrl+Q prompts instead.
     if ($doc->is_dirty()) {
-        my $name = $self->active_tab()->{untitled_name}
-                || $doc->filename()
-                || '[untitled]';
-        my $save_icon = Zepto::Chars->get('save');
-        my $times_icon = Zepto::Chars->get('times');
-        $self->open_prompt(
-            text => "Save changes to $name?",
-            options => [
-                { key => 'y', label => 'Save', icon => $save_icon },
-                { key => 'n', label => 'Discard', icon => $times_icon },
-                { key => 'c', label => 'Cancel' },
-            ],
-            on_select => sub {
-                my ($choice) = @_;
-                if ($choice eq 'y') {
-                    $self->cmd_save();
-                    # Close after save succeeds
-                    unless ($self->active_doc()->is_dirty()) {
-                        $self->_do_close_tab($self->{tab_manager}->active_index());
-                    }
-                }
-                elsif ($choice eq 'n') {
-                    $self->_do_close_tab($self->{tab_manager}->active_index());
-                }
-                # 'c' = cancel, do nothing
-            },
-        );
+        $self->cmd_save();
+        # Only close if save succeeded
+        return if $self->active_doc()->is_dirty();
     }
-    else {
-        $self->_do_close_tab($self->{tab_manager}->active_index());
-    }
+    $self->_do_close_tab($self->{tab_manager}->active_index());
 }
 
 sub _do_close_tab {
