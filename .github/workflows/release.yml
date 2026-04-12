@@ -50,6 +50,7 @@ jobs:
           curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.sha.outputs.short }}/zepto -o zepto && chmod +x zepto
           \`\`\`" \
             --prerelease \
+            --draft=false \
             zepto
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
