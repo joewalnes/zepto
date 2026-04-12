@@ -40,6 +40,7 @@ my %priority = (
     'lib/Zepto/View.pm'         => 15,
     'lib/Zepto/InputParser.pm'  => 16,
     'lib/Zepto/Theme.pm'        => 17,
+    'lib/Zepto/StateStore.pm'   => 17.5, # Before Preferences (which will depend on it)
     'lib/Zepto/Preferences.pm'  => 18,
     'lib/Zepto/ImageConverter.pm' => 18.5,  # Before Terminal (which uses it)
     'lib/Zepto/Terminal.pm'     => 19,
@@ -389,27 +390,31 @@ if (@files == 1 && -d $files[0]) {
     $focus_tree = 1;
 }
 
-# Check environment variable for nerd font setting
-my $nerd_font = 1;  # Default ON
+# Create state store and preferences (loads persisted values)
+my $state_store = Zepto::StateStore->new();
+my $prefs = Zepto::Preferences->new(state_store => $state_store);
+
+# CLI flags and env vars override persisted preferences
 if ($no_nerd_font || (defined $ENV{ZEPTO_NERD_FONT} && $ENV{ZEPTO_NERD_FONT} eq '0')) {
-    $nerd_font = 0;
+    $prefs->set_nerd_font(0);
 }
+Zepto::Chars->set_enabled($prefs->nerd_font());
 
-# Determine show_tree: explicit flag > env var > default (hidden when opening files)
-my $show_tree = 1;  # Default ON
+# Determine show_tree for this window: explicit flag > env var > context > persisted
+my $hide_tree;
 if ($force_tree) {
-    $show_tree = 1;
+    # --tree flag: show regardless
 } elsif ($no_tree || (defined $ENV{ZEPTO_TREE} && $ENV{ZEPTO_TREE} eq '0')) {
-    $show_tree = 0;
+    $hide_tree = 1;
 } elsif (@files >= 1 && !$focus_tree) {
-    # Opening specific files (not a directory) — hide tree by default
-    $show_tree = 0;
+    # Opening specific files (not a directory) — hide tree for this window
+    $hide_tree = 1;
 }
 
-# Create preferences
-my $prefs = Zepto::Preferences->new(nerd_font => $nerd_font, show_tree => $show_tree);
-Zepto::Chars->set_enabled($nerd_font);
-
-my $editor = Zepto::Editor->new(files => \@files, prefs => $prefs, focus_tree => $focus_tree);
+my $editor = Zepto::Editor->new(
+    files => \@files, prefs => $prefs,
+    state_store => $state_store, focus_tree => $focus_tree,
+    ($hide_tree ? (show_tree => 0) : ()),
+);
 $editor->run();
 MAIN

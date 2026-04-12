@@ -3,8 +3,10 @@
 use strict;
 use warnings;
 use Test::More;
+use File::Temp;
 use lib 'lib';
 use Zepto::Preferences;
+use Zepto::StateStore;
 
 # ============================================================================
 # Construction
@@ -263,63 +265,64 @@ subtest 'Visual width' => sub {
 };
 
 # ============================================================================
-# Serialization
+# Persistence via StateStore
 # ============================================================================
-subtest 'Serialize' => sub {
-    my $prefs = Zepto::Preferences->new();
-    my $output = $prefs->serialize();
+subtest 'Persistence: global prefs are saved to StateStore' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs = Zepto::Preferences->new(state_store => $store);
 
-    like($output, qr/theme=dark/, 'Contains theme');
-    like($output, qr/tab_width=4/, 'Contains tab_width');
-    like($output, qr/\n/, 'Has newlines');
+    $prefs->set_theme('light');
+    my $data = $store->get('preferences');
+    is($data->{theme}, 'light', 'Theme persisted to StateStore');
 };
 
-subtest 'Deserialize' => sub {
-    my $prefs = Zepto::Preferences->new();
-    my $input = "theme=light\ntab_width=2\nsoft_tabs=0\n";
+subtest 'Persistence: prefs load from StateStore on init' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
 
-    $prefs->deserialize($input);
-    is($prefs->get('theme'), 'light', 'Deserialized theme');
-    is($prefs->get('tab_width'), '2', 'Deserialized tab_width');
-    is($prefs->get('soft_tabs'), '0', 'Deserialized soft_tabs');
+    # Save some prefs
+    $store->put('preferences', { theme => 'light', tab_width => 2 });
+
+    # Create new Preferences instance — should load persisted values
+    my $prefs = Zepto::Preferences->new(state_store => $store);
+    is($prefs->get('theme'), 'light', 'Theme loaded from store');
+    is($prefs->get('tab_width'), 2, 'Tab width loaded from store');
+    # Non-persisted should still be default
+    is($prefs->get('scroll_margin'), 3, 'Non-persisted pref is default');
 };
 
-subtest 'Deserialize with comments and whitespace' => sub {
-    my $prefs = Zepto::Preferences->new();
-    my $input = <<'END';
-# Editor preferences
-theme = light
-tab_width = 2
+subtest 'Persistence: round-trip via StateStore' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
 
-# Ignore unknown
-END
+    my $prefs1 = Zepto::Preferences->new(state_store => $store);
+    $prefs1->set_theme('light');
+    $prefs1->set_tab_width(2);
+    $prefs1->set_nerd_font(0);
 
-    $prefs->deserialize($input);
-    is($prefs->get('theme'), 'light', 'Deserialized with spaces');
-    is($prefs->get('tab_width'), '2', 'Deserialized with comments');
-};
-
-subtest 'Deserialize boolean strings' => sub {
-    my $prefs = Zepto::Preferences->new();
-    my $input = "soft_tabs=true\nauto_indent=false\n";
-
-    $prefs->deserialize($input);
-    is($prefs->get('soft_tabs'), 1, 'true -> 1');
-    is($prefs->get('auto_indent'), 0, 'false -> 0');
-};
-
-subtest 'Round-trip serialization' => sub {
-    my $prefs1 = Zepto::Preferences->new();
-    $prefs1->set('theme', 'light');
-    $prefs1->set('tab_width', 2);
-
-    my $serialized = $prefs1->serialize();
-
-    my $prefs2 = Zepto::Preferences->new();
-    $prefs2->deserialize($serialized);
-
+    # New instance loads the same values
+    my $prefs2 = Zepto::Preferences->new(state_store => $store);
     is($prefs2->get('theme'), 'light', 'Theme round-trip');
-    is($prefs2->get('tab_width'), '2', 'Tab width round-trip');
+    is($prefs2->get('tab_width'), 2, 'Tab width round-trip');
+    is($prefs2->get('nerd_font'), 0, 'Nerd font round-trip');
+};
+
+subtest 'Persistence: cross-instance sync via on_change' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store_a = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $store_b = Zepto::StateStore->new(base_dir => $tmpdir);
+
+    my $prefs_a = Zepto::Preferences->new(state_store => $store_a);
+    my $prefs_b = Zepto::Preferences->new(state_store => $store_b);
+
+    # Instance A changes theme
+    $prefs_a->set_theme('light');
+    sleep 1;  # Ensure mtime differs
+
+    # Instance B picks up the change
+    $store_b->check_for_changes();
+    is($prefs_b->get('theme'), 'light', 'Cross-instance theme sync');
 };
 
 # ============================================================================

@@ -32,6 +32,7 @@ use Zepto::Terminal;
 use Zepto::Renderer;
 use Zepto::InputParser;
 use Zepto::Preferences;
+use Zepto::StateStore;
 use Zepto::Theme;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
@@ -74,11 +75,12 @@ sub new {
 
     my $self = bless {
         # Core components
-        tab_manager => Zepto::Editor::TabManager->new(),
-        terminal    => $opts{terminal} // Zepto::Terminal->new(),
-        parser      => Zepto::InputParser->new(),
-        prefs       => $opts{prefs} // Zepto::Preferences->new(),
-        theme       => undef,
+        tab_manager  => Zepto::Editor::TabManager->new(),
+        terminal     => $opts{terminal} // Zepto::Terminal->new(),
+        parser       => Zepto::InputParser->new(),
+        state_store  => $opts{state_store} // Zepto::StateStore->new(),
+        prefs        => undef,  # initialized below (needs state_store)
+        theme        => undef,
 
         # UI state
         state        => STATE_EDITING,
@@ -164,6 +166,14 @@ sub new {
         _completion_pending_at => 0,      # Debounce timer (Time::HiRes timestamp)
     }, $class;
 
+    # Initialize preferences (needs state_store for persistence)
+    $self->{prefs} = $opts{prefs} // Zepto::Preferences->new(
+        state_store => $self->{state_store},
+    );
+
+    # Per-window state, initialized from global default (or explicit override)
+    $self->{_show_tree} = defined $opts{show_tree} ? $opts{show_tree} : $self->{prefs}->show_tree();
+
     # Initialize theme
     $self->{theme} = Zepto::Theme->get_theme($self->{prefs}->theme());
 
@@ -220,51 +230,12 @@ sub _effective_word_wrap {
 
 use constant RECENT_FILES_MAX => 50;
 
-sub _recent_files_path {
-    my $home = $ENV{HOME} || (getpwuid($<))[7] || '.';
-    return "$home/.config/zepto/recent_files";
-}
-
 sub _load_recent_files {
     my ($self) = @_;
-    my $path = $self->_recent_files_path();
-    return unless -f $path;
-
-    my @files;
-    if (open my $fh, '<', $path) {
-        while (my $line = <$fh>) {
-            chomp $line;
-            push @files, $line if length($line) && -f $line;
-        }
-        close $fh;
-    }
-    $self->{_recent_files} = \@files;
-}
-
-sub _save_recent_files {
-    my ($self) = @_;
-    my $path = $self->_recent_files_path();
-
-    # Ensure directory exists
-    my $dir = $path;
-    $dir =~ s{/[^/]+$}{};
-    if (!-d $dir) {
-        # Create directory recursively
-        my @parts = split m{/}, $dir;
-        my $built = '';
-        for my $part (@parts) {
-            $built .= "/$part";
-            next if -d $built;
-            mkdir $built or return;  # Silently fail
-        }
-    }
-
-    if (open my $fh, '>', $path) {
-        for my $file (@{$self->{_recent_files}}) {
-            print $fh "$file\n";
-        }
-        close $fh;
-    }
+    my $history = $self->{state_store}->get('history');
+    my $files = $history->{recent_files} || [];
+    # Filter to files that still exist
+    $self->{_recent_files} = [grep { -f $_ } @$files];
 }
 
 sub _track_recent_file {
@@ -274,8 +245,12 @@ sub _track_recent_file {
     # Resolve to absolute path
     my $abs_path = File::Spec->rel2abs($file_path);
 
+    # Merge with on-disk state (another instance may have added files)
+    my $history = $self->{state_store}->get('history');
+    my @files = @{$history->{recent_files} || []};
+
     # Remove if already in list (we'll re-add at front)
-    my @files = grep { $_ ne $abs_path } @{$self->{_recent_files}};
+    @files = grep { $_ ne $abs_path } @files;
 
     # Add to front
     unshift @files, $abs_path;
@@ -284,7 +259,113 @@ sub _track_recent_file {
     splice @files, RECENT_FILES_MAX if @files > RECENT_FILES_MAX;
 
     $self->{_recent_files} = \@files;
-    $self->_save_recent_files();
+    $self->{state_store}->put('history', { recent_files => \@files });
+}
+
+# =============================================================================
+# History Persistence (find, replace, transform, cursor positions)
+# =============================================================================
+
+use constant {
+    FIND_HISTORY_MAX      => 30,
+    TRANSFORM_HISTORY_MAX => 30,
+    CURSOR_POSITIONS_MAX  => 200,
+};
+
+# Save the current search term to history (called when exiting find mode)
+sub _save_find_history {
+    my ($self, $term) = @_;
+    return unless defined $term && length($term);
+
+    my $history = $self->{state_store}->get('history');
+    my @terms = @{$history->{find_history} || []};
+    @terms = grep { $_ ne $term } @terms;
+    unshift @terms, $term;
+    splice @terms, FIND_HISTORY_MAX if @terms > FIND_HISTORY_MAX;
+    $self->{state_store}->put('history', { find_history => \@terms });
+}
+
+# Save the current replace string to history
+sub _save_replace_history {
+    my ($self, $term) = @_;
+    return unless defined $term && length($term);
+
+    my $history = $self->{state_store}->get('history');
+    my @terms = @{$history->{replace_history} || []};
+    @terms = grep { $_ ne $term } @terms;
+    unshift @terms, $term;
+    splice @terms, FIND_HISTORY_MAX if @terms > FIND_HISTORY_MAX;
+    $self->{state_store}->put('history', { replace_history => \@terms });
+}
+
+# Save a transform command to history
+sub _save_transform_history {
+    my ($self, $cmd) = @_;
+    return unless defined $cmd && length($cmd);
+
+    my $history = $self->{state_store}->get('history');
+    my @cmds = @{$history->{transform_history} || []};
+    @cmds = grep { $_ ne $cmd } @cmds;
+    unshift @cmds, $cmd;
+    splice @cmds, TRANSFORM_HISTORY_MAX if @cmds > TRANSFORM_HISTORY_MAX;
+    $self->{state_store}->put('history', { transform_history => \@cmds });
+}
+
+# Get find/replace/transform history
+sub find_history      { $_[0]->{state_store}->get('history')->{find_history} || [] }
+sub replace_history   { $_[0]->{state_store}->get('history')->{replace_history} || [] }
+sub transform_history { $_[0]->{state_store}->get('history')->{transform_history} || [] }
+
+# Save cursor position for a file (called when closing tab or switching away)
+sub _save_cursor_position {
+    my ($self, $file_path, $line, $col) = @_;
+    return unless defined $file_path && length($file_path);
+
+    my $abs_path = File::Spec->rel2abs($file_path);
+    my $history = $self->{state_store}->get('history');
+    my $positions = $history->{cursor_positions} || {};
+
+    $positions->{$abs_path} = { line => $line, col => $col };
+
+    # Trim to max: remove oldest entries beyond the limit
+    my @keys = CORE::keys %$positions;
+    if (@keys > CURSOR_POSITIONS_MAX) {
+        # Keep only entries that are in recent_files (most relevant)
+        my %recent = map { $_ => 1 } @{$self->{_recent_files} || []};
+        for my $k (@keys) {
+            delete $positions->{$k} unless $recent{$k};
+            last if CORE::keys(%$positions) <= CURSOR_POSITIONS_MAX;
+        }
+    }
+
+    $self->{state_store}->put('history', { cursor_positions => $positions });
+}
+
+# Restore cursor position for a file (called when opening a file)
+sub _restore_cursor_position {
+    my ($self, $file_path, $view) = @_;
+    return unless defined $file_path && length($file_path);
+
+    my $abs_path = File::Spec->rel2abs($file_path);
+    my $history = $self->{state_store}->get('history');
+    my $positions = $history->{cursor_positions} || {};
+    my $pos = $positions->{$abs_path};
+    return unless $pos;
+
+    my $line = $pos->{line} // 0;
+    my $col  = $pos->{col}  // 0;
+
+    # Clamp to document bounds
+    my $max_line = $view->{document}->line_count() - 1;
+    $line = $max_line if $line > $max_line;
+    $line = 0 if $line < 0;
+
+    my $line_len = length($view->{document}->get_line_content($line) // '');
+    $col = $line_len if $col > $line_len;
+    $col = 0 if $col < 0;
+
+    $view->set_cursor($line, $col);
+    $view->ensure_cursor_visible();
 }
 
 # =============================================================================
@@ -484,6 +565,10 @@ sub init {
     # Load recent files list from disk
     $self->_load_recent_files();
 
+    # Load last transform command from history
+    my $transform_hist = $self->transform_history();
+    $self->{last_transform_cmd} = $transform_hist->[0] // '';
+
     # Create tabs from initial files (or one empty tab if none specified)
     if (@files) {
         for my $file_path (@files) {
@@ -495,6 +580,8 @@ sub init {
                 highlighter => $highlighter,
                 file_path   => $file_path,
             );
+            # Restore cursor position from history
+            $self->_restore_cursor_position($file_path, $view);
             # Track in recent files
             $self->_track_recent_file($file_path);
         }
@@ -512,7 +599,7 @@ sub init {
     }
 
     # Initialize file tree
-    if ($self->{prefs}->show_tree()) {
+    if ($self->{_show_tree}) {
         $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
         if ($self->active_file_path()) {
             $self->{file_tree}->set_current_file($self->active_file_path());
@@ -522,6 +609,27 @@ sub init {
             $self->{file_tree}->set_focused(1);
         }
     }
+
+    # React to cross-instance preference changes (e.g. theme toggle)
+    $self->{prefs}->on_change(sub {
+        my ($key, $new_value, $old_value) = @_;
+        if ($key eq 'theme') {
+            $self->{theme} = Zepto::Theme->get_theme($new_value);
+            my $cursor_color = $self->{theme}->color('cursor_color');
+            if ($cursor_color) {
+                print STDOUT "\x1b]12;${cursor_color}\x1b\\";
+                STDOUT->flush();
+            }
+            $self->{_prev_frame} = undef;  # Force full redraw
+        }
+        elsif ($key eq 'nerd_font') {
+            Zepto::Chars->set_enabled($new_value);
+            $self->{_prev_frame} = undef;
+        }
+        elsif ($key eq 'show_minimap' || $key eq 'show_line_numbers') {
+            $self->{_prev_frame} = undef;
+        }
+    });
 
     return $self;
 }
@@ -1211,7 +1319,7 @@ sub handle_mouse_event {
 
         # Check if click is in tab bar (row 1) — but not in tree panel area
         my $_tree_w = 0;
-        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+        if ($self->{file_tree} && $self->{_show_tree}) {
             $_tree_w = $self->{file_tree}->panel_width() + 1;
         }
         if ($y == 1 && $x > $_tree_w) {
@@ -1258,7 +1366,7 @@ sub handle_mouse_event {
 
         # Check tree panel region (columns 1..tree_width, rows 1+)
         my $tree_width = 0;
-        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+        if ($self->{file_tree} && $self->{_show_tree}) {
             $tree_width = $self->{file_tree}->panel_width() + 1;
         }
         if ($tree_width > 0 && $x <= $tree_width && $y >= 1 && $y < $rows) {
@@ -1525,7 +1633,7 @@ sub handle_mouse_event {
 
         # Scroll in tree panel
         my $tw = 0;
-        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+        if ($self->{file_tree} && $self->{_show_tree}) {
             $tw = $self->{file_tree}->panel_width() + 1;
         }
         if ($tw > 0 && $x <= $tw && $y >= 4) {
@@ -1601,7 +1709,7 @@ sub handle_mouse_event {
         my $line_count = $self->active_doc() ? $self->active_doc()->line_count() : 1;
         my $gutter_width = Zepto::Renderer->get_gutter_width($line_count);
         my $drag_tree_w = 0;
-        if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+        if ($self->{file_tree} && $self->{_show_tree}) {
             $drag_tree_w = $self->{file_tree}->panel_width() + 1;
         }
         my $visual_col = $x - $drag_tree_w - $gutter_width - 1;  # -1 because terminal columns are 1-indexed
@@ -2050,6 +2158,8 @@ sub exit_find_mode {
 
     $self->{search_term}    = $self->{find_widget}->value();         # Save for next time
     $self->{search_replace} = $self->{find_replace_widget}->value(); # Save replace too
+    $self->_save_find_history($self->{search_term});
+    $self->_save_replace_history($self->{search_replace});
     $self->{find_matches} = [];  # Clear highlights
     $self->{find_replaced} = [];  # Clear replaced highlights
     $self->{find_replace_preview} = undef;  # Clear virtual preview
@@ -3968,15 +4078,15 @@ sub handle_tree_event {
 sub cmd_toggle_tree {
     my ($self) = @_;
 
-    if ($self->{prefs}->show_tree()) {
-        # Hide tree
-        $self->{prefs}->set_show_tree(0);
+    if ($self->{_show_tree}) {
+        # Hide tree (per-window only)
+        $self->{_show_tree} = 0;
         if ($self->{file_tree} && $self->{file_tree}->focused()) {
             $self->_tree_unfocus();
         }
     } else {
-        # Show tree
-        $self->{prefs}->set_show_tree(1);
+        # Show tree (per-window only)
+        $self->{_show_tree} = 1;
         if (!$self->{file_tree}) {
             $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
         }
@@ -4209,6 +4319,7 @@ sub render {
     # Check for external file changes (only in editing state, not during prompts)
     if ($self->{state} eq STATE_EDITING) {
         $self->_check_external_file_changes();
+        $self->{state_store}->check_for_changes();
     }
 
     # If we have a LineMap, keep it in sync with current hunks/doc count
@@ -4226,7 +4337,7 @@ sub render {
     my ($rows, $cols) = $term->get_size();
 
     # Sync file tree viewport height and VCS statuses
-    if ($self->{file_tree} && $self->{prefs}->show_tree()) {
+    if ($self->{file_tree} && $self->{_show_tree}) {
         # Tree spans rows 2..N-1 (2 more rows than text area which starts at row 4)
         $self->{file_tree}->set_viewport_height($rows - RESERVED_ROWS + 2);
         # Update VCS statuses (debounced internally)
@@ -4259,7 +4370,7 @@ sub render {
         {
             # Compute actual text content width (tree has priority over minimap)
             my $tree_width = 0;
-            if ($self->{file_tree} && $self->{prefs}->show_tree() && $self->{file_tree}->panel_width() > 0) {
+            if ($self->{file_tree} && $self->{_show_tree} && $self->{file_tree}->panel_width() > 0) {
                 my $tw = $self->{file_tree}->panel_width() + 1;
                 my $remaining = $cols - $tw - $gutter_width;
                 $tree_width = $tw if $remaining >= Zepto::Renderer::MIN_TEXT_WIDTH;
@@ -4329,7 +4440,7 @@ sub render {
             tabs => $self->{tab_manager}->tabs_for_render(),
             active_tab_index => $self->{tab_manager}->active_index(),
             tab_manager => $self->{tab_manager},
-            file_tree => ($self->{prefs}->show_tree() && $self->{file_tree}) ? $self->{file_tree} : undef,
+            file_tree => ($self->{_show_tree} && $self->{file_tree}) ? $self->{file_tree} : undef,
             find_mode => ($self->{state} eq STATE_FIND) ? {
                 value          => $self->{find_widget}->value(),
                 cursor         => $self->{find_widget}->cursor(),
@@ -4386,7 +4497,7 @@ sub render {
     if ($showing_image) {
         my $image_path = File::Spec->rel2abs($doc->{path});
         # Calculate image area: text area starts at row 3 (after tab bar + ruler)
-        my $tree = ($self->{prefs}->show_tree() && $self->{file_tree}) ? $self->{file_tree} : undef;
+        my $tree = ($self->{_show_tree} && $self->{file_tree}) ? $self->{file_tree} : undef;
         my $tree_width = ($tree && $tree->panel_width() > 0) ? $tree->panel_width() + 1 : 0;
         my $img_row = 3;  # 1-based, after tab bar and ruler
         my $img_col = $tree_width + 1;
@@ -4662,7 +4773,7 @@ sub _record_frame {
     # Active features
     my @features;
     push @features, 'wrap' if $self->_effective_word_wrap();
-    push @features, 'tree' if $self->{file_tree} && $self->{prefs}->show_tree();
+    push @features, 'tree' if $self->{file_tree} && $self->{_show_tree};
     push @features, 'minimap' if $self->{prefs}->show_minimap();
     my $features_str = join(',', @features) || 'none';
 

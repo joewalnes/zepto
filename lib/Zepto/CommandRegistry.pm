@@ -614,6 +614,10 @@ sub get_toggle_state {
     if ($cmd->{id} eq 'toggle_word_wrap') {
         return $editor->_effective_word_wrap() ? 1 : 0;
     }
+    # File tree: per-window state, not from prefs
+    if ($cmd->{id} eq 'toggle_tree') {
+        return $editor->{_show_tree} ? 1 : 0;
+    }
 
     # Standard preference-based toggle
     if ($pref) {

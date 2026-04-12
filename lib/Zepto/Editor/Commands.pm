@@ -105,6 +105,17 @@ sub _do_close_tab {
     my ($self, $index) = @_;
     my $tm = $self->{tab_manager};
 
+    # Save cursor position before closing
+    my $tab = $tm->tab_at($index);
+    if ($tab && $tab->{view} && $tab->{file_path}) {
+        my $view = $tab->{view};
+        $self->_save_cursor_position(
+            $tab->{file_path},
+            $view->cursor_line(),
+            $view->cursor_col(),
+        );
+    }
+
     # If this is the last tab, quit
     if ($tm->tab_count() <= 1) {
         $self->{state} = 'quit';
@@ -124,6 +135,18 @@ sub _do_close_tab {
 sub cmd_quit {
     my ($self) = @_;
     my $tm = $self->{tab_manager};
+
+    # Save cursor positions for all open tabs
+    for my $i (0 .. $tm->tab_count() - 1) {
+        my $tab = $tm->tab_at($i);
+        if ($tab && $tab->{view} && $tab->{file_path}) {
+            $self->_save_cursor_position(
+                $tab->{file_path},
+                $tab->{view}->cursor_line(),
+                $tab->{view}->cursor_col(),
+            );
+        }
+    }
 
     # Collect indices of dirty tabs
     my @dirty;
@@ -271,6 +294,8 @@ sub _load_file {
             highlighter => $highlighter,
             file_path   => $path,
         );
+        # Restore cursor position from history
+        $self->_restore_cursor_position($path, $view);
         if ($doc->{_is_binary}) {
             $self->show_message("Binary file — read only");
         }
@@ -961,6 +986,7 @@ sub cmd_transform {
             }
 
             $self->{last_transform_cmd} = $cmd;
+            $self->_save_transform_history($cmd);
 
             my $doc = $self->active_doc();
 

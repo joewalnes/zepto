@@ -1,10 +1,11 @@
 package Zepto::Preferences;
 # =============================================================================
-# Preferences: Editor configuration with defaults
+# Preferences: Editor configuration with defaults and persistence
 # =============================================================================
 #
-# Stores editor preferences in memory. Later can be extended to support
-# persistent storage (file-based or XDG config).
+# Global preferences are persisted via StateStore and synced across instances.
+# Per-window preferences (show_tree, word_wrap) are in-memory only, initialized
+# from global defaults.
 #
 # Categories:
 #   - Display: theme, line numbers, etc.
@@ -23,8 +24,8 @@ my %DEFAULTS = (
     show_status_bar  => 1,
     nerd_font        => 1,            # Use Nerd Font glyphs
     show_minimap     => 1,            # Show minimap/scrollbar
-    show_tree        => 1,            # Show file tree panel
-    word_wrap        => 0,            # Word wrap mode (break long lines at viewport edge)
+    show_tree        => 1,            # Show file tree panel (default for new windows)
+    word_wrap        => 0,            # Word wrap mode (default for new windows)
 
     # Editing
     tab_width        => 4,
@@ -51,17 +52,49 @@ my %DEFAULTS = (
     ensure_final_newline => 1,
 );
 
+# Preferences that are persisted globally and synced across instances.
+# Everything else is per-window or internal.
+my %GLOBAL_PREFS = map { $_ => 1 } qw(
+    theme
+    show_line_numbers
+    nerd_font
+    show_minimap
+    show_tree
+    word_wrap
+    tab_width
+    soft_tabs
+    auto_indent
+    auto_complete
+    auto_pairs
+    mouse_enabled
+);
+
 sub new {
-    my ($class, %initial) = @_;
+    my ($class, %opts) = @_;
+
+    my $state_store = delete $opts{state_store};
 
     my $self = bless {
-        prefs => { %DEFAULTS },
-        _callbacks => {},
+        prefs       => { %DEFAULTS },
+        _callbacks  => {},
+        _state_store => $state_store,
+        _loading     => 0,  # Guard against persist-during-load
     }, $class;
 
-    # Apply any initial values
-    for my $key (keys %initial) {
-        $self->set($key, $initial{$key});
+    # Load persisted preferences from StateStore
+    if ($state_store) {
+        $self->_load_from_store();
+
+        # Listen for cross-instance changes
+        $state_store->on_change('preferences', sub {
+            my ($data) = @_;
+            $self->_apply_external_changes($data);
+        });
+    }
+
+    # Apply any programmatic initial values (e.g. from tests)
+    for my $key (CORE::keys %opts) {
+        $self->set($key, $opts{$key});
     }
 
     return $self;
@@ -85,6 +118,11 @@ sub set {
     # Notify callbacks if value changed
     if (!defined $old_value || !defined $value || $old_value ne $value) {
         $self->_notify($key, $value, $old_value);
+
+        # Persist global prefs to StateStore (unless we're loading)
+        if (!$self->{_loading} && $self->{_state_store} && $GLOBAL_PREFS{$key}) {
+            $self->{_state_store}->put('preferences', { $key => $value });
+        }
     }
 
     return $value;
@@ -257,45 +295,39 @@ sub visual_width {
 }
 
 # =============================================================================
-# Persistence (for future use)
+# Persistence via StateStore
 # =============================================================================
 
-# Serialize preferences to a string (simple key=value format)
-sub serialize {
+sub _load_from_store {
     my ($self) = @_;
-    my $output = '';
-    for my $key (sort CORE::keys %{$self->{prefs}}) {
-        my $value = $self->{prefs}{$key};
-        $value //= '';
-        $output .= "$key=$value\n";
-    }
-    return $output;
-}
+    my $data = $self->{_state_store}->get('preferences');
+    return unless $data && %$data;
 
-# Load preferences from a string
-sub deserialize {
-    my ($self, $input) = @_;
-    return unless defined $input;
-
-    for my $line (split /\n/, $input) {
-        $line =~ s/^\s+//;
-        $line =~ s/\s+$//;
-        next if $line =~ /^#/ || $line eq '';
-
-        if ($line =~ /^([^=]+)=(.*)$/) {
-            my ($key, $value) = ($1, $2);
-            $key =~ s/\s+$//;
-            $value =~ s/^\s+//;
-
-            # Convert 'true'/'false' to 1/0 for booleans
-            $value = 1 if $value eq 'true';
-            $value = 0 if $value eq 'false';
-
-            $self->set($key, $value) if exists $DEFAULTS{$key};
+    $self->{_loading} = 1;
+    for my $key (CORE::keys %$data) {
+        # Only load known preferences
+        if (exists $DEFAULTS{$key}) {
+            $self->{prefs}{$key} = $data->{$key};
         }
     }
+    $self->{_loading} = 0;
+}
 
-    return 1;
+sub _apply_external_changes {
+    my ($self, $data) = @_;
+    return unless $data && %$data;
+
+    $self->{_loading} = 1;
+    for my $key (CORE::keys %$data) {
+        next unless exists $DEFAULTS{$key} && $GLOBAL_PREFS{$key};
+        my $old = $self->{prefs}{$key};
+        my $new = $data->{$key};
+        if (!defined $old || !defined $new || $old ne $new) {
+            $self->{prefs}{$key} = $new;
+            $self->_notify($key, $new, $old);
+        }
+    }
+    $self->{_loading} = 0;
 }
 
 1;

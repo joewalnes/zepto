@@ -12,6 +12,7 @@ use Zepto::Terminal;
 use Zepto::Document;
 use Zepto::View;
 use Zepto::Preferences;
+use Zepto::StateStore;
 use Zepto::FindEngine;
 use Zepto::Highlighter;
 
@@ -195,7 +196,11 @@ subtest 'Quit pending' => sub {
 # ============================================================================
 subtest 'Theme change' => sub {
     my $term = mock_terminal();
-    my $editor = Zepto::Editor->new(terminal => $term);
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
 
     is($editor->{theme}->name(), 'dark', 'Default theme is dark');
 
@@ -1718,7 +1723,11 @@ subtest 'Normal mode: right arrow still wraps at EOL' => sub {
 # =============================================================================
 
 subtest 'Recent files - tracking and ordering' => sub {
-    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
     # Initialize with empty state
     $editor->{_recent_files} = [];
 
@@ -1740,7 +1749,11 @@ subtest 'Recent files - tracking and ordering' => sub {
 };
 
 subtest 'Recent files - max limit' => sub {
-    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
     $editor->{_recent_files} = [];
 
     # Track more than the max
