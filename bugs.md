@@ -786,3 +786,6 @@ After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not r
 **Root cause:** `_retrigger_completion_if_word()` did not check that the cursor column was within the actual line length before calling `substr()`.
 
 **Fix:** Added `return unless $col <= length($line)` guard and `defined $char_before` check.
+
+### P2: [Tests] diff_constraint.t spews debug output to console
+`tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues. Should be removed or guarded behind a verbose flag.
