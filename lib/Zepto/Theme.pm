@@ -158,6 +158,9 @@ sub dark_theme {
         pill_toggle_off_fg  => fg_rgb(148, 155, 185),   # Readable but subdued
         pill_toggle_off_bg  => bg_rgb(52, 59, 86),      # Slightly lighter for contrast
         pill_toggle_off_edge => fg_rgb(52, 59, 86),
+        pill_hover_fg       => fg_rgb(220, 228, 255),
+        pill_hover_bg       => bg_rgb(62, 69, 100),
+        pill_hover_edge     => fg_rgb(62, 69, 100),
         pill_action_fg      => fg_rgb(192, 202, 245),
         pill_action_bg      => bg_rgb(52, 59, 86),      # Neutral
         pill_action_edge    => fg_rgb(52, 59, 86),
@@ -238,6 +241,9 @@ sub dark_theme {
         tab_inactive_fg     => fg_rgb(140, 148, 190),  # Readable muted text
         tab_inactive_bg     => bg_rgb(40, 44, 62),     # Subtle, between bar and menu
         tab_inactive_edge   => fg_rgb(40, 44, 62),     # Matches inactive bg
+        tab_hover_fg        => fg_rgb(200, 208, 240),  # Brighter than inactive
+        tab_hover_bg        => bg_rgb(50, 55, 78),     # Between inactive and active
+        tab_hover_edge      => fg_rgb(50, 55, 78),
         tab_modified_fg     => fg_rgb(224, 175, 104),  # Yellow dot for unsaved
         tab_close_fg        => fg_rgb(100, 106, 134),  # Dim close button
         tab_shortcut_fg     => fg_rgb(120, 130, 170),  # Readable hint
@@ -274,6 +280,8 @@ sub dark_theme {
         tree_fg               => fg_rgb(169, 177, 214),
         tree_cursor_bg        => bg_rgb(52, 79, 138),
         tree_cursor_fg        => fg_rgb(255, 255, 255),
+        tree_hover_bg         => bg_rgb(35, 39, 58),
+        tree_hover_fg         => fg_rgb(192, 202, 245),
         tree_current_bg       => bg_rgb(45, 55, 85),
         tree_current_fg       => BOLD . fg_rgb(220, 225, 245),
         tree_dir_fg           => fg_rgb(125, 207, 255),
@@ -422,6 +430,9 @@ sub light_theme {
         pill_toggle_off_fg  => fg_rgb(108, 112, 134),   # Darker text for contrast
         pill_toggle_off_bg  => bg_rgb(213, 217, 227),    # Slightly different bg
         pill_toggle_off_edge => fg_rgb(213, 217, 227),
+        pill_hover_fg       => fg_rgb(40, 44, 60),
+        pill_hover_bg       => bg_rgb(190, 195, 210),
+        pill_hover_edge     => fg_rgb(190, 195, 210),
         pill_action_fg      => fg_rgb(76, 79, 105),
         pill_action_bg      => bg_rgb(206, 210, 218),    # Neutral
         pill_action_edge    => fg_rgb(206, 210, 218),
@@ -502,6 +513,9 @@ sub light_theme {
         tab_inactive_fg     => fg_rgb(100, 104, 120),  # Muted text
         tab_inactive_bg     => bg_rgb(210, 214, 226),  # Subtle, slightly darker than bar
         tab_inactive_edge   => fg_rgb(210, 214, 226),  # Matches inactive bg
+        tab_hover_fg        => fg_rgb(60, 64, 80),     # Darker than inactive
+        tab_hover_bg        => bg_rgb(195, 200, 215),  # Between inactive and active
+        tab_hover_edge      => fg_rgb(195, 200, 215),
         tab_modified_fg     => fg_rgb(223, 142, 29),   # Yellow dot for unsaved
         tab_close_fg        => fg_rgb(156, 160, 176),  # Dim close button
         tab_shortcut_fg     => fg_rgb(130, 136, 156),  # Readable hint
@@ -538,6 +552,8 @@ sub light_theme {
         tree_fg               => fg_rgb(76, 79, 105),
         tree_cursor_bg        => bg_rgb(114, 135, 253),
         tree_cursor_fg        => fg_rgb(255, 255, 255),
+        tree_hover_bg         => bg_rgb(220, 224, 236),
+        tree_hover_fg         => fg_rgb(76, 79, 105),
         tree_current_bg       => bg_rgb(195, 202, 220),
         tree_current_fg       => BOLD . fg_rgb(30, 35, 60),
         tree_dir_fg           => fg_rgb(10, 80, 190),

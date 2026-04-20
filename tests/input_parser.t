@@ -377,13 +377,16 @@ subtest 'Mouse drag' => sub {
     is($events[0]->{action}, 'drag', 'Drag action');
 };
 
-subtest 'Mouse motion without button is ignored' => sub {
+subtest 'Mouse motion without button emits move event' => sub {
     my $parser = Zepto::InputParser->new();
 
     # Motion without button: btn=3 + motion=32 = 35
-    # This is pure mouse movement, not a drag
+    # This is pure mouse movement — emitted as 'move' for hover effects
     my @events = $parser->parse("\x1b[<35;15;10M");
-    is(scalar @events, 0, 'Motion without button produces no event');
+    is(scalar @events, 1, 'Motion without button produces one event');
+    is($events[0]->{action}, 'move', 'Action is move');
+    is($events[0]->{x}, 15, 'Move x position');
+    is($events[0]->{y}, 10, 'Move y position');
 };
 
 # ============================================================================

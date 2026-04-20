@@ -53,6 +53,7 @@ use constant {
     MOUSE_RELEASE => 'release',
     MOUSE_DRAG    => 'drag',
     MOUSE_SCROLL  => 'scroll',
+    MOUSE_MOVE    => 'move',
 };
 
 sub new {
@@ -327,12 +328,13 @@ sub _decode_sgr_mouse {
         $btn = ($btn == 0) ? 'up' : 'down';
     }
     elsif ($motion) {
-        # Motion with btn == 3 means mouse movement without any button held
-        # This is not a drag, just movement - ignore it
         if ($btn == 3) {
-            return { type => EVT_NONE };
+            # Motion without button held — hover
+            $action = MOUSE_MOVE;
+            $btn = 'none';
+        } else {
+            $action = MOUSE_DRAG;
         }
-        $action = MOUSE_DRAG;
     }
     elsif ($final eq 'M') {
         $action = MOUSE_PRESS;

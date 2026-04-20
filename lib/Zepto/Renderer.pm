@@ -844,9 +844,12 @@ sub _render_tab_bar {
     my $active_idx = $ui->{active_tab_index} // 0;
     my $tab_manager = $ui->{tab_manager};
 
+    my $hover_tab_idx = $ui->{hover_tab_index};
+
     # Build cache key from inputs that affect tab bar output
     my $cache_key = join("\0",
         $theme->name(), $cols, $tree_width, $active_idx, scalar(@$tabs),
+        ($hover_tab_idx // -1),
         map { ($_->{display_name} // '') . ($_->{is_dirty} ? 'D' : '') . ($_->{has_vcs_changes} ? 'V' : '') } @$tabs
     );
     my $cached = $class->_tab_bar_cache_get($cache_key);
@@ -963,12 +966,13 @@ sub _render_tab_bar {
 
         my $tab_start_x = $x;
 
-        my $tab_bg = $is_active
-            ? $theme->color('tab_active_bg')
-            : $theme->color('tab_inactive_bg');
-        my $edge_fg = $is_active
-            ? $theme->color('tab_active_edge')
-            : $theme->color('tab_inactive_edge');
+        my $is_hover = defined $hover_tab_idx && $hover_tab_idx == $i && !$is_active;
+        my $tab_bg = $is_active  ? $theme->color('tab_active_bg')
+                   : $is_hover   ? $theme->color('tab_hover_bg')
+                   :               $theme->color('tab_inactive_bg');
+        my $edge_fg = $is_active ? $theme->color('tab_active_edge')
+                    : $is_hover  ? $theme->color('tab_hover_edge')
+                    :              $theme->color('tab_inactive_edge');
 
         # Left triangle edge ◢ — underlined (part of bar territory)
         push @_out, $bar_bg . $edge_fg . $TAB_LEFT;
@@ -978,6 +982,8 @@ sub _render_tab_bar {
         my $name_color;
         if ($is_active) {
             $name_color = $theme->color('tab_active_fg');
+        } elsif ($is_hover) {
+            $name_color = $theme->color('tab_hover_fg');
         } else {
             $name_color = $has_vcs_changes
                 ? $theme->color('tab_vcs_fg')
@@ -2726,10 +2732,14 @@ sub _render_tree_panel {
                 push @guides_for_node, ($guide_active[$l] ? 1 : 0);
             }
 
+            my $hover_tree_row = $ui->{hover_tree_row};
+            my $is_tree_hover = defined $hover_tree_row && $hover_tree_row == $row_idx
+                && !$is_cursor;
+
             push @_out, $class->_render_tree_node_content(
                 $node, $content_width, $theme, $is_cursor, 0, $focused,
                 $has_scrollbar, $row_idx, $sb, $node_is_last, \@guides_for_node,
-                $filter_active, $is_current
+                $filter_active, $is_current, $is_tree_hover
             );
 
             # Update guide state after rendering this node
@@ -2755,7 +2765,7 @@ sub _render_tree_panel {
 sub _render_tree_node_content {
     my ($class, $node, $width, $theme, $is_cursor, $is_sticky, $focused,
         $has_scrollbar, $row_idx, $sb, $is_last, $guides, $filter_active,
-        $is_current) = @_;
+        $is_current, $is_hover) = @_;
 
     my @_out;
 
@@ -2767,6 +2777,9 @@ sub _render_tree_node_content {
     } elsif ($is_cursor) {
         $bg = $theme->color('tree_cursor_bg');
         $fg = $theme->color('tree_cursor_fg');
+    } elsif ($is_hover && !$is_current) {
+        $bg = $theme->color('tree_hover_bg');
+        $fg = $theme->color('tree_hover_fg');
     } elsif ($is_current) {
         $bg = $theme->color('tree_current_bg') // ($focused ? $theme->color('tree_focused_bg') : $theme->color('tree_bg'));
         $fg = $theme->color('tree_current_fg') // $theme->color('tree_fg');
@@ -4095,17 +4108,25 @@ sub _render_context_status_bar {
         push @_out, $theme->color('status_bg') . ' ';
         $center_col += 1;
     }
+    my $hover_pill_index = $ui->{hover_pill_index};
+    # Button index offset: pills rendered so far in @buttons
+    my $pill_btn_offset = scalar @buttons;
+
     for my $i (0 .. $#pills_to_render) {
         my $pill = $pills_to_render[$i];
+        my $is_hover = defined $hover_pill_index && $hover_pill_index == ($pill_btn_offset + $i);
+        my $eff_fg   = $is_hover ? 'pill_hover_fg'   : $pill->{fg};
+        my $eff_bg   = $is_hover ? 'pill_hover_bg'   : $pill->{bg};
+        my $eff_edge = $is_hover ? 'pill_hover_edge'  : $pill->{edge};
 
         if ($nerd_font) {
             # Left round cap
-            push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+            push @_out, $theme->color('status_bg') . $theme->color($eff_edge);
             push @_out, $round_l;
             $center_col += 1;
         }
 
-        push @_out, $theme->color($pill->{bg}) . $theme->color($pill->{fg});
+        push @_out, $theme->color($eff_bg) . $theme->color($eff_fg);
         push @_out, " $pill->{text} ";
         push @buttons, {
             x_start    => $center_col,
@@ -4116,7 +4137,7 @@ sub _render_context_status_bar {
 
         if ($nerd_font) {
             # Right round cap
-            push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
+            push @_out, $theme->color('status_bg') . $theme->color($eff_edge);
             push @_out, $round_r;
             $center_col += 1;
         }

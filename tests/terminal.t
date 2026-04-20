@@ -20,8 +20,8 @@ subtest 'Constants' => sub {
     is(Zepto::Terminal::CLEAR_SCREEN, "\x1b[2J", 'CLEAR_SCREEN');
     is(Zepto::Terminal::CLEAR_LINE, "\x1b[K", 'CLEAR_LINE');
     is(Zepto::Terminal::RESET_ATTRS, "\x1b[0m", 'RESET_ATTRS');
-    like(Zepto::Terminal::MOUSE_ENABLE, qr/\x1b\[\?1002h/, 'MOUSE_ENABLE (button-event tracking)');
-    like(Zepto::Terminal::MOUSE_DISABLE, qr/\x1b\[\?1002l/, 'MOUSE_DISABLE');
+    like(Zepto::Terminal::MOUSE_ENABLE, qr/\x1b\[\?1003h/, 'MOUSE_ENABLE (any-event tracking)');
+    like(Zepto::Terminal::MOUSE_DISABLE, qr/\x1b\[\?1003l/, 'MOUSE_DISABLE');
     like(Zepto::Terminal::ALT_SCREEN_ON, qr/\x1b\[\?1049h/, 'ALT_SCREEN_ON');
     like(Zepto::Terminal::ALT_SCREEN_OFF, qr/\x1b\[\?1049l/, 'ALT_SCREEN_OFF');
 };
@@ -226,7 +226,7 @@ subtest 'Mouse enable idempotent' => sub {
     my $output = do { local $/; <$out_fh> };
 
     # Count enable sequences - should only be one
-    my $count = () = $output =~ /\x1b\[\?1002h/g;
+    my $count = () = $output =~ /\x1b\[\?1003h/g;
     is($count, 1, 'Mouse enabled only once');
 };
 

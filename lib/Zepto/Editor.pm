@@ -118,6 +118,14 @@ sub new {
         # Mouse button state for reliable drag detection
         mouse_button_down => 0,
 
+        # Hover state for mouse-over effects
+        _hover_x => -1,
+        _hover_y => -1,
+        _hover_tab_index => undef,
+        _hover_pill_index => undef,
+        _hover_tree_row => undef,
+        _hover_palette_idx => undef,
+
         # Initial file paths from command line (supports both 'file' and 'files')
         initial_file  => $opts{file},  # backward compat for tests
         initial_files => $opts{files} // ($opts{file} ? [$opts{file}] : []),
@@ -673,6 +681,7 @@ sub run {
             my $input = $self->{terminal}->read_blocking($timeout);
 
             my $needs_render = 0;
+            $self->{_hover_changed} = 0;
 
             # Reset per-frame perf flags
             my $frame_start = time();
@@ -687,8 +696,15 @@ sub run {
 
             if (length $input) {
                 $self->handle_input($input);
-                $needs_render = 1;
-                $last_search_render = 0;  # Reset throttle on user input
+                if ($self->{_hover_changed}) {
+                    # Hover-only change — only render if target changed
+                    $needs_render = 1;
+                } elsif ($self->{_last_event_was_hover}) {
+                    # Motion without target change — skip render
+                } else {
+                    $needs_render = 1;
+                    $last_search_render = 0;  # Reset throttle on user input
+                }
             }
             else {
                 # Timeout with no input — flush pending escape sequences
@@ -1230,6 +1246,7 @@ sub handle_editing_event {
         }
     }
     elsif ($type eq 'mouse') {
+        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
 }
@@ -1708,6 +1725,10 @@ sub handle_mouse_event {
             $view->scroll_down(1);
         }
     }
+    elsif ($action eq 'move') {
+        $self->_handle_mouse_hover($x, $y);
+        return;
+    }
     elsif ($action eq 'drag') {
         # Only handle drag if mouse button is actually down
         # (some terminals send spurious motion events)
@@ -1819,6 +1840,71 @@ sub handle_mouse_event {
             $view->set_cursor($doc_line, $doc_col, 1);
         }
     }
+}
+
+# =============================================================================
+# Mouse hover handling
+# =============================================================================
+
+sub _handle_mouse_hover {
+    my ($self, $x, $y) = @_;
+
+    return if $x == $self->{_hover_x} && $y == $self->{_hover_y};
+    $self->{_hover_x} = $x;
+    $self->{_hover_y} = $y;
+
+    my $old_tab = $self->{_hover_tab_index};
+    my $old_pill = $self->{_hover_pill_index};
+    my $old_tree = $self->{_hover_tree_row};
+    my $old_pal = $self->{_hover_palette_idx};
+
+    # Reset all hover targets
+    $self->{_hover_tab_index} = undef;
+    $self->{_hover_pill_index} = undef;
+    $self->{_hover_tree_row} = undef;
+    $self->{_hover_palette_idx} = undef;
+
+    my $term = $self->{terminal};
+    my ($rows, $cols) = $term->get_size();
+    my $tree_w = 0;
+    if ($self->{file_tree} && $self->{_show_tree}) {
+        $tree_w = $self->{file_tree}->panel_width() + 1;
+    }
+
+    # Tab bar (row 1, past tree panel)
+    if ($y == 1 && $x > $tree_w) {
+        my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+        for my $btn (@buttons) {
+            next unless $btn->{type} eq 'tab';
+            if ($x >= $btn->{start} + 1 && $x <= $btn->{end} + 1) {
+                $self->{_hover_tab_index} = $btn->{index};
+                last;
+            }
+        }
+    }
+    # Status bar (last row)
+    elsif ($y == $rows) {
+        my @buttons = Zepto::Renderer->get_status_buttons();
+        for my $i (0 .. $#buttons) {
+            my $btn = $buttons[$i];
+            if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
+                $self->{_hover_pill_index} = $i;
+                last;
+            }
+        }
+    }
+    # File tree panel
+    elsif ($tree_w > 0 && $x <= $tree_w && $y > 1 && $y < $rows) {
+        $self->{_hover_tree_row} = $y - 1;  # Convert to tree-relative row
+    }
+
+    # Check if anything changed
+    my $changed = (($self->{_hover_tab_index} // -1) != ($old_tab // -1))
+               || (($self->{_hover_pill_index} // -1) != ($old_pill // -1))
+               || (($self->{_hover_tree_row} // -1) != ($old_tree // -1))
+               || (($self->{_hover_palette_idx} // -1) != ($old_pal // -1));
+
+    $self->{_hover_changed} = 1 if $changed;
 }
 
 # =============================================================================
@@ -2139,6 +2225,7 @@ sub handle_footer_input_event {
     my $type   = $event->{type};
 
     if ($type eq 'mouse') {
+        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
     elsif ($type eq 'key') {
@@ -4133,6 +4220,7 @@ sub handle_tree_event {
         elsif ($char eq ' ') { $tree->toggle_current(); }
     }
     elsif ($event->{type} eq 'mouse') {
+        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
 }
@@ -4503,6 +4591,9 @@ sub render {
             active_tab_index => $self->{tab_manager}->active_index(),
             tab_manager => $self->{tab_manager},
             file_tree => ($self->{_show_tree} && $self->{file_tree}) ? $self->{file_tree} : undef,
+            hover_tab_index   => $self->{_hover_tab_index},
+            hover_pill_index  => $self->{_hover_pill_index},
+            hover_tree_row    => $self->{_hover_tree_row},
             find_mode => ($self->{state} eq STATE_FIND) ? {
                 value          => $self->{find_widget}->value(),
                 cursor         => $self->{find_widget}->cursor(),

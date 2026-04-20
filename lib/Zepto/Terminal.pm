@@ -37,10 +37,10 @@ use constant {
 
     # Mouse modes:
     # ?1000h = basic (press/release only)
-    # ?1002h = button-event tracking (reports drag while button pressed)
+    # ?1003h = any-event tracking (reports motion even without button pressed)
     # ?1006h = SGR extended mode (larger coordinates, better encoding)
-    MOUSE_ENABLE   => "\x1b[?1002h\x1b[?1006h",
-    MOUSE_DISABLE  => "\x1b[?1006l\x1b[?1002l",
+    MOUSE_ENABLE   => "\x1b[?1003h\x1b[?1006h",
+    MOUSE_DISABLE  => "\x1b[?1006l\x1b[?1003l",
 
     # Alternate screen buffer
     ALT_SCREEN_ON  => "\x1b[?1049h",
