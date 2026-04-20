@@ -253,6 +253,9 @@ sub _track_recent_file {
     # Resolve to absolute path
     my $abs_path = File::Spec->rel2abs($file_path);
 
+    # Skip temp files — test runs and other ephemeral files clutter history
+    return if $abs_path =~ m{^/tmp/|^/private/tmp/|^/var/folders/};
+
     # Merge with on-disk state (another instance may have added files)
     my $history = $self->{state_store}->get('history');
     my @files = @{$history->{recent_files} || []};

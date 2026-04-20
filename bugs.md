@@ -799,8 +799,10 @@ After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not r
 
 **Fix:** Added `return unless $col <= length($line)` guard and `defined $char_before` check.
 
-### P2: [Bug] history.json recent_files cluttered with temp files
-`_track_recent_file` in Editor.pm records every file opened — including temp files from test runs (`/tmp/...`, `/private/tmp/...`). The recent files list (max 50) gets filled with ephemeral files that no longer exist, pushing out real files. Should filter out temp directory paths (e.g. `/tmp/`, `/private/tmp/`, or files from `File::Temp` patterns) before adding to history.
+### ~~P2: [Bug] history.json recent_files cluttered with temp files~~ FIXED
+`_track_recent_file` in Editor.pm records every file opened — including temp files from test runs (`/tmp/...`, `/private/tmp/...`). The recent files list (max 50) gets filled with ephemeral files that no longer exist, pushing out real files.
+
+**Fix:** Added early return in `_track_recent_file()` for paths matching `/tmp/`, `/private/tmp/`, and `/var/folders/` (macOS per-user temp). Added regression test. Updated existing tests to use non-temp paths.
 
 ### ~~P2: [Bug] Screen artifacts remain above cursor position after quitting~~ FIXED
 When quitting zepto (`⌃Q`), everything above the cursor's vertical position remains visible on the terminal — the upper portion of the editor's alternate screen buffer content bleeds into the main screen.

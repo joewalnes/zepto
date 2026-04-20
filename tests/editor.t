@@ -1731,21 +1731,21 @@ subtest 'Recent files - tracking and ordering' => sub {
     # Initialize with empty state
     $editor->{_recent_files} = [];
 
-    # Track some files (use absolute paths)
-    $editor->_track_recent_file('/tmp/a.txt');
-    $editor->_track_recent_file('/tmp/b.txt');
-    $editor->_track_recent_file('/tmp/c.txt');
+    # Track some files (use non-temp absolute paths)
+    $editor->_track_recent_file('/home/user/a.txt');
+    $editor->_track_recent_file('/home/user/b.txt');
+    $editor->_track_recent_file('/home/user/c.txt');
 
     is(scalar @{$editor->{_recent_files}}, 3, 'Three files tracked');
-    is($editor->{_recent_files}[0], '/tmp/c.txt', 'Most recent is first');
-    is($editor->{_recent_files}[1], '/tmp/b.txt', 'Second most recent');
-    is($editor->{_recent_files}[2], '/tmp/a.txt', 'Oldest is last');
+    is($editor->{_recent_files}[0], '/home/user/c.txt', 'Most recent is first');
+    is($editor->{_recent_files}[1], '/home/user/b.txt', 'Second most recent');
+    is($editor->{_recent_files}[2], '/home/user/a.txt', 'Oldest is last');
 
     # Re-open a.txt — should move to front
-    $editor->_track_recent_file('/tmp/a.txt');
+    $editor->_track_recent_file('/home/user/a.txt');
     is(scalar @{$editor->{_recent_files}}, 3, 'Still three files (no duplicate)');
-    is($editor->{_recent_files}[0], '/tmp/a.txt', 'Re-opened file moved to front');
-    is($editor->{_recent_files}[1], '/tmp/c.txt', 'Previous first is now second');
+    is($editor->{_recent_files}[0], '/home/user/a.txt', 'Re-opened file moved to front');
+    is($editor->{_recent_files}[1], '/home/user/c.txt', 'Previous first is now second');
 };
 
 subtest 'Recent files - max limit' => sub {
@@ -1758,12 +1758,32 @@ subtest 'Recent files - max limit' => sub {
 
     # Track more than the max
     for my $i (1 .. 60) {
-        $editor->_track_recent_file("/tmp/file_$i.txt");
+        $editor->_track_recent_file("/home/user/file_$i.txt");
     }
 
     ok(scalar @{$editor->{_recent_files}} <= Zepto::Editor::RECENT_FILES_MAX,
        'Recent files list respects max limit');
-    is($editor->{_recent_files}[0], '/tmp/file_60.txt', 'Most recent is first');
+    is($editor->{_recent_files}[0], '/home/user/file_60.txt', 'Most recent is first');
+};
+
+subtest 'Recent files - temp files filtered' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    $editor->{_recent_files} = [];
+
+    # Track a real file
+    $editor->_track_recent_file('/home/user/real.txt');
+
+    # Track temp files — should be ignored
+    $editor->_track_recent_file('/tmp/test_file.txt');
+    $editor->_track_recent_file('/private/tmp/scratch.txt');
+    $editor->_track_recent_file('/var/folders/xx/yy/T/tmp.12345');
+
+    is(scalar @{$editor->{_recent_files}}, 1, 'Only non-temp file tracked');
+    is($editor->{_recent_files}[0], '/home/user/real.txt', 'Real file preserved');
 };
 
 subtest 'Recent files - palette items' => sub {
