@@ -77,10 +77,12 @@ sub diff_and_check {
                       "Deleted lines match") if exists $expected->{deleted};
         }
 
-        # Debug output
-        diag("Added: [@{$result->{added}}]");
-        diag("Modified: [@{$result->{modified}}]");
-        diag("Deleted: [@{$result->{deleted}}]");
+        # Debug output (only when VERBOSE is set)
+        if ($ENV{VERBOSE}) {
+            diag("Added: [@{$result->{added}}]");
+            diag("Modified: [@{$result->{modified}}]");
+            diag("Deleted: [@{$result->{deleted}}]");
+        }
     };
 }
 

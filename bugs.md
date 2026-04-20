@@ -811,5 +811,7 @@ When quitting zepto (`⌃Q`), everything above the cursor's vertical position re
 
 **Fix:** Added `CLEAR_SCREEN` + `CURSOR_HOME` before `ALT_SCREEN_OFF` in `leave_alt_screen()`. This clears the alternate screen buffer before switching back to the main screen, so even terminals with imperfect `?1049l` handling show a clean exit.
 
-### P2: [Tests] diff_constraint.t spews debug output to console
-`tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues. Should be removed or guarded behind a verbose flag.
+### ~~P2: [Tests] diff_constraint.t spews debug output to console~~ FIXED
+`tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues.
+
+**Fix:** Guarded the three `diag()` calls behind `$ENV{VERBOSE}`. Debug output now only appears when running with `VERBOSE=1 prove -v tests/diff_constraint.t`.
