@@ -41,6 +41,9 @@ my %DEFAULTS = (
     auto_complete        => 1,        # Auto-completion (ghost text + menu)
     auto_pairs           => 1,        # Auto-insert closing brackets/quotes
 
+    # Rendering
+    render_markdown_tables => 1,  # Pretty-render Markdown tables
+
     # Behavior
     confirm_quit_unsaved => 1,    # Confirm before closing unsaved
     mouse_enabled    => 1,
@@ -241,6 +244,9 @@ sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
 
 sub word_wrap { $_[0]->get('word_wrap') }
 sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
+
+sub render_markdown_tables { $_[0]->get('render_markdown_tables') }
+sub set_render_markdown_tables { $_[0]->set('render_markdown_tables', $_[1]) }
 
 sub auto_complete { $_[0]->get('auto_complete') }
 sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }

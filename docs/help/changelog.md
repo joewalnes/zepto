@@ -3,6 +3,7 @@
 ## 2026-04-20
 
 - Added KDL syntax highlighting (.kdl files)
+- Pretty-rendered Markdown tables with box-drawing borders, column alignment, and striped rows
 - Fixed screen artifacts remaining after quitting
 
 ## 2026-03-23

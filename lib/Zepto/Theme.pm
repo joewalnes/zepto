@@ -175,6 +175,11 @@ sub dark_theme {
         pill_diff_deleted_bg   => bg_rgb(140, 50, 60),    # Dark red
         pill_diff_deleted_edge => fg_rgb(140, 50, 60),
 
+        # Table rendering (Markdown pretty tables)
+        table_border_fg  => fg_rgb(86, 95, 137),      # Muted blue-gray (matches gutter)
+        table_header_bg  => bg_rgb(35, 39, 55),        # Slightly lighter than editor bg
+        table_header_fg  => fg_rgb(192, 202, 245) . "\x1b[1m",  # Bold text
+
         # Dialog
         dialog_fg    => fg_rgb(192, 202, 245),
         dialog_bg    => bg_rgb(36, 40, 59),
@@ -433,6 +438,11 @@ sub light_theme {
         pill_diff_deleted_fg   => fg_rgb(255, 255, 255),
         pill_diff_deleted_bg   => bg_rgb(190, 50, 60),     # Red
         pill_diff_deleted_edge => fg_rgb(190, 50, 60),
+
+        # Table rendering (Markdown pretty tables)
+        table_border_fg  => fg_rgb(156, 160, 176),     # Muted gray (matches gutter)
+        table_header_bg  => bg_rgb(231, 234, 242),     # Slightly darker than editor bg
+        table_header_fg  => fg_rgb(76, 79, 105) . "\x1b[1m",  # Bold text
 
         # Dialog
         dialog_fg    => fg_rgb(76, 79, 105),

@@ -64,6 +64,9 @@ use constant {
     BOX_BOTTOM_RIGHT   => "\x{2518}",  # ┘
     BOX_VERTICAL_RIGHT => "\x{251C}",  # ├
     BOX_VERTICAL_LEFT  => "\x{2524}",  # ┤
+    BOX_HORIZONTAL_DOWN => "\x{252C}", # ┬
+    BOX_HORIZONTAL_UP   => "\x{2534}", # ┴
+    BOX_CROSS           => "\x{253C}", # ┼
 };
 
 # UI dimensions
@@ -449,7 +452,7 @@ sub render {
         $doc, $view, $theme,
         $text_height, $text_width, $gutter_width, $highlighter,
         $ui->{find_mode}, $minimap_width, $tree_width,
-        $cell_aspect, $ui->{completion}
+        $cell_aspect, $ui->{completion}, $prefs
     );
     for my $i (0 .. $#$text_rows) {
         $row_buf[$i + 2] .= $text_rows->[$i];
@@ -1496,9 +1499,263 @@ sub _detect_markdown_images {
     return \%images;
 }
 
+# Detect Markdown table regions in visible range
+# Returns: { tables => [{start, end, separator, col_widths, alignments, cells}], line_to_table => {line => idx} }
+{
+    my %_table_cache;  # keyed by doc modification count + range
+
+    sub _detect_markdown_tables {
+        my ($class, $doc, $visible_start, $visible_end) = @_;
+        my $empty = { tables => [], line_to_table => {} };
+
+        my $doc_path = $doc->{path};
+        return $empty unless $doc_path;
+        return $empty unless $doc_path =~ /\.(?:md|markdown)$/i;
+
+        my $line_count = $doc->line_count();
+        return $empty if $line_count == 0;
+
+        # Cache by content version + range
+        my $cache_key = ($doc->{_content_version} // 0) . ":$visible_start:$visible_end";
+        return $_table_cache{$cache_key} if exists $_table_cache{$cache_key};
+        %_table_cache = () if keys %_table_cache > 8;  # evict
+
+        # Scan for tables: expand range to capture tables partially visible
+        my $scan_start = $visible_start;
+        while ($scan_start > 0) {
+            my $line = $doc->get_line_content($scan_start - 1);
+            last unless $line =~ /^\s*\|.*\|\s*$/;
+            $scan_start--;
+        }
+        my $scan_end = $visible_end;
+        while ($scan_end < $line_count) {
+            my $line = $doc->get_line_content($scan_end);
+            last unless $line =~ /^\s*\|.*\|\s*$/;
+            $scan_end++;
+        }
+
+        my @tables;
+        my %line_to_table;
+        my $i = $scan_start;
+
+        while ($i < $scan_end && $i < $line_count) {
+            my $line = $doc->get_line_content($i);
+            if ($line =~ /^\s*\|.*\|\s*$/) {
+                # Start of a potential table
+                my $table_start = $i;
+                my @raw_lines;
+                my $separator = -1;
+
+                while ($i < $line_count) {
+                    my $tl = $doc->get_line_content($i);
+                    last unless $tl =~ /^\s*\|.*\|\s*$/;
+                    push @raw_lines, $tl;
+                    # Check if this is the separator row
+                    if ($separator < 0 && $tl =~ /^\s*\|[\s:|-]+\|\s*$/) {
+                        $separator = $i - $table_start;
+                    }
+                    $i++;
+                }
+
+                # Must have header + separator (at least 2 lines, separator at row 1)
+                if (@raw_lines >= 2 && $separator == 1) {
+                    # Parse cells and compute column widths
+                    my @all_cells;
+                    my @col_widths;
+                    my @alignments;
+
+                    my @all_offsets;  # per-row: [offset_of_cell_0_in_source, ...]
+                    for my $ri (0 .. $#raw_lines) {
+                        my $raw = $raw_lines[$ri];
+                        # Compute cell offsets in the original source line
+                        my @offsets;
+                        {
+                            my $scan = $raw;
+                            $scan =~ /^\s*\|/;
+                            my $pos = length($&);  # past the leading |
+                            my @parts = split(/\|/, substr($raw, $pos), -1);
+                            for my $pi (0 .. $#parts) {
+                                my $part = $parts[$pi];
+                                # Trim leading/trailing whitespace to find cell text start
+                                my $trimmed = $part;
+                                $trimmed =~ s/^\s+//;
+                                my $leading = length($part) - length($trimmed);
+                                push @offsets, $pos + $leading;
+                                $pos += length($part) + 1;  # +1 for the | separator
+                            }
+                        }
+                        push @all_offsets, \@offsets;
+
+                        $raw =~ s/^\s*\|\s?//;
+                        $raw =~ s/\s?\|\s*$//;
+                        my @cells = split(/\s*\|\s*/, $raw, -1);
+                        push @all_cells, \@cells;
+
+                        # Parse alignment from separator row
+                        if ($ri == $separator) {
+                            for my $ci (0 .. $#cells) {
+                                my $c = $cells[$ci];
+                                if ($c =~ /^:-+:$/) {
+                                    $alignments[$ci] = 'center';
+                                } elsif ($c =~ /-+:$/) {
+                                    $alignments[$ci] = 'right';
+                                } else {
+                                    $alignments[$ci] = 'left';
+                                }
+                            }
+                        }
+
+                        # Track max widths (skip separator row for width calc)
+                        if ($ri != $separator) {
+                            for my $ci (0 .. $#cells) {
+                                my $w = _display_width($cells[$ci]);
+                                $col_widths[$ci] = $w if !defined $col_widths[$ci] || $w > $col_widths[$ci];
+                            }
+                        }
+                    }
+
+                    # Ensure minimum column width of 3
+                    for my $ci (0 .. $#col_widths) {
+                        $col_widths[$ci] = 3 if ($col_widths[$ci] // 0) < 3;
+                    }
+
+                    my $table_idx = scalar @tables;
+                    push @tables, {
+                        start        => $table_start,
+                        end          => $table_start + $#raw_lines,
+                        separator    => $separator,
+                        col_widths   => \@col_widths,
+                        alignments   => \@alignments,
+                        cells        => \@all_cells,
+                        raw_lines    => \@raw_lines,
+                        cell_offsets => \@all_offsets,
+                    };
+                    for my $li ($table_start .. $table_start + $#raw_lines) {
+                        $line_to_table{$li} = $table_idx;
+                    }
+                }
+            } else {
+                $i++;
+            }
+        }
+
+        my $result = { tables => \@tables, line_to_table => \%line_to_table };
+        $_table_cache{$cache_key} = $result;
+        return $result;
+    }
+}
+
+sub _render_table_line {
+    my ($class, $table, $row_in_table, $width, $theme, $scroll_col, $highlighter, $doc_line) = @_;
+
+    my $cells = $table->{cells}[$row_in_table];
+    my $col_widths = $table->{col_widths};
+    my $alignments = $table->{alignments};
+    my $is_header = ($row_in_table == 0);
+    my $is_separator = ($row_in_table == $table->{separator});
+
+    my $border_fg = $theme->color('table_border_fg');
+    my $bg;
+    my $fg;
+
+    if ($is_header) {
+        $bg = $theme->color('table_header_bg');
+        $fg = $theme->color('table_header_fg');
+    } elsif ($is_separator) {
+        $bg = $theme->color('bg');
+        $fg = $border_fg;
+    } else {
+        $bg = $theme->color('bg');
+        $fg = $theme->color('fg');
+    }
+
+    my $num_cols = scalar @$col_widths;
+    my @out;
+    push @out, $bg;
+
+    if ($is_separator) {
+        # Render: ├───┼───┼───┤
+        my $full = $border_fg . BOX_VERTICAL_RIGHT;
+        for my $ci (0 .. $num_cols - 1) {
+            $full .= BOX_HORIZONTAL x ($col_widths->[$ci] + 2);  # +2 for padding
+            $full .= ($ci < $num_cols - 1) ? BOX_CROSS : BOX_VERTICAL_LEFT;
+        }
+        push @out, $full;
+    } else {
+        # Get syntax tokens for this line to apply within cells
+        my @syntax_colors;  # maps original source char position → ANSI color
+        if ($highlighter) {
+            my $orig_line = $table->{raw_lines}[$row_in_table];
+            my ($tokens) = $highlighter->tokenize_line($orig_line, $doc_line);
+            for my $tok (@$tokens) {
+                my $color = $theme->color("syntax_$tok->{type}");
+                next unless $color;
+                for my $c ($tok->{start} .. $tok->{end} - 1) {
+                    $syntax_colors[$c] = $color;
+                }
+            }
+        }
+
+        # Render: │ cell │ cell │
+        my $full = $border_fg . BOX_VERTICAL;
+        my $cell_offsets = $table->{cell_offsets}[$row_in_table];
+        for my $ci (0 .. $num_cols - 1) {
+            my $cell_text = defined $cells->[$ci] ? $cells->[$ci] : '';
+            my $cell_w = _display_width($cell_text);
+            my $target_w = $col_widths->[$ci] // 3;
+            my $pad = $target_w - $cell_w;
+            $pad = 0 if $pad < 0;
+
+            my $align = $alignments->[$ci] // 'left';
+            my ($lpad, $rpad);
+            if ($align eq 'center') {
+                $lpad = int($pad / 2);
+                $rpad = $pad - $lpad;
+            } elsif ($align eq 'right') {
+                $lpad = $pad;
+                $rpad = 0;
+            } else {
+                $lpad = 0;
+                $rpad = $pad;
+            }
+
+            $full .= $fg . ' ' . (' ' x $lpad);
+
+            # Render cell text with syntax highlighting
+            my $src_offset = $cell_offsets->[$ci] // 0;
+            my $cell_len = length($cell_text);
+            my $prev_color = '';
+            for my $j (0 .. $cell_len - 1) {
+                my $src_pos = $src_offset + $j;
+                my $c = $syntax_colors[$src_pos] // '';
+                if ($c ne $prev_color) {
+                    $full .= $c || ($fg . $bg);
+                    $prev_color = $c;
+                }
+                $full .= substr($cell_text, $j, 1);
+            }
+            # Reset after cell content
+            $full .= $fg . $bg if $prev_color;
+
+            $full .= (' ' x $rpad) . ' ';
+            $full .= $border_fg . BOX_VERTICAL;
+        }
+        push @out, $full;
+    }
+
+    # Compute total rendered width for scroll/truncation
+    my $total_w = 1;  # left border
+    for my $ci (0 .. $num_cols - 1) {
+        $total_w += ($col_widths->[$ci] // 3) + 2 + 1;  # cell + padding + separator
+    }
+
+    my $rendered = join('', @out);
+    return ($rendered, $total_w);
+}
+
 # Render the text area with line numbers
 sub _render_text_area {
-    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width, $cell_aspect, $completion) = @_;
+    my ($class, $doc, $view, $theme, $height, $width, $gutter_width, $highlighter, $find_mode, $minimap_width, $tree_width, $cell_aspect, $completion, $prefs) = @_;
     $minimap_width //= 0;
     $tree_width //= 0;
     $cell_aspect    //= 2.0;
@@ -1665,6 +1922,20 @@ sub _render_text_area {
                 last if ($entry->{type} // '') eq 'doc' && ($entry->{line} // -1) >= $cursor_line
                     && ($entry->{wrap_index} // 0) == 0;
                 $cursor_image_offset++ if ($entry->{type} // '') eq 'image_spacer';
+            }
+        }
+    }
+
+    # Detect Markdown tables for pretty-rendering
+    my $md_tables;
+    my %cursor_in_table;  # table_idx => 1 if cursor is in that table
+    if ($prefs && $prefs->render_markdown_tables() && $highlighter
+        && ($highlighter->grammar_name() // '') eq 'Markdown') {
+        $md_tables = $class->_detect_markdown_tables($doc, $visible_start, $visible_end);
+        if ($md_tables && %{$md_tables->{line_to_table}}) {
+            my $cursor_line = $view->cursor_line();
+            if (exists $md_tables->{line_to_table}{$cursor_line}) {
+                $cursor_in_table{$md_tables->{line_to_table}{$cursor_line}} = 1;
             }
         }
     }
@@ -2011,6 +2282,33 @@ sub _render_text_area {
         push @_out, $line_bg . $theme->color('fg');
 
         # Text content
+
+        # Pretty-render Markdown table lines (unless cursor is in this table)
+        if ($md_tables && !$is_wrap_cont && $doc_line < $doc->line_count()
+            && exists $md_tables->{line_to_table}{$doc_line}) {
+            my $table_idx = $md_tables->{line_to_table}{$doc_line};
+            if (!$cursor_in_table{$table_idx}) {
+                my $table = $md_tables->{tables}[$table_idx];
+                my $row_in_table = $doc_line - $table->{start};
+                my ($rendered, $total_w) = $class->_render_table_line(
+                    $table, $row_in_table, $width, $theme, $scroll_col,
+                    $highlighter, $doc_line
+                );
+                push @_out, $rendered;
+                my $fill = $width - $total_w;
+                if ($fill > 0) {
+                    my $fill_bg = $is_cursor_line ? $line_bg : $theme->color('bg');
+                    push @_out, $fill_bg . (' ' x $fill);
+                }
+                push @_out, $class->_render_minimap_column($minimap_data, $screen_row, $theme)
+                    if $minimap_width > 0;
+                push @_out, CLEAR_LINE;
+                push @_out, RESET;
+                push @text_rows, join('', @_out);
+                next;
+            }
+        }
+
         if ($doc_line < $doc->line_count()) {
             my $line_content = $doc->get_line_content($doc_line);
             my $full_line_content = $line_content;  # Keep full line for tokenization
