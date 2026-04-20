@@ -21,6 +21,9 @@ The status bar should make keyboard shortcuts always visible and organized by mo
 ### P2: Mouse hover effects
 When moving the mouse over interactive elements (status bar pills, tab bar tabs, file tree items, command palette entries), highlight the hovered element with a visual effect — background color change, underline, or similar. This gives immediate feedback about what's clickable and what action will occur. Zellij demonstrates this well. Currently, clickable elements have no hover state, making the UI feel static and making it non-obvious which elements are interactive.
 
+### P2: Markdown table pretty-rendering
+When viewing `.md` files, render tables with continuous Unicode box-drawing lines (e.g. `─`, `│`, `┌`, `┬`), striped row backgrounds for readability, and column alignment. Do not add any extra rows — render the same number of rows as the source. When the cursor enters a table region, switch to raw source mode so the original pipe-delimited Markdown is visible for editing and copying. When selecting a block of text that includes a table, copy the original source content, not the pretty-rendered version. This should be a toggleable preference (on by default). Currently, `Syntax/Markdown.pm` handles tokenization but tables are rendered as plain text with no visual formatting. The renderer (`Renderer.pm`) would need a table-detection pass and a virtual-rendering layer that maps between source lines and display lines without changing the document.
+
 ### P2: Buffer word completion
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
 
