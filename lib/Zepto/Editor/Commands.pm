@@ -1117,6 +1117,74 @@ sub cmd_toggle_auto_pairs {
     $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
 }
 
+sub cmd_toggle_ai {
+    my ($self) = @_;
+    my $ai = $self->{_ai_complete};
+    return unless $ai;
+
+    if (!$ai->{api_key} || !length($ai->{api_key})) {
+        $self->show_message("No API key configured. Run 'AI Completion: Setup' first.");
+        return;
+    }
+
+    $ai->{enabled} = $ai->{enabled} ? 0 : 1;
+    if (!$ai->{enabled}) {
+        $ai->cancel();
+    }
+    $self->{message} = "AI Completion: " . ($ai->{enabled} ? "ON" : "OFF");
+}
+
+sub cmd_ai_setup {
+    my ($self) = @_;
+    my $ai = $self->{_ai_complete};
+    my $prefs = $self->{prefs};
+    my $store = $self->{state_store};
+
+    # Step 1: API URL
+    $self->open_footer_input(
+        prompt => 'API URL:',
+        value  => $prefs->get('ai_api_url'),
+        select_all => 1,
+        wide   => 1,
+        on_submit => sub {
+            my ($url) = @_;
+            return unless length($url);
+            $prefs->set('ai_api_url', $url);
+            $ai->{api_url} = $url;
+
+            # Step 2: Model
+            $self->open_footer_input(
+                prompt => 'Model:',
+                value  => $prefs->get('ai_model'),
+                select_all => 1,
+                wide   => 1,
+                on_submit => sub {
+                    my ($model) = @_;
+                    return unless length($model);
+                    $prefs->set('ai_model', $model);
+                    $ai->{model} = $model;
+
+                    # Step 3: API Key
+                    $self->open_footer_input(
+                        prompt => 'API Key:',
+                        value  => $ai->{api_key} || '',
+                        select_all => 1,
+                        wide   => 1,
+                        on_submit => sub {
+                            my ($key) = @_;
+                            return unless length($key);
+                            $store->put('secrets', { ai_api_key => $key });
+                            $ai->{api_key} = $key;
+                            $ai->{enabled} = 1;
+                            $self->show_message("AI Completion configured and enabled.");
+                        },
+                    );
+                },
+            );
+        },
+    );
+}
+
 sub cmd_toggle_word_wrap {
     my ($self) = @_;
     my $current = $self->_effective_word_wrap();

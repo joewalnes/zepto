@@ -445,6 +445,28 @@ my @COMMANDS = (
         method   => 'cmd_toggle_auto_pairs',
     },
 
+    # === AI section ===
+    {
+        id       => 'ai_setup',
+        label    => 'AI Completion: Setup',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'AI',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_ai_setup',
+    },
+    {
+        id       => 'toggle_ai',
+        label    => 'AI Completion',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'AI',
+        type     => 'toggle',
+        priority => 0,
+        method   => 'cmd_toggle_ai',
+    },
+
     # === DOCUMENTATION section ===
     {
         id       => 'doc_about',
@@ -504,7 +526,7 @@ my @COMMANDS = (
 my %BY_ID = map { $_->{id} => $_ } @COMMANDS;
 
 # Section ordering for palette display
-my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'DOCUMENTATION', 'DIAGNOSTICS');
+my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'AI', 'DOCUMENTATION', 'DIAGNOSTICS');
 
 # =============================================================================
 # Public API
@@ -617,6 +639,10 @@ sub get_toggle_state {
     # File tree: per-window state, not from prefs
     if ($cmd->{id} eq 'toggle_tree') {
         return $editor->{_show_tree} ? 1 : 0;
+    }
+    # AI completion: check AIComplete module
+    if ($cmd->{id} eq 'toggle_ai') {
+        return ($editor->{_ai_complete} && $editor->{_ai_complete}->is_enabled()) ? 1 : 0;
     }
 
     # Standard preference-based toggle

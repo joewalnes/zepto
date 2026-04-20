@@ -41,6 +41,7 @@ use Zepto::WrapMap;
 use Zepto::Editor::TabManager;
 use Zepto::FileTree;
 use Zepto::InputWidget;
+use Zepto::AIComplete;
 use Zepto::Completion::Controller;
 use Zepto::Completion::KeywordProvider;
 use Zepto::Completion::CrossBufferWordProvider;
@@ -190,6 +191,13 @@ sub new {
         $ctrl->add_provider($recent);
         $ctrl->set_recent_provider($recent);
         $self->{_completion} = $ctrl;
+    }
+
+    # Initialize AI completion
+    {
+        my $ai = Zepto::AIComplete->new();
+        $ai->load_config($self->{prefs}, $self->{state_store});
+        $self->{_ai_complete} = $ai;
     }
 
     return $self;
@@ -655,7 +663,8 @@ sub run {
             my $searching = ($self->active_find_engine() && $self->active_find_engine()->is_searching)
                          || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
             my $completion_pending = $self->{_completion_pending_at} && $self->{_completion_pending_at} > 0;
-            my $timeout = ($searching || $completion_pending) ? 0.01 : INPUT_TIMEOUT_SEC;  # 10ms vs 500ms
+            my $ai_active = $self->{_ai_complete} && ($self->{_ai_complete}->is_pending() || $self->{_ai_complete}->is_debouncing());
+            my $timeout = ($searching || $completion_pending || $ai_active) ? 0.01 : INPUT_TIMEOUT_SEC;
 
             # Read input with timeout
             my $input = $self->{terminal}->read_blocking($timeout);
@@ -696,6 +705,16 @@ sub run {
                         }
                         $self->{_completion_pending_at} = 0;
                         $needs_render = 1;
+                    }
+                }
+
+                # AI completion: check debounce trigger and poll for results
+                if ($self->{_ai_complete} && $self->{_ai_complete}->is_enabled()) {
+                    if ($self->{_ai_complete}->check_trigger()) {
+                        $needs_render = 1;  # Show spinner
+                    }
+                    if ($self->{_ai_complete}->poll()) {
+                        $needs_render = 1;  # Show ghost text
                     }
                 }
 
@@ -1066,6 +1085,39 @@ sub handle_editing_event {
             # Any other key with active completion: dismiss and fall through
             if ($key ne 'backspace') {
                 $_comp->dismiss() unless $key eq 'left' || $key eq 'right';
+            }
+        }
+
+        # AI completion key routing — when AI has ghost text showing
+        my $_ai = $self->{_ai_complete};
+        if ($_ai && $_ai->has_result() && !($_comp && $_comp->is_active())) {
+            if ($key eq 'tab' && !$shift) {
+                # Accept AI completion
+                my $text = $_ai->result();
+                $_ai->clear_result();
+                if (defined $text && length($text)) {
+                    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+                    $doc->insert($offset, $text);
+                    # Move cursor to end of inserted text
+                    my @lines = split(/\n/, $text, -1);
+                    if (@lines > 1) {
+                        my $new_line = $view->cursor_line() + @lines - 1;
+                        my $new_col = length($lines[-1]);
+                        $view->set_cursor($new_line, $new_col);
+                    } else {
+                        $view->set_cursor($view->cursor_line(), $view->cursor_col() + length($text));
+                    }
+                    $view->ensure_cursor_visible();
+                }
+                return;
+            }
+            elsif ($key eq 'escape') {
+                $_ai->dismiss();
+                return;
+            }
+            # Any other key: clear AI result (new typing will re-trigger)
+            elsif ($key ne 'left' && $key ne 'right' && $key ne 'backspace') {
+                $_ai->cancel();
             }
         }
 
@@ -2998,6 +3050,13 @@ sub do_insert_char {
             $self->{_completion_pending_at} = 0;
         }
     }
+
+    # AI completion: trigger on any character (debounced internally)
+    if ($self->{_ai_complete} && $self->{_ai_complete}->is_enabled()) {
+        $self->{_ai_complete}->trigger(
+            $self->active_doc(), $self->active_view(), $self->active_highlighter(),
+        );
+    }
 }
 
 # Re-trigger completion if the cursor is currently at a word character.
@@ -4469,7 +4528,9 @@ sub render {
             } : undef,
             completion => ($self->{_completion} && $self->{_completion}->is_active())
                 ? $self->{_completion}->state_for_render($self->active_view(), $self->active_doc())
-                : undef,
+                : ($self->{_ai_complete} && $self->{_ai_complete}->has_result())
+                    ? $self->_ai_completion_for_render()
+                    : undef,
         },
     );
 
@@ -4627,6 +4688,35 @@ sub show_error_message {
 }
 
 # =============================================================================
+# AI Completion
+# =============================================================================
+
+# Build a completion-compatible render state from AI result
+sub _ai_completion_for_render {
+    my ($self) = @_;
+    my $ai = $self->{_ai_complete};
+    return undef unless $ai && $ai->has_result();
+
+    my $view = $self->active_view();
+    return undef unless $view;
+
+    my $text = $ai->result();
+    return undef unless defined $text && length($text);
+
+    # Only show first line as ghost text (multi-line would need more work)
+    my ($first_line) = split(/\n/, $text, 2);
+
+    return {
+        state      => 1,  # STATE_GHOST
+        prefix     => '',
+        cursor_line => $view->cursor_line(),
+        cursor_col  => $view->cursor_col(),
+        ghost_text  => $first_line,
+        ghost_kind  => 'ai',
+    };
+}
+
+# =============================================================================
 # External file change detection
 # =============================================================================
 
@@ -4775,6 +4865,9 @@ sub _record_frame {
     push @features, 'wrap' if $self->_effective_word_wrap();
     push @features, 'tree' if $self->{file_tree} && $self->{_show_tree};
     push @features, 'minimap' if $self->{prefs}->show_minimap();
+    if ($self->{_ai_complete} && $self->{_ai_complete}->is_enabled()) {
+        push @features, $self->{_ai_complete}->is_pending() ? 'ai...' : 'ai';
+    }
     my $features_str = join(',', @features) || 'none';
 
     # Subsystem flags

@@ -46,6 +46,10 @@ my %DEFAULTS = (
     mouse_enabled    => 1,
     scroll_margin    => 3,        # Lines to keep above/below cursor
 
+    # AI completion
+    ai_api_url       => 'https://openrouter.ai/api/v1',
+    ai_model         => 'anthropic/claude-haiku-4-5-20251001',
+
     # File handling
     backup_on_save   => 0,        # Create .bak files
     trim_trailing_whitespace => 0,
@@ -67,6 +71,8 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     auto_complete
     auto_pairs
     mouse_enabled
+    ai_api_url
+    ai_model
 );
 
 sub new {
