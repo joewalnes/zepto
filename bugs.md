@@ -15,6 +15,12 @@ Priority scale:
 
 **Fix:** Added full multi-cursor editing support. First `⌃D` selects word under cursor. Subsequent presses add the next occurrence as a secondary cursor. All typing and backspace affects all cursors simultaneously, processed in reverse document order for offset stability. Same-line cursor position adjustment handles multiple occurrences on one line. Escape clears multi-cursors; arrow keys also exit multi-cursor mode. Status bar shows cursor count indicator. Data model: `_multi_cursors` array in View.pm, editing via `_multi_cursor_insert_char`/`_multi_cursor_backspace` in Editor.pm with undo grouping. Duplicate Line Down moved to palette-only (was `⌃D`). Added `cmd_select_next_occurrence` to CommandRegistry. 9 tests added.
 
+### P1: Status bar rework — always-visible keys grouped by modifier
+The status bar should make keyboard shortcuts always visible and organized by modifier key, similar to Zellij's approach. Group `⌃` (Ctrl) shortcuts on the left and `⌥` (Alt) shortcuts on the right, so the modifier is shown once per group rather than repeated on every pill — saving space and making the modifier split immediately clear. Buttons should be contextual, showing what's most relevant to the current state (e.g., editing vs find mode vs file tree). Currently, pills are arranged by category (FILE/EDIT/NAVIGATE/VIEW from `CommandRegistry::commands_for_status_bar`) with each pill repeating its modifier, and lower-priority pills drop off at narrow widths. The rework should ensure the most useful actions are always visible regardless of terminal width.
+
+### P2: Mouse hover effects
+When moving the mouse over interactive elements (status bar pills, tab bar tabs, file tree items, command palette entries), highlight the hovered element with a visual effect — background color change, underline, or similar. This gives immediate feedback about what's clickable and what action will occur. Zellij demonstrates this well. Currently, clickable elements have no hover state, making the UI feel static and making it non-obvious which elements are interactive.
+
 ### P2: Buffer word completion
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
 
