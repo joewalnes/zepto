@@ -205,6 +205,11 @@ sub leave_alt_screen {
     my ($self) = @_;
     return unless $self->{_alt_screen};
 
+    # Clear the alternate screen before leaving — some terminals don't
+    # fully restore the main screen buffer, leaving alt screen content
+    # visible above the cursor position.
+    $self->write(CLEAR_SCREEN);
+    $self->write(CURSOR_HOME);
     $self->write(ALT_SCREEN_OFF);
     $self->{_alt_screen} = 0;
     return 1;

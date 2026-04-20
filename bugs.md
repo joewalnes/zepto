@@ -802,8 +802,12 @@ After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not r
 ### P2: [Bug] history.json recent_files cluttered with temp files
 `_track_recent_file` in Editor.pm records every file opened — including temp files from test runs (`/tmp/...`, `/private/tmp/...`). The recent files list (max 50) gets filled with ephemeral files that no longer exist, pushing out real files. Should filter out temp directory paths (e.g. `/tmp/`, `/private/tmp/`, or files from `File::Temp` patterns) before adding to history.
 
-### P2: [Bug] Screen artifacts remain above cursor position after quitting
-When quitting zepto (`⌃Q`), everything above the cursor's vertical position remains visible on the terminal — the upper portion of the editor's alternate screen buffer content bleeds into the main screen. The area below the cursor clears correctly. The cleanup sequence in `Terminal.pm:cleanup()` calls `leave_alt_screen()` which writes `ALT_SCREEN_OFF`, but the cursor position at quit time appears to affect how much of the screen gets properly restored.
+### ~~P2: [Bug] Screen artifacts remain above cursor position after quitting~~ FIXED
+When quitting zepto (`⌃Q`), everything above the cursor's vertical position remains visible on the terminal — the upper portion of the editor's alternate screen buffer content bleeds into the main screen.
+
+**Root cause:** `leave_alt_screen()` in Terminal.pm only sent `ALT_SCREEN_OFF` (`\x1b[?1049l`). Some terminals don't fully restore the main screen buffer from the saved state, leaving alternate screen content visible.
+
+**Fix:** Added `CLEAR_SCREEN` + `CURSOR_HOME` before `ALT_SCREEN_OFF` in `leave_alt_screen()`. This clears the alternate screen buffer before switching back to the main screen, so even terminals with imperfect `?1049l` handling show a clean exit.
 
 ### P2: [Tests] diff_constraint.t spews debug output to console
 `tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues. Should be removed or guarded behind a verbose flag.
