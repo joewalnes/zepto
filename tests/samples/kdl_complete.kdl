@@ -1,0 +1,85 @@
+// KDL complete syntax sample
+// Line comment
+
+/* Block comment */
+/* Nested /* block */ comment */
+
+// Nodes with values and properties
+title "Hello, World!"
+author "Alice" email="alice@example.com"
+
+// Multiple nodes on one line
+node1; node2; node3
+
+// Node with children
+parent {
+    child "value"
+    another-child key="val"
+}
+
+// Type annotations
+node (u8)123
+date (date)"2024-01-15"
+uuid-val (uuid)"550e8400-e29b-41d4-a716-446655440000"
+
+// KDL constants
+enabled #true
+disabled #false
+nothing #null
+infinity #inf
+neg-infinity #-inf
+not-a-number #nan
+
+// String types
+basic "Hello\nWorld\t!"
+raw-str #"No \n escaping here"#
+raw-hashes ##"Contains "# inside"##
+
+// Multi-line strings
+description """
+    This is a multi-line
+    string with automatic
+    dedentation
+    """
+
+// Number formats
+decimal 123
+negative -42
+float 3.14159
+scientific 1.0e10
+negative-sci -2.5E-3
+hex 0xDEADBEEF
+octal 0o755
+binary 0b11010110
+underscored 1_000_000
+hex-under 0xFF_FF
+
+// Property keys with various formats
+config key="value" count=42 flag=#true
+
+// Slashdash comments
+/-commented-node "this is ignored"
+node /-"skipped arg" "kept arg"
+node /-key="skipped" other="kept"
+
+// Line continuation
+very-long-node \
+    "arg1" \
+    "arg2" \
+    key="value"
+
+// Nested structure
+package {
+    name "my-app"
+    version "1.0.0"
+    dependencies {
+        serde version="1.0" features="derive"
+        tokio version="1.0" (optional)#true
+    }
+}
+
+// Bare identifiers as node names
+my-node
+my.dotted.node
+node123
+_private

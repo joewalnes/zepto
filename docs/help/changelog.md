@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-20
+
+- Added KDL syntax highlighting (.kdl files)
+
 ## 2026-03-23
 
 - Multi-cursor editing with Ctrl+D (select next occurrence)

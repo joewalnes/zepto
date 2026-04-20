@@ -167,6 +167,9 @@ my %EXTENSION_MAP = (
     # JSON
     json     => 'Zepto::Syntax::JSON',
 
+    # KDL
+    kdl      => 'Zepto::Syntax::KDL',
+
     # YAML
     yaml     => 'Zepto::Syntax::YAML',
     yml      => 'Zepto::Syntax::YAML',
