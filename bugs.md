@@ -24,6 +24,9 @@ When moving the mouse over interactive elements (status bar pills, tab bar tabs,
 ### P2: Markdown table pretty-rendering
 When viewing `.md` files, render tables with continuous Unicode box-drawing lines (e.g. `─`, `│`, `┌`, `┬`), striped row backgrounds for readability, and column alignment. Do not add any extra rows — render the same number of rows as the source. When the cursor enters a table region, switch to raw source mode so the original pipe-delimited Markdown is visible for editing and copying. When selecting a block of text that includes a table, copy the original source content, not the pretty-rendered version. This should be a toggleable preference (on by default). Currently, `Syntax/Markdown.pm` handles tokenization but tables are rendered as plain text with no visual formatting. The renderer (`Renderer.pm`) would need a table-detection pass and a virtual-rendering layer that maps between source lines and display lines without changing the document.
 
+### P3: Dim Markdown formatting delimiters
+In Markdown files, emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) are rendered as `TOKEN_PUNCTUATION` in `Syntax/Markdown.pm`, giving them the same visual weight as the styled text they surround. The delimiters should be rendered much fainter (dimmed/low-opacity) so the bold, italic, strikethrough, and highlighted text pops out visually. This is how many modern Markdown editors handle it — the formatting chars become near-invisible while the styled content stands out. Currently all delimiter tokens share the generic punctuation color in `Theme.pm`.
+
 ### P2: Buffer word completion
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
 
