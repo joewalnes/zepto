@@ -42,7 +42,8 @@ Or [download manually](https://github.com/joewalnes/zepto/releases/download/late
 
 ```bash
 make build    # Creates single-file 'zepto' executable
-make test     # Run tests
+make test     # Run unit tests
+make qa       # Run end-to-end QA tests (requires hangon)
 ```
 
 ## License

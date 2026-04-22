@@ -153,7 +153,7 @@ hangon stop zepto
 | `hangon screen NAME` | Capture current terminal screen as text |
 | `hangon send NAME "text"` | Type literal characters |
 | `hangon sendline NAME "text"` | Type text + Enter |
-| `hangon keys NAME "ctrl-z"` | Send special keys (ctrl-a..z, enter, tab, escape, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1..f12) |
+| `hangon keys NAME "ctrl-z"` | Send special keys (ctrl-a..z, ctrl-space, ctrl-up/down/left/right, shift-up/down/left/right, shift-home/end, alt-a..z, alt-./,/=/-,  alt-up/down/left/right, enter, tab, escape, backspace, delete, up, down, left, right, home, end, pageup, pagedown, f1..f12) |
 | `hangon expect NAME "pattern"` | Wait for regex to appear in output |
 | `hangon screenshot NAME file.png` | Capture screen as SVG/PNG image |
 | `hangon alive NAME` | Check if process is running (exit 0=yes, 1=no) |

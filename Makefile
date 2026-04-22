@@ -1,4 +1,4 @@
-.PHONY: all test test-verbose clean build install check loc website website-screencaps website-clean
+.PHONY: all test test-verbose clean build install check loc website website-screencaps website-clean qa qa-visual qa-full qa-list
 
 PREFIX ?= $(HOME)/.local
 
@@ -72,3 +72,23 @@ loc:
 	@wc -l lib/Zepto/*.pm | tail -1
 	@echo "Test lines:"
 	@wc -l tests/*.t | tail -1
+
+# =============================================================================
+# QA end-to-end tests (require hangon: brew install joewalnes/tap/hangon)
+# =============================================================================
+
+# Tier 1 only — deterministic hangon scripts (fast, free, no LLM)
+qa: build
+	@qa/runner.sh --tier 1
+
+# Tier 1 + Tier 2 — includes LLM visual checks (requires API key)
+qa-visual: build
+	@qa/runner.sh --tier 1,2
+
+# All automated tiers
+qa-full: build
+	@qa/runner.sh --tier 1,2,3
+
+# List available QA scripts without running
+qa-list:
+	@qa/runner.sh --list --tier 1,2,3
