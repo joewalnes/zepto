@@ -23,6 +23,6 @@ qa_assert_screen "2:4|2,4|2: 4" "cursor at line 2 col 4"
 
 qa_keys "ctrl-q"
 sleep 0.2
-qa_send "d" 0.2
+qa_send "n" 0.2
 
 qa_summary

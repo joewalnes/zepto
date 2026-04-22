@@ -23,6 +23,6 @@ qa_assert_screen "3:" "cursor on line 3"
 
 qa_keys "ctrl-q"
 sleep 0.2
-qa_send "d" 0.2
+qa_send "n" 0.2
 
 qa_summary

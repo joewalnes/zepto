@@ -24,6 +24,6 @@ fi
 qa_keys "ctrl-q"
 sleep 0.2
 # Discard changes if prompted
-qa_send "d" 0.2
+qa_send "n" 0.2
 
 qa_summary

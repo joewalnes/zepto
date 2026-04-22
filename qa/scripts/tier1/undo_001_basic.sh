@@ -39,6 +39,6 @@ qa_assert_screen "hello" "after redo, text is present"
 
 qa_keys "ctrl-q"
 sleep 0.2
-qa_send "d" 0.2
+qa_send "n" 0.2
 
 qa_summary
