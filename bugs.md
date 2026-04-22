@@ -40,6 +40,9 @@ Reopen the editor and get back exactly where you were: same tabs, cursor positio
 ### P2: Persistent config file
 Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
 
+### P2: Shortcut key for Duplicate Down
+Duplicate Down currently has no keyboard shortcut — it's palette-only. Should have a direct keybinding for quick access. `⌃D` is taken (Select Next Occurrence). Candidates: `⌃⇧D` (Shift=reverse already used for Duplicate Up as `⌃U`, but `⌃⇧D` is intuitive as "duplicate" with Shift for the pair), or find another mnemonic. Also consider giving Duplicate Up a matching shortcut if it doesn't have one.
+
 ### P3: Automatic dark/light mode
 Detect the system theme (dark/light) on startup and choose the matching editor theme. Detect when the system theme changes at runtime and automatically switch. Auto mode is optional — users can still manually set dark or light via `Ctrl+T` or config.
 
