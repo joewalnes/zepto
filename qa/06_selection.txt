@@ -1,0 +1,299 @@
+================================================================================
+06 — Selection
+================================================================================
+
+Covers: shift+arrow, shift+home/end/pgup/pgdn, word selection, select-all,
+double/triple click, linear vs column semantics.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-001
+NAME:     Shift+Right extends selection one char
+PRIORITY: P0
+FEATURE:  selection
+
+SETUP
+  Line "abcdef", cursor at col 1.
+
+STEPS
+  1. Press Shift+Right three times.
+
+VERIFY
+  - "abc" is highlighted.
+  - Cursor at col 4.
+  - Status shows selected character count or similar indicator.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-002
+NAME:     Shift+Left from mid-selection shrinks
+PRIORITY: P1
+FEATURE:  selection
+
+SETUP
+  Selection "abc" from QA-SEL-001.
+
+STEPS
+  1. Press Shift+Left twice.
+
+VERIFY
+  - Selection shrinks to "a".
+  - Cursor at col 2.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-003
+NAME:     Shift+Down extends multi-line selection
+PRIORITY: P0
+FEATURE:  selection
+
+SETUP
+  3 lines. Cursor at start of line 1.
+
+STEPS
+  1. Press Shift+Down twice.
+
+VERIFY
+  - Lines 1 and 2 are entirely selected (including their newlines).
+  - Cursor at start of line 3.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-004
+NAME:     Shift+End extends to end of line
+PRIORITY: P1
+FEATURE:  selection
+
+STEPS
+  1. Place cursor at col 1 of line with content.
+  2. Press Shift+End.
+
+VERIFY
+  - Entire line content is selected.
+  - Cursor is at end-of-line column.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-005
+NAME:     Shift+Alt+Right selects by word (REGRESSION)
+PRIORITY: P1
+FEATURE:  selection word
+RELATED:  bugs.md P1 "Shift+Alt+Left/Right should select by word, not column select"
+
+SETUP
+  Line `hello world foo bar`, cursor at col 1.
+
+STEPS
+  1. Press Shift+Alt+Right once.
+
+VERIFY
+  - "hello" (or "hello ") is selected.
+  - Cursor is at start of "world" or similar word boundary.
+  - This does NOT enter column selection mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-006
+NAME:     Shift+Alt+Left selects word backward
+PRIORITY: P1
+FEATURE:  selection word
+
+SETUP
+  Line `hello world`, cursor at end.
+
+STEPS
+  1. Press Shift+Alt+Left.
+
+VERIFY
+  - "world" selected (or the last word).
+  - Cursor at start of that word.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-007
+NAME:     Ctrl+A selects all
+PRIORITY: P0
+FEATURE:  select-all
+
+STEPS
+  1. Open multi-line file.
+  2. Press ⌃A.
+
+VERIFY
+  - Entire document is highlighted.
+  - Cursor at document end.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-008
+NAME:     Shift+Ctrl+Home extends to document start
+PRIORITY: P2
+FEATURE:  selection
+
+SETUP
+  Cursor somewhere in middle.
+
+STEPS
+  1. Press Shift+Ctrl+Home (or platform equivalent).
+
+VERIFY
+  - Selection spans from cursor back to doc start.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-009
+NAME:     Arrow without Shift clears selection
+PRIORITY: P0
+FEATURE:  selection
+
+SETUP
+  A selection exists (from QA-SEL-001).
+
+STEPS
+  1. Press Right arrow.
+
+VERIFY
+  - Selection cleared.
+  - Cursor moves one character right of previous position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-010
+NAME:     Double-click selects word (REGRESSION)
+PRIORITY: P1
+FEATURE:  selection mouse
+RELATED:  bugs.md P3 "Mouse parity incomplete"
+
+SETUP
+  Line `hello world`, mouse available.
+
+STEPS
+  1. Double-click on "world".
+
+VERIFY
+  - "world" is selected.
+  - Cursor at end of word.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-011
+NAME:     Triple-click selects entire line
+PRIORITY: P1
+FEATURE:  selection mouse
+
+STEPS
+  1. Triple-click on any line.
+
+VERIFY
+  - Entire line content including trailing newline is selected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-012
+NAME:     Multi-click timing (400ms window)
+PRIORITY: P2
+FEATURE:  selection mouse
+
+STEPS
+  1. Click once, wait 500ms.
+  2. Click again.
+
+VERIFY
+  - Second click is treated as a single click (cursor placement), not
+    a double-click.
+  - Window is roughly 400ms per docs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-013
+NAME:     Click+drag selects range
+PRIORITY: P1
+FEATURE:  selection mouse
+
+STEPS
+  1. Click at a position, hold, drag to another position, release.
+
+VERIFY
+  - Linear selection spans from press to release point.
+  - Cursor at release point.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-014
+NAME:     Alt+click+drag starts column selection
+PRIORITY: P1
+FEATURE:  selection column
+RELATED:  QA-COL-*
+
+STEPS
+  1. Hold Alt, click and drag over a rectangular area.
+
+VERIFY
+  - Rectangular (not linear) selection is shown.
+  - Status bar shows "COL RxC" indicator.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-015
+NAME:     Typing replaces selection
+PRIORITY: P0
+FEATURE:  selection edit
+
+SETUP
+  Selection "world" highlighted in "hello world".
+
+STEPS
+  1. Type "moon".
+
+VERIFY
+  - Selection replaced: "hello moon".
+  - Undo (⌃Z) restores original "hello world".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-016
+NAME:     Backspace deletes selection
+PRIORITY: P1
+FEATURE:  selection edit
+
+SETUP
+  Selection exists.
+
+STEPS
+  1. Press Backspace.
+
+VERIFY
+  - Selection removed.
+  - Cursor positioned at selection's start.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-017
+NAME:     Esc clears selection
+PRIORITY: P1
+FEATURE:  selection esc
+
+STEPS
+  1. Create a selection.
+  2. Press Esc.
+
+VERIFY
+  - Selection is cleared.
+  - Cursor remains where the selection ended (documented behavior).
+  - Does NOT open palette on this Esc press (selection takes priority).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-018
+NAME:     Selection highlight visible under syntax colors
+PRIORITY: P2
+FEATURE:  selection rendering
+
+STEPS
+  1. Open source file with syntax highlighting.
+  2. Select a colorful region (e.g. across keywords and strings).
+
+VERIFY
+  - Selection background (blue) is applied.
+  - Syntax foreground colors remain visible on top.
+  - Contrast remains readable.

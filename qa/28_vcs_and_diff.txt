@@ -1,0 +1,250 @@
+================================================================================
+28 — VCS & Diff
+================================================================================
+
+Covers: git gutter integration, inline diff view (⌥D), next/prev change
+(⌥N/⌥P), diff pill color, character-level highlighting, O(1) lookups,
+auto-refresh on HEAD change, debounce.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-001
+NAME:     Gutter shows git diff markers
+PRIORITY: P0
+FEATURE:  vcs gutter
+RELATED:  QA-GUT-002
+
+SETUP
+  Git-tracked file. Make various changes.
+
+STEPS
+  1. Observe gutter.
+
+VERIFY
+  - Added lines: green marker.
+  - Modified lines: yellow/amber.
+  - Deleted lines: red triangle or similar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-002
+NAME:     ⌥N jumps to next VCS change
+PRIORITY: P1
+FEATURE:  vcs nav
+
+SETUP
+  File with multiple hunks, cursor at top.
+
+STEPS
+  1. Press ⌥N.
+
+VERIFY
+  - Cursor jumps to first line of next VCS hunk.
+  - Press again — moves to next. Wraps around at end.
+  - Location history records each jump.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-003
+NAME:     ⌥P jumps to previous VCS change
+PRIORITY: P1
+FEATURE:  vcs nav
+
+STEPS
+  1. Press ⌥P.
+
+VERIFY
+  - Cursor jumps to previous hunk.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-004
+NAME:     ⌥D expands inline diff view
+PRIORITY: P1
+FEATURE:  vcs diff
+
+SETUP
+  Modified file. Cursor on a changed line.
+
+STEPS
+  1. Press ⌥D.
+
+VERIFY
+  - Hunk expands inline: old lines (red bg) shown above, new lines
+    (green bg) shown below — or interleaved per implementation.
+  - Character-level diff highlighting visible within the hunk.
+  - Diff View toggle pill shows ON.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-005
+NAME:     ⌥D on unchanged line auto-jumps to next change (REGRESSION)
+PRIORITY: P2
+FEATURE:  vcs diff discoverability
+RELATED:  bugs.md P2 "Diff view discoverability"
+
+STEPS
+  1. Cursor on unchanged line.
+  2. Press ⌥D.
+
+VERIFY
+  - Cursor jumps to next VCS change (instead of showing "No change at
+    cursor").
+  - Hunk expands there.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-006
+NAME:     Esc collapses all expanded diff hunks
+PRIORITY: P2
+FEATURE:  vcs diff esc
+
+SETUP
+  Diff hunks expanded.
+
+STEPS
+  1. Press Esc.
+
+VERIFY
+  - All expanded hunks collapse.
+  - Cursor stays in place.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-007
+NAME:     Adaptive debounce on large files (REGRESSION)
+PRIORITY: P2
+FEATURE:  vcs performance
+RELATED:  bugs.md P1 "Large file sluggishness"
+
+SETUP
+  File with >5000 lines.
+
+STEPS
+  1. Make rapid edits.
+
+VERIFY
+  - VCS diff recomputation debounced to 1.0s (instead of 0.3s for small
+    files).
+  - Typing remains smooth.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-008
+NAME:     O(1) VCS lookups (REGRESSION)
+PRIORITY: P1
+FEATURE:  vcs performance
+
+SETUP
+  File with 10K+ lines with many changes.
+
+STEPS
+  1. Scroll through the file.
+
+VERIFY
+  - No frame-time degradation based on number of changes.
+  - Verify via performance log if available.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-009
+NAME:     Auto-refresh after external commit
+PRIORITY: P2
+FEATURE:  vcs refresh
+
+STEPS
+  1. Make changes in editor.
+  2. External: `git add . && git commit -m 'test'`.
+  3. Interact in editor.
+
+VERIFY
+  - Gutter markers refresh (no longer "modified" against the new HEAD).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-010
+NAME:     Shell injection protected (REGRESSION)
+PRIORITY: P1
+FEATURE:  vcs security
+RELATED:  bugs.md P1 "Shell injection in VCS/Git.pm"
+
+SETUP
+  Git repo with a file whose name contains spaces or shell metachars,
+  e.g. `foo; rm -rf /.txt` (harmless when quoted properly).
+
+STEPS
+  1. Open the file.
+  2. Observe VCS operations do not execute injected commands.
+
+VERIFY
+  - File opens normally.
+  - No side effects from the filename (no shell interpretation).
+  - git commands use list-form exec, not shell.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-011
+NAME:     Inline diff with word wrap (REGRESSION)
+PRIORITY: P2
+FEATURE:  vcs diff wrap
+RELATED:  bugs.md P3 "Diff view does not preserve line wrap"
+RELATED:  QA-WRAP-009
+
+STEPS
+  1. Wrap ON.
+  2. Modified long line.
+  3. ⌥D.
+
+VERIFY
+  - Both old and new lines wrap in the hunk.
+  - Continuation rows rendered with ↪.
+  - Gutter markers extend across wrap rows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-012
+NAME:     Non-git directory has no VCS features
+PRIORITY: P2
+FEATURE:  vcs absence
+
+SETUP
+  Directory outside any git repo.
+
+STEPS
+  1. Open a file.
+
+VERIFY
+  - No gutter markers (no baseline).
+  - Status bar diff pill shows neutral state.
+  - No errors or "git not found" messages.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-013
+NAME:     File tree shows VCS status colors
+PRIORITY: P1
+FEATURE:  vcs tree
+RELATED:  QA-TREE-010
+
+STEPS
+  1. In a git repo with mixed file statuses, open tree.
+
+VERIFY
+  - File colors match VCS status (modified=yellow, untracked=green, etc.).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-VCS-014
+NAME:     Character-level diff highlight
+PRIORITY: P3
+FEATURE:  vcs diff rendering
+
+SETUP
+  A line where only a few characters changed (e.g. "Foo" → "Bar").
+
+STEPS
+  1. ⌥D on that line.
+
+VERIFY
+  - Within the expanded hunk, the changed characters are highlighted
+    more intensely than the unchanged surrounding chars.

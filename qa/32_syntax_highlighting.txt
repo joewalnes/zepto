@@ -1,0 +1,375 @@
+================================================================================
+32 — Syntax Highlighting
+================================================================================
+
+Covers: 52 language grammars, detection (extension / filename / shebang),
+multi-line constructs, embedded languages, incremental re-highlighting,
+Save As activation.
+
+For a per-language feature matrix see lib/Zepto/Syntax/*.pm and
+tests/samples/{lang}_complete.{ext} + {lang}_complete.expected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-001
+NAME:     Highlighting activates on file load
+PRIORITY: P0
+FEATURE:  syntax
+
+STEPS
+  1. Open `.py` file.
+
+VERIFY
+  - Keywords colored (e.g. `def` purple, `True` orange).
+  - Strings colored green.
+  - Comments colored blue-gray.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-002
+NAME:     Extension detection across all 52 languages
+PRIORITY: P1
+FEATURE:  syntax detect
+
+STEPS
+  For each of these extensions, open a sample file:
+    .pl .pm .t .py .pyw .js .mjs .cjs .jsx .ts .tsx .rb .java .php .c
+    .cpp .cc .hpp .cs .sh .bash .zsh .fish .go .rs .zig .swift .kt
+    .scala .groovy .clj .cljs .m .mm .R .html .xml .svg .css .scss
+    .sass .json .yaml .yml .toml .ini .makefile .mk .cmake .tf .sql
+    .graphql .md .adoc .rst .tex .nginxconf .nix .kdl .lua .proto
+    .thrift .diff .log .sshconfig .crontab .service
+
+VERIFY
+  - Each file gets appropriate highlighting.
+  - Cross-reference with tests/samples/ expected outputs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-003
+NAME:     Filename map detection
+PRIORITY: P2
+FEATURE:  syntax detect
+
+STEPS
+  Open these special filenames:
+    Makefile, GNUmakefile, CMakeLists.txt, Dockerfile, Containerfile,
+    Cargo.toml, pyproject.toml, BUILD, WORKSPACE, Rakefile, Gemfile,
+    Vagrantfile, build.gradle, settings.gradle, .bashrc, .zshrc,
+    .gitconfig, .npmrc, crontab, nginx.conf, default.nix, config.fish
+
+VERIFY
+  - Each matches its special-cased grammar per lib/Zepto/Highlighter.pm.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-004
+NAME:     Shebang detection
+PRIORITY: P2
+FEATURE:  syntax detect
+
+SETUP
+  Files with shebang lines:
+    `#!/usr/bin/env python` — python highlighting
+    `#!/bin/bash` — shell
+    `#!/usr/bin/perl` — perl
+    `#!/usr/bin/env ruby` — ruby
+    `#!/usr/bin/env node` — javascript
+    (...)
+
+STEPS
+  1. Open each.
+
+VERIFY
+  - Grammar selected from the shebang when no extension matches.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-005
+NAME:     Multi-line string (Python triple-quote)
+PRIORITY: P2
+FEATURE:  syntax multi-line
+
+SETUP
+  Python file with triple-quoted docstring spanning 5 lines.
+
+STEPS
+  1. Observe entire docstring.
+  2. Insert a character in the middle — re-highlights.
+
+VERIFY
+  - All 5 lines colored as string.
+  - After edit, re-highlighting correctly extends to the closing `"""`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-006
+NAME:     Multi-line block comment (C/*...*/)
+PRIORITY: P2
+FEATURE:  syntax multi-line
+
+SETUP
+  C file with block comment:
+    /* line1
+       line2
+       line3 */
+
+STEPS
+  1. Observe highlighting.
+
+VERIFY
+  - All 3 lines are comment-colored.
+  - Removing `*/` extends the comment to subsequent lines.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-007
+NAME:     Heredoc (shell / perl / ruby)
+PRIORITY: P2
+FEATURE:  syntax heredoc
+
+SETUP
+  Shell:
+    cat <<EOF
+    hello
+    world
+    EOF
+
+STEPS
+  1. Observe highlighting.
+
+VERIFY
+  - Content between <<EOF and EOF is highlighted as string.
+  - Closing EOF as delimiter.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-008
+NAME:     Embedded CSS in HTML <style> (REGRESSION)
+PRIORITY: P1
+FEATURE:  syntax embed
+RELATED:  bugs.md P3 "Toggle comment enhancements" (HTML context)
+
+SETUP
+  HTML file:
+    <style>
+      body { color: red; }
+    </style>
+
+STEPS
+  1. Open.
+
+VERIFY
+  - CSS inside `<style>` is highlighted as CSS (selectors, properties,
+    values, curly braces).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-009
+NAME:     Embedded JS in HTML <script>
+PRIORITY: P1
+FEATURE:  syntax embed
+
+SETUP
+  HTML file:
+    <script>
+      const x = 1;
+    </script>
+
+STEPS
+  1. Open.
+
+VERIFY
+  - JavaScript highlighted (keywords, numbers) inside `<script>`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-010
+NAME:     Save As activates highlighting (REGRESSION)
+PRIORITY: P2
+FEATURE:  syntax save-as
+RELATED:  bugs.md P2 "Syntax highlighting doesn't activate after Save As"
+RELATED:  QA-FILE-003
+
+STEPS
+  1. ⌃N, type Python code.
+  2. ⌃S as `/tmp/zqa_new.py`.
+
+VERIFY
+  - Highlighting activates immediately post-save.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-011
+NAME:     Incremental re-highlighting on edit
+PRIORITY: P2
+FEATURE:  syntax incremental
+
+STEPS
+  1. Long source file (1000+ lines).
+  2. Edit a line near the bottom.
+
+VERIFY
+  - Re-highlighting starts from the edited line, not the whole file.
+  - No noticeable delay on edit.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-012
+NAME:     Wide Unicode chars don't offset tokens (REGRESSION)
+PRIORITY: P2
+FEATURE:  syntax unicode
+RELATED:  bugs.md P2 "Syntax highlighting misaligned on lines with ⌥, ⚠"
+
+STEPS
+  1. Source file with symbols like `⌥ ⚠ ✔` in string or comment.
+
+VERIFY
+  - Tokens after the symbols are NOT shifted right by 1 column each.
+  - East Asian narrow/wide classification is correct.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-013
+NAME:     YAML literals inside bare words (REGRESSION)
+PRIORITY: P2
+FEATURE:  syntax yaml
+RELATED:  bugs.md P2 "YAML syntax highlighting matches literals inside bare words"
+
+SETUP
+  YAML file:
+    region: us-east-1
+    information: value
+
+STEPS
+  1. Open.
+
+VERIFY
+  - The `on` inside `region` is NOT highlighted as YAML literal.
+  - Similarly for `information` containing `on`.
+  - Standalone `on: true` still highlights `on` as literal.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-014
+NAME:     Perl regex s/// highlighted as regex
+PRIORITY: P2
+FEATURE:  syntax perl
+
+STEPS
+  1. Perl file with `$x =~ s/old/new/g;`.
+
+VERIFY
+  - Regex highlighted (not interpreted as division).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-015
+NAME:     Markdown emphasis with intraword underscores (REGRESSION)
+PRIORITY: P2
+FEATURE:  syntax markdown
+RELATED:  bugs.md P2 "Markdown underscore emphasis renders inside identifiers"
+
+STEPS
+  1. Markdown file with `NF_CLOSE (\x{f00d}) duplicated NF_TIMES`.
+
+VERIFY
+  - Text between `NF_` underscores is NOT italicized.
+  - Per CommonMark intraword rule for `_`.
+  - `*` emphasis remains unrestricted (intraword still works).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-016
+NAME:     Python f-string highlighting
+PRIORITY: P3
+FEATURE:  syntax python
+
+STEPS
+  1. Python file with `f"value: {x}"`.
+
+VERIFY
+  - Both the f-string body and the `{x}` expression are highlighted
+    distinctly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-017
+NAME:     JavaScript template literal
+PRIORITY: P3
+FEATURE:  syntax javascript
+
+STEPS
+  1. JS file with `` `Hello, ${name}!` ``.
+
+VERIFY
+  - Template literal body in one color.
+  - `${name}` expression distinct.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-018
+NAME:     Rust raw string with #
+PRIORITY: P3
+FEATURE:  syntax rust
+
+STEPS
+  1. Rust file with `r#"hello "world""#`.
+
+VERIFY
+  - Entire raw string is colored correctly, even with inner quotes.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-019
+NAME:     Go backtick raw string
+PRIORITY: P3
+FEATURE:  syntax go
+
+STEPS
+  1. Go file with `` `some "quoted" text` ``.
+
+VERIFY
+  - Raw string highlighted correctly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-020
+NAME:     Markdown heading styles
+PRIORITY: P2
+FEATURE:  syntax markdown
+
+STEPS
+  1. Markdown with ATX headings `#`, `##`, etc. and Setext `===`, `---`.
+
+VERIFY
+  - All 6 heading levels visually distinct.
+  - Bold and larger treatment where theme permits.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-021
+NAME:     KDL highlighting (REGRESSION - new lang)
+PRIORITY: P3
+FEATURE:  syntax kdl
+RELATED:  changelog "KDL syntax highlighting (.kdl files)"
+
+STEPS
+  1. Open a .kdl file (e.g. tests/samples/kdl_complete.kdl).
+
+VERIFY
+  - Nodes, properties, strings all colored.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-022
+NAME:     Token alignment matches expected
+PRIORITY: P3
+FEATURE:  syntax test infrastructure
+
+STEPS
+  1. Run `prove tests/syntax_samples.t`.
+
+VERIFY
+  - All 52 languages' tokenized output matches expected files.
+  - Guards against accidental grammar regressions.

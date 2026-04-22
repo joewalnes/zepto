@@ -1,0 +1,229 @@
+================================================================================
+39 — Terminal Rendering
+================================================================================
+
+Covers: alternate screen buffer, raw mode, resize handling, RGB color
+support, screen edge fill (REGRESSION), mouse tracking mode, bracketed
+paste mode, cursor show/hide.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-001
+NAME:     Uses alternate screen buffer
+PRIORITY: P0
+FEATURE:  term
+RELATED:  QA-STRT-002
+
+STEPS
+  1. Scrollable terminal history.
+  2. Launch zepto, then quit.
+
+VERIFY
+  - Editor UI was in alt buffer; main buffer preserved.
+  - Scrollback intact.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-002
+NAME:     Raw mode during runtime
+PRIORITY: P0
+FEATURE:  term
+
+STEPS
+  1. Launch.
+  2. Press Ctrl+C (would normally SIGINT).
+
+VERIFY
+  - zepto does NOT exit (raw mode disables signal handling).
+  - ⌃C is interpreted by editor (selection copy in find, etc.).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-003
+NAME:     Terminal restored on ⌃Q clean exit
+PRIORITY: P0
+FEATURE:  term
+RELATED:  QA-STRT-007
+
+STEPS
+  1. Launch, ⌃Q.
+
+VERIFY
+  - raw mode off.
+  - mouse tracking off.
+  - cursor visible.
+  - bracketed paste off.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-004
+NAME:     Window resize triggers re-render
+PRIORITY: P1
+FEATURE:  term resize
+RELATED:  QA-STRT-011
+
+STEPS
+  1. Launch.
+  2. Resize terminal smaller, larger, repeatedly.
+
+VERIFY
+  - Editor re-renders at each size.
+  - Status bar pills adapt.
+  - Tree / minimap drop off at narrow widths correctly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-005
+NAME:     24-bit color rendering
+PRIORITY: P1
+FEATURE:  term color
+
+STEPS
+  1. Launch on truecolor-capable terminal (iTerm2, Kitty, modern GNOME
+     Terminal, etc.).
+
+VERIFY
+  - Theme colors are rich (not restricted to 8 or 256).
+  - Gradient between similar shades visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-006
+NAME:     Bracketed paste mode enabled
+PRIORITY: P1
+FEATURE:  term paste
+RELATED:  QA-EDIT-015
+
+STEPS
+  1. Native paste multi-line text.
+
+VERIFY
+  - Paste bracketed (auto-indent suppressed).
+  - ESC[200~ / ESC[201~ sequences detected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-007
+NAME:     Screen edge fill (REGRESSION)
+PRIORITY: P3
+FEATURE:  term rendering
+RELATED:  bugs.md P3 "Screen width"
+
+STEPS
+  1. Observe rightmost column of:
+     - text rows
+     - ruler bar
+     - status bar
+     - find bar
+     - tab bar
+
+VERIFY
+  - All reach the terminal's last column.
+  - No 1-col gap with default terminal bg.
+  - CLEAR_LINE happens before RESET to paint with editor bg color.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-008
+NAME:     Cursor hidden during frame build
+PRIORITY: P2
+FEATURE:  term cursor
+
+STEPS
+  1. Visually watch cursor during rapid rendering (e.g. hold a key).
+
+VERIFY
+  - No cursor flickering at random positions.
+  - Cursor appears at final position after each frame.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-009
+NAME:     Double buffered single syswrite per frame
+PRIORITY: P2
+FEATURE:  term rendering
+
+STEPS
+  1. Visually inspect for partial updates.
+
+VERIFY
+  - No torn frames.
+  - UI appears atomically.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-010
+NAME:     Alt-screen cleared on exit (REGRESSION)
+PRIORITY: P2
+FEATURE:  term exit
+RELATED:  bugs.md P2 "Screen artifacts remain above cursor after quitting"
+
+STEPS
+  1. In a terminal with quirky alt-screen handling.
+  2. Launch zepto, fill screen, quit.
+
+VERIFY
+  - Clean exit: no residual editor lines visible in main buffer.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-011
+NAME:     ISO-2022, ASCII-only fallback mode
+PRIORITY: P3
+FEATURE:  term fallback
+
+STEPS
+  1. Launch with `--no-nerd-font` in a terminal without Nerd Font.
+
+VERIFY
+  - Only ASCII / single-width Unicode in the UI.
+  - No broken glyphs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-012
+NAME:     stty size / tput cols work via safe exec
+PRIORITY: P2
+FEATURE:  term size
+RELATED:  bugs.md P1 "Shell injection in Terminal.pm"
+
+STEPS
+  1. On a system without `$COLUMNS` set.
+
+VERIFY
+  - `stty size` or `tput cols/lines` called via list-form exec.
+  - Correct terminal dimensions used for layout.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-013
+NAME:     CSI u keyboard support
+PRIORITY: P3
+FEATURE:  term keyboard
+
+SETUP
+  Modern terminal with CSI-u support (Kitty, WezTerm, iTerm2 with enhanced
+  protocol).
+
+STEPS
+  1. Use keys that need disambiguation: Ctrl+Shift+letter, etc.
+
+VERIFY
+  - Zepto recognizes extended keyboard events.
+  - Shortcuts not affected by terminal limitations.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-014
+NAME:     Kitty graphics protocol detection
+PRIORITY: P3
+FEATURE:  term graphics
+RELATED:  QA-BIN-006
+
+STEPS
+  1. Launch in Ghostty / Kitty / WezTerm.
+  2. Open an image file.
+
+VERIFY
+  - `supports_kitty_graphics()` returns true.
+  - Image displayed inline.

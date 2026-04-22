@@ -1,0 +1,194 @@
+================================================================================
+34 — Prompts & Dialogs
+================================================================================
+
+Covers: save-changes prompt, file-changed-on-disk prompt, overwrite prompt,
+generic dialog input widget, pill buttons, persistence (not time-based),
+warning icon.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-001
+NAME:     Save-changes prompt appears on close dirty tab (REGRESSION)
+PRIORITY: P0
+FEATURE:  prompt save
+RELATED:  bugs.md P2 "Save changes prompt: more prominent"
+
+STEPS
+  1. Edit a file (dirty).
+  2. Press ⌃W.
+
+VERIFY
+  - Prompt shown with amber background (warning color).
+  - ⚠ warning icon visible.
+  - Three pill buttons: `💾 Save S`, `✗ Discard D`, `Cancel C`.
+  - Pills have rounded caps and icons.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-002
+NAME:     S saves and closes
+PRIORITY: P1
+FEATURE:  prompt save
+
+SETUP
+  Save-changes prompt visible.
+
+STEPS
+  1. Press S.
+
+VERIFY
+  - File saved.
+  - Tab closed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-003
+NAME:     D discards and closes
+PRIORITY: P1
+FEATURE:  prompt save
+
+STEPS
+  1. Press D.
+
+VERIFY
+  - Tab closed.
+  - File unchanged on disk.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-004
+NAME:     C cancels the close
+PRIORITY: P1
+FEATURE:  prompt save
+
+STEPS
+  1. Press C.
+
+VERIFY
+  - Prompt dismissed.
+  - Tab remains open, dirty flag intact.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-005
+NAME:     Esc cancels the prompt
+PRIORITY: P1
+FEATURE:  prompt esc
+
+STEPS
+  1. Save-changes prompt visible.
+  2. Press Esc.
+
+VERIFY
+  - Same as C: prompt dismissed, tab remains open.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-006
+NAME:     Pill buttons clickable
+PRIORITY: P2
+FEATURE:  prompt mouse
+
+STEPS
+  1. Click each pill (Save, Discard, Cancel).
+
+VERIFY
+  - Each action executes (same as key press).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-007
+NAME:     Prompt persists until resolved (not time-based)
+PRIORITY: P1
+FEATURE:  prompt persistence
+RELATED:  QA-STRT-005
+
+STEPS
+  1. Trigger prompt.
+  2. Wait 10 seconds without pressing anything.
+
+VERIFY
+  - Prompt remains.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-008
+NAME:     File-changed-on-disk prompt (REGRESSION)
+PRIORITY: P1
+FEATURE:  prompt reload
+RELATED:  QA-EXT-002
+
+STEPS
+  1. Dirty buffer. External `echo`.
+  2. Interact.
+
+VERIFY
+  - Prompt: `File changed on disk. [R]eload [K]eep local`.
+  - Same pill-button style as save prompt.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-009
+NAME:     Overwrite prompt for Save As on existing file (if implemented)
+PRIORITY: P3
+FEATURE:  prompt save-as
+
+STEPS
+  1. ⌃N, type content, ⌃S with a path of an existing file.
+
+VERIFY
+  - Either: prompt asks to overwrite, OR save proceeds.
+  - Behavior is predictable per spec.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-010
+NAME:     Unified input widget used for all prompts (REGRESSION)
+PRIORITY: P2
+FEATURE:  prompt input
+RELATED:  bugs.md P2 "Unified input widget missing"
+
+STEPS
+  1. Open various inputs: Find, Replace, Go to Line, Save As, Transform.
+  2. Test editing semantics:
+     - Alt+Left/Right (word motion)
+     - Shift+Arrow/Home/End (selection)
+     - Ctrl+A (select all)
+     - Ctrl+X/C/V (cut/copy/paste)
+     - Mouse click positions cursor
+
+VERIFY
+  - Each input supports these features consistently.
+  - No input is "broken" compared to others.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-011
+NAME:     Global shortcuts (⌃Q, ⌃S) work during prompt (REGRESSION)
+PRIORITY: P1
+FEATURE:  prompt global
+RELATED:  bugs.md P1 "Global nav keys audit"
+
+STEPS
+  1. Save-changes prompt visible.
+  2. Press ⌃Q.
+
+VERIFY
+  - Behavior predictable: prompt cancels and/or quit process begins.
+  - No accidental swallowing of global shortcuts.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PRMT-012
+NAME:     Error messages use consistent style
+PRIORITY: P2
+FEATURE:  prompt error
+
+STEPS
+  1. Trigger save error (permission denied).
+  2. Observe message.
+
+VERIFY
+  - Format: "Save failed: <reason>" (no Perl trace).
+  - Uses error theme color (red fg or warning).

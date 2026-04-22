@@ -1,0 +1,188 @@
+================================================================================
+20 — Binary & Image Files
+================================================================================
+
+Covers: binary file detection, read-only placeholder, "READ ONLY" status
+pill, Kitty graphics protocol image rendering.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-001
+NAME:     Binary file opens with placeholder (REGRESSION)
+PRIORITY: P1
+FEATURE:  binary
+RELATED:  bugs.md P2 "Binary files should not be previewed"
+
+SETUP
+  Create a binary file: `dd if=/dev/urandom of=/tmp/zqa.bin bs=1024 count=4`.
+
+STEPS
+  1. ./zepto /tmp/zqa.bin
+
+VERIFY
+  - Buffer shows placeholder: "(Binary file — 4096 bytes)" or similar.
+  - No garbage characters.
+  - Typing and delete are blocked.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-002
+NAME:     READ ONLY indicator in status bar (REGRESSION)
+PRIORITY: P2
+FEATURE:  binary ui
+RELATED:  bugs.md P2 "Binary file tab looks editable"
+
+STEPS
+  1. Open binary file.
+
+VERIFY
+  - Status bar shows a "READ ONLY" pill with warning colors.
+  - Visually distinct from normal cursor-pos pill.
+  - Clickable (or at least informative).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-003
+NAME:     Save blocked for binary file
+PRIORITY: P1
+FEATURE:  binary save
+
+STEPS
+  1. Binary file open.
+  2. Press ⌃S.
+
+VERIFY
+  - Error: "Cannot save binary file".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-004
+NAME:     Binary tree preview shows placeholder
+PRIORITY: P2
+FEATURE:  binary tree
+
+SETUP
+  Directory has a binary file.
+
+STEPS
+  1. Open tree.
+  2. Navigate with arrows to the binary file.
+
+VERIFY
+  - Preview pane shows placeholder text, not garbage.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-005
+NAME:     Detection uses first 8KB NUL scan
+PRIORITY: P3
+FEATURE:  binary detection
+
+STEPS
+  1. Create file with text first 16KB, then NUL bytes:
+     `(head -c 16384 /dev/urandom | base64; printf '\0foo') > /tmp/zqa_mixed`
+  2. Open.
+
+VERIFY
+  - Detected as binary (NUL detected in first 8KB of file content).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-006
+NAME:     Image file opened on Kitty-capable terminal (REGRESSION)
+PRIORITY: P2
+FEATURE:  image
+RELATED:  bugs.md P2 "Render images in terminal via Kitty graphics protocol"
+
+SETUP
+  Launch zepto inside Ghostty, Kitty, or WezTerm (`TERM_PROGRAM=ghostty`).
+
+STEPS
+  1. Open an image file (e.g. `./zepto /path/to/image.png`).
+
+VERIFY
+  - Editor renders the image inline in the editor area.
+  - Aspect ratio preserved (not squashed).
+  - Scroll / tab switch clears the image properly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-007
+NAME:     Image fallback on non-Kitty terminal
+PRIORITY: P3
+FEATURE:  image
+
+SETUP
+  Terminal without Kitty graphics (e.g. default macOS Terminal).
+
+STEPS
+  1. Open an image file.
+
+VERIFY
+  - Placeholder: "(Image file — size)".
+  - No crash, no garbage rendering.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-008
+NAME:     Supported image extensions detected
+PRIORITY: P3
+FEATURE:  image
+
+STEPS
+  Open files of various extensions: png, jpg, jpeg, gif, bmp, webp, svg,
+  ico, tiff (on Kitty terminal).
+
+VERIFY
+  - Each renders inline as image.
+  - Each shows placeholder when filetype unsupported or content invalid.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-009
+NAME:     Large files >100KB skipped for tree preview (REGRESSION)
+PRIORITY: P2
+FEATURE:  tree preview
+RELATED:  bugs.md P0 "File tree preview hides for certain files"
+
+SETUP
+  Large text file >100KB in the tree (e.g. Editor.pm).
+
+STEPS
+  1. Navigate tree to that file.
+
+VERIFY
+  - Preview shows "(no preview)" or similar.
+  - Does NOT hide the preview entirely (regression).
+  - Does NOT break tree rendering for subsequent files.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-010
+NAME:     Image clear on tab switch
+PRIORITY: P3
+FEATURE:  image
+
+SETUP
+  Image tab open in Kitty-capable terminal.
+
+STEPS
+  1. Switch to text tab.
+
+VERIFY
+  - Image is cleared from the editor area.
+  - No leftover image pixels.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-BIN-011
+NAME:     Image preserved across tab re-focus
+PRIORITY: P3
+FEATURE:  image
+
+STEPS
+  1. Image tab → text tab → back to image tab.
+
+VERIFY
+  - Image re-renders (either cached or re-transmitted).
+  - No performance stall.

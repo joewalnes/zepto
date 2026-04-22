@@ -1,0 +1,249 @@
+================================================================================
+13 — Word Wrap
+================================================================================
+
+Covers: ⌥Z toggle, continuation row rendering (↪), per-filetype defaults
+(prose types), interaction with diff view, column selection, gutter VCS.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-001
+NAME:     ⌥Z toggles word wrap
+PRIORITY: P0
+FEATURE:  wrap
+
+STEPS
+  1. Open file with a long line (wider than viewport).
+  2. Press ⌥Z.
+
+VERIFY
+  - Long line now wraps to multiple visual rows.
+  - Continuation rows are indented (hanging indent) or have ↪ indicator.
+  - Press ⌥Z again — wrap disabled, long line is horizontally scrollable.
+  - Toggle pill in status bar reflects state.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-002
+NAME:     Markdown file defaults to wrap ON
+PRIORITY: P1
+FEATURE:  wrap defaults
+
+SETUP
+  Default preferences.
+
+STEPS
+  1. Open a `.md` file with long lines.
+
+VERIFY
+  - Word wrap is ON by default for .md / .markdown / .txt / .rst / .adoc.
+  - Toggle pill indicates ON.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-003
+NAME:     Code file defaults to wrap OFF
+PRIORITY: P1
+FEATURE:  wrap defaults
+
+STEPS
+  1. Open a `.py` file with long lines.
+
+VERIFY
+  - Word wrap is OFF by default.
+  - Long lines scroll horizontally.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-004
+NAME:     Cursor navigation traverses wrap boundaries naturally
+PRIORITY: P1
+FEATURE:  wrap nav
+
+SETUP
+  Wrap ON, one long wrapped line.
+
+STEPS
+  1. Cursor at start of line.
+  2. Press Right arrow until cursor crosses visual row boundary.
+
+VERIFY
+  - Cursor moves smoothly to the next visual row.
+  - Column position in the status bar reflects document col, not
+    visual col.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-005
+NAME:     Down arrow moves to next visual row then next doc line
+PRIORITY: P1
+FEATURE:  wrap nav
+
+SETUP
+  Wrap ON. Cursor on first visual row of a wrapped line.
+
+STEPS
+  1. Press Down.
+
+VERIFY
+  - Cursor moves to the continuation row (second visual row of the same
+    doc line).
+  - Press Down again: moves to next doc line.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-006
+NAME:     Home on continuation row goes to visual row start
+PRIORITY: P2
+FEATURE:  wrap home
+RELATED:  QA-NAV-014
+
+SETUP
+  Wrap ON. Cursor in the middle of continuation row.
+
+STEPS
+  1. Press Home.
+
+VERIFY
+  - Cursor moves to the start of the current visual row.
+  - Subsequent Home presses cycle through doc-start (per smart home cycle).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-007
+NAME:     Selection across wrap boundaries
+PRIORITY: P1
+FEATURE:  wrap selection
+
+SETUP
+  Wrap ON. Long line wrapping to 3 visual rows.
+
+STEPS
+  1. Shift+Right to extend selection across the wrap boundary.
+
+VERIFY
+  - Selection is contiguous across the visual rows.
+  - Correctly highlighted on both.
+  - ⌃C copies the full selection (no phantom newline from wrap).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-008
+NAME:     VCS gutter markers extend across wrapped rows (REGRESSION)
+PRIORITY: P1
+FEATURE:  wrap vcs
+RELATED:  bugs.md P1 "Diff gutter markers should extend across wrapped continuation lines"
+
+SETUP
+  Git-tracked file, word wrap ON.
+  A changed long line wraps to multiple rows.
+
+STEPS
+  1. Make an edit on a long line.
+  2. Observe gutter.
+
+VERIFY
+  - VCS marker (yellow "modified") appears on the first visual row AND
+    all continuation rows of that line.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-009
+NAME:     Diff view preserves wrap (REGRESSION)
+PRIORITY: P2
+FEATURE:  wrap diff
+RELATED:  bugs.md P3 "Diff view does not preserve line wrap"
+
+SETUP
+  Word wrap ON. Git-tracked file with changed long lines.
+
+STEPS
+  1. Cursor on a changed long line.
+  2. Press ⌥D (toggle diff).
+
+VERIFY
+  - Diff hunk expands inline.
+  - Old and new lines are also wrapped.
+  - Continuation rows show ↪ indicator and correct diff coloring.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-010
+NAME:     Column selection + word wrap (REGRESSION)
+PRIORITY: P2
+FEATURE:  wrap column
+RELATED:  QA-COL-010
+
+SETUP
+  Wrap ON. ⌥C ON.
+
+STEPS
+  1. Make a column selection spanning multiple doc lines, some wrapped.
+
+VERIFY
+  - Selection uses document column positions; skips continuation rows.
+  - Visual rendering is consistent (rectangle by doc line, not visual row).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-011
+NAME:     Continuation indicator (↪) visible in gutter
+PRIORITY: P3
+FEATURE:  wrap ui
+
+STEPS
+  1. Wrap ON. Long line.
+
+VERIFY
+  - Each continuation row shows ↪ in the gutter (with Nerd Font) or ASCII
+    fallback like `>` (without Nerd Font).
+  - Continuation row has no line number.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-012
+NAME:     Toggle wrap is per-window (not persisted globally)
+PRIORITY: P3
+FEATURE:  wrap state
+
+STEPS
+  1. Open file1.md (wraps ON).
+  2. Toggle ⌥Z (now OFF).
+  3. Open another file.md in a new tab.
+
+VERIFY
+  - Behavior per documented preference layering: new tab follows filetype
+    default, not user's last toggle (unless behavior says otherwise).
+  - Verify expected behavior matches Preferences.pm `_effective_word_wrap`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-013
+NAME:     Toggle wrap at edit time does not reorder text
+PRIORITY: P1
+FEATURE:  wrap consistency
+
+STEPS
+  1. Open long-line file, wrap OFF.
+  2. Type text at a specific position.
+  3. Toggle wrap ON.
+
+VERIFY
+  - Text position unchanged (still at document col N).
+  - Cursor maintains logical position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-014
+NAME:     Narrow terminal still wraps
+PRIORITY: P2
+FEATURE:  wrap responsive
+
+STEPS
+  1. Wrap ON.
+  2. Resize terminal to very narrow width (e.g. 40 cols).
+
+VERIFY
+  - Lines re-wrap to the new width.
+  - No rendering artifacts.
+  - Scroll up/down still works.

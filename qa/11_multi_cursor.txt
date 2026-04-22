@@ -1,0 +1,247 @@
+================================================================================
+11 — Multi-cursor Editing
+================================================================================
+
+Covers: Ctrl+D select-next-occurrence, typing affecting all cursors,
+Esc/arrows clearing multi-cursor mode, status bar cursor-count indicator.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-001
+NAME:     First Ctrl+D selects word under cursor
+PRIORITY: P0
+FEATURE:  multi-cursor
+
+SETUP
+  File with "foo bar foo baz foo".
+  Cursor inside the first "foo" (col 2).
+
+STEPS
+  1. Press ⌃D.
+
+VERIFY
+  - "foo" is selected (word under cursor).
+  - Status bar shows "1 cursor" indicator (or does not change).
+  - Only one cursor, not yet in multi-cursor mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-002
+NAME:     Second Ctrl+D adds next occurrence
+PRIORITY: P0
+FEATURE:  multi-cursor
+
+SETUP
+  As in QA-MC-001 after first ⌃D.
+
+STEPS
+  1. Press ⌃D.
+
+VERIFY
+  - Second "foo" is also selected.
+  - Two cursors/selections visible.
+  - Status bar shows "2 cursors" indicator.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-003
+NAME:     Typing affects all cursors
+PRIORITY: P0
+FEATURE:  multi-cursor edit
+
+SETUP
+  Two "foo"s selected via two ⌃D presses.
+
+STEPS
+  1. Type "X".
+
+VERIFY
+  - Both "foo"s replaced by "X" simultaneously.
+  - Resulting line: "X bar X baz foo" (third foo untouched).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-004
+NAME:     Continue adding with more Ctrl+D
+PRIORITY: P1
+FEATURE:  multi-cursor
+
+SETUP
+  Buffer "foo foo foo". Cursor inside first "foo".
+
+STEPS
+  1. Press ⌃D three times.
+
+VERIFY
+  - All 3 "foo" instances selected.
+  - Status bar shows "3 cursors".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-005
+NAME:     Backspace at all cursors
+PRIORITY: P1
+FEATURE:  multi-cursor edit
+
+SETUP
+  3 cursors on "foo".
+
+STEPS
+  1. Type "ABC".
+  2. Press Backspace once.
+
+VERIFY
+  - All 3 occurrences now end with "AB" (one char removed from each).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-006
+NAME:     Esc clears secondary cursors
+PRIORITY: P1
+FEATURE:  multi-cursor esc
+
+SETUP
+  3 cursors active.
+
+STEPS
+  1. Press Esc.
+
+VERIFY
+  - Only primary cursor remains (last-added or first-added).
+  - Secondary cursors cleared.
+  - Status bar shows "1 cursor" or regular cursor-pos pill.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-007
+NAME:     Arrow keys exit multi-cursor
+PRIORITY: P1
+FEATURE:  multi-cursor
+
+SETUP
+  3 cursors active.
+
+STEPS
+  1. Press Right arrow.
+
+VERIFY
+  - Secondary cursors cleared.
+  - Primary cursor moves one char right.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-008
+NAME:     Ctrl+D on empty buffer is no-op
+PRIORITY: P3
+FEATURE:  multi-cursor edge
+
+STEPS
+  1. Empty file, ⌃D.
+
+VERIFY
+  - No crash, no selection (no word to select).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-009
+NAME:     Duplicate Line Down (palette) still works after multi-cursor change
+PRIORITY: P2
+FEATURE:  multi-cursor
+
+SETUP
+  Cursor on a line.
+
+STEPS
+  1. Open palette, filter "Duplicate Down".
+  2. Execute.
+
+VERIFY
+  - Line duplicated below.
+  - (⌃D is now "select next occurrence", not duplicate-down.)
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-010
+NAME:     Multi-line edit with multi-cursor
+PRIORITY: P1
+FEATURE:  multi-cursor edit
+
+SETUP
+  File:
+    foo = 1
+    foo = 2
+    foo = 3
+
+STEPS
+  1. Cursor on first "foo".
+  2. ⌃D, ⌃D, ⌃D — select all three.
+  3. Type "bar".
+
+VERIFY
+  - All lines now start with "bar".
+  - Single undo restores all three "foo"s.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-011
+NAME:     Same-line multiple occurrences handled correctly
+PRIORITY: P2
+FEATURE:  multi-cursor edge
+
+SETUP
+  Line: `foo foo foo`. Cursor at first foo.
+
+STEPS
+  1. ⌃D, ⌃D, ⌃D — expect all 3 selected.
+  2. Type "X".
+
+VERIFY
+  - Line becomes "X X X" (without off-by-one offset errors).
+  - Cursor position adjustment for same-line replacements works.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-012
+NAME:     Undo a multi-cursor edit in one step (REGRESSION)
+PRIORITY: P1
+FEATURE:  multi-cursor undo
+
+SETUP
+  3 cursors selected.
+
+STEPS
+  1. Type "X" (replaces all 3 selections).
+  2. Press ⌃Z.
+
+VERIFY
+  - All 3 edits reverted in one undo.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-013
+NAME:     Ctrl+D does not wrap at end of file
+PRIORITY: P3
+FEATURE:  multi-cursor
+
+SETUP
+  Only one "foo" in the buffer.
+
+STEPS
+  1. Cursor on "foo", press ⌃D to select it.
+  2. Press ⌃D again.
+
+VERIFY
+  - No crash.
+  - Status message like "No more matches" or silent no-op.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MC-014
+NAME:     Multi-cursor respects find case/regex settings?
+PRIORITY: P3
+FEATURE:  multi-cursor
+NOTES
+  Behavior spec: multi-cursor occurrence matching is whole-word and
+  case-sensitive (inspect source). Verify:
+    - `Foo` cursor does NOT select lowercase `foo` on subsequent ⌃D.
+  If behavior differs, document and adjust.

@@ -1,0 +1,302 @@
+================================================================================
+27 — Gutter, Ruler & Minimap
+================================================================================
+
+Covers: gutter (line numbers, VCS markers, wrap indicator, empty line bg),
+ruler bar (column numbers, cursor badge, column-mode indicator), minimap
+(Braille density, VCS column, viewport highlight, click+drag).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-001
+NAME:     Gutter shows right-aligned line numbers
+PRIORITY: P0
+FEATURE:  gutter
+
+STEPS
+  1. Open file with 100 lines.
+  2. Scroll to line 99+.
+
+VERIFY
+  - Line numbers shown right-aligned.
+  - Gutter width expanded to fit 3-digit numbers.
+  - Color: muted blue-gray.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-002
+NAME:     VCS gutter markers (REGRESSION)
+PRIORITY: P1
+FEATURE:  gutter vcs
+
+SETUP
+  Git-tracked file.
+
+STEPS
+  1. Add, modify, and delete lines.
+  2. Observe gutter leftmost column.
+
+VERIFY
+  - Green (added line)
+  - Yellow (modified)
+  - Dim yellow (modified whitespace-only)
+  - Red (deleted) — shown as triangle or marker
+  - Unchanged: space/blank
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-003
+NAME:     VCS markers suppressed on new files (REGRESSION)
+PRIORITY: P2
+FEATURE:  gutter vcs
+RELATED:  bugs.md P2 "Don't show diff gutter markers in new files"
+
+STEPS
+  1. ⌃N, type content.
+
+VERIFY
+  - No VCS gutter markers (no baseline to diff against).
+  - All gutter cells show blank/space.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-004
+NAME:     Wrap continuation shows ↪ indicator
+PRIORITY: P2
+FEATURE:  gutter wrap
+
+SETUP
+  Wrap ON, long line.
+
+STEPS
+  1. Observe continuation rows.
+
+VERIFY
+  - Each continuation row's gutter shows ↪ (or ASCII fallback).
+  - No line number shown on continuation rows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-005
+NAME:     Empty line background blends on light theme (REGRESSION)
+PRIORITY: P3
+FEATURE:  gutter theme
+RELATED:  bugs.md P3 "Lightmode glitches"
+
+STEPS
+  1. Light theme. Short file (e.g. 5 lines).
+  2. Observe area below the last line.
+
+VERIFY
+  - Empty-line background is near-white, blending with editor.
+  - Not a jarring gray block.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-006
+NAME:     Clicking gutter toggles diff hunk expansion
+PRIORITY: P2
+FEATURE:  gutter diff
+
+SETUP
+  VCS-changed line.
+
+STEPS
+  1. Click on the VCS marker in the gutter for that line.
+
+VERIFY
+  - Diff hunk expands inline below/above (old lines shown).
+  - Clicking again collapses.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-007
+NAME:     Ruler bar shows column markers
+PRIORITY: P2
+FEATURE:  ruler
+
+STEPS
+  1. Observe second row of the editor (below tabs).
+
+VERIFY
+  - Ruler shows marks every 10 columns: `|10  |20  |30 ...`.
+  - Digits right-aligned to their mark.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-008
+NAME:     Ruler cursor badge shows current column
+PRIORITY: P2
+FEATURE:  ruler
+
+STEPS
+  1. Move cursor to column 42.
+
+VERIFY
+  - Badge `42` appears in the ruler at the cursor's horizontal position.
+  - Badge has distinct background.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-009
+NAME:     Ruler extends to window edge (REGRESSION)
+PRIORITY: P3
+FEATURE:  ruler
+RELATED:  bugs.md P3 "Ruler does not extend to width of screen"
+
+STEPS
+  1. Observe ruler right edge in light mode.
+
+VERIFY
+  - Ruler fills to the last column (no 1-col gap).
+  - Background matches ruler color, not terminal default.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-010
+NAME:     Column mode indicator at right of ruler
+PRIORITY: P3
+FEATURE:  ruler column
+
+STEPS
+  1. ⌥C.
+
+VERIFY
+  - ` COL ` badge appears at right of ruler bar.
+  - Clickable to toggle column mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-011
+NAME:     Minimap visible by default
+PRIORITY: P1
+FEATURE:  minimap
+
+STEPS
+  1. Open a long file.
+
+VERIFY
+  - Right-side minimap visible (3-4 cols wide).
+  - Shows Braille-encoded density of text.
+  - Viewport highlight shows current visible region.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-012
+NAME:     ⌥M toggles minimap
+PRIORITY: P1
+FEATURE:  minimap toggle
+
+STEPS
+  1. Press ⌥M.
+
+VERIFY
+  - Minimap hidden.
+  - Editor gains the freed width.
+  - Press ⌥M again: minimap returns.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-013
+NAME:     Minimap VCS column
+PRIORITY: P2
+FEATURE:  minimap vcs
+
+SETUP
+  File with VCS changes.
+
+STEPS
+  1. Observe minimap leftmost column.
+
+VERIFY
+  - Small colored marks at the rows containing VCS changes.
+  - Matches gutter markers.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-014
+NAME:     Click on minimap jumps document
+PRIORITY: P2
+FEATURE:  minimap mouse
+
+STEPS
+  1. Click somewhere in the minimap.
+
+VERIFY
+  - Document scrolls to the clicked position.
+  - Viewport highlight re-positions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-015
+NAME:     Drag on minimap scrolls document
+PRIORITY: P2
+FEATURE:  minimap mouse
+
+STEPS
+  1. Click and drag the minimap's viewport highlight up/down.
+
+VERIFY
+  - Document scrolls continuously.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-016
+NAME:     Minimap drops before file tree at narrow widths (REGRESSION)
+PRIORITY: P2
+FEATURE:  minimap layout
+RELATED:  bugs.md P2 "Minimap does not drop off at narrow terminal widths"
+
+STEPS
+  1. Tree visible. Minimap visible.
+  2. Resize terminal narrower and narrower.
+
+VERIFY
+  - Minimap disappears first.
+  - Tree disappears only at very narrow widths.
+  - Status bar pills drop off last.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-017
+NAME:     Minimap cache uses content version (REGRESSION)
+PRIORITY: P1
+FEATURE:  minimap performance
+RELATED:  bugs.md P1 "Editor becomes sluggish when opening large files"
+
+STEPS
+  1. Open large file.
+  2. Type rapidly — observe for minimap recomputation lag.
+
+VERIFY
+  - No frame-drop due to minimap recompute on every keystroke.
+  - Minimap updates when content changes, not on every frame.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-018
+NAME:     Scrollbar thumb boundary correct (REGRESSION)
+PRIORITY: P3
+FEATURE:  minimap
+RELATED:  bugs.md P3 "Scrollbar thumb boundary inconsistency"
+
+STEPS
+  1. Scroll to top, middle, and bottom of a long file.
+
+VERIFY
+  - Minimap thumb accurately represents position.
+  - No off-by-one at boundaries.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-019
+NAME:     Minimap extends full editor height
+PRIORITY: P3
+FEATURE:  minimap layout
+
+STEPS
+  1. Observe minimap vertical bounds.
+
+VERIFY
+  - Spans from top of text area to bottom.
+  - No gaps.

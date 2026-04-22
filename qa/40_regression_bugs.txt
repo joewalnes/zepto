@@ -1,0 +1,934 @@
+================================================================================
+40 — Regression Tests (Every Fixed Bug)
+================================================================================
+
+One regression test per bug marked FIXED in bugs.md. Many of these duplicate
+coverage from the feature files; that's intentional — this file is a
+single flat index for "run every regression" workflows.
+
+Each entry cross-references the primary test case (QA-xxx-###) and summarizes
+what to check. Keep this file in sync with bugs.md: when a new bug is
+FIXED, add a corresponding REG entry here.
+
+Legend:
+  CROSS-REF — the main feature-file test case that covers this bug.
+  VERIFY    — the specific symptom that MUST NOT reappear.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-001
+NAME:     Binary file READ ONLY indicator
+PRIORITY: P2
+BUG:      P2 "Binary file tab looks editable"
+CROSS-REF: QA-BIN-002
+VERIFY    Status bar shows "READ ONLY" pill with warning colors when a
+          binary file is open.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-002
+NAME:     Cursor alignment in Open File picker
+PRIORITY: P1
+BUG:      P1 "Incorrect cursor placement in Open File dialog"
+CROSS-REF: QA-PICK-009
+VERIFY    Terminal cursor aligned with typed character in file picker.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-003
+NAME:     Editor not sluggish on 1MB / 13K-line files
+PRIORITY: P1
+BUG:      P1 "Editor becomes sluggish when opening large files"
+CROSS-REF: QA-PERF-003, QA-PERF-004, QA-PERF-005
+VERIFY    O(1) VCS lookups, minimap cache by content_version, adaptive
+          VCS debounce. File loads quickly and edits are smooth.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-004
+NAME:     File tree auto-expands to opened file
+PRIORITY: P1
+BUG:      P1 "File tree doesn't always expand to opened file"
+CROSS-REF: QA-TREE-014
+VERIFY    After opening file via ⌃O, ⌃E, or find-in-files, tree expands
+          to reveal that file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-005
+NAME:     Global shortcuts from any modal state
+PRIORITY: P1
+BUG:      P1 "Global shortcuts should work from any state"
+CROSS-REF: QA-FIND-021, QA-FIND-022, QA-PICK-016, QA-PRMT-011
+VERIFY    ⌃Q, ⌃S, ⌃T, ⌃O, ⌃W, ⌃N, ⌃E, ⌃Space, ⌃⇧F work in find/palette/
+          tree/prompt/footer-input states.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-006
+NAME:     No shell injection in VCS/Git.pm
+PRIORITY: P1
+BUG:      P1 "Shell injection in VCS/Git.pm"
+CROSS-REF: QA-SEC-001
+VERIFY    Git operations use list-form exec(). Filenames with shell
+          metacharacters don't cause execution.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-007
+NAME:     No shell injection in Terminal.pm
+PRIORITY: P1
+BUG:      P1 "Shell injection in Terminal.pm"
+CROSS-REF: QA-SEC-002, QA-TERM-012
+VERIFY    Clipboard and size-detection commands use list-form exec.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-008
+NAME:     Character width memoization
+PRIORITY: P2
+BUG:      P1 "Character width computed per-character with no caching"
+CROSS-REF: QA-PERF-006
+VERIFY    Char width cached by codepoint; large files scroll smoothly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-009
+NAME:     Shift+Tab cycles backward in find-in-files
+PRIORITY: P2
+BUG:      P2 "Shift+Tab does same thing as Tab in find-in-files palette"
+CROSS-REF: QA-FIF-005
+VERIFY    Shift+Tab direction distinct from Tab.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-010
+NAME:     ReDoS protection (length limit)
+PRIORITY: P2
+BUG:      P2 "ReDoS vulnerability via user search input"
+CROSS-REF: QA-SEC-004, QA-FIND-018, QA-FIF-013
+VERIFY    Patterns > 1000 chars rejected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-011
+NAME:     ReDoS protection (SIGALRM timeout)
+PRIORITY: P2
+BUG:      P2 "ReDoS protection is length-only, no timeout"
+CROSS-REF: QA-SEC-005
+VERIFY    Catastrophic backtracking patterns time out via alarm(1).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-012
+NAME:     Atomic save uses File::Temp
+PRIORITY: P2
+BUG:      P2 "Predictable temp file names in Document.pm atomic save"
+CROSS-REF: QA-SEC-006, QA-FILE-005
+VERIFY    Temp file has unpredictable name, created with O_EXCL.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-013
+NAME:     User-friendly save error messages
+PRIORITY: P1
+BUG:      P2 "Inconsistent error handling across commands"
+CROSS-REF: QA-FILE-008
+VERIFY    Errors shown without Perl stack traces.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-014
+NAME:     Terminal title filename sanitizer
+PRIORITY: P3
+BUG:      P3 "Terminal escape sequence injection via filenames"
+CROSS-REF: QA-SEC-007
+VERIFY    Control chars stripped from terminal title.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-015
+NAME:     Goto line invalid input feedback
+PRIORITY: P2
+BUG:      P3 "No user feedback for invalid goto_line input"
+CROSS-REF: QA-GOTO-005
+VERIFY    "Invalid format" message displayed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-016
+NAME:     Find jumps to first match when off-screen
+PRIORITY: P1
+BUG:      P1 "Search should jump to first"
+CROSS-REF: QA-FIND-003
+VERIFY    Typing a query scrolls viewport to the first match.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-017
+NAME:     Transform via shell
+PRIORITY: P2
+BUG:      P3 "Transform feature" (feature request, implemented)
+CROSS-REF: QA-XFM-*
+VERIFY    ⌥T pipes selection through shell; hint text visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-018
+NAME:     Wide-Unicode symbols width
+PRIORITY: P2
+BUG:      P2 "Syntax highlighting misaligned on lines with ⌥, ⚠"
+CROSS-REF: QA-EDIT-005, QA-SYN-012
+VERIFY    Narrow symbols like ⌥ ⚠ ✔ measure as width 1; no token shift.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-019
+NAME:     Natural (smart) sort in tree and pickers
+PRIORITY: P2
+BUG:      P2 "Smart sort"
+CROSS-REF: QA-TREE-016, QA-PICK-008
+VERIFY    file2, file7, file10 (not file10, file2, file7).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-020
+NAME:     Typing responsiveness
+PRIORITY: P0
+BUG:      P0 "Slight lag on typing"
+CROSS-REF: QA-PERF-002, QA-PERF-008, QA-PERF-010, QA-PERF-011
+VERIFY    No perceptible lag holding a key; differential rendering active.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-021
+NAME:     New saved file visible in tree
+PRIORITY: P1
+BUG:      P1 "New files dont appear in tree"
+CROSS-REF: QA-TREE-015
+VERIFY    After Save As, tree refreshes and shows file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-022
+NAME:     Ruler extends to screen width
+PRIORITY: P3
+BUG:      P3 "Ruler does not extend to width of screen"
+CROSS-REF: QA-GUT-009
+VERIFY    Ruler fills last column with ruler bg, not terminal default.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-023
+NAME:     Cursor aligned in palette filter
+PRIORITY: P1
+BUG:      P1 "Cursor off by one in palette filter"
+CROSS-REF: QA-PAL-001 (implicit); check explicitly.
+VERIFY    Typed char aligns with terminal cursor position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-024
+NAME:     Diff pill color by VCS status
+PRIORITY: P2
+BUG:      P2 "Diff view discoverability"
+CROSS-REF: QA-SBAR-007, QA-VCS-005
+VERIFY    Diff pill green/amber/red/neutral per current line status;
+          ⌥D on unchanged jumps to next change.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-025
+NAME:     Tree hide cli/env control
+PRIORITY: P3
+BUG:      P3 "Tree hide"
+CROSS-REF: QA-CLI-008, QA-CLI-009, QA-CLI-011, QA-TREE-001
+VERIFY    --tree / --no-tree / ZEPTO_TREE respected; ⌃B fully toggles
+          visibility.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-026
+NAME:     Cursor aligned in command palette
+PRIORITY: P1
+BUG:      P1 "Incorrect cursor placement in command palette"
+CROSS-REF: QA-PAL-001
+VERIFY    Cursor in filter field aligned with typed text.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-027
+NAME:     Click editor unfocuses tree
+PRIORITY: P1
+BUG:      P1 "Clicking document editor should unfocus file tree"
+CROSS-REF: QA-TREE-018
+VERIFY    Click in editor while tree focused unfocuses tree, returns
+          focus to document.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-028
+NAME:     HTML context-aware toggle comment
+PRIORITY: P1
+BUG:      P3 "Toggle comment enhancements"
+CROSS-REF: QA-CMT-007, QA-CMT-008, QA-CMT-009
+VERIFY    HTML uses <!-- -->, CSS inside <style> uses /* */, JS inside
+          <script> uses //.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-029
+NAME:     Scroll wheel unlimited scroll
+PRIORITY: P2
+BUG:      P2 "Scroll wheel cannot scroll more than a page"
+CROSS-REF: QA-MS-007
+VERIFY    Scrolling continues past cursor position; snaps back on key
+          press.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-030
+NAME:     Smart Home/End
+PRIORITY: P1
+BUG:      P2 "More home/end"
+CROSS-REF: QA-NAV-004, QA-NAV-005
+VERIFY    Home cycles first-nonws → col 0 → doc start. End cycles line
+          end → doc end.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-031
+NAME:     Location history back/forward
+PRIORITY: P1
+BUG:      P3 "Move forward/back"
+CROSS-REF: QA-GOTO-009 through QA-GOTO-014
+VERIFY    ⌥- / ⌥= navigate across jump history, cross-file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-032
+NAME:     Recent files via ⌃E
+PRIORITY: P1
+BUG:      P2 "Recent files"
+CROSS-REF: QA-RCN-*
+VERIFY    ⌃E opens recent list; MRU order; persists.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-033
+NAME:     Light-mode empty line bg
+PRIORITY: P3
+BUG:      P3 "Lightmode glitches"
+CROSS-REF: QA-GUT-005, QA-THM-008
+VERIFY    Empty-line bg blends with editor in light theme.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-034
+NAME:     Screen width filled
+PRIORITY: P3
+BUG:      P3 "Screen width"
+CROSS-REF: QA-TERM-007, QA-GUT-009
+VERIFY    Ruler/minimap/status bar reach last column.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-035
+NAME:     Status bar cursor-pill spacing
+PRIORITY: P3
+BUG:      P3 "Status bar spacing"
+CROSS-REF: QA-SBAR-003
+VERIFY    Space before first pill; no jiggling from width changes.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-036
+NAME:     Merged goto-line pill with ⌃G shortcut
+PRIORITY: P2
+BUG:      P2 "Go-to-line new UI"
+CROSS-REF: QA-SBAR-002, QA-GOTO-*
+VERIFY    Cursor-pos pill shows ⌃G; click opens inline line:col editor.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-037
+NAME:     ⌃T as global shortcut
+PRIORITY: P1
+BUG:      P3 "Theme ^T should be global shortcut"
+CROSS-REF: QA-THM-005, QA-FIND-021
+VERIFY    ⌃T toggles theme from find/palette/prompt/dialog.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-038
+NAME:     Toggle comment ⌃/
+PRIORITY: P1
+BUG:      P2 "Comment/uncomment line"
+CROSS-REF: QA-CMT-*
+VERIFY    Works for 42+ languages, selection-aware, min-indent.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-039
+NAME:     Empty untitled tab auto-closes on first open
+PRIORITY: P2
+BUG:      P3 "Close empty start tab when opening first file"
+CROSS-REF: QA-FILE-010
+VERIFY    Empty ⌃N tab closed when ⌃O opens a file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-040
+NAME:     Smooth line-by-line editor mouse scroll
+PRIORITY: P2
+BUG:      P2 "Line by line scrolling in editor"
+CROSS-REF: QA-MS-006
+VERIFY    Mouse scroll = 1 line per event.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-041
+NAME:     Word wrap preserved in diff view
+PRIORITY: P2
+BUG:      P3 "Diff view does not preserve line wrap"
+CROSS-REF: QA-WRAP-009, QA-VCS-011
+VERIFY    Old/new diff lines also wrap in wrap-mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-042
+NAME:     Find/replace pills clickable
+PRIORITY: P2
+BUG:      P2 "Find/replace pills should be clickable"
+CROSS-REF: QA-FIND-019
+VERIFY    Regex/case/OK/Cancel pills activate on click.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-043
+NAME:     Column mode mouse drag
+PRIORITY: P2
+BUG:      P3 "Column mode mouse selection"
+CROSS-REF: QA-COL-009
+VERIFY    Drag in column mode creates column selection.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-044
+NAME:     Cursor-pos pill width stable
+PRIORITY: P2
+BUG:      P2 "Line number indicator resizing"
+CROSS-REF: QA-SBAR-003
+VERIFY    Pill padded to min width; no jiggling.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-045
+NAME:     "Commands" label on palette pill
+PRIORITY: P2
+BUG:      P2 "More prominent ctrl-space hint"
+CROSS-REF: QA-PAL-019, QA-SBAR-004
+VERIFY    Status bar pill shows `⌘ Commands ⌃␣`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-046
+NAME:     Palette max width 80 at wide terminals
+PRIORITY: P3
+BUG:      P3 "Command palette too wide"
+CROSS-REF: QA-PAL-015
+VERIFY    Palette width 60/80/120 depending on terminal width.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-047
+NAME:     Tab bar nav hints (⌃W × ⌥, ← ⌥. →)
+PRIORITY: P3
+BUG:      P2 "Non-obvious tab keys"
+CROSS-REF: QA-TAB-013
+VERIFY    Right-aligned nav hints visible when space allows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-048
+NAME:     Palette reorganized into FILE/EDIT/NAVIGATE/VIEW
+PRIORITY: P2
+BUG:      P2 "Command palette re-org"
+CROSS-REF: QA-PAL-003, QA-PAL-007
+VERIFY    Commands grouped per CommandRegistry section_order.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-049
+NAME:     Palette selection bg respects right border
+PRIORITY: P3
+BUG:      P2 "Command palette rendering"
+CROSS-REF: QA-PAL-016
+VERIFY    Selected row background doesn't bleed into border.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-050
+NAME:     Fuzzy find input does not overflow
+PRIORITY: P2
+BUG:      P2 "Fuzzy find text overflow"
+CROSS-REF: QA-PICK-010, QA-PICK-011
+VERIFY    Long query scrolls tail; cursor capped to panel width.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-051
+NAME:     Prominent save prompt with pill buttons
+PRIORITY: P2
+BUG:      P2 "Save changes prompt: more prominent"
+CROSS-REF: QA-PRMT-001
+VERIFY    Amber bg, ⚠ icon, Save/Discard/Cancel pills.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-052
+NAME:     Enter on empty last line — cursor to next line
+PRIORITY: P0
+BUG:      P0 "New file Enter key puts cursor at beginning of current line"
+CROSS-REF: QA-EDIT-010
+VERIFY    WrapMap invalidated on newline insert.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-053
+NAME:     File tree click on tab unfocuses tree
+PRIORITY: P1
+BUG:      P0 "File tree click on tab should unfocus tree and focus document"
+CROSS-REF: QA-TAB-015
+VERIFY    Click tab while tree focused → unfocus tree.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-054
+NAME:     Tree preview works for large files
+PRIORITY: P2
+BUG:      P0 "File tree preview hides for certain files"
+CROSS-REF: QA-BIN-009
+VERIFY    Files >100KB show "no preview" placeholder; don't break tree.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-055
+NAME:     Save As tab track correctly
+PRIORITY: P0
+BUG:      P0 "Saving one new file also saves another new file"
+CROSS-REF: QA-FILE-004
+VERIFY    Each tab's file_path updated independently.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-056
+NAME:     External file change detection
+PRIORITY: P0
+BUG:      P0 "Editor does not detect or reload externally changed files"
+CROSS-REF: QA-EXT-001, QA-EXT-002, QA-EXT-003, QA-EXT-004, QA-PRMT-008
+VERIFY    mtime-based detection; silent reload (clean) or prompt (dirty).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-057
+NAME:     VCS gutter markers on wrap continuation
+PRIORITY: P1
+BUG:      P1 "Diff gutter markers should extend across wrapped continuation lines"
+CROSS-REF: QA-WRAP-008
+VERIFY    Markers shown on all continuation rows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-058
+NAME:     Find/fuzzy uses consistent glyph notation
+PRIORITY: P3
+BUG:      P2 "Inconsistent shortcut notation ^O vs ⌃O"
+CROSS-REF: N/A (visual consistency)
+VERIFY    Tab bar, Find bar use ⌃ glyph, not ^.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-059
+NAME:     Untracked files in file picker
+PRIORITY: P1
+BUG:      P1 "File picker (⌃O) doesn't find untracked files"
+CROSS-REF: QA-PICK-005
+VERIFY    git ls-files --others --exclude-standard also merged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-060
+NAME:     Bracketed paste auto-indent suppression
+PRIORITY: P1
+BUG:      P1 "Native terminal paste (Cmd+V) causes cascading indentation"
+CROSS-REF: QA-EDIT-015
+VERIFY    Pasted multiline text retains original indent.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-061
+NAME:     UTF-8 paste round-trip
+PRIORITY: P1
+BUG:      P1 "Pasting from system clipboard corrupts Unicode"
+CROSS-REF: QA-CLIP-005
+VERIFY    UTF-8 decoded on read from clipboard pipe.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-062
+NAME:     Clicking previewed content confirms preview
+PRIORITY: P1
+BUG:      P1 "Clicking previewed file content dismisses it instead of opening it"
+CROSS-REF: QA-TREE-009
+VERIFY    Click on preview in editor confirms (opens permanently).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-063
+NAME:     YAML literal inside bare words
+PRIORITY: P2
+BUG:      P2 "YAML syntax highlighting matches literals inside bare words"
+CROSS-REF: QA-SYN-013
+VERIFY    `on` inside `region` not highlighted as YAML literal.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-064
+NAME:     Copy double-width chars doesn't crash
+PRIORITY: P0
+BUG:      P0 "Copying double-width characters crashes editor"
+CROSS-REF: QA-CLIP-006
+VERIFY    CJK/emoji copy to system clipboard without Wide Character error.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-065
+NAME:     Binary file detection + placeholder
+PRIORITY: P1
+BUG:      P2 "Binary files should not be previewed or naively opened"
+CROSS-REF: QA-BIN-001, QA-BIN-003, QA-BIN-004
+VERIFY    NUL-byte detection, save blocked, placeholder rendered.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-066
+NAME:     Kitty graphics protocol images
+PRIORITY: P2
+BUG:      P2 "Render images in terminal via Kitty graphics protocol"
+CROSS-REF: QA-BIN-006
+VERIFY    Image files render inline on Ghostty/Kitty.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-067
+NAME:     Syntax highlighting activates on Save As
+PRIORITY: P2
+BUG:      P2 "Syntax highlighting doesn't activate after Save As"
+CROSS-REF: QA-SYN-010, QA-FILE-003
+VERIFY    active_highlighter()->set_file called after Save As.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-068
+NAME:     Diff gutter suppressed on new files
+PRIORITY: P2
+BUG:      P2 "Don't show diff gutter markers in new files"
+CROSS-REF: QA-GUT-003
+VERIFY    No gutter markers for untitled buffers.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-069
+NAME:     Column selection skips wrap continuation
+PRIORITY: P2
+BUG:      P3 "Column selection should skip continuation lines when word wrap is enabled"
+CROSS-REF: QA-COL-010, QA-WRAP-010
+VERIFY    Column extend moves by doc lines, not visual rows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-070
+NAME:     Messages not time-based
+PRIORITY: P1
+BUG:      P1 "Time-based temporary messages violate 'no time-based messages' rule"
+CROSS-REF: QA-SBAR-010, QA-STRT-005, QA-PRMT-007
+VERIFY    Messages persist until next user action.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-071
+NAME:     Esc opens palette as final fallback
+PRIORITY: P2
+BUG:      P1 "Esc does not open command palette as final fallback"
+CROSS-REF: N/A (test: press Esc with nothing to dismiss)
+VERIFY    With no modal / selection / column / diff active, Esc opens
+          palette. (NOTE: user may have reverted this per later audit —
+          check current behavior.)
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-072
+NAME:     Nerd Font toggle via ⌥I
+PRIORITY: P2
+BUG:      P2 "Powerline toggle has no keyboard shortcut"
+CROSS-REF: QA-NF-002
+VERIFY    ⌥I toggles glyphs on/off.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-073
+NAME:     Palette section headers
+PRIORITY: P2
+BUG:      P2 "Command palette has no section headers"
+CROSS-REF: QA-PAL-003
+VERIFY    FILE/EDIT/NAVIGATE/VIEW headers visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-074
+NAME:     Minimap drops before tree
+PRIORITY: P2
+BUG:      P2 "Minimap does not drop off at narrow terminal widths"
+CROSS-REF: QA-GUT-016
+VERIFY    At narrow widths: minimap disappears first, then tree.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-075
+NAME:     Tree status bar pills (not plain text)
+PRIORITY: P2
+BUG:      P2 "File tree status bar hints are plain text, not pills"
+CROSS-REF: QA-TREE-020, QA-SBAR-009
+VERIFY    Tree context shows styled pills with icons.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-076
+NAME:     Duplicate line shortcuts use ⌃U / ⌃D (not Ctrl+Shift+arrow)
+PRIORITY: P2
+BUG:      P2 "⌃⇧↑/⌃⇧↓ (Duplicate Up/Down) uses Shift for non-selection purpose"
+CROSS-REF: QA-LINE-006, QA-LINE-007
+VERIFY    ⌃U duplicates up. Duplicate down via palette (⌃D = Select Next Occurrence).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-077
+NAME:     Palette multi-width layout
+PRIORITY: P3
+BUG:      P3 "Command palette does not use multi-column layout at wide terminals"
+CROSS-REF: QA-PAL-015, QA-REG-046
+VERIFY    Width 60/80/120 based on terminal size.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-078
+NAME:     Unified input widget across find/palette/footer
+PRIORITY: P2
+BUG:      P2 "Unified input widget missing"
+CROSS-REF: QA-PRMT-010
+VERIFY    All inputs support Alt+Left/Right word motion, Shift+arrow
+          selection, Ctrl+A/X/V, mouse click cursor placement.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-079
+NAME:     Shift+Alt+arrow selects by word (not column)
+PRIORITY: P1
+BUG:      P1 "Shift+Alt+Left/Right should select by word, not column select"
+CROSS-REF: QA-SEL-005, QA-SEL-006, QA-COL-013
+VERIFY    Shift+Alt+Right = select word. Column mode via ⌥C only.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-080
+NAME:     Double/triple click selection (mouse parity)
+PRIORITY: P2
+BUG:      P3 "Mouse parity incomplete"
+CROSS-REF: QA-SEL-010, QA-SEL-011
+VERIFY    Word (2-click) and line (3-click) select; 400ms window.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-081
+NAME:     "Nerd Font" label (not "Powerline")
+PRIORITY: P3
+BUG:      P3 "Rename Powerline to Nerd Font throughout the codebase"
+CROSS-REF: QA-NF-005
+VERIFY    Palette shows "Nerd Font"; --no-nerd-font is primary flag;
+          --no-powerline backwards-compat alias.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-082
+NAME:     Ctrl+O unfocuses file tree
+PRIORITY: P1
+BUG:      P1 "Ctrl+O file open doesn't unfocus file tree"
+CROSS-REF: QA-TREE-018 (implicit), QA-PICK-004
+VERIFY    After opening file from tree-focused state, focus moves to
+          editor.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-083
+NAME:     Markdown underscore emphasis intraword rule
+PRIORITY: P2
+BUG:      P2 "Markdown underscore emphasis renders inside identifiers"
+CROSS-REF: QA-SYN-015
+VERIFY    `_word_in_word` NOT italicized; CommonMark intraword rule.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-084
+NAME:     Light mode tab bar updates on theme switch
+PRIORITY: P2
+BUG:      P2 "Light mode: tab bar stays dark after theme switch"
+CROSS-REF: QA-TAB-017, QA-THM-004
+VERIFY    Tab bar cache key includes theme name.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-085
+NAME:     Find bar - Enter doesn't always Replace All
+PRIORITY: P1
+BUG:      P1 "Enter in Find mode triggers Replace All — no separate find-only mode"
+CROSS-REF: QA-FIND-004, QA-FIND-007
+VERIFY    ⌃F opens find-only; Tab activates replace; Enter only does
+          Replace All in that mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-086
+NAME:     Auto-pair quote skip-over
+PRIORITY: P2
+BUG:      P2 "Auto-pair quote skip-over is disabled"
+CROSS-REF: QA-CPLT-006
+VERIFY    Odd-count heuristic; typing closing quote inside unclosed
+          string skips over existing close.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-087
+NAME:     Find bar pre-selects previous query on reopen
+PRIORITY: P2
+BUG:      P2 "Find bar text field doesn't clear or select-all on reopen"
+CROSS-REF: QA-FIND-015
+VERIFY    Reopening ⌃F pre-selects last query.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-088
+NAME:     $N capture group hint only when relevant
+PRIORITY: P3
+BUG:      P3 "Find bar '$0' label"
+CROSS-REF: QA-FIND-010
+VERIFY    Hint appears only when regex ON + pattern has capture groups.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-089
+NAME:     Right arrow accepts ghost text one char
+PRIORITY: P3
+BUG:      P2 "Right arrow accepts entire ghost text completion"
+CROSS-REF: QA-CPLT-011
+VERIFY    Right arrow = 1 char accept; Tab = full accept.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-090
+NAME:     Ghost text re-triggers after undo
+PRIORITY: P3
+BUG:      P3 "Ghost text completion does not re-trigger after undo"
+CROSS-REF: QA-UNDO-010
+VERIFY    After ⌃Z, ghost text reappears if cursor at word.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-091
+NAME:     No Perl warnings on undo/redo near EOL
+PRIORITY: P0
+BUG:      P0 "Perl warning on undo/redo near end-of-line"
+CROSS-REF: QA-UNDO-009, QA-CPLT-015
+VERIFY    No "Use of uninitialized value $char_before" on stderr.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-092
+NAME:     Temp files filtered from recent files
+PRIORITY: P2
+BUG:      P2 "history.json recent_files cluttered with temp files"
+CROSS-REF: QA-RCN-005
+VERIFY    /tmp /private/tmp /var/folders excluded from recent list.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-093
+NAME:     Clean exit — no screen artifacts
+PRIORITY: P2
+BUG:      P2 "Screen artifacts remain above cursor position after quitting"
+CROSS-REF: QA-STRT-009, QA-TERM-010
+VERIFY    CLEAR_SCREEN + CURSOR_HOME before ALT_SCREEN_OFF.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-094
+NAME:     Mouse hover highlights
+PRIORITY: P2
+BUG:      P2 "Mouse hover effects"
+CROSS-REF: QA-MS-014, QA-TAB-014, QA-TREE-021, QA-SBAR-011
+VERIFY    Tabs, pills, tree rows all highlight on hover.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-095
+NAME:     Markdown table pretty-render
+PRIORITY: P2
+BUG:      P2 "Markdown table pretty-rendering"
+CROSS-REF: QA-MD-001 through QA-MD-008
+VERIFY    Box-drawing borders, alignment, stripes; raw source when cursor
+          inside.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-096
+NAME:     Scrollbar thumb boundary consistent
+PRIORITY: P3
+BUG:      P3 "Scrollbar thumb boundary inconsistency"
+CROSS-REF: QA-GUT-018
+VERIFY    Both flat and normal tree paths use `<=` for thumb_end.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-097
+NAME:     Inline input widget in find/palette supports mouse click
+PRIORITY: P3
+BUG:      P3 "Mouse parity incomplete — cursor placement in inputs"
+CROSS-REF: QA-FIND-020, QA-PAL-021
+VERIFY    Click in filter/find/replace input places cursor at clicked position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-098
+NAME:     _char_to_visual_col handles wide chars
+PRIORITY: P2
+BUG:      P2 "_char_to_visual_col() doesn't handle wide characters"
+CROSS-REF: QA-EDIT-003
+VERIFY    CJK/emoji cursor positions correct (width 2).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-099
+NAME:     Render output uses array push (not concat)
+PRIORITY: P2
+BUG:      P2 "Renderer uses 381+ string concatenations in hot path"
+CROSS-REF: QA-PERF-008
+VERIFY    Render performance on typical frames is fast.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-100
+NAME:     Status bar "Commands" label prominence
+PRIORITY: P2
+BUG:      P2 "More prominent ctrl-space hint"
+CROSS-REF: QA-PAL-019, QA-REG-045
+VERIFY    Rightmost pill shows `⌘ Commands ⌃␣` in distinctive color.

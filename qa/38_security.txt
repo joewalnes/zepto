@@ -1,0 +1,192 @@
+================================================================================
+38 — Security
+================================================================================
+
+Covers: shell injection (VCS/Git.pm, Terminal.pm), symlink traversal,
+ReDoS protection (length + timeout), atomic save (File::Temp), terminal
+escape sanitization in filenames, no network calls.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-001
+NAME:     No shell injection in VCS operations (REGRESSION)
+PRIORITY: P1
+FEATURE:  sec injection
+RELATED:  bugs.md P1 "Shell injection in VCS/Git.pm"
+
+SETUP
+  Git repo; file named `foo; touch /tmp/zqa_pwned; bar.txt` (harmless
+  marker for testing).
+
+STEPS
+  1. Open that file in zepto.
+  2. Observe.
+  3. Check /tmp.
+
+VERIFY
+  - `/tmp/zqa_pwned` does NOT exist (shell not invoked on filename).
+  - Git operations use list-form exec, not backticks with interpolation.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-002
+NAME:     No shell injection in clipboard commands (REGRESSION)
+PRIORITY: P1
+FEATURE:  sec injection
+RELATED:  bugs.md P1 "Shell injection in Terminal.pm"
+
+STEPS
+  1. Trigger paste (⌃V) and copy operations.
+
+VERIFY
+  - Clipboard commands (pbpaste, xclip) executed via list-form exec().
+  - No shell interpretation of clipboard content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-003
+NAME:     Symlink traversal bounded (REGRESSION)
+PRIORITY: P2
+FEATURE:  sec symlink
+RELATED:  bugs.md P2 "Symlink traversal in FileTree and FilePicker"
+
+SETUP
+  Project dir with symlink to /etc (e.g. `ln -s /etc escape_link`).
+
+STEPS
+  1. Open project. Navigate tree.
+  2. ⌃O picker.
+
+VERIFY
+  - Symlinks that escape the project root are NOT followed.
+  - Symlinks within root are fine.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-004
+NAME:     ReDoS protection (length limit) (REGRESSION)
+PRIORITY: P2
+FEATURE:  sec regex
+RELATED:  bugs.md P2 "ReDoS vulnerability"
+
+STEPS
+  1. ⌃F, regex ON.
+  2. Paste a pattern > 1000 chars.
+
+VERIFY
+  - Rejected / truncated.
+  - Editor not frozen.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-005
+NAME:     ReDoS protection (execution timeout) (REGRESSION)
+PRIORITY: P2
+FEATURE:  sec regex
+RELATED:  bugs.md P2 "ReDoS protection is length-only, no timeout"
+
+STEPS
+  1. ⌃F, regex ON.
+  2. Type a catastrophic backtracking pattern like `(a+)+$` against
+     content with many `a`s followed by a non-match.
+
+VERIFY
+  - SIGALRM 1-second timeout kicks in.
+  - Editor remains responsive.
+  - Search aborts cleanly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-006
+NAME:     Atomic save uses File::Temp (REGRESSION)
+PRIORITY: P2
+FEATURE:  sec save
+RELATED:  bugs.md P2 "Predictable temp file names"
+
+STEPS
+  1. Save a file, observe temp file naming in target directory.
+
+VERIFY
+  - Temp file has unpredictable suffix (File::Temp with O_EXCL).
+  - Not `<file>.zepto.tmp.<pid>`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-007
+NAME:     Terminal title filename sanitized (REGRESSION)
+PRIORITY: P3
+FEATURE:  sec terminal
+RELATED:  bugs.md P3 "Terminal escape sequence injection via filenames"
+
+SETUP
+  Open file with malicious control chars in name (e.g. ESC-embedded).
+
+STEPS
+  1. Launch zepto with that file path.
+  2. Observe terminal title (if set).
+
+VERIFY
+  - Control chars (0x00-0x1F, 0x7F, 0x80-0x9F) are stripped from title.
+  - Terminal state not altered.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-008
+NAME:     No network calls made
+PRIORITY: P1
+FEATURE:  sec offline
+
+SETUP
+  Block network at OS level (or firewall zepto).
+
+STEPS
+  1. Full session: open, edit, save, find, all features.
+
+VERIFY
+  - Core editor works fully offline.
+  - AI completion requires network but is optional (only called when
+    enabled).
+  - No telemetry or background requests.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-009
+NAME:     Binary file content never executed
+PRIORITY: P2
+FEATURE:  sec binary
+RELATED:  QA-BIN-001
+
+STEPS
+  1. Open executable binary.
+
+VERIFY
+  - Placeholder shown.
+  - No code execution from file content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-010
+NAME:     Shell transform command visible to user
+PRIORITY: P3
+FEATURE:  sec transform
+
+STEPS
+  1. ⌥T, observe footer input.
+
+VERIFY
+  - User types the shell command explicitly.
+  - No hidden auto-execution of shell commands from clipboard/selection.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-011
+NAME:     Find-in-files backend commands use safe exec
+PRIORITY: P2
+FEATURE:  sec
+
+STEPS
+  1. Run find-in-files backend (git grep, rg, grep) with complex patterns.
+
+VERIFY
+  - Commands use list-form exec.
+  - Pattern is passed as argument, not interpolated into a shell string.

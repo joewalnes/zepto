@@ -1,0 +1,386 @@
+================================================================================
+22 — File Tree
+================================================================================
+
+Covers: ⌃B toggle, navigation (↑↓←→ Enter), VCS status colors, preview,
+filter mode, resize drag, header hints, sticky parents, scrollbar, context
+status bar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-001
+NAME:     ⌃B toggles file tree visibility
+PRIORITY: P0
+FEATURE:  tree
+
+STEPS
+  1. Launch. If tree hidden, press ⌃B.
+
+VERIFY
+  - Tree appears on left (default 23 cols wide).
+  - Press ⌃B again: tree hidden, editor uses full width.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-002
+NAME:     ⌃B toggles focus when tree visible
+PRIORITY: P1
+FEATURE:  tree focus
+
+STEPS
+  1. Tree visible. Editor focused.
+  2. Press ⌃B.
+
+VERIFY
+  - Focus moves to tree.
+  - Status bar shows tree-context pills (not document pills).
+  - Press ⌃B again: focus returns to editor.
+
+NOTES
+  Some prior behavior was "⌃B only toggles focus". Current intended
+  behavior per bugs.md "P3 Tree hide" FIXED: ⌃B toggles visibility
+  when hidden; toggles focus when visible. Confirm which is current.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-003
+NAME:     Arrow keys navigate tree (preview)
+PRIORITY: P0
+FEATURE:  tree nav
+
+SETUP
+  Tree visible and focused.
+
+STEPS
+  1. Press Down a few times.
+
+VERIFY
+  - Highlighted row moves down.
+  - File under highlight is previewed in main editor area.
+  - Tree retains focus (shown by visible border/indicator).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-004
+NAME:     Right expands directory
+PRIORITY: P1
+FEATURE:  tree
+
+STEPS
+  1. Highlight a collapsed directory.
+  2. Press Right arrow.
+
+VERIFY
+  - Directory expands in place, children shown.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-005
+NAME:     Left collapses directory
+PRIORITY: P1
+FEATURE:  tree
+
+STEPS
+  1. Highlight an expanded directory.
+  2. Press Left arrow.
+
+VERIFY
+  - Directory collapses.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-006
+NAME:     Enter on file confirms preview (opens tab)
+PRIORITY: P0
+FEATURE:  tree open
+
+STEPS
+  1. Highlight a file.
+  2. Press Enter.
+
+VERIFY
+  - File opens in a tab.
+  - Focus moves to editor.
+  - Status bar switches to document-context pills.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-007
+NAME:     Esc cancels tree preview
+PRIORITY: P1
+FEATURE:  tree esc
+
+STEPS
+  1. Navigate tree, preview shows in editor.
+  2. Press Esc.
+
+VERIFY
+  - Preview is cancelled.
+  - Focus returns to editor.
+  - Editor returns to pre-preview tab / state.
+  - Any tab opened for preview is closed (if it was transient).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-008
+NAME:     Double-click file opens it
+PRIORITY: P1
+FEATURE:  tree mouse
+
+STEPS
+  1. Double-click on a file in the tree.
+
+VERIFY
+  - File opens, preview confirmed, focus to editor.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-009
+NAME:     Click on previewed content confirms (REGRESSION)
+PRIORITY: P1
+FEATURE:  tree mouse preview
+RELATED:  bugs.md P1 "Clicking previewed file content dismisses it instead of opening it"
+
+STEPS
+  1. Launch with no args (or dir).
+  2. In tree, navigate to a file (preview shows).
+  3. Click on the previewed file content in the main editor area.
+
+VERIFY
+  - Preview is CONFIRMED (file is now opened permanently), not dismissed.
+  - Focus moves to editor.
+  - Any prior empty untitled tab is cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-010
+NAME:     VCS status coloring
+PRIORITY: P1
+FEATURE:  tree vcs
+
+SETUP
+  Git repo with mixed files: unchanged, modified, added (staged), untracked,
+  ignored, deleted.
+
+STEPS
+  1. Open tree in git repo.
+
+VERIFY
+  - Modified files: yellow/amber.
+  - Added (staged): blue or green.
+  - Untracked: green.
+  - Ignored: dim gray.
+  - Deleted: red.
+  - Unchanged: default.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-011
+NAME:     Drag border to resize tree
+PRIORITY: P2
+FEATURE:  tree resize
+
+STEPS
+  1. Click+drag the right border of the tree panel.
+
+VERIFY
+  - Tree width changes smoothly.
+  - Editor area adjusts.
+  - Minimum and maximum widths enforced.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-012
+NAME:     `{` / `}` resize tree via keyboard
+PRIORITY: P3
+FEATURE:  tree resize-key
+
+SETUP
+  Tree focused.
+
+STEPS
+  1. Press `}` to grow by 2 cols.
+  2. Press `{` to shrink.
+
+VERIFY
+  - Width changes as expected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-013
+NAME:     Tree filter via typing / to filter
+PRIORITY: P2
+FEATURE:  tree filter
+
+SETUP
+  Tree focused.
+
+STEPS
+  1. Press `/`.
+  2. Type "edit".
+
+VERIFY
+  - Tree switches to flat filter mode.
+  - Only files matching "edit" are shown.
+  - Filter query is visible in header.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-014
+NAME:     Current file auto-reveals in tree (REGRESSION)
+PRIORITY: P1
+FEATURE:  tree sync
+RELATED:  bugs.md P1 "File tree doesn't always expand to opened file"
+
+STEPS
+  1. Open a deeply-nested file via ⌃O or recent files.
+  2. Show tree (⌃B).
+
+VERIFY
+  - Tree auto-expanded parents to reveal the currently open file.
+  - File is highlighted as selected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-015
+NAME:     Tree updates after file created via Save As
+PRIORITY: P1
+FEATURE:  tree refresh
+RELATED:  bugs.md P1 "New files dont appear in tree"
+
+STEPS
+  1. With tree visible, ⌃N, type content, ⌃S "/tmp/zqa_newfile.txt" (in
+     the current working dir if tree rooted there).
+
+VERIFY
+  - After save, tree refreshes and shows the new file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-016
+NAME:     Natural sort in tree
+PRIORITY: P3
+FEATURE:  tree sort
+RELATED:  bugs.md P2 "Smart sort"
+
+SETUP
+  Directory with files: file2.txt, file7.txt, file10.txt, file11.txt.
+
+STEPS
+  1. Open tree.
+
+VERIFY
+  - Order: file2, file7, file10, file11 (natural).
+  - NOT file10, file11, file2, file7 (ASCII order).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-017
+NAME:     Sticky parent headers while scrolling
+PRIORITY: P2
+FEATURE:  tree sticky
+
+SETUP
+  Deep directory expanded with many items.
+
+STEPS
+  1. Scroll tree down past the parent directory.
+
+VERIFY
+  - Parent directory name sticks at top of tree panel while children
+    scroll.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-018
+NAME:     Click in editor unfocuses tree (REGRESSION)
+PRIORITY: P1
+FEATURE:  tree focus
+RELATED:  bugs.md P1 "Clicking document editor should unfocus file tree"
+
+STEPS
+  1. Tree focused.
+  2. Click in main editor area.
+
+VERIFY
+  - Tree preview is cancelled (or confirmed if active preview).
+  - Focus moves to editor.
+  - Status bar switches to document-context pills.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-019
+NAME:     Symlink traversal bounded (REGRESSION)
+PRIORITY: P2
+FEATURE:  tree security
+RELATED:  bugs.md P2 "Symlink traversal in FileTree and FilePicker"
+
+SETUP
+  Directory under cwd containing a symlink pointing outside the tree
+  root (e.g. `ln -s /etc /tmp/projdir/escape`).
+
+STEPS
+  1. Open that directory as project.
+  2. Navigate into the "escape" symlink.
+
+VERIFY
+  - Zepto does not follow the symlink outside the project root.
+  - Either shows a warning or silently skips out-of-root entries.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-020
+NAME:     Status bar pills in tree context (REGRESSION)
+PRIORITY: P2
+FEATURE:  tree ui
+RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills"
+
+STEPS
+  1. Focus tree (⌃B).
+
+VERIFY
+  - Status bar shows pills with icons, not plain text:
+    `↑↓ nav`, `←→ fold`, `↵ open`, `/ filter`, `Esc back`.
+  - Pills drop off at narrow widths.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-021
+NAME:     Hover on tree row (REGRESSION)
+PRIORITY: P3
+FEATURE:  tree hover
+RELATED:  bugs.md P2 "Mouse hover effects"
+
+STEPS
+  1. Mouse over tree rows.
+
+VERIFY
+  - Each row highlights briefly on hover.
+  - Returns to normal when cursor leaves.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-022
+NAME:     Scroll wheel in tree is smooth (line-by-line)
+PRIORITY: P3
+FEATURE:  tree scroll
+
+STEPS
+  1. Focus tree, scroll with mouse wheel / trackpad.
+
+VERIFY
+  - Smooth, one line per scroll event.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-023
+NAME:     Drag scrollbar in tree
+PRIORITY: P3
+FEATURE:  tree scroll
+
+STEPS
+  1. Grab the scrollbar thumb at right edge of tree.
+  2. Drag.
+
+VERIFY
+  - Tree scrolls to match thumb position.

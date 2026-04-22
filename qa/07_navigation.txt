@@ -1,0 +1,305 @@
+================================================================================
+07 — Navigation
+================================================================================
+
+Covers: arrow keys, word motion (Alt+Arrow), home/end (smart cycling),
+page up/down, ctrl+home/end, cursor affinity in wrap mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-001
+NAME:     Arrow keys move cursor one cell
+PRIORITY: P0
+FEATURE:  arrow
+
+STEPS
+  1. Open multi-line file.
+  2. Press Up, Down, Left, Right.
+
+VERIFY
+  - Cursor moves one line up/down or one char left/right.
+  - Position pill in status bar updates on each movement.
+  - No additional side effects.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-002
+NAME:     Alt+Right moves by word (forward)
+PRIORITY: P1
+FEATURE:  word-motion
+
+SETUP
+  Line `hello  world_foo  123bar`, cursor at col 1.
+
+STEPS
+  1. Press Alt+Right.
+  2. Observe cursor position.
+  3. Repeat.
+
+VERIFY
+  - Cursor jumps to start of next word each press.
+  - Punctuation is treated as word boundary.
+  - Whitespace is skipped.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-003
+NAME:     Alt+Left moves by word (backward)
+PRIORITY: P1
+FEATURE:  word-motion
+
+STEPS
+  1. Line `hello world foo`, cursor at end.
+  2. Press Alt+Left.
+  3. Repeat.
+
+VERIFY
+  - Cursor jumps to start of previous word each press.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-004
+NAME:     Home cycles: first-nonws → col 0 → doc start (REGRESSION)
+PRIORITY: P1
+FEATURE:  home smart
+RELATED:  bugs.md P2 "More home/end"
+
+SETUP
+  Line with 4 leading spaces: `    indented`.
+  Cursor at col 8 (mid-line).
+
+STEPS
+  1. Press Home.
+  2. Press Home again.
+  3. Press Home again.
+  4. Press Home again.
+
+VERIFY
+  - Press 1: cursor moves to col 5 (first non-ws).
+  - Press 2: cursor moves to col 1 (start of line).
+  - Press 3: cursor moves to line 1, col 1 (doc start).
+  - Press 4: stays at doc start (or cycles back).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-005
+NAME:     End cycles: line end → doc end
+PRIORITY: P1
+FEATURE:  end smart
+
+SETUP
+  Multi-line file. Cursor mid-line.
+
+STEPS
+  1. Press End.
+  2. Press End again.
+
+VERIFY
+  - Press 1: cursor at end of current line.
+  - Press 2: cursor at last line, last column (document end).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-006
+NAME:     Ctrl+Home jumps to doc start
+PRIORITY: P1
+FEATURE:  doc-nav
+
+STEPS
+  1. Scroll down in a long file.
+  2. Press Ctrl+Home.
+
+VERIFY
+  - Cursor at 1:1.
+  - Viewport scrolled to top.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-007
+NAME:     Ctrl+End jumps to doc end
+PRIORITY: P1
+FEATURE:  doc-nav
+
+STEPS
+  1. Long file.
+  2. Press Ctrl+End.
+
+VERIFY
+  - Cursor at last line, last column.
+  - Viewport scrolled to bottom.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-008
+NAME:     Page Down scrolls by viewport
+PRIORITY: P1
+FEATURE:  page
+
+SETUP
+  File with 200 lines.
+
+STEPS
+  1. Press Page Down.
+
+VERIFY
+  - Viewport scrolls down roughly 1 page (viewport height minus overlap).
+  - Cursor moves to maintain relative position in viewport.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-009
+NAME:     Page Up scrolls back
+PRIORITY: P1
+FEATURE:  page
+
+STEPS
+  1. After Page Down from QA-NAV-008.
+  2. Press Page Up.
+
+VERIFY
+  - Viewport returns to previous position (approximately).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-010
+NAME:     Cursor stays in viewport during vertical nav
+PRIORITY: P1
+FEATURE:  viewport
+
+STEPS
+  1. Long file. Press Down repeatedly (or hold).
+
+VERIFY
+  - Cursor remains visible.
+  - Viewport auto-scrolls with scroll_margin lines of context.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-011
+NAME:     Scroll margin keeps cursor off the edge
+PRIORITY: P2
+FEATURE:  viewport
+
+SETUP
+  scroll_margin = 3 (default).
+
+STEPS
+  1. Move cursor down until it's within 3 lines of the bottom.
+  2. Continue pressing Down.
+
+VERIFY
+  - Viewport scrolls before cursor reaches the bottom edge.
+  - At least 3 lines remain visible below the cursor where possible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-012
+NAME:     Horizontal scrolling on long lines
+PRIORITY: P2
+FEATURE:  viewport
+
+SETUP
+  Word wrap OFF. Line longer than viewport.
+
+STEPS
+  1. Press Right arrow repeatedly to move past the visible edge.
+
+VERIFY
+  - Viewport scrolls horizontally.
+  - No artifacts at left edge (characters clip cleanly).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-013
+NAME:     Cursor at virtual EOL on short line (up/down nav)
+PRIORITY: P2
+FEATURE:  cursor
+
+SETUP
+  Line 1: "long line of text here" (22 chars).
+  Line 2: "short" (5 chars).
+
+STEPS
+  1. Move cursor to col 15 on line 1.
+  2. Press Down.
+  3. Press Down again to line 3 (if exists) — or test returning.
+  4. Press Up.
+
+VERIFY
+  - On line 2: cursor is at col 6 (end of "short") but "virtual" col
+    position is remembered.
+  - On return to line 1 (or equivalent longer line): cursor goes back
+    to col 15.
+
+NOTES
+  This tests "cursor affinity" — a common editor behavior.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-014
+NAME:     Home in word-wrap continuation row
+PRIORITY: P2
+FEATURE:  home wrap
+RELATED:  QA-WRAP-*
+
+SETUP
+  Word wrap ON. A wrapped line (two visual rows).
+
+STEPS
+  1. Position cursor on the 2nd visual row (continuation).
+  2. Press Home.
+
+VERIFY
+  - Cursor moves to the start of that visual row (not doc line start
+    immediately — Home cycle should handle both cases coherently).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-015
+NAME:     Goto line pill click opens inline editor
+PRIORITY: P2
+FEATURE:  goto
+RELATED:  QA-GOTO-*
+
+STEPS
+  1. Click on the cursor-position pill (`⏵ 1:1 ⌃G`) in the status bar.
+
+VERIFY
+  - An inline input appears within the pill.
+  - Pre-filled with current `line:col`.
+  - Text is pre-selected (typing replaces it).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-016
+NAME:     Arrow exits multi-cursor mode
+PRIORITY: P1
+FEATURE:  arrow multi-cursor
+RELATED:  QA-MC-*
+
+SETUP
+  Multiple cursors active (from ⌃D presses).
+
+STEPS
+  1. Press Right arrow.
+
+VERIFY
+  - Only the primary cursor remains.
+  - Secondary cursors are cleared.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-017
+NAME:     Arrow exits column selection mode
+PRIORITY: P1
+FEATURE:  arrow column
+
+SETUP
+  Column selection mode active.
+
+STEPS
+  1. Press arrow keys.
+
+VERIFY
+  - In column mode: arrows extend column selection.
+  - After Esc: column mode exits; arrows behave normally.

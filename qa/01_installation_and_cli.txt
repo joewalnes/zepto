@@ -1,0 +1,331 @@
+================================================================================
+01 — Installation and CLI
+================================================================================
+
+Covers: the zepto binary itself, CLI flags, env vars, install flow, self-
+installer, version reporting, help output.
+
+Reference: /Users/joe/src/zepto/zepto (top-level argv parsing),
+           /Users/joe/src/zepto/install.sh, /Users/joe/src/zepto/Formula/.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-001
+NAME:     Binary runs with no args and no files
+PRIORITY: P0
+FEATURE:  launch
+
+SETUP
+  ./zepto built via `make build`.
+
+STEPS
+  1. Run `./zepto` with no arguments (in a directory that is not a git repo).
+  2. Observe initial state.
+
+VERIFY
+  - Editor opens to an untitled, empty tab.
+  - File tree is visible on left (default when no file arg).
+  - Status bar shows at least the cursor-pos pill (⏵ 1:1 ⌃G) and the
+    Commands palette pill on the right (⌃␣ Commands).
+  - No error output on stderr.
+  - Cursor is positioned at row 1, col 1 of editor area.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-002
+NAME:     Open a single file from CLI
+PRIORITY: P0
+FEATURE:  launch
+
+SETUP
+  Create /tmp/zqa_hello.txt containing "hello world".
+
+STEPS
+  1. Run `./zepto /tmp/zqa_hello.txt`.
+
+VERIFY
+  - File contents are shown in the editor area.
+  - Tab label shows `zqa_hello.txt` (not `[untitled]`).
+  - File tree is hidden by default (single-file launch hides tree per
+    documented behavior).
+  - Status bar cursor pill shows `1:1`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-003
+NAME:     Open multiple files
+PRIORITY: P1
+FEATURE:  launch
+
+SETUP
+  Create /tmp/zqa_a.txt and /tmp/zqa_b.txt with distinct contents.
+
+STEPS
+  1. Run `./zepto /tmp/zqa_a.txt /tmp/zqa_b.txt`.
+
+VERIFY
+  - Two tabs are visible in the tab bar.
+  - First file is active; its content is shown.
+  - Switching tabs via mouse click or `⌥.` shows second file's content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-004
+NAME:     Open a directory shows tree only
+PRIORITY: P1
+FEATURE:  launch
+
+SETUP
+  Target: an existing directory, e.g. /Users/joe/src/zepto/.
+
+STEPS
+  1. Run `./zepto /Users/joe/src/zepto`.
+
+VERIFY
+  - Editor opens with file tree visible (regardless of single-file rule).
+  - No file is loaded in the main editor area.
+  - Main editor shows empty untitled or a placeholder.
+  - Pressing arrow keys in the tree navigates entries.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-005
+NAME:     --version prints version and exits
+PRIORITY: P1
+FEATURE:  cli-flag
+
+STEPS
+  1. Run `./zepto --version`.
+  2. Run `./zepto -v`.
+
+VERIFY
+  - Both print a version string to stdout.
+  - Exit code is 0.
+  - No editor UI is launched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-006
+NAME:     --help prints usage and exits
+PRIORITY: P1
+FEATURE:  cli-flag
+
+STEPS
+  1. Run `./zepto --help`.
+  2. Run `./zepto -h`.
+
+VERIFY
+  - Usage text is printed listing all flags and env vars:
+    --install, --version/-v, --no-nerd-font/-P, --tree, --no-tree,
+    ZEPTO_NERD_FONT, ZEPTO_TREE.
+  - Exit code is 0.
+  - No editor UI is launched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-007
+NAME:     --no-nerd-font disables glyphs
+PRIORITY: P2
+FEATURE:  cli-flag
+
+STEPS
+  1. Run `./zepto --no-nerd-font /tmp/zqa_a.txt`.
+  2. Observe tab bar, status bar pills, file tree (if toggled on).
+
+VERIFY
+  - Rounded caps, folder glyphs, icon glyphs are replaced with ASCII
+    equivalents (parentheses, `[F]` / `[D]`, single chars).
+  - Layout remains readable and complete — no missing characters.
+  - Nerd Font toggle pill in palette shows "off".
+
+NOTES
+  `--no-powerline` and `-P` are documented backwards-compat aliases for
+  `--no-nerd-font`. Test both.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-008
+NAME:     --tree forces tree visible when opening a file
+PRIORITY: P2
+FEATURE:  cli-flag
+
+SETUP
+  /tmp/zqa_a.txt exists.
+
+STEPS
+  1. Run `./zepto --tree /tmp/zqa_a.txt`.
+
+VERIFY
+  - Despite single-file launch (which usually hides tree), tree is shown.
+  - Editor focus is on the document (not the tree).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-009
+NAME:     --no-tree hides tree when opening a directory
+PRIORITY: P2
+FEATURE:  cli-flag
+
+STEPS
+  1. Run `./zepto --no-tree /Users/joe/src/zepto`.
+
+VERIFY
+  - File tree is hidden.
+  - Full editor width is available.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-010
+NAME:     ZEPTO_NERD_FONT=0 env var disables glyphs
+PRIORITY: P2
+FEATURE:  env-var
+
+STEPS
+  1. Run `ZEPTO_NERD_FONT=0 ./zepto`.
+
+VERIFY
+  - Glyphs replaced with ASCII fallbacks (same as QA-CLI-007).
+  - Toggle pill reflects "off".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-011
+NAME:     ZEPTO_TREE=0 env var hides tree
+PRIORITY: P2
+FEATURE:  env-var
+
+STEPS
+  1. Run `ZEPTO_TREE=0 ./zepto /Users/joe/src/zepto`.
+
+VERIFY
+  - File tree is hidden.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-012
+NAME:     CLI flag overrides env var
+PRIORITY: P3
+FEATURE:  env-var
+
+STEPS
+  1. Run `ZEPTO_TREE=0 ./zepto --tree /Users/joe/src/zepto`.
+  2. Run `ZEPTO_NERD_FONT=0 ./zepto /tmp/zqa_a.txt` and compare to
+     running without env var.
+
+VERIFY
+  - `--tree` overrides `ZEPTO_TREE=0` (tree is visible).
+  - Env var alone still disables nerd font when no --no-nerd-font flag.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-013
+NAME:     --install copies binary to default location
+PRIORITY: P1
+FEATURE:  installer
+
+SETUP
+  Move any existing ~/.local/bin/zepto aside. Use a throwaway test user
+  shell if possible.
+
+STEPS
+  1. Run `./zepto --install`.
+  2. When done, run `~/.local/bin/zepto --version`.
+
+VERIFY
+  - Script reports destination path.
+  - Copies successfully, sets exec permissions.
+  - Installed binary runs and prints same version.
+  - Exit code 0.
+
+NOTES
+  Clean up after: `rm ~/.local/bin/zepto` if desired.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-014
+NAME:     --install with custom path
+PRIORITY: P2
+FEATURE:  installer
+
+STEPS
+  1. Run `./zepto --install /tmp/zqa_bin/zepto` (non-existent dir OK
+     if installer creates it, otherwise pre-create).
+  2. Run `/tmp/zqa_bin/zepto --version`.
+
+VERIFY
+  - Installs to specified path.
+  - Binary is self-contained and runnable from that location.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-015
+NAME:     curl | sh installer from zepto.now/get
+PRIORITY: P2
+FEATURE:  installer
+RELATED:  QA-CLI-013
+
+SETUP
+  Clean machine / container where zepto isn't installed. Requires
+  network access.
+
+STEPS
+  1. Run `curl -fsSL https://zepto.now/get | sh`.
+
+VERIFY
+  - Downloads the latest binary for the current platform.
+  - Installs to default location (~/.local/bin/zepto).
+  - Verifies by running `zepto --version`.
+  - Clear on-screen output explaining what happened.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-016
+NAME:     Homebrew install (macOS)
+PRIORITY: P3
+FEATURE:  installer
+
+STEPS
+  1. `brew install joewalnes/tap/zepto`.
+  2. `zepto --version`.
+
+VERIFY
+  - Formula downloads and installs.
+  - Binary runs, version string printed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-017
+NAME:     Zero external dependencies
+PRIORITY: P1
+FEATURE:  packaging
+
+SETUP
+  Fresh environment with only Perl 5.10+ standard library available
+  (no CPAN modules installed).
+
+STEPS
+  1. Run `./zepto /tmp/zqa_a.txt`.
+  2. Type a few characters, save (⌃S), quit (⌃Q).
+
+VERIFY
+  - No "Can't locate X.pm" or other module errors.
+  - Full editing loop works.
+
+NOTES
+  This test is the reason for the project's single-file architecture;
+  any regression here violates Rule 1 of CLAUDE.md.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-018
+NAME:     Invalid file argument shows error or creates new
+PRIORITY: P3
+FEATURE:  launch
+
+STEPS
+  1. Run `./zepto /path/that/does/not/exist/file.txt`.
+
+VERIFY
+  - Either: opens as a new empty file with that filename (future save
+    will create it), or shows a clear status message. Current behavior
+    should be documented and consistent — verify no crash.

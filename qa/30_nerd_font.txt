@@ -1,0 +1,124 @@
+================================================================================
+30 — Nerd Font
+================================================================================
+
+Covers: ⌥I toggle, --no-nerd-font / ZEPTO_NERD_FONT=0, backwards-compat
+alias --no-powerline, ASCII fallback rendering.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-001
+NAME:     Default is nerd font enabled
+PRIORITY: P1
+FEATURE:  nerd-font
+
+STEPS
+  1. Launch, observe.
+
+VERIFY
+  - Nerd Font glyphs visible: folder icons, rounded pill caps, tab
+    triangle edges, VCS dots.
+  - Toggle pill shows "on".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-002
+NAME:     ⌥I toggles nerd font (REGRESSION)
+PRIORITY: P2
+FEATURE:  nerd-font toggle
+RELATED:  bugs.md P2 "Powerline toggle has no keyboard shortcut"
+
+STEPS
+  1. Press ⌥I.
+
+VERIFY
+  - Glyphs replaced with ASCII: (parentheses for rounds, [F]/[D] for
+    folder/file icons, etc.).
+  - Layout remains correct.
+  - Toggle pill shows "off".
+  - Press ⌥I again: restored.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-003
+NAME:     Layout intact without glyphs
+PRIORITY: P2
+FEATURE:  nerd-font fallback
+
+STEPS
+  1. ⌥I off (ASCII mode).
+  2. Check every UI surface: tabs, status bar, tree, palette, find, prompts.
+
+VERIFY
+  - No missing characters / empty boxes.
+  - All labels readable.
+  - Single-width Unicode only (per UI guidelines).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-004
+NAME:     --no-nerd-font flag
+PRIORITY: P2
+FEATURE:  nerd-font cli
+
+STEPS
+  1. `./zepto --no-nerd-font`.
+
+VERIFY
+  - Starts in ASCII mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-005
+NAME:     --no-powerline alias still works (REGRESSION)
+PRIORITY: P3
+FEATURE:  nerd-font cli compat
+RELATED:  bugs.md P3 "Rename Powerline to Nerd Font"
+
+STEPS
+  1. `./zepto --no-powerline`.
+
+VERIFY
+  - Equivalent to --no-nerd-font (backwards compat).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-006
+NAME:     ZEPTO_NERD_FONT=0 env var
+PRIORITY: P3
+FEATURE:  nerd-font env
+
+STEPS
+  1. `ZEPTO_NERD_FONT=0 ./zepto`.
+
+VERIFY
+  - ASCII mode at startup.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-007
+NAME:     Nerd font state persists across restart
+PRIORITY: P3
+FEATURE:  nerd-font persistence
+
+STEPS
+  1. Toggle off, quit, relaunch.
+
+VERIFY
+  - Starts in OFF state (if prefs persist).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NF-008
+NAME:     No duplicate icon codepoints (REGRESSION)
+PRIORITY: P3
+FEATURE:  nerd-font icons
+RELATED:  bugs.md P3 "Nerd icon overhaul"
+
+STEPS
+  1. Inspect /lib/Zepto/Chars.pm or visual UI.
+
+VERIFY
+  - No two icon roles share the same glyph codepoint where they would
+    be confusing.
+  - WRAP icon uses \x{f036} (fa-align-left), not same as paste.

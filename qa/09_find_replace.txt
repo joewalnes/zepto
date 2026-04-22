@@ -1,0 +1,413 @@
+================================================================================
+09 — Find & Replace
+================================================================================
+
+Covers: Ctrl+F find mode, replace mode (Tab), regex toggle (⌃R), case
+toggle (⌃C), capture groups ($0-$3), match count, next/prev navigation,
+jump to first match.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-001
+NAME:     Ctrl+F opens find bar
+PRIORITY: P0
+FEATURE:  find
+
+STEPS
+  1. Open file with content.
+  2. Press ⌃F.
+
+VERIFY
+  - Find bar appears at the bottom.
+  - Label "Find:" visible, input field focused (cursor in it).
+  - Status bar shows find-context pills: `.* ⌃R`, `Aa ⌃C`, `✗ Esc`, `✓ Enter`.
+  - Replace field is NOT visible (find-only mode).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-002
+NAME:     Typing filters matches incrementally
+PRIORITY: P0
+FEATURE:  find incremental
+
+SETUP
+  Buffer contains "hello world" several times.
+
+STEPS
+  1. ⌃F.
+  2. Type "hel".
+
+VERIFY
+  - All occurrences of "hel" are highlighted with amber/brown bg.
+  - Current match gets brighter yellow highlight.
+  - Match count updates: "1 of 3" or similar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-003
+NAME:     Find jumps to first match when off-screen (REGRESSION)
+PRIORITY: P1
+FEATURE:  find jump
+RELATED:  bugs.md P1 "Search should jump to first"
+
+SETUP
+  Long file. First match is far below the viewport.
+
+STEPS
+  1. ⌃F, type a rare search term.
+
+VERIFY
+  - Viewport scrolls to show the first match.
+  - Match is highlighted as current (yellow bg).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-004
+NAME:     Enter in find mode keeps cursor on match (REGRESSION)
+PRIORITY: P1
+FEATURE:  find
+RELATED:  bugs.md P1 "Enter in Find mode triggers Replace All"
+
+STEPS
+  1. ⌃F, type query, press Enter.
+
+VERIFY
+  - Find bar closes.
+  - Cursor stays on the current match position.
+  - Does NOT execute Replace All (which requires Tab-to-replace first).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-005
+NAME:     Tab in find bar activates replace field
+PRIORITY: P1
+FEATURE:  find replace
+
+STEPS
+  1. ⌃F, type query.
+  2. Press Tab.
+
+VERIFY
+  - Replace field becomes visible.
+  - Focus moves to Replace input.
+  - Enter will now trigger Replace All or Replace One (per mode cycle).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-006
+NAME:     Replace All replaces every match
+PRIORITY: P0
+FEATURE:  replace
+
+SETUP
+  File with "foo" 5 times.
+
+STEPS
+  1. ⌃F type "foo", Tab, type "BAR", Enter (in replace-all mode).
+
+VERIFY
+  - All 5 "foo" replaced with "BAR".
+  - Single undo (⌃Z) reverts all 5 replacements.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-007
+NAME:     Replace One replaces current match only
+PRIORITY: P1
+FEATURE:  replace
+
+STEPS
+  1. ⌃F type "foo", Tab to replace field, type "BAR".
+  2. Switch to replace-one mode (Shift+Tab cycle).
+  3. Press Enter.
+
+VERIFY
+  - Only the current match is replaced.
+  - Cursor moves to the next match.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-008
+NAME:     Regex toggle (⌃R) enables regex matching
+PRIORITY: P1
+FEATURE:  find regex
+
+STEPS
+  1. ⌃F, type `\d+`, press Enter (expect literal match).
+  2. Press ⌃R to toggle regex on.
+  3. See re-highlighted matches.
+
+VERIFY
+  - Without regex: literal "\d+" is searched (probably no match).
+  - With regex: actual digits are highlighted.
+  - Regex pill (`.* ⌃R`) shows ON state (brighter background).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-009
+NAME:     Case toggle (⌃C) changes case sensitivity
+PRIORITY: P1
+FEATURE:  find case
+
+STEPS
+  1. File contains "Hello" and "hello".
+  2. ⌃F, type "hello".
+
+VERIFY
+  - Case OFF (default): matches both.
+  - Press ⌃C to turn case ON: only "hello" matches.
+  - Case pill (`Aa ⌃C`) shows ON state.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-010
+NAME:     Capture groups highlighted in regex mode (REGRESSION)
+PRIORITY: P2
+FEATURE:  find regex captures
+RELATED:  bugs.md P3 "Find bar $0 label"
+
+SETUP
+  Content: `abc123 def456`. Regex mode ON.
+
+STEPS
+  1. ⌃F, type `([a-z]+)(\d+)`.
+
+VERIFY
+  - $0 (whole match), $1 (letters), $2 (digits) are each highlighted in
+    distinct colors in the matches.
+  - Capture group hint `$0 $1 $2` appears in find bar.
+  - Hint does NOT appear when regex mode is OFF.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-011
+NAME:     Capture group replacement
+PRIORITY: P2
+FEATURE:  replace captures
+
+STEPS
+  1. Regex mode ON.
+  2. Find: `(\w+)_(\w+)`, Replace: `$2_$1`.
+  3. Replace All.
+
+VERIFY
+  - Words swap parts around the underscore.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-012
+NAME:     Up/Down navigate matches
+PRIORITY: P1
+FEATURE:  find nav
+
+STEPS
+  1. ⌃F, type query with multiple matches.
+  2. Press Down.
+  3. Press Up.
+
+VERIFY
+  - Down moves to next match.
+  - Up moves to previous match.
+  - Match counter updates (e.g. "1 of 5" → "2 of 5").
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-013
+NAME:     ⌃J / ⌃K navigate matches after find closed
+PRIORITY: P1
+FEATURE:  find nav
+
+STEPS
+  1. ⌃F, type query, Esc.
+  2. Press ⌃J.
+  3. Press ⌃K.
+
+VERIFY
+  - ⌃J jumps to next match.
+  - ⌃K jumps to previous match.
+  - Works even after find bar dismissed (uses last query).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-014
+NAME:     Esc closes find bar
+PRIORITY: P0
+FEATURE:  find esc
+
+STEPS
+  1. ⌃F, type query.
+  2. Press Esc.
+
+VERIFY
+  - Find bar is dismissed.
+  - Match highlights removed from viewport.
+  - Cursor returns to position where find began (or stays on current
+    match — per documented behavior).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-015
+NAME:     Reopen find preselects previous query (REGRESSION)
+PRIORITY: P2
+FEATURE:  find
+RELATED:  bugs.md P2 "Find bar text field doesn't clear or select-all on reopen"
+
+STEPS
+  1. ⌃F, type "foo", Esc.
+  2. ⌃F again.
+
+VERIFY
+  - Find field pre-filled with "foo".
+  - Text is entirely selected (visible selection highlight).
+  - Typing immediately replaces the old query.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-016
+NAME:     Find works in background for large files
+PRIORITY: P1
+FEATURE:  find performance
+
+SETUP
+  Open a file with >50K lines.
+
+STEPS
+  1. ⌃F, type a query.
+
+VERIFY
+  - Visible (viewport) matches appear immediately.
+  - Off-screen matches populate progressively without blocking input.
+  - Match counter shows "N of M..." with ellipsis while searching.
+  - Editor responds to typing/scrolling during search.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-017
+NAME:     Invalid regex shows error
+PRIORITY: P2
+FEATURE:  find regex error
+
+STEPS
+  1. Regex mode ON.
+  2. Type "(unbalanced" (malformed regex).
+
+VERIFY
+  - No crash.
+  - Match count shows 0 or "invalid pattern" indicator.
+  - Editor remains responsive.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-018
+NAME:     ReDoS protection (pattern length limit)
+PRIORITY: P2
+FEATURE:  find security
+RELATED:  bugs.md P2 "ReDoS vulnerability"
+
+STEPS
+  1. Regex mode ON.
+  2. Paste a very long regex (> 1000 chars).
+
+VERIFY
+  - Pattern is rejected or truncated.
+  - Editor does not hang/freeze.
+  - Status message or silent reject; no CPU spike.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-019
+NAME:     Mouse click on find bar pills
+PRIORITY: P2
+FEATURE:  find mouse
+RELATED:  bugs.md P2 "Find/replace pills should be clickable"
+
+STEPS
+  1. ⌃F, type query.
+  2. Click on `.* ⌃R` pill.
+  3. Click on `Aa ⌃C` pill.
+  4. Click on `✓ Enter` pill.
+  5. Click on `✗ Esc` pill.
+
+VERIFY
+  - Regex toggles on/off.
+  - Case toggles on/off.
+  - OK executes find (equivalent to Enter).
+  - Cancel closes find bar (equivalent to Esc).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-020
+NAME:     Mouse click positions cursor in find input
+PRIORITY: P2
+FEATURE:  find mouse input
+
+STEPS
+  1. ⌃F, type "hello world".
+  2. Click in the middle of the typed query.
+
+VERIFY
+  - Cursor moves to the clicked position within the input.
+  - Typing continues at that position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-021
+NAME:     Find global shortcuts not swallowed (REGRESSION)
+PRIORITY: P1
+FEATURE:  find global
+RELATED:  bugs.md P1 "Global shortcuts should work from any state"
+
+STEPS
+  1. ⌃F, type query.
+  2. Press ⌃T (theme toggle).
+
+VERIFY
+  - Theme switches dark↔light.
+  - Find bar remains open with query intact.
+  - Similarly test: ⌃Q quits from find mode, ⌃S saves.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-022
+NAME:     Palette accessible during find
+PRIORITY: P1
+FEATURE:  find global
+RELATED:  bugs.md P1 "Global shortcuts should work from any state"
+
+STEPS
+  1. ⌃F, type query.
+  2. Press ⌃Space.
+
+VERIFY
+  - Find bar closes.
+  - Command palette opens.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-023
+NAME:     Replace mode cycling via Shift+Tab
+PRIORITY: P3
+FEATURE:  find replace
+
+STEPS
+  1. ⌃F, type query, Tab to replace field.
+  2. Press Shift+Tab.
+
+VERIFY
+  - Mode cycles: replace-all → replace-one → regex → case → replace-all.
+  - Each state reflected in find bar UI.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-024
+NAME:     Find and Replace available in command palette
+PRIORITY: P2
+FEATURE:  find palette
+RELATED:  bugs.md P1 "Enter in Find mode triggers Replace All"
+
+STEPS
+  1. Open palette, search "find and replace" or "replace".
+
+VERIFY
+  - "Find and Replace" entry is present under NAVIGATE.
+  - Opens find bar with replace field visible from the start.

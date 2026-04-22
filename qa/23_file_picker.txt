@@ -1,0 +1,277 @@
+================================================================================
+23 — File Picker (Ctrl+O)
+================================================================================
+
+Covers: ⌃O fuzzy file picker, tracked + untracked file discovery, natural
+sort, path truncation, skip directories, tree auto-hide if launched
+single-file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-001
+NAME:     ⌃O opens file picker
+PRIORITY: P0
+FEATURE:  pick
+
+STEPS
+  1. Launch zepto in a directory with files.
+  2. Press ⌃O.
+
+VERIFY
+  - Palette opens in "files" mode.
+  - Title shows "Open File" or similar.
+  - Input field focused.
+  - List of files from project visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-002
+NAME:     ⌃P alias also opens picker
+PRIORITY: P2
+FEATURE:  pick
+
+STEPS
+  1. Press ⌃P.
+
+VERIFY
+  - Equivalent to ⌃O.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-003
+NAME:     Typing fuzzy-filters list
+PRIORITY: P0
+FEATURE:  pick fuzzy
+
+STEPS
+  1. ⌃O, type "Edi".
+
+VERIFY
+  - Files containing "Edi" subsequence are shown (e.g. Editor.pm,
+    Editor/Commands.pm).
+  - Matched characters highlighted in cyan.
+  - Best matches at top.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-004
+NAME:     Enter opens selected file
+PRIORITY: P0
+FEATURE:  pick open
+
+STEPS
+  1. ⌃O, navigate to a file, press Enter.
+
+VERIFY
+  - File opens in new tab (or replaces empty untitled).
+  - Focus moves to editor.
+  - Tree (if hidden before) stays hidden; file tree expands to reveal
+    the file if tree is visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-005
+NAME:     Untracked files appear (REGRESSION)
+PRIORITY: P1
+FEATURE:  pick untracked
+RELATED:  bugs.md P1 "File picker doesn't find untracked files"
+
+SETUP
+  Git repo. Create an untracked file `/path/to/repo/newfile.txt`.
+
+STEPS
+  1. ⌃O in the repo.
+
+VERIFY
+  - `newfile.txt` appears in the list.
+  - Both tracked (git ls-files) and untracked (git ls-files --others
+    --exclude-standard) files are merged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-006
+NAME:     Gitignored files are excluded
+PRIORITY: P2
+FEATURE:  pick gitignore
+
+SETUP
+  .gitignore contains "*.log". File "/tmp/proj/debug.log" exists but is
+  ignored.
+
+STEPS
+  1. ⌃O in /tmp/proj.
+
+VERIFY
+  - debug.log does NOT appear in the picker.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-007
+NAME:     Skip directories excluded from discovery
+PRIORITY: P2
+FEATURE:  pick skip
+
+SETUP
+  Repo with `.git/`, `node_modules/`, `.venv/`, `build/`, etc.
+
+STEPS
+  1. ⌃O.
+
+VERIFY
+  - Files from standard noise directories are not listed.
+  - Per Config.pm skip_directories().
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-008
+NAME:     Natural sort (REGRESSION)
+PRIORITY: P3
+FEATURE:  pick sort
+
+SETUP
+  Files: file2.txt, file10.txt, file7.txt.
+
+STEPS
+  1. ⌃O, empty query.
+
+VERIFY
+  - Sorted file2, file7, file10 (natural, not ASCII).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-009
+NAME:     Cursor aligned in picker filter input (REGRESSION)
+PRIORITY: P1
+FEATURE:  pick ui
+RELATED:  bugs.md P1 "Incorrect cursor placement in Open File dialog"
+
+STEPS
+  1. ⌃O, type several characters.
+
+VERIFY
+  - Terminal cursor is aligned with the last typed character position.
+  - No column offset mismatch.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-010
+NAME:     Long path truncated from start with ellipsis
+PRIORITY: P3
+FEATURE:  pick ui
+RELATED:  bugs.md P3 "long filenames in open file dialog"
+
+STEPS
+  1. In deep nested dir, ⌃O, type partial match.
+
+VERIFY
+  - Long paths show `…/shorter/path.txt` — truncated from start with
+    `…` prefix.
+  - Does not overflow palette box.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-011
+NAME:     120-col wide palette (REGRESSION)
+PRIORITY: P3
+FEATURE:  pick ui
+
+STEPS
+  1. Wide terminal (≥160 cols).
+  2. ⌃O.
+
+VERIFY
+  - Picker box is wider than the commands palette.
+  - Accommodates long paths.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-012
+NAME:     Esc closes picker
+PRIORITY: P0
+FEATURE:  pick esc
+
+STEPS
+  1. ⌃O, press Esc.
+
+VERIFY
+  - Picker closes.
+  - Editor returns to prior state.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-013
+NAME:     First Esc clears filter if query non-empty
+PRIORITY: P2
+FEATURE:  pick esc
+
+STEPS
+  1. ⌃O, type "foo".
+  2. Press Esc.
+
+VERIFY
+  - Filter clears (query empty).
+  - Press Esc again: picker closes.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-014
+NAME:     Mouse click on file item opens it
+PRIORITY: P2
+FEATURE:  pick mouse
+
+STEPS
+  1. ⌃O, click a result.
+
+VERIFY
+  - Equivalent to Enter on that result.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-015
+NAME:     Tree auto-hides after single-file launch open
+PRIORITY: P3
+FEATURE:  pick tree
+RELATED:  bugs.md P3 "Tree hide"
+
+SETUP
+  Launch with `./zepto somefile.txt` (tree hidden default).
+
+STEPS
+  1. Press ⌃O, open a different file.
+
+VERIFY
+  - Tree briefly appears for picking, then auto-hides after selection
+    or Esc. (Per documented behavior.)
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-016
+NAME:     Global shortcuts work from picker (REGRESSION)
+PRIORITY: P1
+FEATURE:  pick global
+RELATED:  bugs.md P1 "Global shortcuts should work from any state"
+
+STEPS
+  1. ⌃O.
+  2. Press ⌃Q.
+
+VERIFY
+  - Picker closes; editor quit flow begins (prompt if dirty, else exit).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-017
+NAME:     No 10K file cap (all project files discoverable)
+PRIORITY: P3
+FEATURE:  pick scale
+
+SETUP
+  Large repo with >10K files.
+
+STEPS
+  1. ⌃O, type specific filename.
+
+VERIFY
+  - File found even at scale.
+  - Perhaps scoring capped at 5000 items for performance, but substring
+    filter continues over all.

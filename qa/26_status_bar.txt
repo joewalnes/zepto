@@ -1,0 +1,247 @@
+================================================================================
+26 — Status Bar
+================================================================================
+
+Covers: context-aware status bar (document/tree/find/prompt/footer), pill
+types (INFO/TOGGLE/SETTING/ACTION), priority-based progressive disclosure,
+mouse hover, clicks, cursor-pos pill, diff pill color, messages (no
+time-based).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-001
+NAME:     Cursor-pos pill shows line:col
+PRIORITY: P0
+FEATURE:  sbar cursor
+
+STEPS
+  1. Open file, move cursor around.
+
+VERIFY
+  - Leftmost pill: `⏵ 1:1 ⌃G` (or similar), updating as cursor moves.
+  - Width stable (does not resize on line changes — REGRESSION test).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-002
+NAME:     Cursor pill click opens goto line (REGRESSION)
+PRIORITY: P1
+FEATURE:  sbar mouse
+RELATED:  bugs.md P2 "Go-to-line new UI"
+
+STEPS
+  1. Click on the cursor-pos pill.
+
+VERIFY
+  - Inline input appears with current line:col pre-selected.
+  - Hint "line, line:col, or :col" shown.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-003
+NAME:     Cursor pill minimum width padded (REGRESSION)
+PRIORITY: P3
+FEATURE:  sbar
+RELATED:  bugs.md P2 "Line number indicator resizing"
+
+STEPS
+  1. Move cursor between line `:60` and line `:1`.
+
+VERIFY
+  - Pill width does not shrink — adjacent pills do NOT "jiggle".
+  - Padded with spaces to keep consistent.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-004
+NAME:     Commands palette pill always rightmost (REGRESSION)
+PRIORITY: P1
+FEATURE:  sbar palette
+RELATED:  bugs.md P2 "More prominent ctrl-space hint"
+
+STEPS
+  1. Observe status bar in any state.
+
+VERIFY
+  - `⌘ Commands ⌃␣` pill is always rightmost, visually distinct (blue
+    background).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-005
+NAME:     Toggle pills show ON/OFF visually
+PRIORITY: P1
+FEATURE:  sbar toggle
+
+STEPS
+  1. Toggle word wrap ⌥Z.
+  2. Observe Wrap pill.
+
+VERIFY
+  - ON: bright blue background.
+  - OFF: dimmed background.
+  - Same visual scheme for Minimap, Column Mode, Diff, Nerd Font, Theme.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-006
+NAME:     Priority disclosure drops low-priority pills
+PRIORITY: P2
+FEATURE:  sbar layout
+
+STEPS
+  1. Wide terminal — many pills visible.
+  2. Resize narrower.
+
+VERIFY
+  - Low-priority pills disappear first (P5 before P4, etc.).
+  - P1 (cursor pos + commands) always visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-007
+NAME:     Diff pill color matches VCS status of current line (REGRESSION)
+PRIORITY: P2
+FEATURE:  sbar diff
+RELATED:  bugs.md P2 "Diff view discoverability"
+
+SETUP
+  Git-tracked file with changes on various lines.
+
+STEPS
+  1. Move cursor onto an added line.
+  2. Observe diff pill.
+  3. Move to modified line.
+  4. Move to deleted line marker.
+  5. Move to unchanged line.
+
+VERIFY
+  - Added: green background.
+  - Modified: amber.
+  - Deleted: red.
+  - Unchanged: default gray.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-008
+NAME:     Find bar renders as status bar context
+PRIORITY: P1
+FEATURE:  sbar find
+
+STEPS
+  1. ⌃F.
+
+VERIFY
+  - Status bar shows find-context pills: Find input, ⌃R regex, ⌃C case,
+    ✗ Esc, ✓ Enter, match counter.
+  - On Esc: returns to document-context pills.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-009
+NAME:     Tree context shows pill hints (REGRESSION)
+PRIORITY: P2
+FEATURE:  sbar tree
+RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills"
+
+STEPS
+  1. Focus file tree.
+
+VERIFY
+  - Status bar shows pills: `↑↓ nav`, `←→ fold`, `↵ open`, `/ filter`,
+    `Esc back`.
+  - Each pill has icon and rounded caps (not plain text).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-010
+NAME:     Messages persist until next input (REGRESSION)
+PRIORITY: P1
+FEATURE:  sbar messages
+RELATED:  bugs.md P1 "Time-based temporary messages"
+
+STEPS
+  1. Trigger a save (⌃S) — message "Saved: file.txt".
+  2. Wait 10 seconds.
+  3. Press any key.
+
+VERIFY
+  - Message persists for 10s without auto-dismiss.
+  - Next user input clears it (or replaces with new message).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-011
+NAME:     Hover effect on pills (REGRESSION)
+PRIORITY: P2
+FEATURE:  sbar hover
+RELATED:  bugs.md P2 "Mouse hover effects"
+
+STEPS
+  1. Mouse over status bar pills (no click).
+
+VERIFY
+  - Pills brighten on hover.
+  - Return to normal on mouse leave.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-012
+NAME:     Click on pill executes command
+PRIORITY: P1
+FEATURE:  sbar mouse
+
+STEPS
+  1. Click on Wrap pill.
+  2. Click on Theme pill.
+  3. Click on Find pill.
+
+VERIFY
+  - Each click executes the associated command or toggle.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-013
+NAME:     Column mode pill shows selection dims
+PRIORITY: P3
+FEATURE:  sbar column
+
+SETUP
+  Column selection active.
+
+STEPS
+  1. Observe status bar.
+
+VERIFY
+  - Pill shows `COL 3×5` or current dimensions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-014
+NAME:     Multi-cursor count indicator
+PRIORITY: P2
+FEATURE:  sbar multi-cursor
+
+SETUP
+  3 cursors from ⌃D.
+
+STEPS
+  1. Observe status bar.
+
+VERIFY
+  - Pill shows "3 cursors" or similar count indicator.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-015
+NAME:     Bar extends to terminal edge (REGRESSION)
+PRIORITY: P3
+FEATURE:  sbar rendering
+RELATED:  bugs.md P3 "Screen width"
+
+STEPS
+  1. Observe rightmost column of status bar.
+
+VERIFY
+  - Status bar spans full terminal width (last column filled).
+  - No 1-column gap at right edge.

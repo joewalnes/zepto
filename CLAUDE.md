@@ -4,7 +4,7 @@
 
 ---
 
-## The 7 Rules
+## The 8 Rules
 
 Every commit must satisfy all of these. No exceptions.
 
@@ -68,6 +68,35 @@ When you find a bug (even while working on something else), add it to `bugs.md` 
 - Follow established conventions — don't invent new patterns without a good reason
 - Audit code for quality, architecture, and consistency as you work
 - Full standards and ongoing audit status: `docs/CODE_QUALITY.md`
+
+### 8. QA plan is kept current
+
+The `qa/` directory contains the end-to-end QA test plan — one test case
+per user-visible behavior. It is the executable spec that a QA engineer
+(or future you) uses to validate a release.
+
+**Every new feature, bug fix, or behavioral discovery must update the QA plan.**
+
+- **New feature**: add a test case to the appropriate `qa/NN_*.txt` file
+  covering happy path, key edge cases, and how to verify the feature is
+  discoverable from the UI.
+- **Bug fix (including regressions)**: add a `QA-REG-###` entry to
+  `qa/40_regression_bugs.txt` with a cross-ref to the primary feature
+  test. The regression file is a flat index of every fixed bug.
+- **Behavioral discovery**: when you learn something non-obvious about
+  how Zepto behaves (from code reading, user report, or interactive
+  testing), add a test case so it can't regress silently.
+- **Always update `qa/CATALOG.md`**: add the new test ID under the right
+  file's section. IDs are stable — never renumber. To retire a test,
+  mark it `[RETIRED]` in place rather than deleting.
+
+Test IDs are `QA-<TAG>-<NNN>` where `<TAG>` is the 3-6 char feature tag
+listed in `qa/CATALOG.md`. Use the next unused number within that tag.
+
+If a change doesn't warrant any QA update — which should be rare — say
+so explicitly rather than skipping silently (same rule as Rule 2).
+
+Full plan: `qa/README.md`.
 
 ---
 
@@ -154,7 +183,7 @@ hangon stop zepto
 - Only a direct user message counts. Stop hook messages do **not** count — they are automated infrastructure. If a hook fires asking to commit, inform the user there are uncommitted changes and ask if they want to commit.
 - Tests passing is not sufficient — the user must confirm changes work before committing
 
-### Pre-commit checklist — all 7 rules, every time, no exceptions
+### Pre-commit checklist — all 8 rules, every time, no exceptions
 
 Before every commit, verify each rule in order:
 
@@ -167,11 +196,12 @@ Before every commit, verify each rule in order:
 | 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
 | 6 | Bug tracking | Any bugs found (even incidentally) are recorded in `bugs.md` |
 | 7 | Code quality | Changes follow existing conventions; no new patterns introduced without reason |
+| 8 | QA plan current | New feature → new test case in the right `qa/NN_*.txt`. Bug fix → new `QA-REG-###` in `qa/40_regression_bugs.txt`. Discovery → corresponding test case. Update `qa/CATALOG.md` with new IDs. |
 
 If any rule is not satisfied:
 - **Do not commit.**
 - If a rule doesn't apply to the change (e.g. Rule 2 for a docs-only change), state that explicitly rather than silently skipping it.
-- "It's only a docs change" is not a blanket exemption — still run Rules 1, 3, and 7 at minimum.
+- "It's only a docs change" is not a blanket exemption — still run Rules 1, 3, 7, and 8 at minimum.
 
 ---
 
@@ -181,6 +211,8 @@ If any rule is not satisfied:
 |------|-------------|
 | `CLAUDE.md` | Rules change, workflow improves, new communication preferences |
 | `bugs.md` | Bug found or fixed |
+| `qa/*.txt` | **Every new feature, fix, or behavioral discovery** — see Rule 8 |
+| `qa/CATALOG.md` | Any new or retired QA test ID |
 | `docs/CODE_QUALITY.md` | New patterns, pitfalls, testing lessons |
 | `docs/SECURITY.md` | New security concerns or mitigations |
 | `docs/UI_GUIDELINES.md` | New UI standards or design decisions |

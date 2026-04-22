@@ -1,0 +1,105 @@
+================================================================================
+35 — Help & Documentation
+================================================================================
+
+Covers: F1 tutorial, About, Changelog, License commands; built-in embedded
+help docs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-001
+NAME:     F1 opens Tutorial
+PRIORITY: P1
+FEATURE:  help
+
+STEPS
+  1. Press F1.
+
+VERIFY
+  - A new tab (or overlay) opens with the tutorial.md contents.
+  - Markdown-rendered (emphasis, headings).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-002
+NAME:     Tutorial covers essentials
+PRIORITY: P2
+FEATURE:  help
+
+STEPS
+  1. Read the tutorial.
+
+VERIFY
+  - Covers: Opening files, Saving/Quitting, Navigation, Editing, Selection,
+    Command Palette, key features (Find, Find in Files, Diff, Transform,
+    Column, Tree, Theme, Word Wrap, Minimap, Recent, Multi-cursor).
+  - Kept current per changelog.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-003
+NAME:     About command
+PRIORITY: P3
+FEATURE:  help
+
+STEPS
+  1. Palette → "About Zepto".
+
+VERIFY
+  - Shows about.md content: version, license, attribution.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-004
+NAME:     Changelog command
+PRIORITY: P3
+FEATURE:  help
+
+STEPS
+  1. Palette → "Changelog".
+
+VERIFY
+  - Shows changelog.md content.
+  - Latest entries at top.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-005
+NAME:     License command
+PRIORITY: P3
+FEATURE:  help
+
+STEPS
+  1. Palette → "License & Credits".
+
+VERIFY
+  - Shows license.md content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-006
+NAME:     Doc commands present in palette under DOCUMENTATION section
+PRIORITY: P3
+FEATURE:  help palette
+
+STEPS
+  1. Open palette, scan.
+
+VERIFY
+  - Section header "DOCUMENTATION" visible.
+  - Four commands present: About, Tutorial, Changelog, License.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-HELP-007
+NAME:     Embedded docs work offline
+PRIORITY: P2
+FEATURE:  help offline
+
+STEPS
+  1. Disconnect network.
+  2. Launch zepto.
+  3. Press F1.
+
+VERIFY
+  - Tutorial displays fully (content embedded in binary via build.pl).

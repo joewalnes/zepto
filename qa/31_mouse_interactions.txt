@@ -1,0 +1,267 @@
+================================================================================
+31 — Mouse Interactions
+================================================================================
+
+Covers: click, click+drag, double/triple click, drag-to-resize tree,
+scroll wheel (in editor + tree), hover, click on all pill/palette regions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-001
+NAME:     Click positions cursor in text
+PRIORITY: P0
+FEATURE:  mouse click
+
+STEPS
+  1. Click at any visible position in the editor text area.
+
+VERIFY
+  - Cursor moves there.
+  - Any active selection is cleared.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-002
+NAME:     Shift+Click extends selection to position
+PRIORITY: P1
+FEATURE:  mouse selection
+
+SETUP
+  Cursor at col 5, line 2.
+
+STEPS
+  1. Hold Shift, click at col 20, line 5.
+
+VERIFY
+  - Selection spans from (2,5) to (5,20).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-003
+NAME:     Click+drag creates selection
+PRIORITY: P1
+FEATURE:  mouse selection
+
+STEPS
+  1. Press mouse button at (2,5), drag to (5,20), release.
+
+VERIFY
+  - Linear selection created across the range.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-004
+NAME:     Double-click selects word
+PRIORITY: P1
+FEATURE:  mouse
+RELATED:  QA-SEL-010
+
+STEPS
+  1. Double-click on a word.
+
+VERIFY
+  - Word selected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-005
+NAME:     Triple-click selects line
+PRIORITY: P1
+FEATURE:  mouse
+RELATED:  QA-SEL-011
+
+STEPS
+  1. Triple-click on a line.
+
+VERIFY
+  - Line selected (including newline).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-006
+NAME:     Scroll wheel scrolls viewport by 1 line (REGRESSION)
+PRIORITY: P2
+FEATURE:  mouse scroll
+RELATED:  bugs.md P2 "Line by line scrolling in editor"
+
+STEPS
+  1. Long file. Use scroll wheel.
+
+VERIFY
+  - Viewport scrolls 1 line per event (smooth).
+  - Cursor stays in place (viewport-only scrolling).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-007
+NAME:     Scroll wheel unrestricted by viewport (REGRESSION)
+PRIORITY: P2
+FEATURE:  mouse scroll
+RELATED:  bugs.md P2 "Scroll wheel cannot scroll more than a page"
+
+STEPS
+  1. Long file. Scroll down continuously.
+
+VERIFY
+  - Viewport keeps scrolling past cursor position without getting
+    stuck.
+  - Cursor remains at its original document position (it goes off-screen).
+  - Any non-scroll input (keystroke) snaps view back to cursor.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-008
+NAME:     Alt+drag starts column selection
+PRIORITY: P1
+FEATURE:  mouse column
+RELATED:  QA-COL-003
+
+STEPS
+  1. Hold Alt, click+drag.
+
+VERIFY
+  - Rectangular selection.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-009
+NAME:     Click on tab bar switches tabs
+PRIORITY: P1
+FEATURE:  mouse tab
+RELATED:  QA-TAB-007
+
+STEPS
+  1. Click on a tab.
+
+VERIFY
+  - That tab activated.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-010
+NAME:     Click on × closes tab
+PRIORITY: P1
+FEATURE:  mouse tab
+RELATED:  QA-TAB-006
+
+STEPS
+  1. Click × on a tab.
+
+VERIFY
+  - Tab closes (with prompt if dirty).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-011
+NAME:     Drag tab to reorder
+PRIORITY: P2
+FEATURE:  mouse tab
+RELATED:  QA-TAB-008
+
+STEPS
+  1. Click+drag a tab horizontally past its neighbors.
+
+VERIFY
+  - Tab reorders.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-012
+NAME:     Drag tree border resizes
+PRIORITY: P2
+FEATURE:  mouse tree
+RELATED:  QA-TREE-011
+
+STEPS
+  1. Drag the right border of the tree panel.
+
+VERIFY
+  - Tree width changes smoothly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-013
+NAME:     Click on status bar pill
+PRIORITY: P1
+FEATURE:  mouse sbar
+RELATED:  QA-SBAR-012
+
+STEPS
+  1. Click each kind of pill (toggle, action, cursor-pos, palette).
+
+VERIFY
+  - Each pill's associated action/toggle executes.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-014
+NAME:     Hover effects visible (REGRESSION)
+PRIORITY: P2
+FEATURE:  mouse hover
+RELATED:  bugs.md P2 "Mouse hover effects"
+
+STEPS
+  1. Move mouse over tabs, pills, tree rows (no click).
+
+VERIFY
+  - Each element highlights on hover.
+  - Returns to normal on mouse leave.
+  - Only re-renders when hover target changes (not every pixel).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-015
+NAME:     Click in gutter toggles hunk
+PRIORITY: P3
+FEATURE:  mouse gutter
+
+STEPS
+  1. Click on a VCS gutter marker.
+
+VERIFY
+  - Diff hunk expands/collapses.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-016
+NAME:     Mouse works in find/replace input fields
+PRIORITY: P2
+FEATURE:  mouse input
+
+STEPS
+  1. ⌃F, type query.
+  2. Click in the middle of the typed query.
+
+VERIFY
+  - Cursor moves within the input to the clicked position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-017
+NAME:     Mouse tracking cleanup on exit
+PRIORITY: P1
+FEATURE:  mouse
+RELATED:  QA-STRT-007
+
+STEPS
+  1. Launch zepto.
+  2. Quit.
+
+VERIFY
+  - Terminal mouse tracking is disabled on exit.
+  - Scrolling in parent shell works normally.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-018
+NAME:     Mouse hover uses ?1003 mode (REGRESSION)
+PRIORITY: P3
+FEATURE:  mouse tracking
+RELATED:  bugs.md P2 "Mouse hover effects"
+
+STEPS
+  1. Launch and move mouse without clicking.
+
+VERIFY
+  - Hover events fire (tabs/pills/tree highlight on motion).
+  - Terminal supports the ?1003 any-event mode (most modern terminals).

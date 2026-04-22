@@ -1,0 +1,225 @@
+================================================================================
+12 — Column (Rectangular) Selection
+================================================================================
+
+Covers: ⌥C toggle, column-selection arrows, Alt+drag, column cut/copy/
+paste, column + word wrap, mouse drag in column mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-001
+NAME:     ⌥C toggles column mode
+PRIORITY: P0
+FEATURE:  column
+
+STEPS
+  1. Open file, press ⌥C.
+
+VERIFY
+  - Status bar shows "COL" indicator (or column mode pill ON).
+  - Ruler bar also shows "COL" badge.
+  - Pressing ⌥C again exits column mode.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-002
+NAME:     Arrows extend column selection
+PRIORITY: P0
+FEATURE:  column
+
+SETUP
+  3 lines of identical length. ⌥C active. Cursor at line 1, col 1.
+
+STEPS
+  1. Press Shift-free Down 2 times.
+  2. Press Shift-free Right 4 times.
+
+VERIFY
+  - Rectangular selection across 3 lines × 4 columns.
+  - Status bar shows "COL 3×4" or similar.
+  - Selection background is a clean rectangle.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-003
+NAME:     Alt+drag starts column selection (from normal mode)
+PRIORITY: P1
+FEATURE:  column mouse
+
+STEPS
+  1. Normal mode, hold Alt, click at a position, drag to another.
+
+VERIFY
+  - Column mode is started implicitly.
+  - Rectangular selection tracks drag.
+  - On release, column selection remains; can continue with arrows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-004
+NAME:     Column copy then paste preserves rectangle
+PRIORITY: P1
+FEATURE:  column clipboard
+
+SETUP
+  Column selection over a 3×4 block containing:
+    abcd
+    efgh
+    ijkl
+
+STEPS
+  1. ⌃C.
+  2. Exit column mode (Esc).
+  3. Move cursor to another line.
+  4. ⌃V.
+
+VERIFY
+  - 3 lines inserted at cursor position.
+  - Each line contains its corresponding column chunk (abcd, efgh, ijkl).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-005
+NAME:     Column cut removes rectangle only
+PRIORITY: P1
+FEATURE:  column cut
+
+SETUP
+  Column selection over a 3×4 block within longer lines.
+
+STEPS
+  1. ⌃X.
+
+VERIFY
+  - Only the 3×4 rectangle is removed.
+  - Surrounding text on the same lines is preserved.
+  - Clipboard has the rectangle for paste.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-006
+NAME:     Column type inserts at all lines
+PRIORITY: P1
+FEATURE:  column edit
+
+SETUP
+  Column selection with zero-width (just cursor) on 3 lines.
+
+STEPS
+  1. Type "X".
+
+VERIFY
+  - "X" is inserted at each of the 3 lines at the cursor column.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-007
+NAME:     Esc exits column mode
+PRIORITY: P1
+FEATURE:  column esc
+
+SETUP
+  Column mode active with a selection.
+
+STEPS
+  1. Press Esc.
+
+VERIFY
+  - Column mode exits.
+  - Selection cleared.
+  - Status bar COL indicator gone.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-008
+NAME:     Mouse click toggles column indicator in ruler
+PRIORITY: P3
+FEATURE:  column mouse
+
+STEPS
+  1. Click the "COL" badge at the right of the ruler bar.
+
+VERIFY
+  - Column mode toggles (equivalent to ⌥C).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-009
+NAME:     Mouse drag in column mode (REGRESSION)
+PRIORITY: P2
+FEATURE:  column mouse
+RELATED:  bugs.md P3 "Column mode mouse selection"
+
+STEPS
+  1. Press ⌥C to enter column mode.
+  2. Click+drag in the text area.
+
+VERIFY
+  - Drag creates a rectangular selection (not linear).
+  - This works without holding Alt (column mode already toggled on).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-010
+NAME:     Column selection skips wrap continuation (REGRESSION)
+PRIORITY: P2
+FEATURE:  column wrap
+RELATED:  bugs.md P3 "Column selection should skip continuation lines"
+
+SETUP
+  Long lines. ⌥Z enabled (word wrap). ⌥C enabled (column).
+
+STEPS
+  1. Start column selection on line 1.
+  2. Press ⌥↓ a few times.
+
+VERIFY
+  - Selection moves across document lines, not visual rows.
+  - Continuation (wrapped) visual rows are skipped.
+  - Selection rectangle aligns by original document columns.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-011
+NAME:     Column selection zero-width on first activate
+PRIORITY: P3
+FEATURE:  column state
+
+STEPS
+  1. ⌥C.
+
+VERIFY
+  - A zero-width column selection shown at cursor (no text highlighted
+    yet).
+  - Arrow keys extend in any direction.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-012
+NAME:     Column mode respected in palette toggle
+PRIORITY: P2
+FEATURE:  column palette
+
+STEPS
+  1. Open palette, select "Column Mode" toggle.
+
+VERIFY
+  - Column mode toggles on/off.
+  - Toggle pill state updates.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-COL-013
+NAME:     Shift+Alt+Arrow does NOT enter column mode (REGRESSION)
+PRIORITY: P1
+FEATURE:  column conflict
+RELATED:  bugs.md P1 "Shift+Alt+Left/Right should select by word, not column select"
+
+STEPS
+  1. Normal mode.
+  2. Press Shift+Alt+Right.
+
+VERIFY
+  - Word-level selection is created.
+  - Column mode is NOT entered.
+  - This contrasts with historical buggy behavior.

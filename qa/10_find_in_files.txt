@@ -1,0 +1,273 @@
+================================================================================
+10 — Find in Files
+================================================================================
+
+Covers: Ctrl+Shift+F cross-file search, backends (git grep / rg / grep /
+perl), scope cycling (Tab/Shift+Tab), grouped results, clicking result.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-001
+NAME:     Ctrl+Shift+F opens find-in-files palette
+PRIORITY: P0
+FEATURE:  fif
+
+STEPS
+  1. Launch zepto in a directory with source files.
+  2. Press ⌃⇧F.
+
+VERIFY
+  - Palette opens in "find in files" mode.
+  - Title shows "Find in Files" or similar.
+  - Input field focused with empty query.
+  - Scope indicator shown (e.g. "project").
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-002
+NAME:     Query finds matches across files
+PRIORITY: P0
+FEATURE:  fif
+
+STEPS
+  1. ⌃⇧F, type a known string (e.g. "package Zepto").
+
+VERIFY
+  - Results appear, grouped by filename.
+  - Each group shows: filename header, then per-match line numbers +
+    context.
+  - Relative paths shown.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-003
+NAME:     Enter on result opens file at line
+PRIORITY: P1
+FEATURE:  fif nav
+
+STEPS
+  1. ⌃⇧F, type query, navigate to a result.
+  2. Press Enter.
+
+VERIFY
+  - Target file opens in a tab.
+  - Cursor is on the correct line and column.
+  - File tree expands to reveal the opened file (regression risk).
+  - Location is recorded in history (⌥- returns to previous location).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-004
+NAME:     Tab cycles scope forward
+PRIORITY: P2
+FEATURE:  fif scope
+
+STEPS
+  1. ⌃⇧F.
+  2. Press Tab.
+
+VERIFY
+  - Scope cycles forward (project → file's directory, or similar).
+  - Visible scope indicator updates.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-005
+NAME:     Shift+Tab cycles scope backward (REGRESSION)
+PRIORITY: P2
+FEATURE:  fif scope
+RELATED:  bugs.md P2 "Shift+Tab does same thing as Tab in find-in-files"
+
+STEPS
+  1. ⌃⇧F, press Tab twice.
+  2. Press Shift+Tab.
+
+VERIFY
+  - Scope cycles backward (reverse direction from Tab).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-006
+NAME:     Regex toggle works in find-in-files
+PRIORITY: P2
+FEATURE:  fif regex
+
+STEPS
+  1. ⌃⇧F, press ⌃R.
+  2. Type a regex like `\bdef\s+\w+`.
+
+VERIFY
+  - Results match the regex, not literal.
+  - Regex toggle pill shows ON.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-007
+NAME:     Case toggle in find-in-files
+PRIORITY: P2
+FEATURE:  fif case
+
+STEPS
+  1. ⌃⇧F, type "hello".
+  2. Press ⌃C to enable case-sensitive.
+
+VERIFY
+  - Results filter to only case-matching "hello".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-008
+NAME:     Uses git grep backend when available
+PRIORITY: P3
+FEATURE:  fif backend
+
+SETUP
+  Run inside a git repo; git is installed.
+
+STEPS
+  1. ⌃⇧F, type query.
+
+VERIFY
+  - Results return quickly.
+  - (Optional) Log message confirms "git grep" backend selected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-009
+NAME:     Falls back to rg when not in git repo
+PRIORITY: P3
+FEATURE:  fif backend
+
+SETUP
+  Directory without a git repo; ripgrep (rg) installed.
+
+STEPS
+  1. ⌃⇧F, type query.
+
+VERIFY
+  - Results still return quickly.
+  - Backend selection follows documented priority:
+    git grep → rg → grep → perl.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-010
+NAME:     Falls back to perl when no git/rg/grep
+PRIORITY: P3
+FEATURE:  fif backend
+
+SETUP
+  Constrained environment (e.g. container) with no git/rg/grep on PATH.
+
+STEPS
+  1. ⌃⇧F, type query.
+
+VERIFY
+  - Results still returned (via perl fallback).
+  - Performance may be slower but editor remains responsive.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-011
+NAME:     Large result set doesn't hang (background)
+PRIORITY: P2
+FEATURE:  fif performance
+
+STEPS
+  1. In a large codebase, ⌃⇧F, type a very common string (e.g. "return").
+
+VERIFY
+  - Partial results appear immediately.
+  - Editor accepts input (e.g. typing more characters).
+  - Process can be cancelled by Esc or by continuing to type.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-012
+NAME:     Clicking a result opens file
+PRIORITY: P2
+FEATURE:  fif mouse
+
+STEPS
+  1. ⌃⇧F, type query.
+  2. Click on a match row in the palette.
+
+VERIFY
+  - Equivalent to selecting + Enter: opens the file at the line.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-013
+NAME:     ReDoS protection in FIF
+PRIORITY: P2
+FEATURE:  fif security
+RELATED:  bugs.md P2 "ReDoS protection is length-only, no timeout"
+
+STEPS
+  1. ⌃⇧F, regex ON.
+  2. Paste a pattern > 1000 chars.
+  3. Or: try catastrophic backtracking pattern like `(a+)+$`.
+
+VERIFY
+  - Pattern rejected if too long.
+  - Alarm-based timeout kicks in, search aborts cleanly, editor stays
+    responsive.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-014
+NAME:     File path display uses cwd-relative path
+PRIORITY: P3
+FEATURE:  fif ui
+
+STEPS
+  1. ⌃⇧F, type query.
+
+VERIFY
+  - File path in result headers is relative to current working dir
+    (e.g. "lib/Zepto/Editor.pm", not a long absolute path).
+  - Long paths truncated from the start with … prefix if needed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-015
+NAME:     Esc closes find-in-files palette
+PRIORITY: P0
+FEATURE:  fif esc
+
+STEPS
+  1. ⌃⇧F, type query, press Esc.
+
+VERIFY
+  - Palette closes.
+  - Editor returns to prior state.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-016
+NAME:     Typing over existing palette replaces it
+PRIORITY: P2
+FEATURE:  fif state
+
+STEPS
+  1. ⌃Space, type "foo".
+  2. Without closing, press ⌃⇧F.
+
+VERIFY
+  - Palette mode switches to find-in-files.
+  - Previous filter replaced.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIF-017
+NAME:     Result includes line + context rendering
+PRIORITY: P3
+FEATURE:  fif ui
+
+STEPS
+  1. ⌃⇧F, type query.
+
+VERIFY
+  - Each match row shows: line number, context (line content) with
+    match highlighted.
+  - Highlight colors are visible in both dark and light themes.

@@ -1,0 +1,374 @@
+================================================================================
+03 — Core Editing
+================================================================================
+
+Covers: character insertion, delete/backspace, Enter+auto-indent, Tab/
+Shift+Tab, bracketed paste, dirty flag, cursor tracking.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-001
+NAME:     Insert plain ASCII
+PRIORITY: P0
+FEATURE:  insert
+
+SETUP
+  Launch with empty file: `./zepto /tmp/zqa_edit.txt`.
+
+STEPS
+  1. Type `hello world`.
+
+VERIFY
+  - Text appears at cursor position.
+  - Cursor advances after each character.
+  - Tab label shows modified indicator (●).
+  - Status bar cursor-pos pill updates (1:1 → 1:12).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-002
+NAME:     Insert UTF-8 / accented characters
+PRIORITY: P1
+FEATURE:  insert unicode
+
+STEPS
+  1. Type `café résumé naïve`.
+  2. Move cursor across the string with arrow keys.
+
+VERIFY
+  - Characters render correctly.
+  - Cursor moves 1 visual column per character (no byte-level off-by-one).
+  - Backspace deletes a whole character (not a byte).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-003
+NAME:     Insert CJK (wide characters)
+PRIORITY: P1
+FEATURE:  insert unicode wide
+
+STEPS
+  1. Paste or type `你好世界`.
+  2. Observe display and cursor.
+
+VERIFY
+  - Each CJK character occupies 2 visual columns.
+  - Cursor moves by 2 visual cols per character using arrow keys.
+  - Syntax highlighting positions stay aligned (see QA-SYN-*).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-004
+NAME:     Insert emoji
+PRIORITY: P2
+FEATURE:  insert unicode wide
+
+STEPS
+  1. Paste `Hello 🌍 world`.
+
+VERIFY
+  - Emoji renders without corrupting surrounding text.
+  - Cursor traverses correctly (emoji is usually width 2).
+  - No "Wide character in print" warning on stderr (regression of
+    P0 clipboard crash).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-005
+NAME:     Narrow Unicode symbols aligned (REGRESSION)
+PRIORITY: P2
+FEATURE:  insert unicode
+RELATED:  bugs.md P2 "Syntax highlighting misaligned on lines with ⌥, ⚠"
+
+STEPS
+  1. Type a line containing `⌥ ⚠ ✔ ▶` in a source file (e.g. .pl).
+
+VERIFY
+  - Each symbol occupies exactly 1 column.
+  - Text after them remains aligned.
+  - Syntax tokens (if any) do not shift right by 1 per symbol.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-006
+NAME:     Delete key at cursor
+PRIORITY: P0
+FEATURE:  delete
+
+SETUP
+  Type "abcdef", move cursor to position 3 (between `c` and `d`).
+
+STEPS
+  1. Press Delete.
+  2. Press Delete again.
+
+VERIFY
+  - First press deletes `d`, leaving `abcef`.
+  - Second press deletes `e`, leaving `abcf`.
+  - Cursor remains at position 3.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-007
+NAME:     Backspace deletes char before cursor
+PRIORITY: P0
+FEATURE:  delete
+
+SETUP
+  Type "abcdef", cursor at end.
+
+STEPS
+  1. Press Backspace twice.
+
+VERIFY
+  - Two characters removed, `abcd` remains.
+  - Cursor moves left with each press.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-008
+NAME:     Backspace at line start joins lines
+PRIORITY: P1
+FEATURE:  delete
+
+SETUP
+  Two lines: `foo\nbar`. Cursor at start of line 2 (before `b`).
+
+STEPS
+  1. Press Backspace.
+
+VERIFY
+  - Lines join: `foobar`.
+  - Cursor is positioned between `o` and `b`.
+  - Line count decreases by 1.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-009
+NAME:     Enter creates new line and auto-indents
+PRIORITY: P0
+FEATURE:  enter auto-indent
+
+SETUP
+  File with `    def foo():` (4 leading spaces), cursor at end.
+
+STEPS
+  1. Press Enter.
+
+VERIFY
+  - Cursor moves to line 2.
+  - Line 2 has 4 leading spaces (indent copied from previous line).
+  - Further typing appears at the indented position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-010
+NAME:     Enter on empty last line puts cursor on next line (REGRESSION)
+PRIORITY: P0
+FEATURE:  enter
+RELATED:  bugs.md P0 "New file Enter key puts cursor at beginning of current line"
+
+STEPS
+  1. Create new file with ⌃N.
+  2. Type `abc` (cursor at 1:4).
+  3. Press Enter.
+
+VERIFY
+  - Cursor moves to line 2, col 1.
+  - Does NOT go back to line 1, col 1.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-011
+NAME:     Tab inserts spaces (soft tabs default)
+PRIORITY: P1
+FEATURE:  tab
+
+SETUP
+  Default preferences (soft_tabs=1, tab_width=4).
+
+STEPS
+  1. Open empty file.
+  2. Press Tab.
+
+VERIFY
+  - 4 spaces inserted.
+  - Cursor at col 5.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-012
+NAME:     Tab indents a selection
+PRIORITY: P1
+FEATURE:  tab
+
+SETUP
+  3 lines, all selected with Shift+Arrow down.
+
+STEPS
+  1. Press Tab.
+
+VERIFY
+  - All 3 lines gain 4 leading spaces.
+  - Selection is preserved and extended to cover the new indents.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-013
+NAME:     Shift+Tab unindents a selection
+PRIORITY: P1
+FEATURE:  tab
+
+SETUP
+  3 lines, each indented with 4+ spaces. Selected.
+
+STEPS
+  1. Press Shift+Tab.
+
+VERIFY
+  - All 3 lines lose up to 4 leading spaces (but never go negative).
+  - Selection preserved.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-014
+NAME:     Tab on non-leading-whitespace inserts, doesn't indent
+PRIORITY: P2
+FEATURE:  tab
+
+SETUP
+  Line `hello|world` with cursor at the `|`.
+
+STEPS
+  1. Press Tab (no selection).
+
+VERIFY
+  - Tab/spaces are inserted at cursor position.
+  - Line becomes `hello    world` (or `hello\tworld` with hard tabs).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-015
+NAME:     Native terminal paste does not cascade indent (REGRESSION)
+PRIORITY: P1
+FEATURE:  paste
+RELATED:  bugs.md P1 "Native terminal paste (Cmd+V) causes cascading indentation"
+
+SETUP
+  File open. Clipboard contains multi-line indented text, e.g.:
+    def a():
+        return 1
+    def b():
+        return 2
+
+STEPS
+  1. Use terminal's native paste (Cmd+V on macOS, Shift+Insert elsewhere).
+
+VERIFY
+  - Pasted text retains its original indentation.
+  - Indent is NOT doubled/tripled on subsequent lines.
+  - Bracketed-paste mode correctly suppresses auto-indent during the paste.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-016
+NAME:     Typing invalidates WrapMap (REGRESSION)
+PRIORITY: P1
+FEATURE:  wrap cache
+RELATED:  bugs.md P0 sluggishness
+
+SETUP
+  Long line that would wrap when ⌥Z enabled.
+
+STEPS
+  1. Enable word wrap (⌥Z).
+  2. Type continuously (e.g. hold a key).
+
+VERIFY
+  - Typing is smooth, no stutter.
+  - Wrapped lines update in real time as the line grows.
+  - No "jumping" cursor.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-017
+NAME:     Dirty flag set on first edit
+PRIORITY: P1
+FEATURE:  dirty
+
+STEPS
+  1. Open existing file — tab has no ● indicator.
+  2. Type one character.
+
+VERIFY
+  - Tab title gains ● (modified marker) immediately.
+  - Remains until a successful save.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-018
+NAME:     Dirty flag cleared on save
+PRIORITY: P1
+FEATURE:  dirty
+
+STEPS
+  1. Modify the file (edit, as in QA-EDIT-017).
+  2. Press ⌃S.
+
+VERIFY
+  - ● indicator is removed from the tab title.
+  - Status message shows save confirmation.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-019
+NAME:     Cursor clamps at line/document bounds
+PRIORITY: P2
+FEATURE:  cursor
+
+STEPS
+  1. Press arrow keys in all directions from the first character.
+  2. Press arrow keys from the last character.
+
+VERIFY
+  - Left at col 1 of line 1: no-op (or wraps to prev line end).
+  - Down past last line: no-op or clamps.
+  - Right at end of last line: no-op or clamps.
+  - No cursor goes off-screen or into negative position.
+  - Check expected behavior matches typical editors.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-020
+NAME:     Long horizontal line scrolls viewport
+PRIORITY: P2
+FEATURE:  scroll
+
+SETUP
+  Word wrap OFF.
+
+STEPS
+  1. Type a long line wider than the viewport (e.g. 200 chars).
+  2. Move cursor to the end using End.
+
+VERIFY
+  - Viewport scrolls horizontally to keep cursor visible.
+  - Characters at left edge are clipped cleanly.
+  - No horizontal artifacts.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-021
+NAME:     Typing during active find preview does not corrupt buffer
+PRIORITY: P2
+FEATURE:  find
+RELATED:  QA-FIND-*
+
+STEPS
+  1. Open file, press ⌃F, type a search query.
+  2. Press Esc to dismiss find.
+  3. Type characters.
+
+VERIFY
+  - Buffer content reflects the typed characters, not remnants of find.
+  - No find highlights left on screen.

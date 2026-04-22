@@ -1,0 +1,217 @@
+================================================================================
+16 — Transform via Shell
+================================================================================
+
+Covers: ⌥T transform, pipes selection or current line through sh -c,
+replaces inline, error handling, hint text.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-001
+NAME:     ⌥T opens transform input
+PRIORITY: P1
+FEATURE:  transform
+
+STEPS
+  1. Open file. Press ⌥T.
+
+VERIFY
+  - Footer input appears with prompt and hint text.
+  - Hint shows example commands: `sort | uniq`, `tac`,
+    `python3 -m json.tool`.
+  - Input field focused.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-002
+NAME:     Transform selection with sort
+PRIORITY: P1
+FEATURE:  transform
+
+SETUP
+  Selection:
+    charlie
+    alpha
+    bravo
+
+STEPS
+  1. ⌥T, type "sort", Enter.
+
+VERIFY
+  - Selection replaced with:
+      alpha
+      bravo
+      charlie
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-003
+NAME:     No selection transforms current line
+PRIORITY: P1
+FEATURE:  transform default
+
+SETUP
+  Line `{"foo":"bar"}`. No selection.
+
+STEPS
+  1. ⌥T, type "python3 -m json.tool", Enter.
+
+VERIFY
+  - Current line replaced with pretty-printed JSON (multi-line).
+  - Dirty flag set.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-004
+NAME:     Piped commands work
+PRIORITY: P2
+FEATURE:  transform
+
+SETUP
+  Selection of 5 lines with duplicates.
+
+STEPS
+  1. ⌥T, type "sort | uniq", Enter.
+
+VERIFY
+  - Selection replaced with sorted + deduplicated text.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-005
+NAME:     Invalid command shows error
+PRIORITY: P2
+FEATURE:  transform error
+
+SETUP
+  Any selection.
+
+STEPS
+  1. ⌥T, type "nonexistentcmd123", Enter.
+
+VERIFY
+  - Status message shows error (e.g. "sh: nonexistentcmd123: not found").
+  - Selection is NOT replaced.
+  - Editor remains responsive.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-006
+NAME:     Command returns empty
+PRIORITY: P3
+FEATURE:  transform empty
+
+SETUP
+  Selection.
+
+STEPS
+  1. ⌥T, type "cat /dev/null", Enter.
+
+VERIFY
+  - Selection is replaced with empty content.
+  - Undo restores original.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-007
+NAME:     Long output handled
+PRIORITY: P2
+FEATURE:  transform
+
+SETUP
+  Selection of 1 line.
+
+STEPS
+  1. ⌥T, type "yes foo | head -n 100", Enter.
+
+VERIFY
+  - Selection replaced with 100 lines of "foo".
+  - No hang.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-008
+NAME:     Esc cancels transform
+PRIORITY: P1
+FEATURE:  transform cancel
+
+STEPS
+  1. ⌥T, type some command.
+  2. Press Esc.
+
+VERIFY
+  - Input closes.
+  - Selection/buffer unchanged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-009
+NAME:     UTF-8 preserved through transform
+PRIORITY: P2
+FEATURE:  transform unicode
+
+SETUP
+  Selection contains `café 你好`.
+
+STEPS
+  1. ⌥T, type "tee" (no-op pass-through), Enter.
+
+VERIFY
+  - Selection unchanged, no byte corruption.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-010
+NAME:     Transform undo
+PRIORITY: P1
+FEATURE:  transform undo
+
+STEPS
+  1. Apply a transform.
+  2. ⌃Z.
+
+VERIFY
+  - Original selection restored.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-011
+NAME:     Shell with pipes/redirects works
+PRIORITY: P2
+FEATURE:  transform
+
+STEPS
+  1. ⌥T, type "awk '{print NR\": \"$0}'".
+  2. Selection of 3 lines.
+
+VERIFY
+  - Each line prefixed with its number.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-012
+NAME:     Preserves trailing newline behavior
+PRIORITY: P3
+FEATURE:  transform newline
+
+STEPS
+  1. Selection that ends with newline.
+  2. Transform with no-op (e.g. tee).
+
+VERIFY
+  - Trailing newline preserved.
+  - No extra newline added.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-013
+NAME:     Transform command is discoverable
+PRIORITY: P2
+FEATURE:  transform palette
+
+STEPS
+  1. Open palette, search "transform".
+
+VERIFY
+  - "Transform via Shell" command present under EDIT section with ⌥T
+    shortcut.

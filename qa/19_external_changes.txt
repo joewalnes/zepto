@@ -1,0 +1,147 @@
+================================================================================
+19 — External Changes
+================================================================================
+
+Covers: mtime polling, silent reload for clean buffer, Reload/Keep prompt
+for dirty buffer, undo stack cleared on reload.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-001
+NAME:     Clean buffer silently reloads on external change (REGRESSION)
+PRIORITY: P0
+FEATURE:  reload
+RELATED:  bugs.md P0 "Editor does not detect or reload externally changed files"
+
+SETUP
+  Open /tmp/zqa_ext.txt with content "foo".
+  Do NOT modify in zepto.
+
+STEPS
+  1. In another terminal: `echo "bar" > /tmp/zqa_ext.txt`.
+  2. In zepto, press any key (or interact somehow).
+
+VERIFY
+  - Buffer silently updates to show "bar".
+  - No prompt.
+  - Cursor position preserved (clamped if file shrank).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-002
+NAME:     Dirty buffer shows prompt on external change
+PRIORITY: P0
+FEATURE:  reload prompt
+
+SETUP
+  Open /tmp/zqa_ext.txt. Modify (don't save) — dirty flag set.
+
+STEPS
+  1. In another terminal: `echo "external edit" > /tmp/zqa_ext.txt`.
+  2. Interact in zepto.
+
+VERIFY
+  - Prompt appears: "File changed on disk. [R]eload [K]eep local".
+  - Pressing R reloads (loses local edits).
+  - Pressing K dismisses prompt (local buffer preserved).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-003
+NAME:     Reload clears undo/redo stacks
+PRIORITY: P2
+FEATURE:  reload undo
+
+STEPS
+  1. Edit file (builds undo stack).
+  2. External edit + reload via R.
+  3. Press ⌃Z.
+
+VERIFY
+  - Undo stack is empty ("Nothing to undo" or no change).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-004
+NAME:     Keep local preserves buffer, next save overwrites
+PRIORITY: P1
+FEATURE:  reload keep
+
+STEPS
+  1. Dirty buffer, external change, prompt appears.
+  2. Press K.
+  3. ⌃S.
+
+VERIFY
+  - Prompt dismissed.
+  - Local buffer unchanged.
+  - Next save overwrites the external version.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-005
+NAME:     Prompt reappears if not resolved (persistent)
+PRIORITY: P2
+FEATURE:  reload
+
+SETUP
+  Dirty buffer + external change + prompt visible.
+
+STEPS
+  1. Click/press an arrow key to navigate (without answering prompt).
+  2. Continue to interact.
+
+VERIFY
+  - Prompt persists until R or K is pressed (or Esc).
+  - Not auto-dismissed by time.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-006
+NAME:     File deleted externally while open
+PRIORITY: P2
+FEATURE:  reload edge
+
+SETUP
+  Open /tmp/zqa_ext.txt.
+
+STEPS
+  1. External: `rm /tmp/zqa_ext.txt`.
+  2. Interact in zepto.
+
+VERIFY
+  - Editor doesn't crash.
+  - Buffer retained.
+  - Saving creates the file again (or shows a clear error).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-007
+NAME:     mtime polling debounced
+PRIORITY: P3
+FEATURE:  reload performance
+
+STEPS
+  1. Open file.
+  2. Rapidly interact (hold a key).
+
+VERIFY
+  - mtime is not checked on every render frame (debounced to ~1s).
+  - No observable performance hit.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EXT-008
+NAME:     VCS diff refreshes after external change
+PRIORITY: P2
+FEATURE:  reload vcs
+
+SETUP
+  Git-tracked file.
+
+STEPS
+  1. External commit (via git).
+  2. In zepto, interact.
+
+VERIFY
+  - Gutter markers refresh to reflect the new baseline.

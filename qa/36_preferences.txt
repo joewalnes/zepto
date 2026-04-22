@@ -1,0 +1,220 @@
+================================================================================
+36 — Preferences
+================================================================================
+
+Covers: the preferences system (defaults, global vs per-window), each key,
+persistence via StateStore, cross-instance sync.
+
+Reference: /Users/joe/src/zepto/lib/Zepto/Preferences.pm.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-001
+NAME:     All default preferences loaded on first launch
+PRIORITY: P2
+FEATURE:  pref defaults
+
+STEPS
+  1. Fresh environment (no persisted state).
+  2. Launch.
+  3. Observe default behaviors.
+
+VERIFY
+  - theme = dark, nerd_font = on, show_minimap = on, show_tree varies,
+    word_wrap = off, tab_width = 4, soft_tabs = on, auto_indent = on,
+    auto_complete = on, auto_pairs = on, render_markdown_tables = on,
+    ensure_final_newline = on, mouse_enabled = on, confirm_quit_unsaved = on.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-002
+NAME:     Theme persists across restart
+PRIORITY: P2
+FEATURE:  pref persistence
+RELATED:  QA-THM-006
+
+STEPS
+  1. ⌃T to light, quit, relaunch.
+
+VERIFY
+  - Light theme restored.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-003
+NAME:     Nerd font persists
+PRIORITY: P3
+FEATURE:  pref persistence
+
+STEPS
+  1. ⌥I off, quit, relaunch.
+
+VERIFY
+  - Started in off state.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-004
+NAME:     Minimap toggle persists
+PRIORITY: P3
+FEATURE:  pref persistence
+
+STEPS
+  1. ⌥M off, quit, relaunch.
+
+VERIFY
+  - Minimap hidden on next launch.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-005
+NAME:     Auto complete persists
+PRIORITY: P3
+FEATURE:  pref persistence
+
+STEPS
+  1. Palette → "Auto Complete" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Auto complete remains off.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-006
+NAME:     Auto pairs persists
+PRIORITY: P3
+FEATURE:  pref persistence
+
+STEPS
+  1. Palette → "Auto Pairs" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Auto pairs remains off.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-007
+NAME:     Tab width preference respected
+PRIORITY: P2
+FEATURE:  pref tab
+
+SETUP
+  Set tab_width = 2 via config (or test fixture).
+
+STEPS
+  1. Open empty file, press Tab.
+
+VERIFY
+  - 2 spaces inserted.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-008
+NAME:     Hard tabs when soft_tabs=0
+PRIORITY: P3
+FEATURE:  pref tab
+
+SETUP
+  soft_tabs = 0.
+
+STEPS
+  1. Press Tab.
+
+VERIFY
+  - Literal \t character inserted (visible as wider empty).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-009
+NAME:     Auto-indent on Enter respects preference
+PRIORITY: P2
+FEATURE:  pref indent
+
+SETUP
+  auto_indent = 0.
+
+STEPS
+  1. Line with 4 leading spaces. Cursor at end. Press Enter.
+
+VERIFY
+  - New line has 0 leading spaces (no auto-indent).
+  - Reverting to auto_indent = 1 restores indent-copy behavior.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-010
+NAME:     Cross-instance sync (REGRESSION)
+PRIORITY: P3
+FEATURE:  pref sync
+
+SETUP
+  Two zepto instances running simultaneously on the same user account.
+
+STEPS
+  1. In instance A, change theme (⌃T).
+  2. Interact in instance B.
+
+VERIFY
+  - Instance B's theme changes to match A (via StateStore change
+    notification).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-011
+NAME:     Preferences viewable in palette
+PRIORITY: P3
+FEATURE:  pref palette
+
+STEPS
+  1. Palette → search for toggle commands.
+
+VERIFY
+  - Each toggle command shows its current state (on/off or value).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-012
+NAME:     Word wrap default is per-filetype (REGRESSION)
+PRIORITY: P2
+FEATURE:  pref wrap filetype
+RELATED:  QA-WRAP-002
+RELATED:  QA-WRAP-003
+
+STEPS
+  1. Open .md — wrap ON.
+  2. Open .py — wrap OFF.
+
+VERIFY
+  - Per-filetype default applied.
+  - User toggle overrides at runtime.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-013
+NAME:     AI model/URL preferences
+PRIORITY: P3
+FEATURE:  pref ai
+
+STEPS
+  1. Check defaults: ai_api_url and ai_model.
+
+VERIFY
+  - Defaults match Preferences.pm (e.g. openrouter.ai, anthropic/claude-haiku).
+  - Can override via config (when persistent config file implemented).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-014
+NAME:     No persistent config file yet (DOC CHECK)
+PRIORITY: P3
+FEATURE:  pref persistence
+
+NOTES
+  bugs.md P2 "Persistent config file" is an open feature request. Until
+  implemented, preferences persist via StateStore (sqlite-like
+  $HOME/.local/share/zepto/state.store), NOT via ~/.config/zepto/config.toml.
+
+  Once config.toml support is added, add new tests here for loading,
+  saving, and priority order (CLI > env > config > defaults).

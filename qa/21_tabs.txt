@@ -1,0 +1,289 @@
+================================================================================
+21 — Tabs
+================================================================================
+
+Covers: tab bar rendering, open/close/reorder, direct jumps (⌥1-⌥9),
+next/prev (⌥./⌥,), close prompt, tab navigation hints, VCS tinting,
+modified dot, truncation, hover effects, scroll arrows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-001
+NAME:     Open two files shows tab bar with two tabs
+PRIORITY: P0
+FEATURE:  tab
+
+STEPS
+  1. ./zepto /tmp/a.txt /tmp/b.txt
+
+VERIFY
+  - Tab bar shows two tabs.
+  - First tab is active (brighter background).
+  - Tab labels show filenames with icons.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-002
+NAME:     Switch tabs with ⌥. and ⌥,
+PRIORITY: P0
+FEATURE:  tab nav
+
+STEPS
+  1. Two tabs open, tab 1 active.
+  2. Press ⌥.
+  3. Press ⌥,
+
+VERIFY
+  - ⌥. moves to tab 2.
+  - ⌥, moves back to tab 1.
+  - Content switches accordingly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-003
+NAME:     Direct tab jump ⌥1-⌥9
+PRIORITY: P1
+FEATURE:  tab nav
+
+SETUP
+  Three tabs open.
+
+STEPS
+  1. Press ⌥1, ⌥2, ⌥3.
+
+VERIFY
+  - ⌥1 activates tab 1.
+  - ⌥2 activates tab 2.
+  - ⌥3 activates tab 3.
+  - Each tab shows its ⌥N shortcut hint in the tab label.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-004
+NAME:     Close tab with ⌃W (clean)
+PRIORITY: P0
+FEATURE:  tab close
+
+STEPS
+  1. Three tabs open. Tab 2 is active.
+  2. Press ⌃W.
+
+VERIFY
+  - Tab 2 is closed.
+  - Remaining tabs (1 and 3) shown.
+  - Focus moves to a neighbor tab.
+  - No prompt (clean buffer).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-005
+NAME:     Close dirty tab shows save prompt
+PRIORITY: P0
+FEATURE:  tab close
+
+STEPS
+  1. Edit a file (dirty).
+  2. Press ⌃W.
+
+VERIFY
+  - Prompt: "Save changes to <name>? [S]ave [D]iscard [C]ancel".
+  - Pills with icons visible.
+  - S saves + closes, D closes without saving, C cancels.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-006
+NAME:     Close × button (mouse)
+PRIORITY: P1
+FEATURE:  tab mouse
+
+STEPS
+  1. Click the × on a tab.
+
+VERIFY
+  - Tab closes (with save prompt if dirty).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-007
+NAME:     Click tab to switch
+PRIORITY: P1
+FEATURE:  tab mouse
+
+STEPS
+  1. Click on an inactive tab.
+
+VERIFY
+  - That tab becomes active.
+  - Content switches.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-008
+NAME:     Tab reorder via drag (REGRESSION)
+PRIORITY: P2
+FEATURE:  tab drag
+
+STEPS
+  1. Click and drag a tab to the left or right past another tab.
+
+VERIFY
+  - Tabs reorder as cursor drags.
+  - Final order reflects drop position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-009
+NAME:     Modified dot appears on first edit
+PRIORITY: P1
+FEATURE:  tab dirty
+
+STEPS
+  1. Open clean file.
+  2. Type one character.
+
+VERIFY
+  - ● indicator appears on tab label.
+  - Cleared on save (⌃S).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-010
+NAME:     VCS-changed file tinted in tab name
+PRIORITY: P2
+FEATURE:  tab vcs
+
+SETUP
+  Git-tracked file with modifications.
+
+STEPS
+  1. Open.
+
+VERIFY
+  - Tab name has amber/yellow tint (VCS-changed).
+  - Clean file tabs show default color.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-011
+NAME:     Long tab name truncated with ellipsis
+PRIORITY: P2
+FEATURE:  tab truncation
+
+STEPS
+  1. Open file with long name like `supercalifragilisticexpialidocious.txt`.
+
+VERIFY
+  - Tab displays truncated name with `…`.
+  - Extension preserved where possible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-012
+NAME:     Tab bar scroll arrows at many tabs
+PRIORITY: P2
+FEATURE:  tab scroll
+
+STEPS
+  1. Open many tabs (say, 20 files).
+
+VERIFY
+  - Left/right scroll arrows appear at edges of tab bar.
+  - Clicking scroll arrow cycles visible tabs.
+  - Current active tab is always visible when activated.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-013
+NAME:     Tab bar nav hints visible (REGRESSION)
+PRIORITY: P3
+FEATURE:  tab ui
+RELATED:  bugs.md P2 "Non-obvious tab keys"
+
+STEPS
+  1. At least 1 tab open.
+  2. Observe right side of tab bar at wide terminal.
+
+VERIFY
+  - Right-aligned hints visible: `⌃W ×  ⌥, ←  ⌥. →`.
+  - Hints disappear at narrow widths.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-014
+NAME:     Hover on tab highlights it (REGRESSION)
+PRIORITY: P2
+FEATURE:  tab hover
+RELATED:  bugs.md P2 "Mouse hover effects"
+
+STEPS
+  1. Move mouse over inactive tab.
+
+VERIFY
+  - Background brightens slightly on hover.
+  - Returns to normal on mouse leave.
+  - Works without button press.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-015
+NAME:     Click on tab bar unfocuses file tree (REGRESSION)
+PRIORITY: P1
+FEATURE:  tab tree
+RELATED:  bugs.md P0 "File tree click on tab should unfocus tree"
+
+STEPS
+  1. File tree focused (after ⌃B or click in tree).
+  2. Click on a tab.
+
+VERIFY
+  - Tab becomes active.
+  - Tree is unfocused (focus moves to editor).
+  - Status bar shows document-context pills (not tree hints).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-016
+NAME:     Closing last tab quits or leaves empty tab
+PRIORITY: P2
+FEATURE:  tab close
+
+STEPS
+  1. Single tab open.
+  2. ⌃W.
+
+VERIFY
+  - Editor either quits, or leaves one empty untitled tab per spec.
+  - Consistent and non-crashing behavior.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-017
+NAME:     Tab bar cache includes theme (REGRESSION)
+PRIORITY: P2
+FEATURE:  tab theme
+RELATED:  bugs.md P2 "Light mode tab bar stays dark after theme switch"
+
+STEPS
+  1. Start in dark theme.
+  2. Observe tab bar colors.
+  3. Press ⌃T to switch to light.
+
+VERIFY
+  - Tab bar immediately updates to light theme colors.
+  - No stale dark-theme tabs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TAB-018
+NAME:     Ctrl+Shift+PgUp / Ctrl+Shift+PgDn moves tabs
+PRIORITY: P3
+FEATURE:  tab reorder-key
+
+STEPS
+  1. 3 tabs, tab 2 active.
+  2. Press Ctrl+Shift+PgUp.
+
+VERIFY
+  - Tab 2 moves left (swap with tab 1).
+  - Tab 2 remains active.

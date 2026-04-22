@@ -1,0 +1,216 @@
+================================================================================
+02 — Startup and Quit
+================================================================================
+
+Covers: initial render, alternate screen buffer usage, clean exit,
+unsaved-changes prompt, terminal restoration on crash.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-001
+NAME:     Startup under 100ms (first render)
+PRIORITY: P1
+FEATURE:  performance
+
+STEPS
+  1. Time the command: `time ./zepto /tmp/small.txt` (Ctrl+Q immediately).
+  2. Use a separate timer if possible to measure time-to-first-render.
+
+VERIFY
+  - Time from launch to first visible render is under ~100ms on a
+    typical machine.
+  - No noticeable flash of unstyled content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-002
+NAME:     Alternate screen buffer does not clobber scrollback
+PRIORITY: P0
+FEATURE:  terminal
+
+SETUP
+  In a fresh terminal, run `ls -la` or similar to produce scrollback.
+
+STEPS
+  1. Run `./zepto`.
+  2. Do some work (type, navigate).
+  3. Press ⌃Q to quit.
+
+VERIFY
+  - After quitting, the terminal shows the previous `ls` output — the
+    editor content did NOT persist to scrollback.
+  - Cursor is positioned at the shell prompt, below the previous output.
+  - No stray escape sequences visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-003
+NAME:     Clean quit with no unsaved changes
+PRIORITY: P0
+FEATURE:  quit
+
+STEPS
+  1. Run `./zepto /tmp/zqa_a.txt`.
+  2. Press ⌃Q.
+
+VERIFY
+  - Editor exits immediately.
+  - No save prompt.
+  - Exit code 0.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-004
+NAME:     Quit with unsaved changes prompts
+PRIORITY: P0
+FEATURE:  quit
+
+STEPS
+  1. Run `./zepto /tmp/zqa_a.txt`.
+  2. Type "hello".
+  3. Press ⌃Q.
+
+VERIFY
+  - A prompt appears (amber background, pill buttons) asking to save
+    changes.
+  - Options shown: Save (S), Discard (D), Cancel (C), each with icon.
+  - Pressing S saves and exits.
+  - Pressing D exits without saving.
+  - Pressing C or Esc returns to editing.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-005
+NAME:     Quit prompt persists (not time-based)
+PRIORITY: P1
+FEATURE:  quit
+RELATED:  QA-PRMT-*
+
+STEPS
+  1. Trigger unsaved-changes prompt (as above).
+  2. Wait 10 seconds without pressing anything.
+
+VERIFY
+  - Prompt remains on screen.
+  - Does NOT auto-dismiss.
+  - Per UI guideline: "No time-based temporary messages."
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-006
+NAME:     Multi-tab quit with dirty tabs
+PRIORITY: P1
+FEATURE:  quit
+
+STEPS
+  1. Open two files, modify both.
+  2. Press ⌃Q.
+
+VERIFY
+  - Prompt iterates through dirty tabs, one at a time.
+  - Each tab shows its own Save/Discard/Cancel prompt.
+  - After all resolved (save or discard), editor exits.
+  - Cancel at any point aborts the quit.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-007
+NAME:     Terminal is restored on clean exit
+PRIORITY: P0
+FEATURE:  terminal
+
+STEPS
+  1. Launch zepto, do work.
+  2. Quit via ⌃Q.
+
+VERIFY
+  - Terminal cursor is visible (not hidden).
+  - Mouse tracking is disabled (scrolling in other app works).
+  - Bracketed-paste mode is disabled.
+  - Text entered in shell renders normally, no escape sequences.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-008
+NAME:     Terminal is restored on crash (regression)
+PRIORITY: P1
+FEATURE:  terminal
+
+STEPS
+  1. Launch `./zepto /tmp/zqa_a.txt`.
+  2. Kill with SIGTERM from another terminal: `kill -TERM <pid>`.
+  3. Or: force a runtime error (e.g. open a file with a path containing
+     only permission-denied parents).
+
+VERIFY
+  - Terminal is restored — cursor visible, no raw mode, no mouse tracking.
+  - A crash report file is written (path is printed on exit) if an
+    unhandled exception occurred.
+  - Scrollback is intact.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-009
+NAME:     No screen artifacts above cursor after quit (REGRESSION)
+PRIORITY: P2
+FEATURE:  terminal
+RELATED:  bugs.md P2 "Screen artifacts remain above cursor after quitting" — 788ec6d
+
+STEPS
+  1. In a terminal where the alternate screen buffer behavior is
+     imperfect (e.g. some terminals not fully restoring main screen).
+  2. Launch zepto, scroll content so editor fills the window.
+  3. Quit with ⌃Q.
+
+VERIFY
+  - After quit, NO lines from the editor remain visible above the shell
+    prompt.
+  - The CLEAR_SCREEN + CURSOR_HOME + ALT_SCREEN_OFF sequence should
+    produce a clean exit regardless of terminal.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-010
+NAME:     Re-launch after crash still works
+PRIORITY: P1
+FEATURE:  reliability
+
+STEPS
+  1. Cause a crash (QA-STRT-008).
+  2. Immediately relaunch `./zepto`.
+
+VERIFY
+  - Startup is clean, no leftover state issues.
+  - Recent files list is preserved if possible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-011
+NAME:     Window resize during startup
+PRIORITY: P2
+FEATURE:  resize
+
+STEPS
+  1. Launch zepto in a terminal.
+  2. Quickly resize the terminal (make it narrower, then wider).
+
+VERIFY
+  - Editor re-renders correctly at each size.
+  - Status bar pills drop off / reappear per priority disclosure.
+  - No stray characters left over.
+  - File tree disappears at very narrow widths before minimap.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-STRT-012
+NAME:     Tutorial on first launch (if implemented)
+PRIORITY: P3
+FEATURE:  launch
+
+STEPS
+  1. Remove any persisted state (e.g. rm -rf ~/.config/zepto).
+  2. Launch `./zepto`.
+
+VERIFY
+  - First-launch behavior is predictable (no crash).
+  - Pressing F1 opens the tutorial.

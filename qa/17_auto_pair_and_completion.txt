@@ -1,0 +1,322 @@
+================================================================================
+17 — Auto-Pair & Completion
+================================================================================
+
+Covers: auto-pair brackets/quotes, skip-over on matching close, ghost-text
+completion (buffer word + snippet + recent + AI), completion menu.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-001
+NAME:     Typing `(` inserts `()` and places cursor between
+PRIORITY: P1
+FEATURE:  auto-pair
+
+SETUP
+  Preference auto_pairs = ON.
+
+STEPS
+  1. Empty buffer.
+  2. Type `(`.
+
+VERIFY
+  - Buffer shows `()`.
+  - Cursor is between `(` and `)`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-002
+NAME:     Typing `{` inserts `{}`
+PRIORITY: P1
+FEATURE:  auto-pair
+
+STEPS
+  1. Type `{`.
+
+VERIFY
+  - Buffer: `{}`. Cursor between.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-003
+NAME:     Typing `[` inserts `[]`
+PRIORITY: P1
+FEATURE:  auto-pair
+
+STEPS
+  1. Type `[`.
+
+VERIFY
+  - Buffer: `[]`. Cursor between.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-004
+NAME:     Typing `"` inserts `""`
+PRIORITY: P1
+FEATURE:  auto-pair quote
+
+STEPS
+  1. Type `"`.
+
+VERIFY
+  - Buffer: `""`. Cursor between.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-005
+NAME:     Closing bracket skipped over if already at cursor
+PRIORITY: P2
+FEATURE:  auto-pair skip
+
+SETUP
+  Buffer: `()`. Cursor between.
+
+STEPS
+  1. Type `)`.
+
+VERIFY
+  - Buffer remains `()`.
+  - Cursor moves to after `)`.
+  - No duplicate `))`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-006
+NAME:     Quote skip-over uses odd-count heuristic (REGRESSION)
+PRIORITY: P2
+FEATURE:  auto-pair quote
+RELATED:  bugs.md P2 "Auto-pair quote skip-over is disabled"
+
+STEPS
+  1. Type `"`. Buffer: `""`. Cursor between.
+  2. Type `hello` (cursor inside `"hello"`).
+  3. Type `"`.
+
+VERIFY
+  - Cursor jumps over the closing `"` — result: `"hello"` with cursor
+    after `"`.
+  - Does NOT produce `"hello""`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-007
+NAME:     Auto-pair disabled when toggle off
+PRIORITY: P2
+FEATURE:  auto-pair pref
+
+STEPS
+  1. Palette → "Auto Pairs" toggle OFF.
+  2. Type `(`.
+
+VERIFY
+  - Only `(` inserted, no `)` added.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-008
+NAME:     Backspace on auto-pair removes both
+PRIORITY: P2
+FEATURE:  auto-pair
+
+SETUP
+  Buffer: `()`. Cursor between.
+
+STEPS
+  1. Press Backspace.
+
+VERIFY
+  - Buffer empty.
+  - Both characters removed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-009
+NAME:     Auto-complete dropdown triggers after pause
+PRIORITY: P2
+FEATURE:  completion
+
+SETUP
+  auto_complete ON. Buffer has `function foo() { const longVar = 1; }`.
+
+STEPS
+  1. On a new line, type `long`, pause ~500ms.
+
+VERIFY
+  - A dropdown menu appears or ghost text shown.
+  - Menu includes "longVar" (from buffer words).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-010
+NAME:     Tab accepts full completion
+PRIORITY: P2
+FEATURE:  completion
+
+SETUP
+  Ghost text "longVar" after partial "long".
+
+STEPS
+  1. Press Tab.
+
+VERIFY
+  - "long" expands to "longVar".
+  - Cursor positioned after "r".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-011
+NAME:     Right arrow accepts one char (REGRESSION)
+PRIORITY: P3
+FEATURE:  completion
+RELATED:  bugs.md P2 "Right arrow accepts entire ghost text"
+
+STEPS
+  1. Ghost text "longVar" after "long".
+  2. Press Right arrow.
+
+VERIFY
+  - Partial text extends by one character: "longV" now in buffer.
+  - Ghost text shows remaining "ar".
+  - Continue pressing Right to accept char-by-char.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-012
+NAME:     Esc dismisses completion
+PRIORITY: P1
+FEATURE:  completion
+
+STEPS
+  1. Ghost text shown.
+  2. Press Esc.
+
+VERIFY
+  - Ghost text hidden.
+  - Buffer unchanged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-013
+NAME:     Up/Down navigates completion menu
+PRIORITY: P3
+FEATURE:  completion menu
+
+STEPS
+  1. Ghost text showing a menu of 3+ options.
+  2. Press Down, Up.
+
+VERIFY
+  - Selection moves within the menu.
+  - Highlighted item updates.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-014
+NAME:     Enter accepts menu selection
+PRIORITY: P3
+FEATURE:  completion menu
+
+STEPS
+  1. Menu showing. Select a specific item.
+  2. Press Enter.
+
+VERIFY
+  - Selected completion inserted.
+  - Menu closes.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-015
+NAME:     Completion menu does not break undo/redo (REGRESSION)
+PRIORITY: P1
+FEATURE:  completion undo
+RELATED:  bugs.md P0 "Perl warning on undo/redo near end-of-line"
+
+STEPS
+  1. Accept a completion.
+  2. Press ⌃Z, then ⌃Y.
+
+VERIFY
+  - No stderr warnings.
+  - Undo/redo works correctly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-016
+NAME:     Snippet completion triggers on known keywords
+PRIORITY: P3
+FEATURE:  completion snippet
+
+SETUP
+  Python file, auto_complete ON.
+
+STEPS
+  1. Type `def`.
+  2. Pause.
+
+VERIFY
+  - Snippet suggestion may appear (e.g. `def name():` template).
+  - Accepting fills the template.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-017
+NAME:     Recent-pick remembered
+PRIORITY: P3
+FEATURE:  completion recent
+
+STEPS
+  1. Accept completion "foo_bar".
+  2. Later, type "foo".
+
+VERIFY
+  - "foo_bar" is preferred in ghost text (recent provider boost).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-018
+NAME:     AI completion enabled
+PRIORITY: P3
+FEATURE:  completion ai
+
+SETUP
+  AI Completion configured (palette → "AI Completion: Setup").
+
+STEPS
+  1. Type in a source file, pause.
+
+VERIFY
+  - AI suggestion appears as ghost text (may take longer than buffer
+    word completion).
+  - Rate-limited to ~12 requests/minute per docs.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-019
+NAME:     Completion off by toggle
+PRIORITY: P2
+FEATURE:  completion pref
+
+STEPS
+  1. Palette → "Auto Complete" toggle OFF.
+  2. Type a common word prefix.
+
+VERIFY
+  - No ghost text, no menu appears.
+  - Typing is unaffected otherwise.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-020
+NAME:     Completion doesn't interfere with paste (REGRESSION)
+PRIORITY: P2
+FEATURE:  completion paste
+
+STEPS
+  1. auto_complete ON.
+  2. Paste a long word fragment from clipboard.
+
+VERIFY
+  - Paste goes through cleanly.
+  - Completion does NOT trigger mid-paste with cascading suggestions.

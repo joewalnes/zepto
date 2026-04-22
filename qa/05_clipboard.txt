@@ -1,0 +1,242 @@
+================================================================================
+05 — Clipboard
+================================================================================
+
+Covers: cut, copy, paste, UTF-8 preservation, no-selection = line, column
+clipboard, OSC 52, system integration (pbcopy/xclip/wl-paste).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-001
+NAME:     Copy then paste within editor (ASCII)
+PRIORITY: P0
+FEATURE:  copy paste
+
+STEPS
+  1. Type "hello".
+  2. Select "ell" with Shift+Arrow.
+  3. Press ⌃C.
+  4. Move cursor to end of line.
+  5. Press ⌃V.
+
+VERIFY
+  - Line becomes "helloell".
+  - No garbled characters.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-002
+NAME:     Cut removes and stores
+PRIORITY: P0
+FEATURE:  cut
+
+STEPS
+  1. Type "hello world".
+  2. Select "world".
+  3. Press ⌃X.
+  4. Move cursor elsewhere, press ⌃V.
+
+VERIFY
+  - Original line became "hello ".
+  - Pasted "world" appears at new location.
+  - Dirty flag set.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-003
+NAME:     Copy with no selection copies current line
+PRIORITY: P1
+FEATURE:  copy line
+
+STEPS
+  1. On a line containing "hello", no selection.
+  2. Press ⌃C.
+  3. Move to a different line, press ⌃V.
+
+VERIFY
+  - Entire line (including newline) is pasted.
+  - Result: new line inserted with "hello" content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-004
+NAME:     Cut with no selection removes current line
+PRIORITY: P1
+FEATURE:  cut line
+
+STEPS
+  1. On line containing "delete me".
+  2. Press ⌃X (no selection).
+
+VERIFY
+  - The entire line is removed from the buffer.
+  - Clipboard now contains that line's content + newline.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-005
+NAME:     Paste UTF-8 from external app (REGRESSION)
+PRIORITY: P1
+FEATURE:  paste unicode
+RELATED:  bugs.md P1 "Pasting from system clipboard corrupts Unicode"
+
+SETUP
+  Copy `café 你好 🌍` to system clipboard from an external application.
+
+STEPS
+  1. Open zepto.
+  2. Press ⌃V.
+
+VERIFY
+  - Characters appear correctly.
+  - No byte-level corruption (e.g. "cafÃ©").
+  - Works on macOS (pbpaste), Linux X11 (xclip), Wayland (wl-paste).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-006
+NAME:     Copy CJK/emoji doesn't crash (REGRESSION)
+PRIORITY: P0
+FEATURE:  copy unicode
+RELATED:  bugs.md P0 "Copying double-width characters crashes editor"
+
+STEPS
+  1. Type `你好 🌍`.
+  2. Select all (⌃A).
+  3. Press ⌃C.
+
+VERIFY
+  - No "Wide character in subroutine entry" error.
+  - Editor remains stable.
+  - System clipboard contains the copied text (verify by pasting elsewhere).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-007
+NAME:     Column copy/paste preserves rectangle
+PRIORITY: P1
+FEATURE:  column paste
+RELATED:  QA-COL-*
+
+SETUP
+  File with 3 lines of 10 chars each.
+
+STEPS
+  1. Enter column mode (⌥C).
+  2. Select a 3×4 block with arrow keys.
+  3. Press ⌃C.
+  4. Exit column mode (Esc).
+  5. Move cursor to another line.
+  6. Paste with ⌃V.
+
+VERIFY
+  - A rectangular block is inserted at the cursor.
+  - Each line of the clipboard contents appears on its own line.
+  - Behavior matches typical column-paste semantics.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-008
+NAME:     Paste in middle of word inserts cleanly
+PRIORITY: P2
+FEATURE:  paste
+
+STEPS
+  1. Type "abcdef".
+  2. Move cursor between `c` and `d`.
+  3. Paste "XX".
+
+VERIFY
+  - Result: "abcXXdef".
+  - Cursor is after the inserted text.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-009
+NAME:     Paste replaces selection
+PRIORITY: P1
+FEATURE:  paste
+
+STEPS
+  1. Type "hello world".
+  2. Select "world".
+  3. Paste "moon" (from clipboard).
+
+VERIFY
+  - Line becomes "hello moon".
+  - Selection is replaced atomically (single undo).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-010
+NAME:     Copy, quit, relaunch, paste
+PRIORITY: P3
+FEATURE:  clipboard persistence
+
+STEPS
+  1. Open zepto, type & copy "xyz".
+  2. Quit.
+  3. Relaunch, paste.
+
+VERIFY
+  - "xyz" is still in system clipboard.
+  - Pastes correctly (depends on OS clipboard persistence).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-011
+NAME:     OSC 52 clipboard over SSH
+PRIORITY: P3
+FEATURE:  clipboard osc52
+
+SETUP
+  SSH session to a remote host where zepto is installed. Terminal
+  emulator must support OSC 52 (iTerm2, Kitty, WezTerm).
+
+STEPS
+  1. Launch zepto on remote host.
+  2. Type and copy some text.
+
+VERIFY
+  - Text appears in the local clipboard.
+  - Works without X11 forwarding.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-012
+NAME:     Paste very large text
+PRIORITY: P2
+FEATURE:  paste performance
+
+SETUP
+  Copy a large buffer (e.g. 1MB of text) to clipboard.
+
+STEPS
+  1. Paste into zepto.
+
+VERIFY
+  - Paste completes in reasonable time (seconds, not minutes).
+  - Editor remains responsive during paste.
+  - Resulting buffer is navigable.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLIP-013
+NAME:     Cut/copy/paste in find bar
+PRIORITY: P2
+FEATURE:  input clipboard
+RELATED:  QA-FIND-*
+
+STEPS
+  1. Press ⌃F.
+  2. Type a query.
+  3. Select all (⌃A) in find field.
+  4. Press ⌃X.
+
+VERIFY
+  - Field is cleared.
+  - Query is in clipboard.
+  - Paste (⌃V) into field restores it.
+
+NOTES
+  In find-bar context, ⌃C is repurposed for case toggle.

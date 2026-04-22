@@ -1,0 +1,175 @@
+================================================================================
+24 — Recent Files (Ctrl+E)
+================================================================================
+
+Covers: ⌃E recent files picker, persistence to StateStore, MRU sort, temp-
+file filter, size cap.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-001
+NAME:     ⌃E opens recent files list
+PRIORITY: P0
+FEATURE:  recent
+
+STEPS
+  1. Open and close several files.
+  2. Press ⌃E.
+
+VERIFY
+  - Palette opens in "recent_files" mode.
+  - Title shows "Recent Files" with ⌃E glyph.
+  - List includes recently-opened files, MRU first.
+  - Each item shows icon, filename, directory.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-002
+NAME:     Most recent file on top
+PRIORITY: P1
+FEATURE:  recent mru
+
+STEPS
+  1. Open files A, B, C in sequence.
+  2. ⌃E.
+
+VERIFY
+  - Order: C, B, A (most recent first).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-003
+NAME:     Enter opens selected file
+PRIORITY: P0
+FEATURE:  recent open
+
+STEPS
+  1. ⌃E, navigate to a file, Enter.
+
+VERIFY
+  - File opens in tab.
+  - Also added to top of recent list on next invocation.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-004
+NAME:     Recent persists across restart (REGRESSION)
+PRIORITY: P1
+FEATURE:  recent persistence
+
+SETUP
+  Delete ~/.config/zepto/recent_files (or StateStore recent_files).
+
+STEPS
+  1. Open file X.
+  2. Quit zepto.
+  3. Relaunch.
+  4. ⌃E.
+
+VERIFY
+  - X appears in the recent list.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-005
+NAME:     Temp files filtered out (REGRESSION)
+PRIORITY: P2
+FEATURE:  recent temp-filter
+RELATED:  bugs.md P2 "history.json recent_files cluttered with temp files"
+
+SETUP
+  Open a file from /tmp (e.g. ./zepto /tmp/throwaway.txt).
+
+STEPS
+  1. Quit.
+  2. Relaunch, press ⌃E.
+
+VERIFY
+  - /tmp/throwaway.txt is NOT in the recent list.
+  - Same for /private/tmp/* and /var/folders/*.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-006
+NAME:     Non-existent files gracefully skipped
+PRIORITY: P2
+FEATURE:  recent cleanup
+
+SETUP
+  Open /tmp/zqa_recent.txt, quit. External: `rm /tmp/zqa_recent.txt`.
+
+STEPS
+  1. Relaunch, ⌃E.
+
+VERIFY
+  - Either: file is not shown, OR shown but Enter gives a clean error.
+  - No crash.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-007
+NAME:     Cursor aligned in recent picker input (REGRESSION)
+PRIORITY: P1
+FEATURE:  recent ui
+RELATED:  bugs.md P1 "Incorrect cursor placement"
+
+STEPS
+  1. ⌃E, type.
+
+VERIFY
+  - Terminal cursor aligned with typed character position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-008
+NAME:     Recent list size cap (max 50)
+PRIORITY: P3
+FEATURE:  recent cap
+
+STEPS
+  1. Open 60 different files over a session.
+  2. ⌃E.
+
+VERIFY
+  - List shows at most 50 items (oldest dropped).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-009
+NAME:     Fuzzy filter works in recent list
+PRIORITY: P2
+FEATURE:  recent fuzzy
+
+STEPS
+  1. ⌃E, type filename substring.
+
+VERIFY
+  - Matching files filter incrementally.
+  - Match highlights shown.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-010
+NAME:     File tree reveals file opened from recents
+PRIORITY: P2
+FEATURE:  recent tree
+
+STEPS
+  1. Tree visible.
+  2. ⌃E, open a file.
+
+VERIFY
+  - Tree auto-reveals and highlights the opened file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-011
+NAME:     120-col wide palette for recent (REGRESSION)
+PRIORITY: P3
+FEATURE:  recent ui
+
+STEPS
+  1. Wide terminal, ⌃E.
+
+VERIFY
+  - Picker wider than commands palette.

@@ -1,0 +1,244 @@
+================================================================================
+08 — Go To Line & Location History
+================================================================================
+
+Covers: Ctrl+G goto line (line, line:col, :col formats), inline cursor-
+position pill editor, back/forward navigation history.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-001
+NAME:     Ctrl+G opens goto line input
+PRIORITY: P0
+FEATURE:  goto
+
+STEPS
+  1. Open a file, press ⌃G.
+
+VERIFY
+  - Inline input appears (associated with cursor-position pill or footer).
+  - Hint text visible: "line, line:col, or :col".
+  - Input is pre-filled with current line:col, pre-selected.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-002
+NAME:     Go to line N
+PRIORITY: P0
+FEATURE:  goto
+
+STEPS
+  1. ⌃G, type "10", press Enter.
+
+VERIFY
+  - Cursor jumps to line 10, col 1 (or first non-whitespace).
+  - Viewport scrolls to make line 10 visible.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-003
+NAME:     Go to line:col
+PRIORITY: P1
+FEATURE:  goto
+
+STEPS
+  1. ⌃G, type "5:3", press Enter.
+
+VERIFY
+  - Cursor jumps to line 5, col 3.
+  - Status bar reflects the position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-004
+NAME:     Go to :col (same line)
+PRIORITY: P2
+FEATURE:  goto
+
+STEPS
+  1. On line 5, ⌃G, type ":15", press Enter.
+
+VERIFY
+  - Cursor stays on line 5, moves to col 15.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-005
+NAME:     Invalid goto input shows error (REGRESSION)
+PRIORITY: P2
+FEATURE:  goto error
+RELATED:  bugs.md P3 "No user feedback for invalid goto_line input"
+
+STEPS
+  1. ⌃G, type "abc", press Enter.
+
+VERIFY
+  - Status message appears: "Invalid format. Use: line, line:col, or :col".
+  - Cursor does not move.
+  - Persists until user takes next action.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-006
+NAME:     Goto line beyond document clamps to end
+PRIORITY: P2
+FEATURE:  goto
+
+SETUP
+  File with 10 lines.
+
+STEPS
+  1. ⌃G, type "9999", press Enter.
+
+VERIFY
+  - Cursor clamps to line 10 (last line).
+  - No error; behavior is predictable.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-007
+NAME:     Esc cancels goto
+PRIORITY: P1
+FEATURE:  goto
+
+STEPS
+  1. ⌃G, type "5".
+  2. Press Esc.
+
+VERIFY
+  - Input dismissed.
+  - Cursor remains at original position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-008
+NAME:     Goto input is wide enough for 9999:999
+PRIORITY: P3
+FEATURE:  goto ui
+
+STEPS
+  1. ⌃G in a file.
+  2. Type "9999:999".
+
+VERIFY
+  - All 8 characters visible in the input field.
+  - Input scrolls for longer values.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-009
+NAME:     Go Back (⌥-) returns to previous location
+PRIORITY: P1
+FEATURE:  location-history
+
+SETUP
+  Multi-line file. Cursor at line 1.
+
+STEPS
+  1. ⌃G goto line 50. (Location recorded.)
+  2. ⌃G goto line 100.
+  3. Press ⌥-.
+
+VERIFY
+  - Cursor returns to line 50.
+  - Another ⌥- returns to line 1.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-010
+NAME:     Go Forward (⌥=) after going back
+PRIORITY: P1
+FEATURE:  location-history
+
+SETUP
+  After QA-GOTO-009, cursor at line 1.
+
+STEPS
+  1. Press ⌥=.
+
+VERIFY
+  - Cursor returns to line 50.
+  - Another ⌥= returns to line 100.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-011
+NAME:     New jump clears forward stack
+PRIORITY: P2
+FEATURE:  location-history
+
+SETUP
+  State: back stack has locations, forward stack has some.
+
+STEPS
+  1. Press ⌥- to go back.
+  2. Make a new jump (⌃G to a different line).
+  3. Press ⌥=.
+
+VERIFY
+  - Forward has no effect — the new jump cleared the forward stack.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-012
+NAME:     History is cross-file (navigates between tabs)
+PRIORITY: P1
+FEATURE:  location-history
+
+SETUP
+  Two files open in tabs, each with content.
+
+STEPS
+  1. In tab 1, ⌃G to line 50.
+  2. Switch to tab 2, ⌃G to line 20.
+  3. Press ⌥- twice.
+
+VERIFY
+  - First ⌥-: returns to tab 1, line 50.
+  - Second ⌥-: returns to tab 1, line 1 (wherever it started).
+  - Tab switching happens automatically.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-013
+NAME:     History records jumps from find / next-change / open
+PRIORITY: P2
+FEATURE:  location-history
+
+STEPS
+  1. ⌃F, search, jump to match — location recorded.
+  2. ⌥N to next VCS change — location recorded.
+  3. ⌃O open different file — location recorded.
+  4. Press ⌥- three times.
+
+VERIFY
+  - Each ⌥- walks back one step.
+  - All documented jump triggers are recorded.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-014
+NAME:     History caps at 100 entries
+PRIORITY: P3
+FEATURE:  location-history
+
+STEPS
+  1. Perform >100 ⌃G jumps to various lines.
+
+VERIFY
+  - Editor remains performant.
+  - ⌥- works. Oldest entries are discarded.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GOTO-015
+NAME:     Go Back/Forward in palette
+PRIORITY: P3
+FEATURE:  palette discoverability
+
+STEPS
+  1. Open palette (⌃Space).
+  2. Filter "back" or "forward".
+
+VERIFY
+  - "Go Back" (⌥-) and "Go Forward" (⌥=) appear under NAVIGATE section.

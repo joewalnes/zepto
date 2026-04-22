@@ -1,0 +1,251 @@
+================================================================================
+37 — Performance
+================================================================================
+
+Covers: startup time, typing smoothness, large file responsiveness, render
+caching (WrapMap, Minimap, VCS lookups, tab bar, char width), scroll lag,
+profiler.
+
+Note: timing thresholds are guidelines, not hard gates — adjust for
+slower CI machines.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-001
+NAME:     Startup under ~100ms (typical)
+PRIORITY: P1
+FEATURE:  perf startup
+RELATED:  QA-STRT-001
+
+STEPS
+  1. Time `./zepto` startup on local machine.
+
+VERIFY
+  - Subjective: feels instant.
+  - Target: under 100ms to first render.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-002
+NAME:     Typing latency feels instantaneous (REGRESSION)
+PRIORITY: P0
+FEATURE:  perf type
+RELATED:  bugs.md P0 "Slight lag on typing"
+
+STEPS
+  1. Hold down a key to produce repeated characters.
+
+VERIFY
+  - Characters appear in real-time without visible lag.
+  - No stuttering.
+  - Cursor keeps pace with input.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-003
+NAME:     Open 1MB / 50K-line file (REGRESSION)
+PRIORITY: P1
+FEATURE:  perf large
+RELATED:  bugs.md P1 "Editor becomes sluggish when opening large files"
+
+SETUP
+  Create /tmp/zqa_big.txt (50K lines, 1MB).
+
+STEPS
+  1. Open.
+  2. Scroll with Page Down.
+  3. Type in middle of file.
+
+VERIFY
+  - Open completes in a few seconds.
+  - Scrolling remains smooth.
+  - Typing doesn't lag.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-004
+NAME:     Large file + VCS (REGRESSION)
+PRIORITY: P1
+FEATURE:  perf vcs
+
+SETUP
+  Git-tracked large file (5K+ lines), many changes.
+
+STEPS
+  1. Edit rapidly.
+
+VERIFY
+  - VCS diff debounced (1.0s for large files, 0.3s for small).
+  - Typing remains smooth.
+  - Gutter markers update without frame drops.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-005
+NAME:     Minimap cache keyed on content_version (REGRESSION)
+PRIORITY: P1
+FEATURE:  perf minimap
+RELATED:  bugs.md P1 "Large file sluggishness"
+
+STEPS
+  1. Large file + minimap on.
+  2. Move cursor (no edits).
+
+VERIFY
+  - Minimap does NOT recompute on pure cursor movement.
+  - Only recomputes on content change.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-006
+NAME:     Char width memoization (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf render
+RELATED:  bugs.md P1 "Character width computed per-character with no caching"
+
+STEPS
+  1. Large source file with Unicode.
+  2. Scroll.
+
+VERIFY
+  - Scroll is smooth.
+  - Width calcs cached by codepoint.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-007
+NAME:     Tab bar cache incl. theme (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf render
+RELATED:  QA-TAB-017
+
+STEPS
+  1. Many tabs.
+  2. Switch tabs rapidly.
+
+VERIFY
+  - Tab bar re-render is cached (not recomputed when state unchanged).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-008
+NAME:     Differential rendering (REGRESSION)
+PRIORITY: P1
+FEATURE:  perf render
+RELATED:  bugs.md P0 "Slight lag on typing"
+
+STEPS
+  1. Type in large file.
+
+VERIFY
+  - Per-keystroke terminal I/O is ~1-2KB, not the full screen.
+  - Only changed rows emitted.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-009
+NAME:     Scroll with mouse wheel smooth on large file (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf scroll
+RELATED:  bugs.md P2 "Mouse scroll in editor is janky"
+
+STEPS
+  1. Large file, scroll with trackpad wheel.
+
+VERIFY
+  - Smooth, 1-line increments.
+  - No stuck points or loops.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-010
+NAME:     WrapMap incremental updates (REGRESSION)
+PRIORITY: P1
+FEATURE:  perf wrap
+RELATED:  bugs.md P0 "Sluggishness"
+
+STEPS
+  1. Wrap ON, large file.
+  2. Type at end of a line.
+
+VERIFY
+  - WrapMap only rebuilds if content version changed.
+  - Typing is smooth.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-011
+NAME:     Debounced file I/O (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf io
+
+STEPS
+  1. Hold a key (rapid edits).
+
+VERIFY
+  - `head_changed()` (git HEAD) polled every 2s, not every frame.
+  - `check_external_changes()` stat every 1s, not per frame.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-012
+NAME:     Palette filter incremental on many files
+PRIORITY: P2
+FEATURE:  perf pick
+
+SETUP
+  Repo with many files (e.g. 5000).
+
+STEPS
+  1. ⌃O, type chars.
+
+VERIFY
+  - Filter updates quickly.
+  - Substring filter handles all files; fuzzy scoring capped at 5000.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-013
+NAME:     Find engine regex pre-compiled once (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf find
+RELATED:  bugs.md P3 "Regex recompilation in FileSearchEngine inner loop"
+
+STEPS
+  1. Find in files with a complex regex in a large repo.
+
+VERIFY
+  - Completes in reasonable time.
+  - Regex compiled once, reused per line.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-014
+NAME:     Performance log command
+PRIORITY: P3
+FEATURE:  perf diagnostic
+
+STEPS
+  1. Palette → DIAGNOSTICS → "Performance Log".
+
+VERIFY
+  - Shows the 20 slowest frames with subsystem breakdown.
+  - Useful for diagnosing regressions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-015
+NAME:     Startup on large git repo (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf startup
+
+SETUP
+  Launch in a large git repo (10K+ files).
+
+STEPS
+  1. Time startup.
+  2. Interact.
+
+VERIFY
+  - Startup reasonable (<1s typical).
+  - VCS diff deferred; doesn't block first render.

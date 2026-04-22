@@ -1,0 +1,273 @@
+================================================================================
+15 — Toggle Comment
+================================================================================
+
+Covers: ⌃/ (toggle comment) behavior per language, HTML context-aware
+commenting (HTML vs CSS vs JS), comment alignment at minimum indent,
+single-line and selection-span cases.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-001
+NAME:     Toggle comment adds line comment for current line
+PRIORITY: P0
+FEATURE:  comment
+
+SETUP
+  Python file (.py). Cursor on line `x = 1`.
+
+STEPS
+  1. Press ⌃/.
+
+VERIFY
+  - Line becomes `# x = 1`.
+  - Prefix inserted at first non-whitespace position (respecting indent).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-002
+NAME:     Toggle comment uncomments a commented line
+PRIORITY: P0
+FEATURE:  comment
+
+SETUP
+  Python line `# x = 1`.
+
+STEPS
+  1. Press ⌃/.
+
+VERIFY
+  - Line reverts to `x = 1`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-003
+NAME:     Selection spans multiple lines — all commented
+PRIORITY: P1
+FEATURE:  comment multi
+
+SETUP
+  Python file, 3 lines:
+    def foo():
+        return 1
+    def bar():
+  All selected.
+
+STEPS
+  1. Press ⌃/.
+
+VERIFY
+  - All 3 lines get `#` prefix at the minimum indent of the selection.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-004
+NAME:     Mixed commented+uncommented treats all as "toggle to comment"
+PRIORITY: P2
+FEATURE:  comment mixed
+
+SETUP
+  Selection:
+    # already commented
+    not commented
+    # another commented
+
+STEPS
+  1. Press ⌃/.
+
+VERIFY
+  - All lines are now commented (prefix on every non-blank line).
+  - Pressing ⌃/ again uncomments all.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-005
+NAME:     JavaScript uses //
+PRIORITY: P1
+FEATURE:  comment lang
+
+SETUP
+  .js file, line `const x = 1;`.
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - Line becomes `// const x = 1;`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-006
+NAME:     Shell uses #
+PRIORITY: P1
+FEATURE:  comment lang
+
+SETUP
+  .sh file.
+
+STEPS
+  1. ⌃/ on a line.
+
+VERIFY
+  - `#` prefix inserted.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-007
+NAME:     HTML uses <!-- -->
+PRIORITY: P1
+FEATURE:  comment html
+
+SETUP
+  .html file, line `<p>Hello</p>`.
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - Line becomes `<!-- <p>Hello</p> -->`.
+  - Second ⌃/ removes both prefix and suffix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-008
+NAME:     CSS inside HTML uses /* */ (REGRESSION)
+PRIORITY: P1
+FEATURE:  comment html-embed
+RELATED:  bugs.md P3 "Toggle comment enhancements"
+
+SETUP
+  .html with:
+    <style>
+      body { color: red; }
+    </style>
+  Cursor on the `body { ... }` line.
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - Line becomes `/* body { color: red; } */` (CSS block comment).
+  - NOT `<!-- ... -->`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-009
+NAME:     JavaScript inside HTML uses //
+PRIORITY: P1
+FEATURE:  comment html-embed
+
+SETUP
+  .html with:
+    <script>
+      const x = 1;
+    </script>
+  Cursor on the JS line.
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - Line becomes `// const x = 1;` (JS line comment).
+  - NOT `<!-- ... -->`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-010
+NAME:     Minimum indent alignment
+PRIORITY: P2
+FEATURE:  comment align
+
+SETUP
+  Python selection:
+    def foo():
+        x = 1
+          y = 2
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - All `#` are inserted at the minimum indent (col 1 in this case).
+  - Not at each line's own indent.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-011
+NAME:     Blank line in selection is not commented
+PRIORITY: P2
+FEATURE:  comment blank
+
+SETUP
+  Selection includes a blank line between code.
+
+STEPS
+  1. ⌃/.
+
+VERIFY
+  - Non-blank lines get `#`.
+  - Blank line remains blank.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-012
+NAME:     Known-correct languages (sanity per language)
+PRIORITY: P2
+FEATURE:  comment lang matrix
+
+STEPS
+  For each language file type, verify ⌃/ uses the correct prefix:
+    .pl / .pm   → #
+    .py         → #
+    .rb         → #
+    .sh / .bash → #
+    .yaml       → #
+    .toml       → #
+    .ini        → ;   (or #, per syntax rules)
+    .sql        → --
+    .lua        → --
+    .c / .cpp / .h → // (line) or /* */
+    .java       → //
+    .js / .ts   → //
+    .go         → //
+    .rs         → //
+    .swift      → //
+    .php        → //
+    .cs         → //
+    .css / .scss → /* */ (block) — may use line if supported
+    .html / .xml → <!-- -->
+    .md         → <!-- -->  (or no prefix if ambiguous)
+    .tex        → %
+
+VERIFY
+  - Each type produces its expected comment prefix/suffix.
+  - Reference: lib/Zepto/Syntax/*.pm `line_comment_prefix`/`comment_style`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-013
+NAME:     Toggle comment on empty document is no-op
+PRIORITY: P3
+FEATURE:  comment edge
+
+STEPS
+  1. Empty buffer, no language detected.
+  2. Press ⌃/.
+
+VERIFY
+  - No crash.
+  - Status may show "No comment style" or silently no-op.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CMT-014
+NAME:     Undo a comment toggle
+PRIORITY: P1
+FEATURE:  comment undo
+
+STEPS
+  1. ⌃/ on a line.
+  2. ⌃Z.
+
+VERIFY
+  - Comment removed (line reverts).

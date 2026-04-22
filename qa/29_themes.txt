@@ -1,0 +1,181 @@
+================================================================================
+29 — Themes
+================================================================================
+
+Covers: ⌃T dark/light toggle, theme persistence, re-render on switch,
+contrast verification, semantic colors (selection, VCS, match, etc.).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-001
+NAME:     Default theme is dark
+PRIORITY: P1
+FEATURE:  theme
+
+SETUP
+  Fresh state (no persisted prefs).
+
+STEPS
+  1. Launch zepto.
+
+VERIFY
+  - Editor background is dark blue-black.
+  - Foreground is soft blue-white (Tokyo Night inspired).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-002
+NAME:     ⌃T toggles dark → light
+PRIORITY: P0
+FEATURE:  theme toggle
+
+STEPS
+  1. Press ⌃T.
+
+VERIFY
+  - Editor switches to light theme (near-white background, dark text).
+  - All UI elements (tabs, status bar, gutter, minimap, syntax tokens)
+    update to light variants.
+  - Toggle pill in status bar shows current theme.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-003
+NAME:     ⌃T toggles back to dark
+PRIORITY: P0
+FEATURE:  theme toggle
+
+STEPS
+  1. From light theme, press ⌃T.
+
+VERIFY
+  - Returns to dark theme.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-004
+NAME:     Tab bar updates on theme switch (REGRESSION)
+PRIORITY: P2
+FEATURE:  theme tab
+RELATED:  bugs.md P2 "Light mode tab bar stays dark after theme switch"
+RELATED:  QA-TAB-017
+
+STEPS
+  1. Dark theme. Observe tab colors.
+  2. ⌃T.
+
+VERIFY
+  - Tab bar immediately re-renders with light colors.
+  - No stale dark tabs (cache was correctly invalidated).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-005
+NAME:     ⌃T works from find bar (REGRESSION)
+PRIORITY: P1
+FEATURE:  theme global
+RELATED:  bugs.md P3 "Theme ^T should be global shortcut"
+
+STEPS
+  1. ⌃F, type query.
+  2. Press ⌃T.
+
+VERIFY
+  - Theme toggles.
+  - Find bar remains open with query intact.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-006
+NAME:     Theme persists across restart
+PRIORITY: P2
+FEATURE:  theme persistence
+
+STEPS
+  1. Set light theme.
+  2. Quit.
+  3. Relaunch.
+
+VERIFY
+  - Light theme restored (via StateStore prefs).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-007
+NAME:     Contrast is sufficient in both themes (AUDITED)
+PRIORITY: P2
+FEATURE:  theme readability
+RELATED:  bugs.md P3 "Theme contrast not verified" — AUDITED OK
+
+STEPS
+  1. Switch to each theme and visually inspect:
+     - Regular text
+     - Selection highlight
+     - Find matches (current and others)
+     - VCS gutter
+     - Minimap
+     - Syntax highlighting
+
+VERIFY
+  - All elements readable.
+  - Contrast sufficient per audit notes.
+  - No color-only state indicators (icons/text also present).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-008
+NAME:     Light mode empty-line bg not jarring (REGRESSION)
+PRIORITY: P3
+FEATURE:  theme light
+RELATED:  bugs.md P3 "Lightmode glitches"
+
+STEPS
+  1. Light theme. Short file (5 lines).
+
+VERIFY
+  - Area below the last line blends with editor (near-white).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-009
+NAME:     Light theme status_accent uses fg, not bg (REGRESSION)
+PRIORITY: P3
+FEATURE:  theme light
+RELATED:  bugs.md P3 "Light theme status_accent used bg_rgb instead of fg_rgb"
+
+STEPS
+  1. Light theme. Observe status bar accent colors (e.g. accented text).
+
+VERIFY
+  - Accent color is visible as text foreground.
+  - Not an invisible/wrong styled background.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-010
+NAME:     Syntax colors map in both themes
+PRIORITY: P2
+FEATURE:  theme syntax
+
+STEPS
+  1. Open a source file.
+  2. Toggle themes.
+
+VERIFY
+  - Keywords, strings, comments, numbers all change color consistently.
+  - Dark: purple keywords, green strings, blue-gray comments.
+  - Light: deep purple, deep green, softer comment gray.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-011
+NAME:     Theme name visible in palette
+PRIORITY: P3
+FEATURE:  theme palette
+
+STEPS
+  1. Open palette, search "Theme".
+
+VERIFY
+  - Theme row shows current value ("dark" or "light") with sun/moon icon.
+  - Enter toggles between them.

@@ -1,0 +1,220 @@
+================================================================================
+04 — Undo and Redo
+================================================================================
+
+Covers: undo stack, redo stack, edit grouping, interactions with save,
+external reload, multi-cursor, completion.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-001
+NAME:     Basic undo restores previous state
+PRIORITY: P0
+FEATURE:  undo
+
+SETUP
+  File with "hello".
+
+STEPS
+  1. Type ` world` — document becomes "hello world".
+  2. Press ⌃Z.
+
+VERIFY
+  - Document reverts to "hello".
+  - Cursor is repositioned to pre-edit position.
+  - Dirty flag may still be set (edit happened, even if undone).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-002
+NAME:     Redo re-applies undone change
+PRIORITY: P0
+FEATURE:  redo
+
+SETUP
+  As in QA-UNDO-001 after pressing ⌃Z.
+
+STEPS
+  1. Press ⌃Y.
+
+VERIFY
+  - Document becomes "hello world" again.
+  - Cursor at post-edit position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-003
+NAME:     Undo groups consecutive character inserts
+PRIORITY: P1
+FEATURE:  undo-grouping
+
+STEPS
+  1. Open empty file, type "hello world" (all at once, no pauses).
+  2. Press ⌃Z once.
+
+VERIFY
+  - Entire "hello world" is removed in one undo (or at least in a small
+    number of logical groups, not 11 individual character undos).
+  - Pressing ⌃Z further eventually empties the document.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-004
+NAME:     Undo grouping breaks on newline or major action
+PRIORITY: P2
+FEATURE:  undo-grouping
+
+STEPS
+  1. Type "line1", press Enter, type "line2".
+  2. Press ⌃Z.
+
+VERIFY
+  - First undo removes "line2" (or the newline+line2 group).
+  - Subsequent undos remove earlier groups.
+  - Behavior is predictable and matches other editors.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-005
+NAME:     Empty stack shows "Nothing to undo"
+PRIORITY: P2
+FEATURE:  undo
+
+STEPS
+  1. Open unedited file.
+  2. Press ⌃Z.
+
+VERIFY
+  - Status bar shows a message like "Nothing to undo".
+  - Message persists until next user action (not time-based).
+  - Document unchanged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-006
+NAME:     Redo stack cleared by new edit
+PRIORITY: P1
+FEATURE:  redo
+
+SETUP
+  Type "abc", press ⌃Z to undo "c".
+
+STEPS
+  1. Type "x".
+  2. Press ⌃Y.
+
+VERIFY
+  - ⌃Y has no effect (redo stack was cleared by the new edit "x").
+  - Status may show "Nothing to redo".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-007
+NAME:     Undo affects document state, not just messages (REGRESSION)
+PRIORITY: P1
+FEATURE:  undo
+RELATED:  bugs.md P3 "Tautological tests verify messages not behavior"
+
+STEPS
+  1. Insert specific text.
+  2. Press ⌃Z.
+
+VERIFY
+  - Query actual document content (via screen inspection) to confirm
+    text was removed — not just that a message was displayed.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-008
+NAME:     Undo after multi-cursor edit
+PRIORITY: P1
+FEATURE:  multi-cursor undo
+RELATED:  QA-MC-*
+
+SETUP
+  Select 3 occurrences of "foo" via ⌃D presses, type "BAR" — all replaced.
+
+STEPS
+  1. Press ⌃Z.
+
+VERIFY
+  - All 3 replacements are undone in one undo step.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-009
+NAME:     Undo/redo don't throw Perl warnings near EOL (REGRESSION)
+PRIORITY: P0
+FEATURE:  undo
+RELATED:  bugs.md P0 "Perl warning on undo/redo near end-of-line"
+
+STEPS
+  1. Type text with completion enabled.
+  2. Move cursor to end of line.
+  3. Press ⌃Z several times.
+
+VERIFY
+  - No "Use of uninitialized value $char_before in pattern match"
+    on stderr.
+  - Editor works normally.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-010
+NAME:     Ghost text re-triggers after undo (REGRESSION)
+PRIORITY: P3
+FEATURE:  completion
+RELATED:  bugs.md P3 "Ghost text completion does not re-trigger after undo"
+
+SETUP
+  Autocomplete enabled.
+
+STEPS
+  1. Type "foo_bar = 1" on one line.
+  2. Next line, type "foo" — ghost text may suggest "foo_bar".
+  3. Accept with Tab.
+  4. Press ⌃Z.
+
+VERIFY
+  - After undo restores partial word, ghost text completion reappears
+    for the partial word.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-011
+NAME:     Undo stack cleared on external reload
+PRIORITY: P2
+FEATURE:  undo reload
+
+SETUP
+  Open file, make edits (undo stack now has entries).
+
+STEPS
+  1. Modify file externally (`echo "new" > file`).
+  2. Zepto detects and silently reloads clean buffer, or user accepts
+     reload prompt on dirty buffer.
+  3. Press ⌃Z.
+
+VERIFY
+  - Undo stack was cleared after reload (can't undo across reload).
+  - Status shows "Nothing to undo" or similar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-012
+NAME:     Undo restores dirty flag state
+PRIORITY: P2
+FEATURE:  undo dirty
+
+STEPS
+  1. Open saved file.
+  2. Type one character — dirty indicator ● appears.
+  3. Press ⌃Z.
+
+VERIFY
+  - Document content reverts.
+  - Dirty indicator ● is cleared (buffer matches saved state).
+
+NOTES
+  Some editors keep the dirty flag because the undo itself is an edit;
+  zepto's behavior should be predictable and documented.

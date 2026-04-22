@@ -1,0 +1,184 @@
+================================================================================
+33 — Markdown Special Rendering
+================================================================================
+
+Covers: pretty-rendered Markdown tables (box-drawing borders, alignment,
+striped rows, cursor-inside switches to raw), dimmed emphasis delimiters,
+inline images (future).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-001
+NAME:     Markdown table pretty-rendered (REGRESSION)
+PRIORITY: P2
+FEATURE:  md table
+RELATED:  bugs.md P2 "Markdown table pretty-rendering"
+
+SETUP
+  Markdown file with:
+    | Name | Age | Role |
+    | ---- | --- | ---- |
+    | Alice | 30 | Eng |
+    | Bob | 25 | PM |
+  Cursor OUTSIDE the table (say, above it).
+
+STEPS
+  1. Observe.
+
+VERIFY
+  - Box-drawing borders: `┌───┬───┐`, `│ a │ b │`, `├───┼───┤`, etc.
+  - Column widths auto-aligned.
+  - Header row bold + distinct bg.
+  - Data rows alternating stripe bg.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-002
+NAME:     Alignment syntax respected
+PRIORITY: P3
+FEATURE:  md table
+
+SETUP
+  Table with:
+    | left | right | center |
+    | :--- | ---:  | :----: |
+    | a    | b     | c      |
+
+STEPS
+  1. Observe.
+
+VERIFY
+  - "left" column left-aligned.
+  - "right" column right-aligned.
+  - "center" column center-aligned.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-003
+NAME:     Cursor in table switches to raw source
+PRIORITY: P2
+FEATURE:  md table raw
+
+STEPS
+  1. Click/place cursor inside a pretty-rendered table cell.
+
+VERIFY
+  - That table reverts to raw Markdown `| text | text |` format.
+  - Editing in raw is then possible.
+  - Other tables on screen remain pretty-rendered.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-004
+NAME:     Leaving table returns pretty render
+PRIORITY: P3
+FEATURE:  md table raw
+
+STEPS
+  1. Cursor in table, move cursor out (arrow keys or click).
+
+VERIFY
+  - Table re-renders pretty.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-005
+NAME:     Copy from table gets raw source
+PRIORITY: P2
+FEATURE:  md table copy
+
+STEPS
+  1. Cursor in table; select all with ⌃A.
+  2. ⌃C.
+
+VERIFY
+  - Clipboard has the RAW pipe-delimited markdown, not the rendered
+    box-drawing.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-006
+NAME:     Row count preserved (no extra rows inserted)
+PRIORITY: P3
+FEATURE:  md table
+
+SETUP
+  Table with exactly 3 data rows.
+
+STEPS
+  1. Count rendered rows in pretty view.
+
+VERIFY
+  - Header row + separator render + 3 data rows = 5 visual rows max
+    (depending on exact separator representation).
+  - Number of rendered rows equals number in source (no phantom blank
+    rows).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-007
+NAME:     Table render toggleable
+PRIORITY: P3
+FEATURE:  md pref
+
+STEPS
+  1. Palette → search "render markdown tables" (if exposed).
+  2. Or set preference directly.
+
+VERIFY
+  - Can toggle `render_markdown_tables` OFF.
+  - Tables then render as plain text source.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-008
+NAME:     Table render performance (cache by content version)
+PRIORITY: P3
+FEATURE:  md performance
+
+STEPS
+  1. Large document with many tables.
+
+VERIFY
+  - No performance stall on scroll.
+  - Tables detection is cached; not recomputed each frame.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-009
+NAME:     Dim emphasis delimiters (FEATURE REQUEST TRACK)
+PRIORITY: P3
+FEATURE:  md emphasis
+RELATED:  bugs.md P3 "Dim Markdown formatting delimiters"
+
+NOTES
+  This is currently an open P3 feature request. When implemented:
+    - `**bold**` — the `**` delimiters should render in a dimmed color.
+    - Same for `*italic*`, `_..._`, `~~..~~`, `==..==`.
+  Add a test case here once implemented.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-010
+NAME:     Markdown heading styles render
+PRIORITY: P2
+FEATURE:  md heading
+RELATED:  QA-SYN-020
+
+STEPS
+  1. `# H1`, `## H2`, `### H3` in the file.
+
+VERIFY
+  - Each heading level visually distinct (bold, color variation).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-011
+NAME:     Inline images (future)
+PRIORITY: P3
+FEATURE:  md image
+RELATED:  bugs.md P3 "Inline image rendering in Markdown preview" SKIPPED
+
+NOTES
+  Not yet implemented. When added: Markdown `![alt](path)` should render
+  inline on Kitty-protocol terminals.
