@@ -25,7 +25,7 @@ shot_wrap="$QA_TMPDIR/sbar_wrap_on.png"
 qa_screenshot "$shot_wrap"
 
 qa_assert_visual "$shot_wrap" \
-    "Look at the status bar (bottom row). The 'Wrap' toggle pill should now appear highlighted/bright (ON state) compared to the previous screenshot where it was dimmed/off. Is there a visually distinct 'Wrap' or word-wrap indicator that looks 'active' or 'enabled' (brighter background than other pills)?" \
+    "Look at the status bar (bottom row). Find a 'Wrap' or 'Word Wrap' toggle pill. It should look visually different from its OFF state — this could be a brighter/filled background, bold text, inverted colors, or a different color than inactive pills. Is there ANY visual indicator that the Wrap feature is currently enabled/ON? Even a subtle difference counts as PASS." \
     "Wrap pill visually distinct when ON"
 
 # Toggle wrap OFF

@@ -10,6 +10,8 @@ repo="$QA_TMPDIR/repo"
 mkdir -p "$repo"
 cd "$repo"
 git init -q
+git config user.email "qa@test.com"
+git config user.name "QA"
 echo "line 1 original" > test.txt
 echo "line 2 original" >> test.txt
 echo "line 3 original" >> test.txt
@@ -31,7 +33,7 @@ CONTENT
 cd - >/dev/null
 
 qa_start "$repo/test.txt"
-sleep 0.8  # wait for VCS diff computation
+sleep 1.5  # wait for VCS diff computation
 
 shot="$QA_TMPDIR/vcs_gutter.png"
 qa_screenshot "$shot"

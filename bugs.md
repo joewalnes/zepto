@@ -822,3 +822,8 @@ When quitting zepto (`⌃Q`), everything above the cursor's vertical position re
 `tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues.
 
 **Fix:** Guarded the three `diag()` calls behind `$ENV{VERBOSE}`. Debug output now only appears when running with `VERBOSE=1 prove -v tests/diff_constraint.t`.
+
+### ~~P1: [Bug] Undo of move-line corrupts buffer~~ FIXED
+Moving a line with `⌥↓` or `⌥↑` then pressing `⌃Z` to undo corrupts the buffer — only one line remains visible, others disappear. Root cause: `_move_lines()` performs delete + insert as two separate undo actions; undoing only reverses the insert, leaving the delete in place.
+
+**Fix:** Wrapped the delete and insert calls in `_move_lines()` with `$doc->begin_undo_group()` / `$doc->end_undo_group()` so the entire move is one atomic undo operation. QA-LINE-009 unskipped.

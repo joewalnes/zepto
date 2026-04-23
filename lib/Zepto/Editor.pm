@@ -3514,6 +3514,9 @@ sub _move_lines {
     my $full_start = $direction < 0 ? $swap_start : $move_start;
     my $full_end = $direction < 0 ? $move_end : $swap_end;
 
+    # Group delete+insert as one undo operation
+    $doc->begin_undo_group();
+
     # Delete the entire range
     $doc->delete($full_start, $full_end - $full_start);
 
@@ -3526,6 +3529,8 @@ sub _move_lines {
         # Moving down: insert swap text, then moved text
         $doc->insert($full_start, $swap_text . $move_text);
     }
+
+    $doc->end_undo_group();
 
     # Update cursor/selection to follow moved lines
     my $new_start_line = $start_line + $direction;

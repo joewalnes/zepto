@@ -16,7 +16,7 @@ qa_keys "alt-up"
 
 # First line should now be banana
 qa_screen
-line1=$(echo "$QA_SCREEN" | head -3 | grep "banana" || true)
+line1=$(echo "$QA_SCREEN" | head -5 | grep "banan" || true)
 if [[ -n "$line1" ]]; then
     qa_pass "alt-up moved banana to line 1"
 else

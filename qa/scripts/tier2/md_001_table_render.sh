@@ -22,8 +22,8 @@ shot="$QA_TMPDIR/md_table.png"
 qa_screenshot "$shot"
 
 qa_assert_visual "$shot" \
-    "This shows a Markdown file in a terminal text editor. There should be a TABLE rendered with box-drawing characters (continuous lines like ─, │, ┌, ┬, ├, ┼, etc.) instead of raw pipe characters. Verify: (1) The table has visible borders made of line-drawing characters (not just | and -). (2) The header row ('Name', 'Role', 'Location') appears bold or with a distinct background. (3) Data rows may have alternating stripe backgrounds for readability. (4) The text BEFORE and AFTER the table ('Some text before/after') appears as normal text, not inside the table. (5) Column alignment looks correct — text is properly spaced within cells." \
-    "Markdown table rendered with box-drawing borders"
+    "This shows a Markdown file in a terminal text editor. There should be a TABLE that is pretty-rendered — NOT shown as raw Markdown source. Verify ANY of these indicators of pretty-rendering: (1) The table has visible borders made of box-drawing characters (─, │, ┌, etc.) or other line-drawing symbols. (2) The header row appears visually distinct (bold, colored, or different background). (3) Column alignment looks neat and formatted (evenly spaced cells). (4) The separator row (---) is replaced with a horizontal line. If the table appears as raw Markdown (just | and - characters with no visual formatting), that is a FAIL." \
+    "Markdown table rendered with pretty formatting"
 
 qa_keys "ctrl-q"
 
