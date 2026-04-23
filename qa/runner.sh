@@ -206,20 +206,32 @@ if [[ $PARALLEL -eq 1 ]]; then
     SCRIPT_NAMES=()
     SCRIPT_INDICES=()
 
+    # Build script array for batch processing
+    SCRIPT_LIST=()
     while IFS= read -r script; do
-        INDEX=$((INDEX + 1))
-        script_name=$(basename "$script" .sh)
-        SCRIPT_NAMES+=("$script_name")
-        SCRIPT_INDICES+=("$INDEX")
-
-        run_script "$script" "$INDEX" &
-        PIDS+=($!)
-
-        # Throttle to MAX_JOBS
-        while [[ $(jobs -r | wc -l) -ge $MAX_JOBS ]]; do
-            sleep 0.1
-        done
+        SCRIPT_LIST+=("$script")
     done <<< "$scripts"
+
+    # Process in batches of MAX_JOBS
+    for ((BATCH_START=0; BATCH_START<${#SCRIPT_LIST[@]}; BATCH_START+=MAX_JOBS)); do
+        BATCH_PIDS=()
+        for ((j=BATCH_START; j<BATCH_START+MAX_JOBS && j<${#SCRIPT_LIST[@]}; j++)); do
+            INDEX=$((j + 1))
+            script="${SCRIPT_LIST[$j]}"
+            script_name=$(basename "$script" .sh)
+            SCRIPT_NAMES+=("$script_name")
+            SCRIPT_INDICES+=("$INDEX")
+
+            run_script "$script" "$INDEX" &
+            PIDS+=($!)
+            BATCH_PIDS+=($!)
+        done
+
+        # Wait for entire batch to complete
+        for pid in "${BATCH_PIDS[@]}"; do
+            wait "$pid" 2>/dev/null || true
+        done
+    done
 
     # Wait for all, printing results as they complete
     REPORTED=()
