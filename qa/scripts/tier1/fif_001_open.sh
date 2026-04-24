@@ -11,18 +11,13 @@ echo "hello again from gamma" > "$proj_dir/gamma.txt"
 
 qa_start "$proj_dir/alpha.txt"
 
-# Ctrl+Shift+F (CSI for ctrl+shift+f)
-qa_raw $'\x1b[102;6u'
-sleep 0.5
+# Open find-in-files via palette (Ctrl+Shift+F may not transmit via tmux)
+qa_keys "ctrl-space"
+qa_send "find in" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "Find in|Search|find.*files"; then
-    qa_pass "find-in-files palette opened"
-else
-    # Try alternative: might use a different key
-    qa_pass "ctrl+shift+f key sent"
-fi
+qa_assert_screen "Find in Files|Find in files|find.in.files" "find-in-files command visible in palette"
 
+qa_keys "escape"
 qa_keys "escape"
 qa_keys "ctrl-q"
 

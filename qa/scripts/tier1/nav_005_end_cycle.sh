@@ -10,16 +10,11 @@ qa_start "$file"
 
 # First End → end of line 1
 qa_keys "end" 0.1
-qa_assert_screen "1:6" "End goes to end of line 1"
+qa_assert_cursor_at 1:6 "End goes to end of line 1"
 
-# Second End → end of document
+# Second End → end of document (line 3)
 qa_keys "end" 0.1
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "3:[3-4]"; then
-    qa_pass "second End goes to doc end"
-else
-    qa_pass "End cycling active (position changed)"
-fi
+qa_assert_cursor_at 3 "second End goes to last line"
 
 qa_keys "ctrl-q"
 qa_summary

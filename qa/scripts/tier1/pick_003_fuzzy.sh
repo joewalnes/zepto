@@ -17,12 +17,8 @@ sleep 0.3
 # Type fuzzy filter
 qa_send "bravo" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "bravo"; then
-    qa_pass "fuzzy filter shows matching file"
-else
-    qa_pass "picker accepted filter input"
-fi
+qa_assert_screen "bravo" "fuzzy filter shows matching file"
+qa_assert_not_screen "something_else" "non-matching file filtered out"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

@@ -17,22 +17,25 @@ printf '%s' "$content" > test.txt
 git add test.txt
 git commit -q -m "initial"
 
-# Modify some lines to create VCS changes
+# Modify line 15 to create a VCS change
 sed -i '' 's/line 15 original/line 15 MODIFIED/' test.txt
-sed -i '' 's/line 25 original/line 25 MODIFIED/' test.txt
 
 cd /Users/joe/src/zepto
 qa_start "$repo_dir/test.txt"
+sleep 1  # wait for VCS diff computation
 
-# Jump to next change
+# Should start at line 1
+qa_assert_cursor_at 1 "starts at line 1"
+
+# Jump to next change — should land on or near line 15
 qa_keys "alt-n"
 sleep 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "MODIFIED"; then
-    qa_pass "alt-n jumped to a modified line"
+qa_cursor_pos
+if [[ -n "$QA_CURSOR_LINE" && "$QA_CURSOR_LINE" -ge 14 && "$QA_CURSOR_LINE" -le 16 ]]; then
+    qa_pass "alt-n jumped to modified line ($QA_CURSOR_LINE)"
 else
-    qa_pass "alt-n key accepted (change navigation)"
+    qa_fail "alt-n jumped to modified line (at line $QA_CURSOR_LINE, expected ~15)"
 fi
 
 qa_keys "ctrl-q"

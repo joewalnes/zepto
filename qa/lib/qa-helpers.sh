@@ -237,6 +237,74 @@ qa_assert_exited() {
 }
 
 # ---------------------------------------------------------------------------
+# Precise state extraction
+# ---------------------------------------------------------------------------
+# These helpers extract specific state from the screen, making it easy
+# to write precise assertions instead of weak "screen changed" checks.
+#
+# RULE: Never assert "before != after" — always assert the specific
+# expected state. Ask: "would this pass if the feature was broken?"
+
+# Extract cursor position from status bar (e.g. "5:12")
+#   qa_cursor_pos → sets QA_CURSOR_LINE and QA_CURSOR_COL
+qa_cursor_pos() {
+    qa_screen
+    local pos
+    # Status bar shows "LINE:COL" as the cursor position pill
+    pos=$(echo "$QA_SCREEN" | tail -2 | grep -oE '[0-9]+:[0-9]+' | head -1 || true)
+    if [[ -n "$pos" ]]; then
+        QA_CURSOR_LINE="${pos%%:*}"
+        QA_CURSOR_COL="${pos##*:}"
+    else
+        QA_CURSOR_LINE=""
+        QA_CURSOR_COL=""
+    fi
+}
+
+# Assert cursor is at a specific line (col optional)
+#   qa_assert_cursor_at 5 "description"
+#   qa_assert_cursor_at 5:12 "description"
+qa_assert_cursor_at() {
+    local expected="$1"
+    local desc="${2:-cursor at $expected}"
+    qa_cursor_pos
+    local actual="${QA_CURSOR_LINE}:${QA_CURSOR_COL}"
+    if [[ "$expected" == *:* ]]; then
+        # Check line:col
+        if [[ "$actual" == "$expected" ]]; then
+            qa_pass "$desc"
+        else
+            qa_fail "$desc" "Expected $expected, got $actual"
+        fi
+    else
+        # Check line only
+        if [[ "$QA_CURSOR_LINE" == "$expected" ]]; then
+            qa_pass "$desc"
+        else
+            qa_fail "$desc" "Expected line $expected, got $QA_CURSOR_LINE"
+        fi
+    fi
+}
+
+# Assert cursor is NOT at a specific line (useful for "it moved away")
+qa_assert_cursor_not_at() {
+    local unexpected="$1"
+    local desc="${2:-cursor not at line $unexpected}"
+    qa_cursor_pos
+    if [[ "$QA_CURSOR_LINE" != "$unexpected" ]]; then
+        qa_pass "$desc"
+    else
+        qa_fail "$desc" "Cursor still at line $unexpected"
+    fi
+}
+
+# Extract the last line (status bar) from screen
+qa_status_bar() {
+    qa_screen
+    QA_STATUS_BAR=$(echo "$QA_SCREEN" | tail -1)
+}
+
+# ---------------------------------------------------------------------------
 # Results reporting
 # ---------------------------------------------------------------------------
 

@@ -8,20 +8,30 @@ for i in $(seq 1 30); do content+="line $i with some content"$'\n'; done
 file=$(qa_tmpfile_nl "gut012.txt" "$content")
 qa_start "$file"
 
-# Minimap should be visible by default (braille chars)
+# Check minimap state via palette
+qa_keys "ctrl-space"
+qa_send "minimap" 0.3
 qa_screen
-has_braille=$(echo "$QA_SCREEN" | grep -cP '[\x{2800}-\x{28FF}]' || true)
+initial_state=$(echo "$QA_SCREEN" | grep -oE '\[(on|off)\]' | head -1)
+qa_keys "escape" 0.2
+qa_keys "escape" 0.2
 
-# Toggle minimap off
+# Toggle minimap
 qa_keys "alt-m"
-qa_screen
-after_toggle=$(echo "$QA_SCREEN" | grep -cP '[\x{2800}-\x{28FF}]' || true)
+sleep 0.3
 
-if [[ "$has_braille" -ne "$after_toggle" ]]; then
-    qa_pass "alt-m toggled minimap (braille char count changed)"
+# Check new state
+qa_keys "ctrl-space"
+qa_send "minimap" 0.3
+qa_screen
+new_state=$(echo "$QA_SCREEN" | grep -oE '\[(on|off)\]' | head -1)
+qa_keys "escape" 0.2
+qa_keys "escape" 0.2
+
+if [[ -n "$initial_state" && -n "$new_state" && "$initial_state" != "$new_state" ]]; then
+    qa_pass "alt-m toggled minimap ($initial_state → $new_state)"
 else
-    # Fallback: just check screen changed at all
-    qa_pass "alt-m key accepted"
+    qa_fail "alt-m toggled minimap (before=$initial_state after=$new_state)"
 fi
 
 # Toggle back

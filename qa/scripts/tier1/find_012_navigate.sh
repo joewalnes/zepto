@@ -11,17 +11,23 @@ qa_start "$file"
 qa_keys "ctrl-f"
 qa_send "apple" 0.3
 
-# Should show match count in the find bar
+# Should show match count
 qa_assert_screen "3" "match count visible"
+
+# Find bar shows "N of M" — check initial match index
+qa_screen
+initial_match=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
 
 # Navigate to next match with Down
 qa_keys "down" 0.2
-# Cursor should move to a different line
+
 qa_screen
-if echo "$QA_SCREEN" | grep -qE "2:[0-9]"; then
-    qa_pass "Down navigated to next match"
+next_match=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
+
+if [[ -n "$initial_match" && -n "$next_match" && "$initial_match" != "$next_match" ]]; then
+    qa_pass "Down navigated to next match ($initial_match → $next_match)"
 else
-    qa_pass "Down key accepted in find mode"
+    qa_fail "Down navigated to next match (before=$initial_match after=$next_match)"
 fi
 
 qa_keys "escape"

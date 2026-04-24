@@ -114,3 +114,69 @@ behavioral discovery must add a test case to this plan. See CLAUDE.md
 "QA plan maintenance" section for the required checklist.
 
 The QA plan is the executable spec of Zepto's visible behavior.
+
+## Writing Good Test Assertions
+
+The most dangerous test is one that passes when the feature is broken.
+Before committing any test, ask: **"would this still pass if the feature
+was completely broken?"** If yes, the assertion is tautological.
+
+### Anti-patterns (DO NOT use)
+
+```bash
+# BAD: "screen changed" — always true if anything renders
+qa_screen; before="$QA_SCREEN"
+qa_keys "pagedown"
+qa_screen; after="$QA_SCREEN"
+[[ "$before" != "$after" ]]   # passes even if the feature didn't work
+
+# BAD: "key accepted" fallback — gives up and passes
+if echo "$QA_SCREEN" | grep -q "expected"; then
+    qa_pass "feature works"
+else
+    qa_pass "key accepted"  # this is a lie — you don't know it worked
+fi
+
+# BAD: checking for content that was never at risk
+# (file always contained "alpha", so grep "alpha" always passes)
+qa_assert_screen "alpha" "undo restored content"
+```
+
+### Correct patterns (DO use)
+
+```bash
+# GOOD: assert the specific expected output
+qa_assert_screen "CONTENT_15" "preview shows the correct file"
+
+# GOOD: assert content that should NOT be there anymore
+qa_assert_not_screen "CONTENT_02" "preview updated away from old file"
+
+# GOOD: assert exact cursor position
+qa_assert_cursor_at 5 "cursor moved to line 5"
+
+# GOOD: verify by action — type to replace selection, then check result
+qa_send "X"
+qa_assert_screen "hello X bar" "word was selected and replaced"
+
+# GOOD: assert specific state, not just "something changed"
+qa_assert_screen "COL" "column mode indicator visible"
+
+# GOOD: check file on disk (ground truth, not screen rendering)
+qa_assert_file_contains "$file" "expected content" "file saved correctly"
+```
+
+### The "verify by action" technique
+
+When testing selection or cursor position, the most robust pattern is
+to **perform an action that depends on the state being correct**:
+
+```bash
+# Instead of trying to detect "is text selected?", type to replace it:
+qa_keys "shift-right" 0.1   # extend selection
+qa_keys "shift-right" 0.1
+qa_send "X"                  # replaces selection if it exists
+qa_assert_screen "Xdef"      # verifies exactly 2 chars were selected
+```
+
+This is unfakeable — if the selection wasn't created, the replacement
+won't produce the expected output.
