@@ -8,19 +8,26 @@ bravo
 charlie")
 qa_start "$file"
 
-# Move line 1 down
+# Move line 1 (alpha) down — bravo should now be first
 qa_keys "alt-down"
-qa_assert_screen "bravo" "line moved"
+qa_screen
+first_content=$(echo "$QA_SCREEN" | grep -E "alpha|bravo" | head -1)
+if echo "$first_content" | grep -q "bravo"; then
+    qa_pass "alt-down moved alpha below bravo"
+else
+    qa_fail "alt-down moved alpha below bravo"
+fi
 
-# Undo should restore original order
+# Undo should restore original order — alpha first again
 qa_keys "ctrl-z"
 sleep 0.3
 
 qa_screen
-if echo "$QA_SCREEN" | grep -q "alpha"; then
-    qa_pass "undo reverted move"
+first_after_undo=$(echo "$QA_SCREEN" | grep -E "alpha|bravo" | head -1)
+if echo "$first_after_undo" | grep -q "alpha"; then
+    qa_pass "undo restored alpha to first position"
 else
-    qa_fail "undo reverted move"
+    qa_fail "undo restored alpha to first position"
 fi
 
 qa_keys "ctrl-q"

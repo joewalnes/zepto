@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-04-23
+
+- Fixed move-line undo corruption — Ctrl+Z after Alt+Up/Down now correctly restores line order
+
 ## 2026-04-20
 
 - Added KDL syntax highlighting (.kdl files)
