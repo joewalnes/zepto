@@ -4212,10 +4212,10 @@ sub handle_tree_event {
         elsif ($key eq 'right')    { $tree->expand_current(); }
         elsif ($key eq 'enter')    { $self->_tree_open_selected(); }
         elsif ($key eq 'escape') { $self->_tree_unfocus(); }
-        elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); }
-        elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); }
-        elsif ($key eq 'home')     { $tree->home(); }
-        elsif ($key eq 'end')      { $tree->end(); }
+        elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); $self->_tree_preview_current(); }
+        elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); $self->_tree_preview_current(); }
+        elsif ($key eq 'home')     { $tree->home(); $self->_tree_preview_current(); }
+        elsif ($key eq 'end')      { $tree->end(); $self->_tree_preview_current(); }
         elsif ($key eq 'backspace') { }  # no-op in tree
     }
     elsif ($event->{type} eq 'char') {

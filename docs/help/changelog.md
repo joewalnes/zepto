@@ -3,6 +3,7 @@
 ## 2026-04-23
 
 - Fixed move-line undo corruption — Ctrl+Z after Alt+Up/Down now correctly restores line order
+- Fixed file tree Page Down/Up/Home/End not updating preview
 
 ## 2026-04-20
 

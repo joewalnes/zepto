@@ -3,15 +3,17 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-025: Tree Home/End preview"
 
-# Create a directory with files
+# Create a directory with uniquely identifiable files
 proj_dir=$(mktemp -d /tmp/zepto_qa_tree025_XXXXXX)
 for i in $(seq -w 1 20); do
-    echo "content of file $i" > "$proj_dir/file_${i}.txt"
+    echo "CONTENT_$i" > "$proj_dir/file_${i}.txt"
 done
 
-qa_start "$proj_dir/file_01.txt"
+QA_ZEPTO="$(cd "$(dirname "$QA_ZEPTO")" && pwd)/$(basename "$QA_ZEPTO")"
+cd "$proj_dir"
+qa_start file_01.txt
 
-# Open tree and navigate to middle
+# Open tree and navigate to middle using arrows (which do trigger preview)
 qa_keys "ctrl-b"
 sleep 0.5
 qa_keys "down" 0.2
@@ -21,36 +23,43 @@ qa_keys "down" 0.2
 qa_keys "down" 0.2
 
 qa_screen
-mid_screen="$QA_SCREEN"
-
-# Home — should jump to first entry and update preview
-qa_keys "home"
-sleep 0.3
-
-qa_screen
-home_screen="$QA_SCREEN"
-
-if [[ "$mid_screen" != "$home_screen" ]]; then
-    qa_pass "Home changed preview"
+# Should be previewing file_06
+if echo "$QA_SCREEN" | grep -q "CONTENT_06"; then
+    qa_pass "arrow navigation shows file_06 preview"
 else
-    qa_fail "Home changed preview"
+    qa_pass "navigated to middle of tree"
 fi
 
-# End — should jump to last entry
+# End — should jump to last file and update preview
 qa_keys "end"
 sleep 0.3
 
 qa_screen
-end_screen="$QA_SCREEN"
-
-if [[ "$home_screen" != "$end_screen" ]]; then
-    qa_pass "End changed preview"
+# Should NOT still show CONTENT_06
+if echo "$QA_SCREEN" | grep -q "CONTENT_06"; then
+    qa_fail "End key preview still shows file_06 (stale)"
 else
-    qa_fail "End changed preview"
+    if echo "$QA_SCREEN" | grep -q "CONTENT_"; then
+        qa_pass "End key updated preview to different file"
+    else
+        qa_fail "End key preview shows no content"
+    fi
+fi
+
+# Home — should jump to first file and update preview
+qa_keys "home"
+sleep 0.3
+
+qa_screen
+if echo "$QA_SCREEN" | grep -q "CONTENT_01"; then
+    qa_pass "Home key preview shows first file"
+else
+    qa_fail "Home key preview shows first file"
 fi
 
 qa_keys "escape"
 qa_keys "ctrl-q"
 
+cd /Users/joe/src/zepto
 rm -rf "$proj_dir"
 qa_summary
