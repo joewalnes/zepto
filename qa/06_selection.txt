@@ -297,3 +297,33 @@ VERIFY
   - Selection background (blue) is applied.
   - Syntax foreground colors remain visible on top.
   - Contrast remains readable.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-019
+NAME:     Shift+Page Down/Up extends selection by page
+PRIORITY: P1
+FEATURE:  selection
+
+STEPS
+  1. Place cursor at line 5. Hold Shift, press Page Down.
+  2. Hold Shift, press Page Up.
+
+VERIFY
+  - Selection extends/contracts by viewport height.
+  - Status bar shows updated selection range.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEL-020
+NAME:     Shift+Ctrl+Home/End selects to doc start/end
+PRIORITY: P1
+FEATURE:  selection
+
+STEPS
+  1. Cursor at middle of document. Shift+Ctrl+End.
+  2. Shift+Ctrl+Home from same position.
+
+VERIFY
+  - Selection extends to end/start of document respectively.
+  - Typing replaces entire selection.

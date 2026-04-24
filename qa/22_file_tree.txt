@@ -384,3 +384,57 @@ STEPS
 
 VERIFY
   - Tree scrolls to match thumb position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-024
+NAME:     Page Down/Up navigates tree and triggers preview
+PRIORITY: P1
+FEATURE:  tree navigation
+RELATED:  QA-TREE-003
+
+STEPS
+  1. Open tree (⌃B), focus tree.
+  2. Press Page Down.
+  3. Press Page Up.
+
+VERIFY
+  - Cursor jumps by viewport height in tree listing.
+  - Preview updates to show the newly highlighted file.
+  - Behavior is identical to pressing Down multiple times
+    (including preview).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-025
+NAME:     Home/End in tree jump to first/last and trigger preview
+PRIORITY: P1
+FEATURE:  tree navigation
+RELATED:  QA-TREE-003
+
+STEPS
+  1. Open tree, navigate to middle of listing.
+  2. Press Home.
+  3. Press End.
+
+VERIFY
+  - Home jumps to first item in tree.
+  - End jumps to last visible item.
+  - Preview updates in both cases.
+  - Works regardless of tree scroll position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-026
+NAME:     Mouse scroll in tree
+PRIORITY: P2
+FEATURE:  tree mouse
+RELATED:  QA-MS-006
+
+STEPS
+  1. Open tree with many files.
+  2. Scroll wheel in tree area.
+
+VERIFY
+  - Tree scrolls (not the editor).
+  - Smooth one-line-per-event scrolling.

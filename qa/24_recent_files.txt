@@ -173,3 +173,33 @@ STEPS
 
 VERIFY
   - Picker wider than commands palette.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-012
+NAME:     Page Down/Up in recent files list
+PRIORITY: P2
+FEATURE:  recent navigation
+
+STEPS
+  1. ⌃E to open recent files with many entries.
+  2. Press Page Down, then Page Up.
+
+VERIFY
+  - Highlight jumps by viewport height.
+  - Selection remains within bounds.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-RCN-013
+NAME:     Home/End in recent files list
+PRIORITY: P2
+FEATURE:  recent navigation
+
+STEPS
+  1. ⌃E, navigate into the list.
+  2. Press Home, then End.
+
+VERIFY
+  - Home jumps to first recent file.
+  - End jumps to last recent file.

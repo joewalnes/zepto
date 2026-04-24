@@ -247,3 +247,21 @@ VERIFY
   - Lines re-wrap to the new width.
   - No rendering artifacts.
   - Scroll up/down still works.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-WRAP-015
+NAME:     Home/End on continuation rows
+PRIORITY: P2
+FEATURE:  wrap navigation
+RELATED:  QA-WRAP-006
+
+STEPS
+  1. Long line wrapped across 3+ visual rows. Cursor on middle row.
+  2. Press Home — should go to start of visual row (or logical line start).
+  3. Press End — should go to end of visual row (or logical line end).
+
+VERIFY
+  - Home/End behavior is consistent with arrow key behavior on
+    continuation rows.
+  - Smart Home cycling works: first-nonws → col 1 → doc start.

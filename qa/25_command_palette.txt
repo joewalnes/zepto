@@ -318,3 +318,34 @@ STEPS
 VERIFY
   - Text cursor moves to clicked position within the filter input.
   - Further typing inserts at that position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PAL-022
+NAME:     Page Down/Up in command palette
+PRIORITY: P2
+FEATURE:  palette navigation
+RELATED:  QA-PAL-007
+
+STEPS
+  1. Open palette (⌃Space) with no filter (full command list).
+  2. Press Page Down, then Page Up.
+
+VERIFY
+  - Highlight jumps by viewport height, skipping section headers.
+  - Commands remain visible and selectable.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PAL-023
+NAME:     Home/End in command palette
+PRIORITY: P2
+FEATURE:  palette navigation
+
+STEPS
+  1. Open palette, navigate into the list.
+  2. Press Home, then End.
+
+VERIFY
+  - Home jumps to first command.
+  - End jumps to last command.

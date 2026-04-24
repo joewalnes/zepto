@@ -411,3 +411,33 @@ STEPS
 VERIFY
   - "Find and Replace" entry is present under NAVIGATE.
   - Opens find bar with replace field visible from the start.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-025
+NAME:     Home/End in find input field
+PRIORITY: P2
+FEATURE:  find input
+
+STEPS
+  1. ⌃F, type a long query like "abcdefghij".
+  2. Press Home — cursor moves to start of input.
+  3. Press End — cursor moves to end of input.
+
+VERIFY
+  - Home/End navigate within the find input text, not the document.
+  - Arrow keys also work within input.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-026
+NAME:     Alt+Left/Right word motion in find input
+PRIORITY: P3
+FEATURE:  find input
+
+STEPS
+  1. ⌃F, type "hello world foo".
+  2. Press Alt+Left/Right.
+
+VERIFY
+  - Cursor jumps by word within the input field.

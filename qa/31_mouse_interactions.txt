@@ -265,3 +265,36 @@ STEPS
 VERIFY
   - Hover events fire (tabs/pills/tree highlight on motion).
   - Terminal supports the ?1003 any-event mode (most modern terminals).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-019
+NAME:     Scroll wheel in file tree
+PRIORITY: P2
+FEATURE:  mouse tree scroll
+RELATED:  QA-MS-006, QA-TREE-022
+
+STEPS
+  1. Open tree with many files.
+  2. Scroll wheel over the tree panel area.
+
+VERIFY
+  - Tree scrolls, not the editor.
+  - Scrolling is smooth (one line per event).
+  - No horizontal drift.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-020
+NAME:     Scroll wheel in command palette
+PRIORITY: P2
+FEATURE:  mouse palette scroll
+
+STEPS
+  1. Open palette (⌃Space), ensure many commands visible.
+  2. Scroll wheel over the palette.
+
+VERIFY
+  - Palette list scrolls.
+  - Highlight remains visible.
+  - No scroll leakage to editor behind palette.

@@ -275,3 +275,35 @@ VERIFY
   - File found even at scale.
   - Perhaps scoring capped at 5000 items for performance, but substring
     filter continues over all.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-018
+NAME:     Page Down/Up navigates file picker list
+PRIORITY: P2
+FEATURE:  picker navigation
+RELATED:  QA-PICK-004
+
+STEPS
+  1. ⌃O to open picker with many results.
+  2. Press Page Down several times.
+  3. Press Page Up.
+
+VERIFY
+  - Highlight jumps by viewport height.
+  - Preview updates on each page jump (if preview is supported).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PICK-019
+NAME:     Home/End in file picker
+PRIORITY: P2
+FEATURE:  picker navigation
+
+STEPS
+  1. ⌃O, navigate into the list.
+  2. Press Home, then End.
+
+VERIFY
+  - Home jumps to first result.
+  - End jumps to last result.

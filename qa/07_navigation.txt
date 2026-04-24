@@ -303,3 +303,18 @@ STEPS
 VERIFY
   - In column mode: arrows extend column selection.
   - After Esc: column mode exits; arrows behave normally.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-018
+NAME:     Page Down/Up in word-wrap mode
+PRIORITY: P2
+FEATURE:  navigation wrap
+RELATED:  QA-WRAP-001
+
+STEPS
+  1. Long file with wrap on. Press Page Down.
+
+VERIFY
+  - Viewport scrolls by visual rows (not document lines).
+  - Cursor moves to matching visual position.

@@ -135,6 +135,8 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-SEL-009 — Arrow without Shift clears selection (T1)
 - QA-SEL-015 — Typing replaces selection (T1)
 - QA-SEL-016 — Backspace deletes selection (T1)
+- QA-SEL-019 — Shift+Page Down/Up extends selection by page
+- QA-SEL-020 — Shift+Ctrl+Home/End selects to doc start/end
 
 ### NAV (07_navigation.txt)
 
@@ -146,6 +148,7 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-NAV-007 — Ctrl+End jumps to doc end (T1)
 - QA-NAV-008 — Page Down scrolls by viewport (T1)
 - QA-NAV-009 — Page Up scrolls back (T1)
+- QA-NAV-018 — Page Down/Up in word-wrap mode
 
 ### GOTO (08_goto_and_history.txt)
 
@@ -170,6 +173,8 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-FIND-014 — Esc closes find bar (T1)
 - QA-FIND-015 — Reopen preselects previous query (T1)
 - QA-FIND-017 — Invalid regex no crash (T1)
+- QA-FIND-025 — Home/End in find input field
+- QA-FIND-026 — Alt+Left/Right word motion in find input
 
 ### FIF (10_find_in_files.txt)
 
@@ -190,6 +195,7 @@ text assertions. Tier 2 = LLM visual judgment.
 
 - QA-WRAP-001 — Alt+Z toggles wrap (T1)
 - QA-WRAP-002 — Markdown defaults to wrap ON (T1)
+- QA-WRAP-015 — Home/End on continuation rows
 
 ### LINE (14_line_operations.txt)
 
@@ -251,15 +257,22 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-TREE-005 — Left collapses directory (T1)
 - QA-TREE-006 — Enter opens file from tree (T1)
 - QA-TREE-007 — Esc returns focus to editor (T1)
+- QA-TREE-024 — Page Down/Up triggers preview (T1)
+- QA-TREE-025 — Home/End triggers preview (T1)
+- QA-TREE-026 — Mouse scroll in tree
 
 ### PICK (23_file_picker.txt)
 
 - QA-PICK-001 — Ctrl+O opens file picker (T1)
 - QA-PICK-003 — Fuzzy filtering (T1)
+- QA-PICK-018 — Page Down/Up in file picker
+- QA-PICK-019 — Home/End in file picker
 
 ### RCN (24_recent_files.txt)
 
 - QA-RCN-001 — Ctrl+E opens recent files (T1)
+- QA-RCN-012 — Page Down/Up in recent files
+- QA-RCN-013 — Home/End in recent files
 
 ### PAL (25_command_palette.txt)
 
@@ -268,6 +281,8 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-PAL-008 — Enter executes command (T1)
 - QA-PAL-013 — Esc clears filter then closes (T1)
 - QA-PAL-014 — Ctrl+Space toggles palette (T1)
+- QA-PAL-022 — Page Down/Up in palette
+- QA-PAL-023 — Home/End in palette
 
 ### SBAR (26_status_bar.txt)
 
@@ -309,6 +324,8 @@ text assertions. Tier 2 = LLM visual judgment.
 - QA-MS-012 — Drag tree border resizes (T1)
 - QA-MS-013 — Click Commands pill opens palette (T1)
 - QA-MS-017 — Mouse tracking cleanup on exit (T1)
+- QA-MS-019 — Scroll wheel in file tree
+- QA-MS-020 — Scroll wheel in command palette
 
 ### SYN (32_syntax_highlighting.txt)
 
