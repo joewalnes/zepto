@@ -827,3 +827,6 @@ When quitting zepto (`⌃Q`), everything above the cursor's vertical position re
 Moving a line with `⌥↓` or `⌥↑` then pressing `⌃Z` to undo corrupts the buffer — only one line remains visible, others disappear. Root cause: `_move_lines()` performs delete + insert as two separate undo actions; undoing only reverses the insert, leaving the delete in place.
 
 **Fix:** Wrapped the delete and insert calls in `_move_lines()` with `$doc->begin_undo_group()` / `$doc->end_undo_group()` so the entire move is one atomic undo operation. QA-LINE-009 unskipped.
+
+### P2: [Bug] File tree Page Down/Up and Home/End don't trigger preview
+In the file tree, pressing Page Down, Page Up, Home, or End moves the cursor but doesn't show the preview of the newly highlighted file. Regular Up/Down arrows do trigger preview correctly. The `pageup`/`pagedown`/`home`/`end` handlers in `handle_tree_event()` (`Editor.pm:4215-4218`) call the tree navigation methods but omit `$self->_tree_preview_current()` which Up/Down include.
