@@ -60,6 +60,6 @@ fi
 qa_keys "escape"
 qa_keys "ctrl-q"
 
-cd /Users/joe/src/zepto
+cd "$OLDPWD"
 rm -rf "$proj_dir"
 qa_summary

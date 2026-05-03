@@ -18,9 +18,14 @@ git add test.txt
 git commit -q -m "initial"
 
 # Modify line 15 to create a VCS change
-sed -i '' 's/line 15 original/line 15 MODIFIED/' test.txt
+# sed -i behaves differently on macOS vs Linux
+if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' 's/line 15 original/line 15 MODIFIED/' test.txt
+else
+    sed -i 's/line 15 original/line 15 MODIFIED/' test.txt
+fi
 
-cd /Users/joe/src/zepto
+cd "$OLDPWD"
 qa_start "$repo_dir/test.txt"
 sleep 1  # wait for VCS diff computation
 

@@ -42,6 +42,6 @@ qa_assert_not_screen "deep_nested" "nested file hidden after collapse"
 qa_keys "escape"
 qa_keys "ctrl-q"
 
-cd /Users/joe/src/zepto
+cd "$OLDPWD"
 rm -rf "$proj_dir"
 qa_summary
