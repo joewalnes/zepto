@@ -24,9 +24,40 @@ jobs:
       - name: Build
         run: make build
 
-  notify-failure:
+  qa:
     runs-on: ubuntu-latest
     needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+
+      - name: Install tmux
+        run: sudo apt-get install -y tmux
+
+      - name: Install hangon
+        run: |
+          go install github.com/joewalnes/hangon@main
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Build zepto
+        run: make build
+
+      - name: Run QA tests
+        run: make qa
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [test, qa]
     if: failure()
     steps:
       - name: Create failure issue
