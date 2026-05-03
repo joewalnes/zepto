@@ -79,16 +79,16 @@ loc:
 
 # Tier 1 only — deterministic hangon scripts (fast, free, no LLM)
 qa: build
-	@qa/runner.sh --tier 1
+	@perl qa/runner.pl --tier 1
 
 # Tier 1 + Tier 2 — includes LLM visual checks (requires API key)
 qa-visual: build
-	@qa/runner.sh --tier 1,2
+	@perl qa/runner.pl --tier 1,2
 
 # All automated tiers
 qa-full: build
-	@qa/runner.sh --tier 1,2,3
+	@perl qa/runner.pl --tier 1,2,3
 
 # List available QA scripts without running
 qa-list:
-	@qa/runner.sh --list --tier 1,2,3
+	@perl qa/runner.pl --list --tier 1,2,3
