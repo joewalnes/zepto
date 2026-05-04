@@ -832,3 +832,19 @@ Moving a line with `⌥↓` or `⌥↑` then pressing `⌃Z` to undo corrupts th
 In the file tree, pressing Page Down, Page Up, Home, or End moves the cursor but doesn't show the preview of the newly highlighted file. Regular Up/Down arrows do trigger preview correctly. The `pageup`/`pagedown`/`home`/`end` handlers in `handle_tree_event()` (`Editor.pm:4215-4218`) call the tree navigation methods but omit `$self->_tree_preview_current()` which Up/Down include.
 
 **Fix:** Added `$self->_tree_preview_current()` to all four handlers. QA-TREE-024 and QA-TREE-025 verify the fix.
+
+## QA test suite discoveries (2026-05-03)
+
+Bugs and observations found while expanding QA test coverage from 129 to 205+ scripts.
+
+### P3: Regex mode defaults to ON in find bar
+The find bar starts with regex mode enabled by default. Most editors (VS Code, Sublime, etc.) default to literal search. This means typing `foo.bar` matches `fooXbar` on first use, which is unexpected for most users. Toggle with ⌃R. Confirmed via QA-FIND-009.
+
+### P3: No "Save As" command in palette
+The command palette has "Save" (⌃S) and "Save and Close Tab" (⌃W) but no "Save As" / "Save to different location" command. File→Save As is a standard editor operation. Users can only save to the original path.
+
+### P3: Preference state persists between sessions
+Toggle states (minimap, word wrap, nerd font, etc.) persist to preferences. This means QA tests that toggle features can affect subsequent tests. Tests must save and restore state. Not a bug per se, but a testing hazard worth documenting.
+
+### P3: Transform (Alt+T) is shell-pipe only
+The transform feature (Alt+T) opens a shell command prompt. There are no built-in text transforms (uppercase, lowercase, sort, etc.) — users must type shell commands like `tr '[:lower:]' '[:upper:]'` or `sort`. This works but is not discoverable for users unfamiliar with Unix pipes.
