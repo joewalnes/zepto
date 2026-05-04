@@ -357,29 +357,42 @@ my @files;
 my $no_nerd_font = 0;
 my $no_tree = 0;
 my $force_tree = 0;
+my $state_dir = $ENV{ZEPTO_STATE_DIR} || '';
 
-for my $arg (@ARGV) {
-    if ($arg eq '--no-nerd-font' || $arg eq '--no-powerline' || $arg eq '-P') {
-        $no_nerd_font = 1;
-    } elsif ($arg eq '--no-tree') {
-        $no_tree = 1;
-    } elsif ($arg eq '--tree') {
-        $force_tree = 1;
-    } elsif ($arg eq '--help' || $arg eq '-h') {
-        print "Usage: zepto [options] [file ...]\n";
-        print "Options:\n";
-        print "  --install [path]    Install zepto (default: ~/.local/bin/zepto)\n";
-        print "  --version, -v       Show version\n";
-        print "  --no-nerd-font, -P  Disable Nerd Font glyphs\n";
-        print "  --tree              Show file tree on startup\n";
-        print "  --no-tree           Hide file tree on startup\n";
-        print "  --help, -h          Show this help\n";
-        print "\nEnvironment:\n";
-        print "  ZEPTO_NERD_FONT=0   Disable Nerd Font glyphs by default\n";
-        print "  ZEPTO_TREE=0        Hide file tree by default\n";
-        exit 0;
-    } elsif ($arg !~ /^-/) {
-        push @files, $arg;
+{
+    my @raw_args = @ARGV;
+    my $i = 0;
+    while ($i <= $#raw_args) {
+        my $arg = $raw_args[$i];
+        if ($arg eq '--no-nerd-font' || $arg eq '--no-powerline' || $arg eq '-P') {
+            $no_nerd_font = 1;
+        } elsif ($arg eq '--no-tree') {
+            $no_tree = 1;
+        } elsif ($arg eq '--tree') {
+            $force_tree = 1;
+        } elsif ($arg eq '--state-dir' && defined $raw_args[$i+1]) {
+            $state_dir = $raw_args[++$i];
+        } elsif ($arg =~ /^--state-dir=(.+)/) {
+            $state_dir = $1;
+        } elsif ($arg eq '--help' || $arg eq '-h') {
+            print "Usage: zepto [options] [file ...]\n";
+            print "Options:\n";
+            print "  --install [path]    Install zepto (default: ~/.local/bin/zepto)\n";
+            print "  --version, -v       Show version\n";
+            print "  --no-nerd-font, -P  Disable Nerd Font glyphs\n";
+            print "  --tree              Show file tree on startup\n";
+            print "  --no-tree           Hide file tree on startup\n";
+            print "  --state-dir DIR     State/prefs directory (default: ~/.config/zepto)\n";
+            print "  --help, -h          Show this help\n";
+            print "\nEnvironment:\n";
+            print "  ZEPTO_NERD_FONT=0   Disable Nerd Font glyphs by default\n";
+            print "  ZEPTO_TREE=0        Hide file tree by default\n";
+            print "  ZEPTO_STATE_DIR     Override state directory path\n";
+            exit 0;
+        } elsif ($arg !~ /^-/) {
+            push @files, $arg;
+        }
+        $i++;
     }
 }
 
@@ -392,7 +405,7 @@ if (@files == 1 && -d $files[0]) {
 }
 
 # Create state store and preferences (loads persisted values)
-my $state_store = Zepto::StateStore->new();
+my $state_store = Zepto::StateStore->new($state_dir ? (base_dir => $state_dir) : ());
 my $prefs = Zepto::Preferences->new(state_store => $state_store);
 
 # CLI flags and env vars override persisted preferences

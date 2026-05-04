@@ -41,6 +41,10 @@ _RESET=$'\033[0m'
 # Create a temp directory for this test run
 qa_setup() {
     QA_TMPDIR=$(mktemp -d /tmp/zepto_qa_XXXXXX)
+    # Each test gets isolated state/preferences (no cross-test pollution)
+    QA_STATE_DIR="$QA_TMPDIR/.zepto_state"
+    mkdir -p "$QA_STATE_DIR"
+    export ZEPTO_STATE_DIR="$QA_STATE_DIR"
     # Ensure hangon is available
     if ! command -v hangon &>/dev/null; then
         echo "${_RED}ERROR: hangon not found in PATH. Install: brew install joewalnes/tap/hangon${_RESET}" >&2
