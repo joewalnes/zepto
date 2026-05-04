@@ -6,6 +6,20 @@ qa_header "QA-EDIT-020: Bracket auto-close"
 file=$(qa_tmpfile_nl "edit020.js" "")
 qa_start "$file"
 
+# Ensure auto-pairs is ON
+qa_keys "ctrl-space"
+qa_send "auto pair" 0.3
+qa_screen
+if echo "$QA_SCREEN" | grep -q '\[off\]'; then
+    qa_keys "enter" 0.3
+    qa_keys "escape" 0.2
+    qa_keys "escape" 0.2
+else
+    qa_keys "escape" 0.2
+    qa_keys "escape" 0.2
+fi
+sleep 0.3
+
 # Type opening bracket — should auto-insert closing bracket
 qa_send "("
 sleep 0.2

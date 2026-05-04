@@ -5,6 +5,7 @@ qa_header "QA-MS-012: Drag tree border resize"
 
 file=$(qa_tmpfile_nl "ms012.txt" "hello world test content here that is long enough to see")
 qa_start "$file"
+sleep 0.3
 
 # Open tree
 qa_keys "ctrl-b"
