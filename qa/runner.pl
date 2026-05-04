@@ -247,10 +247,11 @@ sub hangon_quiet { system("hangon @_ >/dev/null 2>&1"); }
 # Ensure clean hangon state
 # ---------------------------------------------------------------------------
 
-# Remove potentially corrupt state file from prior runs
+# Kill stale tmux sessions and reset hangon state
+system("tmux kill-server >/dev/null 2>&1");
 my $hangon_state = "$ENV{HOME}/.hangon/state.json";
 unlink $hangon_state if -e $hangon_state;
-hangon_quiet('stopall');
+sleep 0.5;
 
 # ---------------------------------------------------------------------------
 # Run scripts
@@ -340,7 +341,7 @@ if ($serial) {
             $running{$pid} = $name;
 
             # Stagger launches to reduce hangon state.json contention
-            sleep 0.1 if $next_idx <= $#scripts;
+            sleep 0.15 if $next_idx <= $#scripts;
         }
     };
 
