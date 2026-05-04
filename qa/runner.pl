@@ -247,8 +247,8 @@ sub hangon_quiet { system("hangon @_ >/dev/null 2>&1"); }
 # Ensure clean hangon state
 # ---------------------------------------------------------------------------
 
-# Kill stale tmux sessions and reset hangon state
-system("tmux kill-server >/dev/null 2>&1");
+# Reset hangon state — stop all sessions and clean state file
+hangon_quiet('stopall');
 my $hangon_state = "$ENV{HOME}/.hangon/state.json";
 unlink $hangon_state if -e $hangon_state;
 sleep 0.5;
