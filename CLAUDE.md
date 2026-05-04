@@ -75,28 +75,79 @@ The `qa/` directory contains the end-to-end QA test plan — one test case
 per user-visible behavior. It is the executable spec that a QA engineer
 (or future you) uses to validate a release.
 
-**Every new feature, bug fix, or behavioral discovery must update the QA plan.**
+**Every new feature, bug fix, or behavioral discovery must have a QA script. No exceptions.**
 
-- **New feature**: add a test case to the appropriate `qa/NN_*.txt` file
-  covering happy path, key edge cases, and how to verify the feature is
-  discoverable from the UI.
-- **Bug fix (including regressions)**: add a `QA-REG-###` entry to
-  `qa/40_regression_bugs.txt` with a cross-ref to the primary feature
-  test. The regression file is a flat index of every fixed bug.
+This means:
+- **New feature**: add an executable test script in `qa/scripts/tier1/` AND
+  a test case to the appropriate `qa/NN_*.txt` file covering happy path,
+  key edge cases, and how to verify the feature is discoverable from the UI.
+- **Bug fix (including regressions)**: add a test script that reproduces
+  the bug AND a `QA-REG-###` entry to `qa/40_regression_bugs.txt` with a
+  cross-ref to the primary feature test.
 - **Behavioral discovery**: when you learn something non-obvious about
   how Zepto behaves (from code reading, user report, or interactive
-  testing), add a test case so it can't regress silently.
+  testing), add a test script and test case so it can't regress silently.
 - **Always update `qa/CATALOG.md`**: add the new test ID under the right
   file's section. IDs are stable — never renumber. To retire a test,
   mark it `[RETIRED]` in place rather than deleting.
+- **Run `make qa`** to verify the new test passes along with all existing tests.
+
+Work is not done until the QA script exists and passes. "I'll add the test later" is not acceptable.
 
 Test IDs are `QA-<TAG>-<NNN>` where `<TAG>` is the 3-6 char feature tag
 listed in `qa/CATALOG.md`. Use the next unused number within that tag.
 
-If a change doesn't warrant any QA update — which should be rare — say
-so explicitly rather than skipping silently (same rule as Rule 2).
-
 Full plan: `qa/README.md`.
+
+---
+
+## Cross-platform compatibility
+
+Zepto targets macOS, Linux, and most Unix-like systems. The only runtime dependency is Perl (core modules only — no CPAN). Testing requires a few additional tools (see below).
+
+### Runtime
+
+- **Perl standard library only.** No CPAN modules — Zepto ships as a single self-contained file.
+- **No platform-specific system calls or paths.** Use portable Perl idioms. Avoid anything that assumes a specific OS layout.
+
+### Code and scripts
+
+- **No hardcoded paths.** Never embed `/Users/joe/...` or any machine-specific path. Use `$PWD`, `$OLDPWD`, `$HOME`, `$(dirname "$0")`, or variables.
+- **No platform-specific commands without guards.** `sed -i ''` is macOS-only; GNU `sed -i` has no empty argument. Use a platform check (`if [[ "$(uname)" == "Darwin" ]]`) or avoid the divergent syntax entirely. Same applies to `stat`, `readlink`, `mktemp` flags, clipboard commands, etc.
+- **Prefer POSIX-compatible shell constructs** where possible. When bash-isms are needed, scripts must use `#!/usr/bin/env bash`.
+
+### Testing dependencies
+
+These are required for development/CI but not for end users:
+
+| Tool | Purpose |
+|------|---------|
+| Perl 5.20+ | Runtime + unit tests (`make test`) |
+| `prove` | Test harness (ships with Perl) |
+| `hangon` | QA session automation (`make qa`) |
+| `tmux` | Required by hangon |
+| `git` | VCS integration tests |
+
+### Verification
+
+When in doubt, ask: "would this work on a fresh Ubuntu runner with just Perl, tmux, hangon, and git?"
+
+---
+
+## No sloppy assumptions
+
+Be precise. Don't assume things that could change or differ between environments.
+
+- **Don't hardcode paths** — compute them from context (`$PWD`, `$OLDPWD`, `$(dirname "$0")`).
+- **Don't assume directory structure** — use variables, not string literals.
+- **Don't assume tool behavior is uniform** — verify flags work on both macOS and Linux.
+- **Don't write tautological tests** — every assertion must fail if the feature is broken. Ask: "would this pass on a no-op implementation?" See `qa/README.md` for anti-patterns.
+- **Don't leave temp state** — clean up temp files, sessions, and directories. Use traps.
+
+Past examples of sloppy assumptions that caused CI failures:
+- `cd /Users/joe/src/zepto` hardcoded in 5 test scripts — broke on Ubuntu
+- `sed -i ''` — macOS-only syntax, fails on Linux
+- Tests that asserted "screen changed" instead of checking specific content — passed even when features were broken
 
 ---
 
@@ -196,7 +247,7 @@ Before every commit, verify each rule in order:
 | 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
 | 6 | Bug tracking | Any bugs found (even incidentally) are recorded in `bugs.md` |
 | 7 | Code quality | Changes follow existing conventions; no new patterns introduced without reason |
-| 8 | QA plan current | New feature → new test case in the right `qa/NN_*.txt`. Bug fix → new `QA-REG-###` in `qa/40_regression_bugs.txt`. Discovery → corresponding test case. Update `qa/CATALOG.md` with new IDs. |
+| 8 | QA plan current | New feature or bug fix → new executable test script in `qa/scripts/tier1/` + test case in the right `qa/NN_*.txt` + `qa/CATALOG.md` updated. Bug fix also gets `QA-REG-###` in `qa/40_regression_bugs.txt`. Run `make qa` to verify. No exceptions. |
 
 If any rule is not satisfied:
 - **Do not commit.**
