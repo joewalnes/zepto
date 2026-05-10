@@ -341,7 +341,9 @@ if ($serial) {
             $running{$pid} = $name;
 
             # Stagger launches to reduce hangon state.json contention
-            sleep 0.15 if $next_idx <= $#scripts;
+            # Scale stagger with total count to avoid tmux exhaustion
+            my $stagger = $total > 400 ? 0.25 : $total > 200 ? 0.2 : 0.15;
+            sleep $stagger if $next_idx <= $#scripts;
         }
     };
 
