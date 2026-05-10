@@ -17,7 +17,7 @@ line 16 original
 line 17 original
 line 18 original
 line 19 original
-line 20 original
+line 20 CHANGED
 line 21 original
 line 22 original
 line 23 original
@@ -47,7 +47,7 @@ line 46 original
 line 47 original
 line 48 original
 line 49 original
-line 50 original
+line 50 CHANGED
 line 51 original
 line 52 original
 line 53 original
@@ -77,7 +77,7 @@ line 76 original
 line 77 original
 line 78 original
 line 79 original
-line 80 original
+line 80 CHANGED
 line 81 original
 line 82 original
 line 83 original
