@@ -2,12 +2,8 @@
 # ===========================================================================
 # qa-helpers.sh — shared utilities for Zepto QA test scripts
 # ===========================================================================
-# Source this file at the top of every test script:
-#   source "$(dirname "$0")/../lib/qa-helpers.sh"
-#
-# Provides: qa_start, qa_stop, qa_send, qa_keys, qa_screen, qa_screenshot,
-#           qa_assert_screen, qa_assert_not_screen, qa_assert_file,
-#           qa_pass, qa_fail, qa_skip, qa_tmpfile, qa_cleanup
+# Source this at the top of every test script:
+#   source "$(dirname "$0")/../../lib/qa-helpers.sh"
 # ===========================================================================
 
 set -euo pipefail
@@ -26,7 +22,10 @@ QA_SKIPPED=0
 QA_TEST_NAME="${QA_TEST_NAME:-$(basename "$0" .sh)}"
 QA_TIER="${QA_TIER:-1}"
 
-# Colors for output
+# Internal tracking for auto-cleanup
+_QA_ORIG_DIR=""
+_QA_PROJECT_DIR=""
+
 _RED=$'\033[31m'
 _GREEN=$'\033[32m'
 _YELLOW=$'\033[33m'
@@ -38,32 +37,40 @@ _RESET=$'\033[0m'
 # Lifecycle
 # ---------------------------------------------------------------------------
 
-# Create a temp directory for this test run
 qa_setup() {
     QA_TMPDIR=$(mktemp -d /tmp/zepto_qa_XXXXXX)
-    # Each test gets isolated state/preferences (no cross-test pollution)
+    _QA_ORIG_DIR="$PWD"
+
+    # Isolated state dir per test (no cross-test preference pollution)
     QA_STATE_DIR="$QA_TMPDIR/.zepto_state"
     mkdir -p "$QA_STATE_DIR"
     export ZEPTO_STATE_DIR="$QA_STATE_DIR"
-    # Ensure hangon is available
+
+    # Resolve QA_ZEPTO to absolute path (needed before any cd)
+    QA_ZEPTO="$(cd "$(dirname "$QA_ZEPTO")" && pwd)/$(basename "$QA_ZEPTO")"
+
     if ! command -v hangon &>/dev/null; then
-        echo "${_RED}ERROR: hangon not found in PATH. Install: brew install joewalnes/tap/hangon${_RESET}" >&2
+        echo "${_RED}ERROR: hangon not found. Install: brew install joewalnes/tap/hangon${_RESET}" >&2
         exit 1
     fi
-    # Ensure zepto binary exists
     if [[ ! -x "$QA_ZEPTO" ]]; then
-        echo "${_RED}ERROR: $QA_ZEPTO not found or not executable. Run 'make build' first.${_RESET}" >&2
+        echo "${_RED}ERROR: $QA_ZEPTO not found. Run 'make build' first.${_RESET}" >&2
         exit 1
     fi
-    # Clean stale sessions with our prefix
     hangon stop "$QA_SESSION" 2>/dev/null || true
 }
 
-# Clean up temp files and sessions
 qa_cleanup() {
     hangon stop "$QA_SESSION" 2>/dev/null || true
+    # Restore original directory if we cd'd somewhere
+    if [[ -n "$_QA_ORIG_DIR" ]]; then
+        cd "$_QA_ORIG_DIR" 2>/dev/null || true
+    fi
     if [[ -n "$QA_TMPDIR" && -d "$QA_TMPDIR" ]]; then
         rm -rf "$QA_TMPDIR"
+    fi
+    if [[ -n "$_QA_PROJECT_DIR" && -d "$_QA_PROJECT_DIR" ]]; then
+        rm -rf "$_QA_PROJECT_DIR"
     fi
 }
 trap qa_cleanup EXIT
@@ -74,8 +81,6 @@ trap qa_cleanup EXIT
 
 # Start zepto in a hangon session
 #   qa_start [args...]
-# Example: qa_start /tmp/test.txt
-#          qa_start --no-nerd-font /tmp/test.txt
 qa_start() {
     hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" "$@"
     sleep "$QA_RENDER_WAIT"
@@ -86,69 +91,114 @@ qa_stop() {
     hangon stop "$QA_SESSION" 2>/dev/null || true
 }
 
+# Restart zepto (quit + relaunch). Same state dir, fresh session.
+#   qa_restart [args...]
+# Use after qa_keys "ctrl-q" to test preference persistence, etc.
+qa_restart() {
+    qa_stop
+    sleep 0.3
+    qa_start "$@"
+}
+
 # Check if session is alive (exit 0 = alive)
 qa_alive() {
     hangon alive "$QA_SESSION" 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
+# Project & git helpers
+# ---------------------------------------------------------------------------
+
+# Create a project directory and cd into it. Auto-cleaned on exit.
+# Returns the directory path. QA_ZEPTO is already absolute.
+#   dir=$(qa_project)
+#   echo "content" > "$dir/file.txt"
+#   qa_start file.txt
+qa_project() {
+    _QA_PROJECT_DIR=$(mktemp -d /tmp/zepto_qa_proj_XXXXXX)
+    cd "$_QA_PROJECT_DIR"
+    echo "$_QA_PROJECT_DIR"
+}
+
+# Create a git repo project directory. Cd into it.
+# Initializes git with test user config.
+#   dir=$(qa_git_repo)
+#   echo "content" > file.txt && git add . && git commit -m "init"
+qa_git_repo() {
+    local dir
+    dir=$(qa_project)
+    git init -q
+    git config user.email "test@test.com"
+    git config user.name "Test"
+    echo "$dir"
+}
+
+# Portable sed -i (macOS vs GNU)
+qa_sed_i() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Input
 # ---------------------------------------------------------------------------
 
-# Type literal text
 qa_send() {
     hangon send "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
-# Send special keys (ctrl-a, enter, escape, etc.)
 qa_keys() {
     hangon keys "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
-# Send raw bytes (for key combos not in hangon's key map)
-#   qa_raw $'\x1b[32;5u'
+# Send raw escape sequences
 qa_raw() {
     hangon send "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
-# Send raw bytes from stdin (for NUL bytes or binary data)
-#   printf '\x00' | qa_raw_stdin
 qa_raw_stdin() {
     hangon send "$QA_SESSION" --stdin
     sleep "${1:-$QA_RENDER_WAIT}"
 }
 
-# Send a line of text (text + enter)
 qa_sendline() {
     hangon sendline "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
-# Wait for a regex pattern to appear on screen (with timeout)
 qa_expect() {
     local pattern="$1"
     local timeout="${2:-5}"
-    if ! hangon expect "$QA_SESSION" "$pattern" --timeout "$timeout" 2>/dev/null; then
-        return 1
-    fi
-    return 0
+    hangon expect "$QA_SESSION" "$pattern" --timeout "$timeout" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Mouse
+# ---------------------------------------------------------------------------
+
+# Move mouse to position without clicking (triggers hover)
+#   qa_hover 40 10
+qa_hover() {
+    local x="$1" y="$2"
+    # SGR mouse motion: ESC [ < 35 ; x ; y M (35 = motion, no button)
+    qa_raw "$(printf '\x1b[<35;%d;%dM' "$x" "$y")"
 }
 
 # ---------------------------------------------------------------------------
 # Screen capture
 # ---------------------------------------------------------------------------
 
-# Capture current screen as text, store in $QA_SCREEN
 QA_SCREEN=""
 qa_screen() {
     QA_SCREEN=$(hangon screen "$QA_SESSION" 2>/dev/null || echo "")
 }
 
-# Capture screen as PNG screenshot
-#   qa_screenshot /path/to/file.png
 qa_screenshot() {
     hangon screenshot "$QA_SESSION" "$1" 2>/dev/null
 }
@@ -157,8 +207,6 @@ qa_screenshot() {
 # Assertions
 # ---------------------------------------------------------------------------
 
-# Assert screen contains a pattern (grep -E)
-#   qa_assert_screen "pattern" "description"
 qa_assert_screen() {
     local pattern="$1"
     local desc="${2:-screen contains '$pattern'}"
@@ -170,7 +218,6 @@ qa_assert_screen() {
     fi
 }
 
-# Assert screen does NOT contain a pattern
 qa_assert_not_screen() {
     local pattern="$1"
     local desc="${2:-screen does not contain '$pattern'}"
@@ -182,7 +229,6 @@ qa_assert_not_screen() {
     fi
 }
 
-# Assert a file exists on disk
 qa_assert_file_exists() {
     local path="$1"
     local desc="${2:-file exists: $path}"
@@ -193,7 +239,6 @@ qa_assert_file_exists() {
     fi
 }
 
-# Assert a file contains a pattern
 qa_assert_file_contains() {
     local path="$1"
     local pattern="$2"
@@ -205,7 +250,6 @@ qa_assert_file_contains() {
     fi
 }
 
-# Assert a file does NOT contain a pattern
 qa_assert_file_not_contains() {
     local path="$1"
     local pattern="$2"
@@ -217,7 +261,6 @@ qa_assert_file_not_contains() {
     fi
 }
 
-# Assert exit code of last command
 qa_assert_exit() {
     local expected="$1"
     local actual="$2"
@@ -229,7 +272,6 @@ qa_assert_exit() {
     fi
 }
 
-# Assert the session is no longer alive (editor exited)
 qa_assert_exited() {
     local desc="${1:-editor has exited}"
     sleep 0.3
@@ -243,18 +285,10 @@ qa_assert_exited() {
 # ---------------------------------------------------------------------------
 # Precise state extraction
 # ---------------------------------------------------------------------------
-# These helpers extract specific state from the screen, making it easy
-# to write precise assertions instead of weak "screen changed" checks.
-#
-# RULE: Never assert "before != after" — always assert the specific
-# expected state. Ask: "would this pass if the feature was broken?"
 
-# Extract cursor position from status bar (e.g. "5:12")
-#   qa_cursor_pos → sets QA_CURSOR_LINE and QA_CURSOR_COL
 qa_cursor_pos() {
     qa_screen
     local pos
-    # Status bar shows "LINE:COL" as the cursor position pill
     pos=$(echo "$QA_SCREEN" | tail -2 | grep -oE '[0-9]+:[0-9]+' | head -1 || true)
     if [[ -n "$pos" ]]; then
         QA_CURSOR_LINE="${pos%%:*}"
@@ -265,23 +299,18 @@ qa_cursor_pos() {
     fi
 }
 
-# Assert cursor is at a specific line (col optional)
-#   qa_assert_cursor_at 5 "description"
-#   qa_assert_cursor_at 5:12 "description"
 qa_assert_cursor_at() {
     local expected="$1"
     local desc="${2:-cursor at $expected}"
     qa_cursor_pos
     local actual="${QA_CURSOR_LINE}:${QA_CURSOR_COL}"
     if [[ "$expected" == *:* ]]; then
-        # Check line:col
         if [[ "$actual" == "$expected" ]]; then
             qa_pass "$desc"
         else
             qa_fail "$desc" "Expected $expected, got $actual"
         fi
     else
-        # Check line only
         if [[ "$QA_CURSOR_LINE" == "$expected" ]]; then
             qa_pass "$desc"
         else
@@ -290,7 +319,6 @@ qa_assert_cursor_at() {
     fi
 }
 
-# Assert cursor is NOT at a specific line (useful for "it moved away")
 qa_assert_cursor_not_at() {
     local unexpected="$1"
     local desc="${2:-cursor not at line $unexpected}"
@@ -302,7 +330,6 @@ qa_assert_cursor_not_at() {
     fi
 }
 
-# Extract the last line (status bar) from screen
 qa_status_bar() {
     qa_screen
     QA_STATUS_BAR=$(echo "$QA_SCREEN" | tail -1)
@@ -313,8 +340,7 @@ qa_status_bar() {
 # ---------------------------------------------------------------------------
 
 qa_pass() {
-    local desc="$1"
-    echo "  ${_GREEN}PASS${_RESET} $desc"
+    echo "  ${_GREEN}PASS${_RESET} $1"
     QA_PASSED=$((QA_PASSED + 1))
 }
 
@@ -322,10 +348,7 @@ qa_fail() {
     local desc="$1"
     local detail="${2:-}"
     echo "  ${_RED}FAIL${_RESET} $desc"
-    if [[ -n "$detail" ]]; then
-        echo "       ${_DIM}$detail${_RESET}"
-    fi
-    # Dump screen for debugging
+    [[ -n "$detail" ]] && echo "       ${_DIM}$detail${_RESET}"
     if [[ -n "$QA_SCREEN" ]]; then
         echo "       ${_DIM}--- screen snapshot ---${_RESET}"
         echo "$QA_SCREEN" | head -5 | sed 's/^/       /'
@@ -341,12 +364,10 @@ qa_skip() {
     QA_SKIPPED=$((QA_SKIPPED + 1))
 }
 
-# Print test header
 qa_header() {
     echo "${_CYAN}[$QA_TEST_NAME]${_RESET} $1"
 }
 
-# Print summary and exit with appropriate code
 qa_summary() {
     echo ""
     local total=$((QA_PASSED + QA_FAILED + QA_SKIPPED))
@@ -362,8 +383,6 @@ qa_summary() {
 # File helpers
 # ---------------------------------------------------------------------------
 
-# Create a temp file with content, return its path
-#   path=$(qa_tmpfile "filename.txt" "content here")
 qa_tmpfile() {
     local name="$1"
     local content="${2:-}"
@@ -373,7 +392,6 @@ qa_tmpfile() {
     echo "$path"
 }
 
-# Create a temp file with content ending in newline
 qa_tmpfile_nl() {
     local name="$1"
     local content="${2:-}"
@@ -387,20 +405,11 @@ qa_tmpfile_nl() {
 # LLM judge (Tier 2)
 # ---------------------------------------------------------------------------
 
-# Check if LLM judging is available
 qa_llm_available() {
-    if [[ "${ZEPTO_QA_SKIP_LLM:-0}" == "1" ]]; then
-        return 1
-    fi
-    if [[ -z "${ZEPTO_QA_API_KEY:-}" && -z "${ANTHROPIC_API_KEY:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
-        return 1
-    fi
-    return 0
+    [[ "${ZEPTO_QA_SKIP_LLM:-0}" != "1" ]] && \
+    [[ -n "${ZEPTO_QA_API_KEY:-}${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}" ]]
 }
 
-# Judge a screenshot with an LLM
-#   result=$(qa_llm_judge /path/to/screenshot.png "prompt question")
-# Returns "PASS" or "FAIL: reason"
 qa_llm_judge() {
     local screenshot="$1"
     local prompt="$2"
@@ -409,7 +418,6 @@ qa_llm_judge() {
     "$script_dir/llm-judge.sh" "$screenshot" "$prompt"
 }
 
-# Assert LLM judges screenshot as passing
 qa_assert_visual() {
     local screenshot="$1"
     local prompt="$2"
