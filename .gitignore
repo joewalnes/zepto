@@ -4,3 +4,14 @@ website/out/
 .DS_Store
 perflog*.txt
 foo.txt
+
+# Test scratch files must NEVER be created in the repo root. QA scripts and
+# unit tests create their own scratch dirs via mktemp/File::Temp (see
+# qa/lib/qa-helpers.sh: qa_project/qa_git_repo). These patterns exist as a
+# safety net in case a test is ever written incorrectly and leaks debris
+# into the repo root — they should normally never match anything tracked.
+/file_*.txt
+/item_*.txt
+/*.tmp
+/node_modules/
+/.venv/

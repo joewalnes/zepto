@@ -1,4 +1,4 @@
-.PHONY: all test test-verbose clean build install check loc website website-screencaps website-clean qa qa-visual qa-full qa-list
+.PHONY: all test test-verbose clean build install check loc website website-screencaps website-clean qa qa-visual qa-full qa-list qa-coverage
 
 PREFIX ?= $(HOME)/.local
 
@@ -92,3 +92,7 @@ qa-full: build
 # List available QA scripts without running
 qa-list:
 	@perl qa/runner.pl --list --tier 1,2,3
+
+# Report documented-vs-scripted QA coverage (qa/CATALOG.md numbers)
+qa-coverage:
+	@perl qa/coverage.pl

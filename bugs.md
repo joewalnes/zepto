@@ -848,3 +848,25 @@ Toggle states (minimap, word wrap, nerd font, etc.) persist to preferences. This
 
 ### P3: Transform (Alt+T) is shell-pipe only
 The transform feature (Alt+T) opens a shell command prompt. There are no built-in text transforms (uppercase, lowercase, sort, etc.) — users must type shell commands like `tr '[:lower:]' '[:upper:]'` or `sort`. This works but is not discoverable for users unfamiliar with Unix pipes.
+
+## Repo audit / hygiene bugs (2026-07-09)
+
+Bugs found during a repo-wide hygiene and quality audit (Phase 0). Filing only — fixes deferred to Phase 2.
+
+### P1: Mouse drag above first visual row in word-wrap mode jumps selection/view to end of document
+With word wrap enabled, dragging the mouse above the first visible row (e.g. dragging a selection upward past the top of the viewport) jumps the selection/view to the *end* of the document instead of extending toward the start. `WrapMap::visual_to_doc` (`WrapMap.pm:386-393`) returns the last document line whenever `segment_at_visual_row($vrow)` fails to find a segment — which happens both when `$vrow` is beyond the last row (correct) and when `$vrow` is negative, i.e. above the first row (incorrect: should clamp to line 0, col 0). Any caller that passes a negative vrow during an upward drag inherits this failure.
+
+### P2: Ghost completion renders offset from cursor in wrapped/markdown lines
+Inline ghost-text completion is anchored to the end of wrap-segment-0 content and rendered by character count rather than display width. In `Renderer.pm` (~2531-2544), the fill/ghost-text render path guards on `!$is_wrap_cont`, so on a wrapped line the ghost text only renders in the fill area after the *first* visual segment, not necessarily after the actual cursor position if the cursor has moved into a later wrap segment. Combined with `length($ghost)` / `substr($ghost, 0, $fill_remaining)` truncation using character counts instead of display-width-aware truncation, wide characters (CJK, emoji) or Markdown-rendered lines (table cells, etc.) cause the ghost suggestion to visually land in the wrong column, offset from where the cursor actually is.
+
+### P1: cmd_transform open3 sequential-slurp can deadlock/hang UI indefinitely
+`cmd_transform` in `Editor/Commands.pm` (~1006-1018) pipes buffer content through a user shell command via `IPC::Open3::open3`, then reads stdout and stderr sequentially: `$output = <$out_fh>; $stderr_text = <$err_fh>;` with no `select()`/`IO::Select` loop and no timeout. If the child process writes enough to stderr to fill its pipe buffer before the stdout read completes (or vice versa — e.g. a command that alternates output and interleaves large stderr output), both processes can block forever: the child blocks writing to a full stderr pipe, and the parent blocks waiting to finish reading stdout before it ever reads stderr. There is no way to cancel or time out, so the whole UI hangs indefinitely. The same pattern (blocking pipe I/O with no timeout) also affects clipboard pipe helpers and render-path git invocations elsewhere in the codebase — worth a broader audit, not just this call site.
+
+### P2: Ruler cursor-column indicator partially overwrites tick labels
+The gutter/ruler's cursor-column indicator can render on top of the ruler's tick-mark labels instead of replacing or spacing around them cleanly. For example, at column 18 the ruler renders `18 0` where the tick label `|20` was expected — the cursor-column digits and the tick label digits are interleaved/overlapping rather than one cleanly taking precedence, producing garbled output instead of either label.
+
+### P2: Open File picker — Enter on a non-matching absolute path outside cwd is a silent no-op
+In the Open File picker (⌃O), typing an absolute path that lies outside the current project root and that matches no discovered files, then pressing Enter, does nothing: no error message, no "file not found", and no offer to create a new file at that path. The user gets no feedback that their input was rejected and no indication of what to do next.
+
+### P2: Mouse events never dismiss active ghost completion; stale suggestion re-renders at new cursor position
+Ghost-text completion is dismissed by various keyboard actions (see the P3 "re-trigger after undo" fix history above) but mouse clicks and drags are never checked. Clicking or dragging the mouse to reposition the cursor while a ghost suggestion is showing leaves the stale suggestion in `Completion::Controller` state; on the next render it reappears anchored to the new cursor position, showing a completion that was computed for a different location/context than where the cursor now is.
