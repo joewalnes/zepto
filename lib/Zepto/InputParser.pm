@@ -89,7 +89,13 @@ sub parse {
 sub flush_pending {
     my ($self) = @_;
 
-    if ($self->{buffer} eq "\x1b") {
+    # Any incomplete escape fragment stuck at read-timeout — a lone ESC,
+    # an abandoned CSI/SS3 introducer, or a bracketed-paste end marker
+    # split across reads on a stalled machine — must resolve to a
+    # standalone Escape key. Matching only the exact single-byte "\x1b"
+    # left longer fragments pending forever, dropping the Escape and
+    # letting the fragment swallow the next typed key as a bogus CSI.
+    if (length($self->{buffer}) && substr($self->{buffer}, 0, 1) eq "\x1b") {
         $self->{buffer} = '';
         return { type => EVT_KEY, key => KEY_ESCAPE, modifiers => [] };
     }

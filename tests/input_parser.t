@@ -445,4 +445,64 @@ subtest 'describe_event' => sub {
     like(Zepto::InputParser::describe_event($mouse_evt), qr/mouse:press\@10,5/, 'Describe mouse');
 };
 
+# overloaded) was left buffered forever: flush_pending() returned undef,
+# so the pending Escape keypress was silently dropped (explains "the panel
+# never closes"), and worse, the abandoned fragment was still sitting at
+# the front of the buffer waiting to be combined with whatever the user
+# typed *next* — which can silently swallow/corrupt those keystrokes (see
+# the "eats subsequent input" subtest below).
+subtest 'Stuck incomplete escape sequence resolves to Escape on flush' => sub {
+    # Simulates a bracketed-paste end marker ("\x1b[201~") whose first two
+    # bytes ("\x1b[") land in one read, with the rest never arriving in
+    # time (a slow/loaded runner stalls between the two writes long enough
+    # for the idle-timeout to fire first).
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[");
+    is(scalar @events, 0, 'Incomplete CSI introducer returns no events yet');
+
+    my $event = $parser->flush_pending();
+    ok($event, 'Flush resolves the stuck fragment to an event')
+        or diag('flush_pending() returned undef — pending Escape was dropped, buffer stuck forever');
+    is($event && $event->{key}, 'escape', 'Stuck "\\x1b[" resolves to a standalone Escape key, not left pending');
+
+    # A real, pending single-byte ESC must still work exactly as before.
+    $parser = Zepto::InputParser->new();
+    $parser->parse("\x1b");
+    $event = $parser->flush_pending();
+    is($event->{key}, 'escape', 'Plain lone ESC still resolves to Escape (no regression)');
+
+    # Incomplete SS3 introducer (e.g. a split F1-F4 sequence) must resolve
+    # the same way — never left stuck, never leaked as literal text.
+    $parser = Zepto::InputParser->new();
+    $parser->parse("\x1bO");
+    $event = $parser->flush_pending();
+    is($event && $event->{key}, 'escape', 'Stuck "\\x1bO" (incomplete SS3) resolves to Escape');
+};
+
+subtest 'Stuck escape fragment does not corrupt subsequent typed input' => sub {
+    # This is the concrete mechanism behind the literal "hello^[" / dropped
+    # characters symptom: with the old flush_pending(), an abandoned
+    # "\x1b[" fragment sits at the front of the buffer. If the FIF Escape
+    # keypress that caused it is never actually flushed by the main loop
+    # before the user's *next* keystrokes arrive, those bytes glue onto
+    # the stuck buffer as "\x1b[hello" — and 'h' (ord 104) falls inside
+    # the CSI final-byte range (64-126), so _parse_csi silently consumes
+    # "\x1b[h" as an unrecognized (discarded) CSI sequence, corrupting
+    # "hello" down to "ello" with zero events emitted for the dropped 'h'.
+    #
+    # The fix works one layer up: Editor::flush_pending_input() is called
+    # on every idle timeout, so a stuck fragment like "\x1b[" is resolved
+    # to a standalone Escape key (and the buffer cleared) *before* any
+    # later keystroke can ever reach it. Simulate that idle flush here.
+    my $parser = Zepto::InputParser->new();
+    $parser->parse("\x1b[");
+
+    $parser->flush_pending();  # main loop calls this once nothing arrives
+
+    my @events = $parser->parse('hello');
+    is(scalar @events, 5, 'All five characters of "hello" arrive intact after the stuck fragment was flushed')
+        or diag('Got ' . scalar(@events) . ' events: ' . join(',', map { $_->{char} // $_->{key} // '?' } @events));
+    is(join('', map { $_->{char} // '' } @events), 'hello', 'No characters dropped or mangled');
+};
+
 done_testing();
