@@ -50,9 +50,12 @@ my %DEFAULTS = (
     mouse_enabled    => 1,
     scroll_margin    => 3,        # Lines to keep above/below cursor
 
-    # AI completion
-    ai_api_url       => 'https://openrouter.ai/api/v1',
-    ai_model         => 'anthropic/claude-haiku-4-5-20251001',
+    # AI completion — ships disabled/unconfigured. Defaults come from the
+    # provider preset the user picks in the Settings dialog (see
+    # Zepto::AIProviders), not a hardcoded value here.
+    ai_provider      => '',
+    ai_api_url       => '',
+    ai_model         => '',
 
     # File handling
     backup_on_save   => 0,        # Create .bak files
@@ -79,6 +82,7 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     auto_complete
     auto_pairs
     mouse_enabled
+    ai_provider
     ai_api_url
     ai_model
     hang_detector

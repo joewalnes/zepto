@@ -16,6 +16,8 @@ use IO::Select;
 use POSIX qw(WNOHANG setpgid);
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 use Time::HiRes qw(time);
+use Zepto::AIHttp;
+use Zepto::AIProviders;
 
 # Check if editor is in a modal input state (footer_input, prompt, find, dialog)
 sub _in_modal_state {
@@ -1381,67 +1383,72 @@ sub cmd_toggle_ai {
     my $ai = $self->{_ai_complete};
     return unless $ai;
 
-    if (!$ai->{api_key} || !length($ai->{api_key})) {
-        $self->show_message("No API key configured. Run 'AI Completion: Setup' first.");
+    # Turning OFF: always allowed, no consent needed.
+    if ($ai->{enabled}) {
+        $ai->{enabled} = 0;
+        $ai->cancel();
+        $self->{message} = "AI Completion: OFF";
         return;
     }
 
-    $ai->{enabled} = $ai->{enabled} ? 0 : 1;
-    if (!$ai->{enabled}) {
-        $ai->cancel();
+    # Turning ON: must be configured first.
+    unless (length($ai->{api_url}) && length($ai->{model})) {
+        $self->show_message("AI not configured. Run 'AI: Configure' first.");
+        return;
     }
-    $self->{message} = "AI Completion: " . ($ai->{enabled} ? "ON" : "OFF");
+    unless (Zepto::AIHttp::curl_available()) {
+        $self->show_message("AI completion requires curl (not found on PATH).");
+        return;
+    }
+    my $provider = Zepto::AIProviders::get($ai->{provider_id});
+    my $needs_key = !$provider || (($provider->{auth} // 'bearer') ne 'none');
+    if ($needs_key && !length($ai->{api_key})) {
+        $self->show_message("No API key configured. Run 'AI: Configure' first.");
+        return;
+    }
+
+    $self->_ai_enable_with_consent();
+}
+
+# AI is opt-in and network-capable: the first time (per endpoint) a user
+# enables it, ask for explicit confirmation naming the endpoint. Acceptance
+# is remembered per-endpoint in preferences (state_store 'preferences'
+# category, key ai_consented_urls) — changing the endpoint re-asks.
+sub _ai_enable_with_consent {
+    my ($self) = @_;
+    my $ai = $self->{_ai_complete};
+    my $store = $self->{state_store};
+    my $url = $ai->{api_url};
+
+    my @consented = $store ? @{ $store->get('preferences')->{ai_consented_urls} || [] } : ();
+    if (grep { $_ eq $url } @consented) {
+        $ai->{enabled} = 1;
+        $self->{message} = "AI Completion: ON";
+        return;
+    }
+
+    $self->open_prompt(
+        text => "Sends text near your cursor to $url as you type. Enable?",
+        options => [
+            { key => 'y', label => 'Enable' },
+            { key => 'n', label => 'Cancel' },
+        ],
+        on_select => sub {
+            my ($choice) = @_;
+            return unless $choice eq 'y';
+            if ($store) {
+                push @consented, $url;
+                $store->put('preferences', { ai_consented_urls => \@consented });
+            }
+            $ai->{enabled} = 1;
+            $self->{message} = "AI Completion: ON";
+        },
+    );
 }
 
 sub cmd_ai_setup {
     my ($self) = @_;
-    my $ai = $self->{_ai_complete};
-    my $prefs = $self->{prefs};
-    my $store = $self->{state_store};
-
-    # Step 1: API URL
-    $self->open_footer_input(
-        prompt => 'API URL:',
-        value  => $prefs->get('ai_api_url'),
-        select_all => 1,
-        wide   => 1,
-        on_submit => sub {
-            my ($url) = @_;
-            return unless length($url);
-            $prefs->set('ai_api_url', $url);
-            $ai->{api_url} = $url;
-
-            # Step 2: Model
-            $self->open_footer_input(
-                prompt => 'Model:',
-                value  => $prefs->get('ai_model'),
-                select_all => 1,
-                wide   => 1,
-                on_submit => sub {
-                    my ($model) = @_;
-                    return unless length($model);
-                    $prefs->set('ai_model', $model);
-                    $ai->{model} = $model;
-
-                    # Step 3: API Key
-                    $self->open_footer_input(
-                        prompt => 'API Key:',
-                        value  => $ai->{api_key} || '',
-                        select_all => 1,
-                        wide   => 1,
-                        on_submit => sub {
-                            my ($key) = @_;
-                            return unless length($key);
-                            $store->put('secrets', { ai_api_key => $key });
-                            $ai->{api_key} = $key;
-                            $ai->{enabled} = 1;
-                            $self->show_message("AI Completion configured and enabled.");
-                        },
-                    );
-                },
-            );
-        },
-    );
+    $self->open_ai_dialog();
 }
 
 sub cmd_toggle_word_wrap {

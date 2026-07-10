@@ -1,0 +1,243 @@
+================================================================================
+41 — AI Completion
+================================================================================
+
+Covers: the AI Settings dialog (provider/model configuration, Test
+Connection, masked API key), the opt-in consent flow, ghost-text
+completion sourced from a configured AI provider, and graceful
+degradation when curl is unavailable. See docs/SECURITY.md "Network: AI
+Completion" for the security model (off by default, endpoint-named
+consent, curl-only transport with the key never on argv/env/disk in the
+clear).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-001
+NAME:     Command palette -> AI: Configure opens the Settings dialog
+PRIORITY: P1
+FEATURE:  ai dialog
+
+SETUP
+  Fresh install (AI unconfigured).
+
+STEPS
+  1. Ctrl+Space, filter/select "AI: Configure", Enter.
+
+VERIFY
+  - Dialog shows: title, Provider, Base URL, API Key, Test Connection,
+    Model, Save, Cancel.
+  - No plaintext-looking API key ever appears on screen.
+  - Esc cancels the whole dialog (state returns to editing; nothing is
+    persisted).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-002
+NAME:     Configure against a server, consent flow, enable/disable
+PRIORITY: P0
+FEATURE:  ai consent security dialog
+
+SETUP
+  Local mock OpenAI-compatible server (qa/lib/ai_mock_server.pl).
+
+STEPS
+  1. AI: Configure -> set Base URL to the mock server, set an API key,
+     Test Connection, Save.
+  2. Palette -> "AI Completion" (starts [off]). Enter.
+  3. Y at the consent prompt.
+  4. Toggle off, then back on for the SAME endpoint.
+
+VERIFY
+  - A confirm prompt appears naming the EXACT configured base URL:
+    "Sends text near your cursor to <url> as you type. Enable?" [Y]/[N].
+  - Y enables (pill/palette state -> [on], status message "AI Completion:
+    ON"); N leaves it off.
+  - Re-toggling off then back on for the SAME endpoint does NOT re-prompt
+    (consent remembered per-endpoint, in preferences ai_consented_urls).
+  - Changing the endpoint (different base URL) DOES re-prompt on next
+    enable.
+  - Turning OFF never requires confirmation.
+  - Save persists ai_provider/ai_api_url/ai_model to preferences.json and
+    the key to secrets.json at mode 0600 (never more permissive, even
+    transiently — see docs/SECURITY.md and the chmod-race fix in
+    bugs.md).
+  - Scripted: qa/scripts/tier1/ai_002_consent_flow.sh.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-003
+NAME:     Ghost-text completion sourced from the configured provider; Tab accepts
+PRIORITY: P1
+FEATURE:  ai completion ghost
+
+SETUP
+  AI Completion enabled against a mock server returning a fixed,
+  distinctive completion string.
+
+STEPS
+  1. Type in the document, pause (debounce ~0.5s).
+  2. Wait for ghost text; press Esc, then retrigger; press Tab.
+
+VERIFY
+  - Ghost text shows the EXACT completion text from the response (proves
+    real JSON::PP parsing end-to-end, not a stub).
+  - Esc dismisses the ghost text without altering the real buffer content
+    (a subsequent 1s cooldown applies before the next request can fire).
+  - Tab inserts the completion into the real buffer (survives save/reload
+    — not just a rendering artifact).
+  - Rate-limited to ~12 requests/minute (unchanged from the prior
+    implementation).
+  - Scripted: qa/scripts/tier1/ai_003_completion_ghost.sh.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-004
+NAME:     Graceful degradation when curl is not installed
+PRIORITY: P1
+FEATURE:  ai security curl
+
+SETUP
+  PATH with no curl binary.
+
+STEPS
+  1. Open AI: Configure.
+  2. Separately, with AI already "configured" (provider/URL/model/key all
+     set), try the "AI Completion" toggle.
+
+VERIFY
+  - Dialog opens normally and immediately shows "AI completion requires
+    curl (not found on PATH)" instead of crashing, hanging, or silently
+    doing nothing.
+  - Toggling AI on reports the same clear error and does NOT report
+    success.
+  - Test Connection button also reports the curl-missing error if pressed.
+  - Detection is cached (only checked once per process — see
+    Zepto::AIHttp::curl_available).
+  - Scripted: qa/scripts/tier1/ai_004_no_curl.sh.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-005
+NAME:     Provider picker changes Base URL and Model defaults
+PRIORITY: P2
+FEATURE:  ai dialog provider
+
+SETUP
+  AI Settings dialog open, Provider field focused.
+
+STEPS
+  1. Enter on the Provider field opens a filterable list of presets
+     (openai, anthropic, openrouter, opencode zen, opencode go, deepseek,
+     ollama, gemini, custom).
+  2. Type to filter, arrow keys to navigate, Enter to select.
+
+VERIFY
+  - Selecting a provider repopulates Base URL with that provider's preset
+    URL (editable afterward) and Model with its default (if any).
+  - Esc while the list is open backs out to the form WITHOUT changing the
+    previously selected value (only closes the whole dialog on a second
+    Esc from the form).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-006
+NAME:     API Key field renders masked (dots + last 4 chars)
+PRIORITY: P1
+FEATURE:  ai dialog security
+
+STEPS
+  1. Focus the API Key field and type a key, e.g. "sk-abcdEFGH1234".
+
+VERIFY
+  - Field shows dots for every character except the last 4, which render
+    in the clear (e.g. "•••••••••1234").
+  - A key of 4 characters or fewer shows all dots (nothing revealed).
+  - An empty key shows "(not set)", not an empty/blank-looking field.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-007
+NAME:     Test Connection: auth failure shows a clear, distinct error
+PRIORITY: P1
+FEATURE:  ai dialog test error
+
+SETUP
+  Mock server configured to return 401 for a specific key.
+
+STEPS
+  1. Configure with that key, run Test Connection.
+
+VERIFY
+  - Status shows "Error 401: <message from the server>", distinguishable
+    from a network-level failure (which shows "Network error - could not
+    reach <url>").
+  - Model field is NOT populated / left unchanged on failure.
+  - Anthropic's /models endpoint falls back from Bearer auth to native
+    x-api-key + anthropic-version headers automatically on 401/403 before
+    surfacing an error (Zepto::AIProviders::models_auth_variants).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-008
+NAME:     Model field opens a filterable picker of live results
+PRIORITY: P2
+FEATURE:  ai dialog model
+
+SETUP
+  Test Connection already succeeded (model list populated).
+
+STEPS
+  1. Focus Model, Enter opens the list; type to filter, Up/Down to
+     navigate, Enter to select.
+
+VERIFY
+  - List shows all models from the last successful Test Connection, with
+    the provider's documented default preselected if present, else the
+    first model.
+  - Filtering narrows results (fuzzy match).
+  - Enter on the Model field BEFORE a successful Test shows a hint
+    ("Run Test Connection to list available models") instead of an
+    empty/broken list.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-009
+NAME:     Ollama / no-auth providers work without an API key
+PRIORITY: P2
+FEATURE:  ai provider ollama
+
+SETUP
+  Provider = ollama (or any preset with auth: none).
+
+STEPS
+  1. Configure with an empty API Key field, run Test Connection / enable.
+
+VERIFY
+  - No "no API key" error is shown for a no-auth provider.
+  - No Authorization header is sent (see Zepto::AIProviders::auth_headers
+    — auth=>'none' never emits one, even if a key happens to be set).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-AI-010
+NAME:     Status pill reflects on/off/not-ready state
+PRIORITY: P3
+FEATURE:  ai pill discoverability
+
+STEPS
+  1. Check palette [on]/[off] state for "AI Completion" through the
+     dialog-open -> configure -> enable -> disable flow.
+  2. Enable AI, then make it unable to fire (e.g. clear the key from
+     underneath it, or curl becomes unavailable).
+
+VERIFY
+  - Palette shows [off] before configuration, [on] after enabling.
+  - When enabled but unable to actually fire a request, the toggle
+    display shows a "!" suffix ("AI Completion:!") rather than silently
+    doing nothing while claiming to be on.
+  - AI Completion is deliberately palette-only (not a status bar pill) —
+    consistent with several other secondary toggles (Auto Complete, Auto
+    Pairs, Minimap, Nerd Font) that are also palette-only; this still
+    satisfies discoverability (Rule 2: palette AND/OR status bar pill).
+
+================================================================================

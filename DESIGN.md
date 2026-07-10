@@ -22,7 +22,7 @@ Perl is the most portable scripting language for system environments:
 | Ruby     | Often missing on minimal systems                   | Yes          | Good               |
 | Go/Rust  | Requires compilation per platform                  | Binary       | Excellent          |
 
-Perl 5.10+ is installed by default on virtually every Unix-like system. It has:
+Perl 5.14+ is installed by default on virtually every Unix-like system. It has:
 - Native POSIX terminal control (termios)
 - Excellent UTF-8 support
 - Fast startup (~20ms)

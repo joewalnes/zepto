@@ -1,30 +1,32 @@
 package Zepto::AIComplete;
 # =============================================================================
-# AIComplete: Async AI code completion via OpenAI-compatible API
+# AIComplete: Async AI code completion via any OpenAI-compatible provider
 # =============================================================================
 #
-# Uses fork+pipe to make non-blocking HTTP requests to an OpenAI-compatible
-# API endpoint. The editor event loop polls the pipe for results.
+# Uses Zepto::AIHttp (fork+curl+pipe) to make non-blocking HTTP requests to
+# the user-configured provider (see Zepto::AIProviders). The editor event
+# loop polls for results — this module never blocks.
 #
 # Features:
 #   - Async: never blocks the editor event loop
 #   - Debounced: waits for typing pause before requesting
 #   - Cancellable: new keystrokes abort in-flight requests
-#   - Streaming: shows partial results as they arrive
-#   - Rate-limited: max ~10 requests/minute
+#   - Rate-limited: max ~12 requests/minute
 #   - Cost-aware: limits context and output tokens
+#   - Opt-in: disabled by default; inert unless curl is present and the
+#     provider is configured (key present, or provider requires none)
 # =============================================================================
 
 use strict;
 use warnings;
-use IO::Select;
-use POSIX qw(:sys_wait_h);
-use File::Spec;
+use JSON::PP ();
+use Zepto::AIHttp;
+use Zepto::AIProviders;
 
 # Context and output limits
 use constant {
-    PREFIX_LINES     => 100,    # Lines before cursor to send
-    SUFFIX_LINES     => 50,     # Lines after cursor to send
+    PREFIX_LINES     => 30,     # Lines before cursor to send
+    SUFFIX_LINES     => 5,      # Lines after cursor to send
     MAX_OUTPUT_TOKENS => 200,   # Max tokens in completion response
     DEBOUNCE_SEC     => 0.5,    # Seconds of inactivity before triggering
     COOLDOWN_SEC     => 1.0,    # Min seconds between requests
@@ -35,16 +37,15 @@ use constant {
 sub new {
     my ($class, %opts) = @_;
     return bless {
-        # Config (loaded from StateStore)
+        # Config (loaded from Preferences + StateStore)
+        provider_id => $opts{provider_id} || '',
         api_url    => $opts{api_url}  || '',
         api_key    => $opts{api_key}  || '',
         model      => $opts{model}    || '',
         enabled    => 0,
 
         # Async state
-        _pid       => undef,
-        _pipe      => undef,
-        _select    => undef,
+        _handle    => undef,   # Zepto::AIHttp request handle
         _buffer    => '',
         _request_id => 0,
 
@@ -68,17 +69,21 @@ sub load_config {
     my ($self, $prefs, $state_store) = @_;
     return unless $state_store;
 
-    # URL and model come from Preferences (which has defaults)
     if ($prefs) {
-        $self->{api_url} = $prefs->get('ai_api_url');
-        $self->{model}   = $prefs->get('ai_model');
+        $self->{provider_id} = $prefs->get('ai_provider') // '';
+        $self->{api_url}     = $prefs->get('ai_api_url')  // '';
+        $self->{model}       = $prefs->get('ai_model')    // '';
     }
 
     # API key comes from secrets (not in Preferences for security)
     my $secrets = $state_store->get('secrets');
     $self->{api_key} = $secrets->{ai_api_key} || '';
 
-    $self->{enabled} = length($self->{api_key}) ? 1 : 0;
+    # "Enabled" here means "the user has turned the toggle on". Whether the
+    # feature can actually fire a request also depends on ready() — see
+    # cmd_toggle_ai's consent flow in Editor::Commands, which is the only
+    # code path that should set this to 1.
+    $self->{enabled} = 0;
 }
 
 sub is_enabled  { $_[0]->{enabled} }
@@ -86,6 +91,33 @@ sub is_pending  { $_[0]->{_pending} }
 sub has_result  { defined $_[0]->{_result} }
 sub result      { $_[0]->{_result} }
 sub clear_result { $_[0]->{_result} = undef }
+sub provider_id { $_[0]->{provider_id} }
+sub api_url     { $_[0]->{api_url} }
+sub model       { $_[0]->{model} }
+
+# Is the feature fully configured and able to fire a request right now?
+# (curl present, endpoint configured, and a key present unless the
+# provider explicitly requires none — e.g. ollama).
+sub ready {
+    my ($self) = @_;
+    return 0 unless Zepto::AIHttp::curl_available();
+    return 0 unless length($self->{api_url});
+    return 0 unless length($self->{model});
+    my $provider = Zepto::AIProviders::get($self->{provider_id});
+    my $needs_key = !$provider || (($provider->{auth} // 'bearer') ne 'none');
+    return 0 if $needs_key && !length($self->{api_key});
+    return 1;
+}
+
+# Why the feature isn't ready right now — used for the 'ai!' status pill
+# and error messages. Returns '' if ready() is true.
+sub not_ready_reason {
+    my ($self) = @_;
+    return '' if $self->ready();
+    return 'curl not found on PATH' unless Zepto::AIHttp::curl_available();
+    return 'not configured' unless length($self->{api_url}) && length($self->{model});
+    return 'no API key';
+}
 
 # =============================================================================
 # Trigger / Cancel / Poll
@@ -94,7 +126,7 @@ sub clear_result { $_[0]->{_result} = undef }
 # Schedule a completion request (debounced)
 sub trigger {
     my ($self, $doc, $view, $highlighter) = @_;
-    return unless $self->{enabled};
+    return unless $self->{enabled} && $self->ready();
 
     # Don't trigger during cooldown after dismiss
     return if (time() - $self->{_dismissed_at}) < COOLDOWN_SEC;
@@ -140,30 +172,16 @@ sub dismiss {
 # Returns 1 if new result available, 0 otherwise
 sub poll {
     my ($self) = @_;
-    return 0 unless $self->{_pipe} && $self->{_select};
+    return 0 unless $self->{_handle};
 
-    # Check for timeout
-    if ($self->{_pending} && (time() - $self->{_last_request_time}) > REQUEST_TIMEOUT) {
+    if ($self->{_pending} && Zepto::AIHttp::timed_out($self->{_handle}, REQUEST_TIMEOUT)) {
         $self->_kill_child();
         return 0;
     }
 
-    my $got_data = 0;
-    while ($self->{_select} && $self->{_select}->can_read(0)) {
-        my $buf;
-        my $n = sysread($self->{_pipe}, $buf, 4096);
-        if (!defined $n || $n == 0) {
-            # EOF or error — child done
-            $self->_finish_request();
-            return defined $self->{_result} ? 1 : 0;
-        }
-        $self->{_buffer} .= $buf;
-        $got_data = 1;
-    }
-
-    # Parse streaming chunks as they arrive
-    if ($got_data && length($self->{_buffer})) {
-        $self->_parse_streaming_buffer();
+    my $state = Zepto::AIHttp::poll($self->{_handle}, \$self->{_buffer});
+    if ($state eq 'done') {
+        $self->_finish_request();
         return defined $self->{_result} ? 1 : 0;
     }
 
@@ -202,6 +220,34 @@ sub _fire_request {
     # Cancel any existing request
     $self->_kill_child();
 
+    my $provider = Zepto::AIProviders::get($self->{provider_id}) || { auth => 'bearer' };
+
+    my $system_msg = 'Complete the code/text at the cursor. Reply with ONLY the continuation, no explanation, no quotes.';
+    my $lang_hint  = $language ? " ($language)" : '';
+    my $file_hint  = $filename ? "File: $filename$lang_hint\n\n" : '';
+    my $user_msg   = "${file_hint}${prefix}<CURSOR>${suffix}";
+
+    my $req_data = Zepto::AIProviders::build_completion_request(
+        model      => $self->{model},
+        system     => $system_msg,
+        user       => $user_msg,
+        max_tokens => MAX_OUTPUT_TOKENS,
+    );
+    my $body = eval { JSON::PP->new->utf8->encode($req_data) };
+    return unless defined $body;
+
+    my @headers = (['Content-Type', 'application/json']);
+    push @headers, @{ Zepto::AIProviders::auth_headers($provider, $self->{api_key}) };
+
+    my $handle = Zepto::AIHttp::start_request(
+        method  => 'POST',
+        url     => $self->{api_url} . '/chat/completions',
+        headers => \@headers,
+        body    => $body,
+        timeout => REQUEST_TIMEOUT,
+    );
+    return unless $handle;
+
     $self->{_context_hash} = $ctx_hash;
     $self->{_pending} = 1;
     $self->{_buffer} = '';
@@ -209,34 +255,7 @@ sub _fire_request {
     $self->{_last_request_time} = $now;
     push @{$self->{_request_times}}, $now;
     $self->{_request_id}++;
-
-    # Build the request payload
-    my $payload = $self->_build_payload($prefix, $suffix, $language, $filename);
-
-    # Fork child to make HTTP request
-    pipe(my $read_end, my $write_end) or return;
-
-    my $pid = fork();
-    if (!defined $pid) {
-        close($read_end);
-        close($write_end);
-        $self->{_pending} = 0;
-        return;
-    }
-
-    if ($pid == 0) {
-        # Child process: make HTTP request and write result to pipe
-        close($read_end);
-        $self->_child_http_request($write_end, $payload);
-        close($write_end);
-        POSIX::_exit(0);
-    }
-
-    # Parent
-    close($write_end);
-    $self->{_pid} = $pid;
-    $self->{_pipe} = $read_end;
-    $self->{_select} = IO::Select->new($read_end);
+    $self->{_handle} = $handle;
 }
 
 sub _build_context {
@@ -281,117 +300,43 @@ sub _build_context {
     return ($prefix, $suffix, $language, $filename);
 }
 
-sub _build_payload {
-    my ($self, $prefix, $suffix, $language, $filename) = @_;
-
-    # Use chat completion format (most compatible)
-    my $lang_hint = $language ? " ($language)" : '';
-    my $file_hint = $filename ? "File: $filename$lang_hint\n\n" : '';
-
-    # Escape for JSON
-    my $system_msg = _json_escape("You are a code completion assistant. You will be given code with a <CURSOR> marker. Output ONLY the code that should be inserted at the cursor position. Do not repeat any existing code. Do not add explanations, markdown formatting, or comments about the completion. Output nothing if no completion is appropriate. Keep completions short - usually 1-3 lines.");
-    my $user_msg = _json_escape("${file_hint}${prefix}<CURSOR>${suffix}");
-    my $model = _json_escape($self->{model});
-
-    return qq({"model":"$model","messages":[{"role":"system","content":"$system_msg"},{"role":"user","content":"$user_msg"}],"max_tokens":) . MAX_OUTPUT_TOKENS . qq(,"temperature":0,"stream":true,"stop":["\\n\\n\\n"]});
-}
-
-# Child process: make HTTP request using curl (reliable, handles SSL/chunked)
-sub _child_http_request {
-    my ($self, $write_fh, $payload) = @_;
-
-    my $api_url = $self->{api_url};
-    my $api_key = $self->{api_key};
-    my $url = $api_url . '/chat/completions';
-
-    # Redirect stdout to our pipe, suppress stderr
-    open(STDOUT, '>&', $write_fh) or return;
-    open(STDERR, '>', '/dev/null');
-    close($write_fh);
-
-    # Use curl with streaming — outputs SSE data lines directly
-    exec('curl', '-sS', '-N',
-        '-X', 'POST',
-        '-H', 'Content-Type: application/json',
-        '-H', "Authorization: Bearer $api_key",
-        '-d', $payload,
-        '--max-time', REQUEST_TIMEOUT,
-        $url,
-    );
-    # exec failed
-}
-
 # =============================================================================
 # Response Parsing
 # =============================================================================
 
-sub _parse_streaming_buffer {
-    my ($self) = @_;
-
-    # Parse SSE data: lines starting with "data: "
-    my $text = '';
-    while ($self->{_buffer} =~ s/^data:\s*(.*?)\r?\n//m) {
-        my $data = $1;
-        next if $data eq '[DONE]';
-
-        # Parse JSON minimally — extract content delta
-        if ($data =~ /"delta"\s*:\s*\{[^}]*"content"\s*:\s*"((?:[^"\\]|\\.)*)"/s) {
-            my $chunk = $1;
-            # Unescape JSON string
-            $chunk =~ s/\\n/\n/g;
-            $chunk =~ s/\\t/\t/g;
-            $chunk =~ s/\\"/"/g;
-            $chunk =~ s/\\\\/\\/g;
-            $text .= $chunk;
-        }
-    }
-
-    if (length($text)) {
-        $self->{_result} = ($self->{_result} // '') . $text;
-    }
-}
-
 sub _finish_request {
     my ($self) = @_;
 
-    # Parse any remaining buffer
-    $self->_parse_streaming_buffer() if length($self->{_buffer});
+    my ($body, $status) = Zepto::AIHttp::extract_status($self->{_buffer});
+
+    if ($status && !Zepto::AIHttp::is_network_error($status) && $status =~ /^2/) {
+        my $data = eval { JSON::PP->new->utf8->decode($body) };
+        if (!$@ && $data) {
+            my $text = Zepto::AIProviders::parse_completion_response($data);
+            if (defined $text) {
+                # First line only, trimmed — ghost text is a single-line
+                # suggestion.
+                $text =~ s/\r\n/\n/g;
+                ($text) = split /\n/, $text, 2;
+                $text =~ s/^\s+//;
+                $text =~ s/\s+$//;
+                $self->{_result} = length($text) ? $text : undef;
+            }
+        }
+    }
 
     # Clean up
-    if ($self->{_pipe}) {
-        close($self->{_pipe});
-        $self->{_pipe} = undef;
-    }
-    $self->{_select} = undef;
+    Zepto::AIHttp::finish($self->{_handle});
+    $self->{_handle} = undef;
     $self->{_pending} = 0;
-
-    # Reap child
-    if ($self->{_pid}) {
-        waitpid($self->{_pid}, WNOHANG);
-        $self->{_pid} = undef;
-    }
-
-    # Clean up result — trim leading/trailing whitespace artifacts
-    if (defined $self->{_result}) {
-        # Remove trailing whitespace-only content
-        $self->{_result} =~ s/\s+$//;
-        # If result is empty, clear it
-        $self->{_result} = undef unless length($self->{_result} // '');
-    }
 }
 
 sub _kill_child {
     my ($self) = @_;
-    if ($self->{_pid}) {
-        kill('TERM', $self->{_pid});
-        waitpid($self->{_pid}, WNOHANG);
-        $self->{_pid} = undef;
+    if ($self->{_handle}) {
+        Zepto::AIHttp::kill_request($self->{_handle});
+        $self->{_handle} = undef;
     }
-    if ($self->{_pipe}) {
-        close($self->{_pipe});
-        $self->{_pipe} = undef;
-    }
-    $self->{_select} = undef;
     $self->{_pending} = 0;
     $self->{_buffer} = '';
 }
@@ -399,33 +344,6 @@ sub _kill_child {
 # =============================================================================
 # Utilities
 # =============================================================================
-
-sub _parse_url {
-    my ($url) = @_;
-    my ($scheme, $rest) = $url =~ m{^(https?)://(.+)$};
-    $scheme //= 'https';
-    $rest //= $url;
-
-    my ($hostport, $path) = split(m{/}, $rest, 2);
-    $path = '/' . ($path // '');
-
-    my ($host, $port) = split(/:/, $hostport, 2);
-    $port //= ($scheme eq 'https' ? 443 : 80);
-
-    return ($scheme, $host, $port, $path);
-}
-
-sub _json_escape {
-    my ($s) = @_;
-    $s =~ s/\\/\\\\/g;
-    $s =~ s/"/\\"/g;
-    $s =~ s/\n/\\n/g;
-    $s =~ s/\r/\\r/g;
-    $s =~ s/\t/\\t/g;
-    # Escape control characters
-    $s =~ s/([\x00-\x1f])/sprintf("\\u%04x", ord($1))/ge;
-    return $s;
-}
 
 sub _hash {
     my ($s) = @_;

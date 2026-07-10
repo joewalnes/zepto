@@ -19,7 +19,7 @@ package Zepto::StateStore;
 
 use strict;
 use warnings;
-use Fcntl qw(:flock);
+use Fcntl qw(:flock O_CREAT O_EXCL O_WRONLY);
 use File::Spec;
 use JSON::PP ();
 
@@ -100,14 +100,25 @@ sub put {
     # Atomic write
     my $tmp_path = "$path.tmp.$$";
     my $ok = eval {
-        open my $fh, '>', $tmp_path or die "open: $!";
+        my $fh;
+        if ($category eq 'secrets') {
+            # Secrets must never exist on disk with permissive
+            # permissions, even for an instant. sysopen() with
+            # O_CREAT|O_EXCL creates the file WITH mode 0600 atomically —
+            # there is no window between "file exists" and "permissions
+            # restricted" the way a plain open() + later chmod() has.
+            # Defensively unlink any stale leftover (a previous crashed
+            # process, or an attacker-planted symlink — unlink() removes
+            # the symlink itself rather than following it) so O_EXCL
+            # doesn't spuriously fail.
+            unlink $tmp_path;
+            sysopen($fh, $tmp_path, O_CREAT | O_EXCL | O_WRONLY, 0600)
+                or die "sysopen: $!";
+        } else {
+            open($fh, '>', $tmp_path) or die "open: $!";
+        }
         print $fh $JSON->encode(\%merged);
         close $fh or die "close: $!";
-
-        # Secrets get restricted permissions
-        if ($category eq 'secrets') {
-            chmod 0600, $tmp_path;
-        }
 
         rename($tmp_path, $path) or die "rename: $!";
         1;

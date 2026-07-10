@@ -193,16 +193,22 @@ VERIFY
 --------------------------------------------------------------------------------
 
 ID:       QA-PREF-013
-NAME:     AI model/URL preferences
+NAME:     AI provider/model/URL preferences
 PRIORITY: P3
 FEATURE:  pref ai
+CROSS-REF: qa/41_ai_completion.txt (QA-AI-002, QA-AI-005)
 
 STEPS
-  1. Check defaults: ai_api_url and ai_model.
+  1. Check defaults on a fresh install: ai_provider, ai_api_url, ai_model.
+  2. Configure via the AI Settings dialog ("AI: Configure").
 
 VERIFY
-  - Defaults match Preferences.pm (e.g. openrouter.ai, anthropic/claude-haiku).
-  - Can override via config (when persistent config file implemented).
+  - Fresh-install defaults are all empty ('') — AI ships unconfigured;
+    there is no hardcoded default provider/URL/model (see
+    Zepto::Preferences %DEFAULTS and Zepto::AIProviders for the per-
+    provider presets the dialog picks from).
+  - Values set via the dialog persist to preferences.json (ai_provider,
+    ai_api_url, ai_model) and secrets.json (ai_api_key, mode 0600).
 
 --------------------------------------------------------------------------------
 

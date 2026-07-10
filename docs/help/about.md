@@ -2,7 +2,7 @@
 
 Zepto is a modern, intuitive terminal text editor.
 
-It's a single file with zero dependencies - just Perl 5.10+ and a terminal.
+It's a single file with zero dependencies - just Perl 5.14+ and a terminal.
 No plugins, no config files, no package managers. Download it and go.
 
 ## Philosophy

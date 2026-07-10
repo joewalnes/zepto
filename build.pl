@@ -110,7 +110,7 @@ print <<'HEADER';
 use strict;
 use warnings;
 use utf8;
-use 5.010001;
+use 5.014;
 
 HEADER
 
@@ -254,11 +254,11 @@ sub _zepto_install {
 
     # 1. Check Perl version
     my $perl_v = sprintf('%vd', $^V);
-    if ($^V ge v5.10.0) {
+    if ($^V ge v5.14.0) {
         $_step->("Checking Perl...", "v${perl_v} ${CHECK}");
     } else {
         $_step->("Checking Perl...", "v${perl_v} ${FAIL}");
-        print "\n  ${RED}Perl 5.10+ required.${RESET}\n\n";
+        print "\n  ${RED}Perl 5.14+ required.${RESET}\n\n";
         exit 1;
     }
 

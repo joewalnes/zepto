@@ -14,7 +14,7 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
 | **Shell injection** | Zepto shells out to git and clipboard tools. Any user-controlled path or content passed to the shell must be safely quoted. |
 | **Malicious file content** | Opened files may contain adversarial terminal escape sequences. File content must be sanitized before rendering. |
 | **Privilege escalation** | Zepto must not execute with elevated privileges. Never use setuid or sudo. |
-| **Network** | Zepto makes zero network connections. This must remain true permanently. |
+| **Network** | Zepto makes zero network connections EXCEPT the opt-in AI completion feature (see "Network: AI Completion" below). Every other subsystem must remain fully offline permanently. |
 
 ---
 
@@ -34,10 +34,11 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
 
 ### Shell Execution
 
-Shell commands are limited to three places:
+Shell commands are limited to four places:
 - **VCS integration**: `git` commands in `lib/Zepto/VCS/Git.pm`
 - **Clipboard tools**: xclip / pbcopy / xsel / wl-copy in `lib/Zepto/Terminal.pm`
 - **File search**: `git grep`, `rg`, `grep` in `lib/Zepto/FileSearchEngine.pm`
+- **AI completion HTTP transport**: `curl` in `lib/Zepto/AIHttp.pm` (the sole network-capable subprocess in the codebase — see "Network: AI Completion" below)
 
 Rules:
 - All user-controlled strings passed to the shell **must** be quoted with `_shell_quote()` or equivalent
@@ -61,6 +62,69 @@ my $cmd = "git diff -- $path";
 If a new shell exec is needed, it must:
 1. Accept only a fixed command with quoted arguments — never a user-supplied command string
 2. Be documented here with its purpose and quoting approach
+
+### Network: AI Completion
+
+Zepto's only network-capable feature is AI ghost-text completion
+(`lib/Zepto/AIComplete.pm`, `lib/Zepto/AIHttp.pm`, `lib/Zepto/AIProviders.pm`,
+the AI Settings dialog in `lib/Zepto/Editor/Dialog.pm`). This is a
+deliberate, owner-sanctioned exception to "no network calls" — not a
+loophole. It is held to a stricter bar than the rest of the codebase:
+
+- **Off by default.** `ai_provider` / `ai_api_url` / `ai_model` all default
+  to empty, and `AIComplete->load_config()` always sets `enabled => 0`
+  regardless of what's persisted. The only code path that can flip it on
+  is the explicit "AI: Toggle Completion" command.
+- **Explicit, endpoint-named consent required before every new endpoint.**
+  Enabling shows: `Sends text near your cursor to <base_url> as you type.
+  Enable?` (Y/N). Acceptance is remembered per-endpoint (StateStore
+  `preferences` category, key `ai_consented_urls`) — pointing the feature
+  at a *different* endpoint (changing provider or base URL) clears that
+  memory for the new URL and re-asks. See `cmd_toggle_ai` /
+  `_ai_enable_with_consent` in `lib/Zepto/Editor/Commands.pm`.
+- **Only cursor-context snippets are sent** — roughly 30 lines before and
+  5 after the cursor, plus the filename/language, never the whole file.
+  Built by `AIComplete::_build_context`.
+- **curl only, never wget**, and only two verbs: `POST {base}/chat/completions`
+  and `GET {base}/models`. Every provider goes through the same
+  OpenAI-compatible wire adapter (`Zepto::AIProviders`) — there is no
+  per-provider bespoke request-building code to audit separately.
+- **The API key and request body never touch argv, the child's
+  environment, or any file.** `Zepto::AIHttp::start_request` forks a
+  child whose argv is `curl -sS --config -` (flags only — no URL, no
+  key). The parent writes a curl config document (`url`, `header`,
+  `data` directives) to the child's stdin over a pipe. This was a
+  deliberate fix: the previous implementation put `Authorization: Bearer
+  <key>` on `-H` and the JSON body on `-d`, both directly on curl's
+  argv, which is visible to any other user on the machine via `ps`.
+- **curl config-string escaping is a reviewed, security-sensitive
+  surface.** `Zepto::AIHttp::_escape_config_string` backslash-escapes
+  `\` and `"` and encodes `\n`/`\r`/`\t`, per curl's documented `-K`
+  config-file quoting rules. If this escaping is wrong, adversarial
+  content reaching the config document (e.g. a source file whose text
+  ends up in the AI context, containing a crafted quote+newline
+  sequence) could inject additional curl config directives. Covered by
+  `tests/ai_http.t`: unit tests for each escape case plus an end-to-end
+  test that round-trips a payload containing quotes, backslashes, a raw
+  newline, unicode, and curly braces through a real curl invocation
+  against a local mock server and asserts byte-for-byte equality on the
+  received body.
+- **The key is stored at rest with mode 0600**, created atomically via
+  `sysopen(..., O_CREAT|O_EXCL|O_WRONLY, 0600)` in `StateStore::put` —
+  there is no window where the temp file exists with permissive
+  permissions (the previous implementation did `open` then `chmod`
+  afterward, which had exactly that window).
+- **Auth failures are distinguishable from network failures.** curl's
+  `write-out` reports the real HTTP status (401/403 vs. connection
+  failure), so the Settings dialog's Test button and error messages
+  don't conflate "wrong key" with "can't reach the server".
+- **If `curl` is not installed**, every AI entry point (toggle, trigger,
+  Test Connection) shows a clear message and the feature stays inert —
+  it never silently does nothing or crashes. Detected once and cached
+  (`Zepto::AIHttp::curl_available`).
+- **Timeouts are bounded**: 5s for completion requests, 10s for model
+  listing / the Test button — never a network call that can hang the
+  editor.
 
 ### Rendering Safety
 
@@ -89,7 +153,7 @@ Run through this before committing any change that touches file I/O, shell execu
 - [ ] All shell-interpolated paths are quoted with `_shell_quote()`
 - [ ] No new shell commands added without review
 - [ ] File permissions preserved on save
-- [ ] No network calls introduced
+- [ ] No new network calls introduced outside the sanctioned AI completion path (`lib/Zepto/AIHttp.pm`)
 - [ ] Control characters from file content are neutralized before rendering
 - [ ] Path operations stay within expected directories
 - [ ] File size/depth limits respected
@@ -110,6 +174,8 @@ Run through this before committing any change that touches file I/O, shell execu
 | P2 | Terminal title OSC injection via file names with ESC | Fixed: `$title =~ s/[\x00-\x1f]//g` in `set_title()` in `Terminal.pm` |
 | P2 | Clipboard command construction in Terminal.pm | Audited: clipboard commands are hardcoded constants, never user-supplied; no injection path |
 | P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths go through `_shell_quote()` using correct single-quote escaping; no gaps |
+| P1 | AI completion API key visible on `curl` child argv (`ps` on the machine could see `Authorization: Bearer <key>`) | Fixed: rebuilt on `Zepto::AIHttp` — curl child argv is `curl -sS --config -` only, key/body travel via a stdin pipe to `--config -`. Regression-tested in `tests/ai_http.t` (asserts the key never appears in the curl child's `/proc/<pid>/cmdline` or `ps` output while the request is in flight) — see QA-REG entry in `qa/40_regression_bugs.txt`. |
+| P2 | AI API key briefly on disk with permissive permissions between file creation and `chmod 0600` (`StateStore::put`) | Fixed: `secrets` category now uses `sysopen(..., O_CREAT\|O_EXCL\|O_WRONLY, 0600)` so the restricted mode is set atomically at creation — no window. Regression-tested in `tests/state_store.t`. |
 
 When an item above is investigated and resolved, document the finding and remove it from this list (or move to bugs.md if it becomes a tracked bug).
 

@@ -135,18 +135,23 @@ ID:       QA-SEC-008
 NAME:     No network calls made
 PRIORITY: P1
 FEATURE:  sec offline
+CROSS-REF: qa/41_ai_completion.txt (full AI feature test plan)
 
 SETUP
   Block network at OS level (or firewall zepto).
 
 STEPS
-  1. Full session: open, edit, save, find, all features.
+  1. Full session: open, edit, save, find, all features, WITHOUT ever
+     configuring or enabling AI completion.
 
 VERIFY
-  - Core editor works fully offline.
-  - AI completion requires network but is optional (only called when
-    enabled).
-  - No telemetry or background requests.
+  - Core editor works fully offline with zero network calls.
+  - AI completion is the one sanctioned exception (see docs/SECURITY.md
+    "Network: AI Completion"): ships disabled, requires the user to
+    explicitly configure AND enable it (with endpoint-named consent) via
+    "AI: Configure" / "AI Completion" in the command palette before any
+    request is ever made.
+  - No telemetry or background requests, ever, regardless of AI state.
 
 --------------------------------------------------------------------------------
 

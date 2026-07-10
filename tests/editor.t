@@ -129,31 +129,55 @@ subtest 'Palette escape closes' => sub {
 # ============================================================================
 # Dialog operations
 # ============================================================================
-subtest 'Open dialog' => sub {
+subtest 'Open AI settings dialog' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_dialog(
-        title => 'Test',
-        prompt => 'Enter:',
-        value => 'initial',
-    );
+    $editor->open_ai_dialog();
 
     is($editor->{state}, 'dialog', 'State is dialog');
-    is($editor->{dialog}{title}, 'Test', 'Dialog title');
-    is($editor->{dialog}{prompt}, 'Enter:', 'Dialog prompt');
-    is($editor->{dialog}{value}, 'initial', 'Dialog value');
+    is($editor->{dialog}{title}, 'AI: Configure', 'Dialog title');
+    ok($editor->{dialog}{fields}, 'Dialog has a fields array');
+    my @ids = map { $_->{id} } @{$editor->{dialog}{fields}};
+    is_deeply(\@ids, [qw(provider base_url api_key test model save cancel)], 'Fields in expected order');
+    is($editor->{dialog}{focus}, 0, 'Provider field focused by default');
 };
 
 subtest 'Close dialog' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_dialog(title => 'Test', prompt => 'Input:');
+    $editor->open_ai_dialog();
     $editor->close_dialog();
 
     is($editor->{state}, 'editing', 'State is editing');
     is($editor->{dialog}, undef, 'Dialog cleared');
+};
+
+subtest 'Dialog field navigation' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->open_ai_dialog();
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab' });
+    is($editor->{dialog}{focus}, 1, 'Tab advances focus');
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab', modifiers => ['shift'] });
+    is($editor->{dialog}{focus}, 0, 'Shift+Tab moves focus back');
+
+    $editor->handle_dialog_event({ type => 'key', key => 'escape' });
+    is($editor->{state}, 'editing', 'Escape cancels the dialog');
+};
+
+subtest 'Dialog text field accepts typed input' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->open_ai_dialog();
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab' });   # -> base_url
+    $editor->{dialog}{fields}[1]{widget}->set_value('');
+    $editor->handle_dialog_event({ type => 'char', char => 'x' });
+    is($editor->{dialog}{fields}[1]{widget}->value(), 'x', 'Typed char inserted into focused text field');
 };
 
 # ============================================================================

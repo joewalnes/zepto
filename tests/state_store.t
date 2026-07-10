@@ -192,6 +192,50 @@ subtest 'Secrets file gets mode 0600' => sub {
     is(sprintf('%04o', $mode), '0600', 'Secrets file is mode 0600');
 };
 
+# QA-REG: chmod-after-write race (StateStore.pm secrets write). The old
+# implementation did `open '>', $tmp` (default-permissive mode) then
+# `chmod 0600` AFTER writing the plaintext secret — a window existed where
+# the temp file briefly existed on disk with insecure permissions. The fix
+# uses sysopen(O_CREAT|O_EXCL|O_WRONLY, 0600) so the restricted mode is set
+# atomically at creation, before any bytes are written.
+subtest 'Secrets temp file is created with 0600 atomically (no permissive window)' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    mkdir $dir unless -d $dir;
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+
+    # Pre-create the exact predictable tmp path (base.tmp.$$) with
+    # attacker-style permissive content/permissions, simulating a stale
+    # leftover or a planted file. If the implementation still used a plain
+    # open() on this pre-existing path (no O_EXCL), the file could retain
+    # its pre-existing insecure mode for a window, or (worse) the
+    # attacker's content could linger via a symlink. The fix must not be
+    # fooled by this: it unlinks the stale path and creates fresh with
+    # mode 0600 from the start.
+    my $tmp_path = "$dir/secrets.json.tmp.$$";
+    open(my $fh, '>', $tmp_path) or die "setup: $!";
+    print $fh "PRE-EXISTING ATTACKER CONTENT";
+    close $fh;
+    chmod 0666, $tmp_path;
+
+    $store->put('secrets', { api_key => 'sk-fresh-456' });
+
+    ok(!-e $tmp_path, 'stale tmp path is gone (renamed away or replaced, not left insecure)');
+    my $mode = (stat("$dir/secrets.json"))[2] & 07777;
+    is(sprintf('%04o', $mode), '0600', 'final secrets file is 0600 even when a permissive file pre-existed at the tmp path');
+
+    my $data = $store->get('secrets');
+    is($data->{api_key}, 'sk-fresh-456', 'real secret data was written, not the attacker content');
+};
+
+subtest 'Non-secret categories are unaffected by the sysopen path (still plain open)' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+    $store->put('preferences', { theme => 'dark' });
+    ok(-f "$dir/preferences.json", 'preferences.json written normally');
+    my $data = $store->get('preferences');
+    is($data->{theme}, 'dark');
+};
+
 # ============================================================================
 # Category validation
 # ============================================================================

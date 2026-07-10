@@ -1055,3 +1055,28 @@ VERIFY    fif_006_esc_close.sh and fif_015_esc_closes.sh pass reliably when
           input field must never render a raw control char regardless of
           how one might reach it. Covered by tests/input_widget.t
           ("control character hardening" subtests).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-107
+NAME:     AI completion API key never appears on the curl child's argv
+PRIORITY: P1
+BUG:      P1 "[Security] AI completion API key visible on `curl` child argv
+          via `ps`" — the original AIComplete implementation passed
+          `-H "Authorization: Bearer $key"` and the request body directly
+          on curl's argv, readable by any other user on the machine via
+          `ps` for the lifetime of the request.
+CROSS-REF: QA-AI-001, QA-AI-002, QA-AI-003, QA-SEC-008
+VERIFY    tests/ai_http.t ("POST request: headers and body arrive intact;
+          key never on curl argv" subtest): fires a real request against a
+          local mock server, keeps it deliberately in flight, and reads the
+          curl child's actual argv via /proc/<pid>/cmdline (falling back to
+          `ps -o args=`) — asserts the secret key string never appears in
+          it, and that argv is exactly `curl -sS --config -` (flags only,
+          no URL, no key). Regresses if Zepto::AIHttp::start_request ever
+          passes the key, URL, or body as an argv element instead of over
+          the --config stdin pipe. The curl config-string escaping that
+          makes this pipe-based approach safe against adversarial content
+          (quotes, backslashes, newlines, unicode, braces) is covered by
+          the same test file's "escape_config_string" subtests and an
+          end-to-end adversarial round-trip test.

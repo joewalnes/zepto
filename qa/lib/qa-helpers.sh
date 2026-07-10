@@ -8,6 +8,15 @@
 
 set -euo pipefail
 
+# Absolute path to this file's directory (qa/lib), resolved ONCE at source
+# time, before qa_setup() below cd's into a per-test tmpdir. Functions that
+# need to find sibling files (ai_mock_server.pl, llm-judge.sh) later, at
+# CALL time, must use this instead of re-deriving `dirname "${BASH_SOURCE[0]}"`
+# on demand — BASH_SOURCE preserves whatever (often relative) path this file
+# was `source`d with, and re-resolving a relative path after cwd has
+# changed silently breaks (see bugs.md).
+_QA_HELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -25,6 +34,7 @@ QA_TIER="${QA_TIER:-1}"
 # Internal tracking for auto-cleanup
 _QA_ORIG_DIR=""
 _QA_PROJECT_DIR=""
+_QA_AI_MOCK_PID=""
 
 _RED=$'\033[31m'
 _GREEN=$'\033[32m'
@@ -70,6 +80,7 @@ qa_setup() {
 
 qa_cleanup() {
     hangon stop "$QA_SESSION" 2>/dev/null || true
+    qa_ai_mock_stop
     # Restore original directory if we cd'd somewhere
     if [[ -n "$_QA_ORIG_DIR" ]]; then
         cd "$_QA_ORIG_DIR" 2>/dev/null || true
@@ -203,6 +214,61 @@ qa_git_repo() {
     git init -q
     git config user.email "test@test.com"
     git config user.name "Test"
+}
+
+# ---------------------------------------------------------------------------
+# AI completion mock server
+# ---------------------------------------------------------------------------
+# Starts a local, plain-HTTP, OpenAI-compatible mock server
+# (qa/lib/ai_mock_server.pl — core Perl, no CPAN) for AI Settings /
+# ghost-text completion QA scripts. Never touches the real network.
+#
+#   qa_ai_mock_start [completion_text]
+#     Picks a free localhost port, starts the server, waits for it to
+#     report ready (bounded), and sets QA_AI_MOCK_URL (e.g.
+#     "http://127.0.0.1:54321"). Auto-stopped by qa_cleanup on exit.
+#
+#   qa_ai_mock_stop
+#     Stops the server early (also called automatically at exit).
+QA_AI_MOCK_URL=""
+qa_ai_mock_start() {
+    local completion_text="${1:-mock_completion_text}"
+    local server_script="$_QA_HELPERS_DIR/ai_mock_server.pl"
+
+    # Pick a free port by asking the OS for one, then race to bind it —
+    # good enough for single-host QA runs (retry a couple of times if two
+    # scripts race for the same port).
+    local port attempt
+    for attempt in 1 2 3; do
+        port=$(perl -MIO::Socket::INET -e '
+            my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1);
+            print $s->sockport(); ')
+        local log="$QA_TMPDIR/ai_mock_server.$port.log"
+        perl "$server_script" "$port" "$completion_text" > "$log" 2>&1 &
+        _QA_AI_MOCK_PID=$!
+        local deadline=$(( $(date +%s) + 5 ))
+        while [[ $(date +%s) -lt $deadline ]]; do
+            grep -q "^READY$" "$log" 2>/dev/null && break
+            kill -0 "$_QA_AI_MOCK_PID" 2>/dev/null || break
+            sleep 0.05
+        done
+        if grep -q "^READY$" "$log" 2>/dev/null; then
+            QA_AI_MOCK_URL="http://127.0.0.1:$port"
+            return 0
+        fi
+        kill "$_QA_AI_MOCK_PID" 2>/dev/null || true
+        _QA_AI_MOCK_PID=""
+    done
+    echo "${_RED}ERROR: could not start ai_mock_server.pl${_RESET}" >&2
+    return 1
+}
+
+qa_ai_mock_stop() {
+    if [[ -n "$_QA_AI_MOCK_PID" ]]; then
+        kill "$_QA_AI_MOCK_PID" 2>/dev/null || true
+        wait "$_QA_AI_MOCK_PID" 2>/dev/null || true
+        _QA_AI_MOCK_PID=""
+    fi
 }
 
 # Portable sed -i (macOS vs GNU)
@@ -646,9 +712,7 @@ qa_llm_available() {
 qa_llm_judge() {
     local screenshot="$1"
     local prompt="$2"
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    "$script_dir/llm-judge.sh" "$screenshot" "$prompt"
+    "$_QA_HELPERS_DIR/llm-judge.sh" "$screenshot" "$prompt"
 }
 
 qa_assert_visual() {

@@ -14,6 +14,7 @@ use Zepto::Chars;
 use Zepto::Minimap;
 use Zepto::Preferences;
 use Zepto::WrapMap;
+use Zepto::InputWidget;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -282,6 +283,26 @@ subtest 'Status bar shows cursor position and palette trigger' => sub {
 # ============================================================================
 # Dialogs
 # ============================================================================
+sub _make_test_ai_dialog {
+    return {
+        title         => 'AI: Configure',
+        focus         => 0,
+        status_text   => '',
+        status_kind   => '',
+        list_mode     => 0,
+        model_options => [],
+        fields => [
+            { id => 'provider', label => 'Provider', type => 'select', value => 'openai' },
+            { id => 'base_url', label => 'Base URL', type => 'text',   widget => Zepto::InputWidget->new(value => 'https://api.openai.com/v1') },
+            { id => 'api_key',  label => 'API Key',  type => 'masked', widget => Zepto::InputWidget->new(value => 'sk-test1234') },
+            { id => 'test',     label => 'Test Connection', type => 'button' },
+            { id => 'model',    label => 'Model',     type => 'select', value => 'gpt-5-nano' },
+            { id => 'save',     label => 'Save',       type => 'button' },
+            { id => 'cancel',   label => 'Cancel',     type => 'button' },
+        ],
+    };
+}
+
 subtest 'Dialog rendering' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
@@ -293,18 +314,17 @@ subtest 'Dialog rendering' => sub {
         rows     => 24,
         cols     => 80,
         ui       => {
-            dialog => {
-                title  => 'Find',
-                prompt => 'Search for:',
-                value  => 'test',
-                cursor => 4,
-            },
+            dialog => _make_test_ai_dialog(),
         },
     );
 
-    like($output, qr/Find/, 'Dialog shows title');
-    like($output, qr/Search for/, 'Dialog shows prompt');
-    like($output, qr/test/, 'Dialog shows value');
+    like($output, qr/AI: Configure/, 'Dialog shows title');
+    like($output, qr/Provider/, 'Dialog shows Provider field label');
+    like($output, qr/Base URL/, 'Dialog shows Base URL field label');
+    like($output, qr/api\.openai\.com/, 'Dialog shows the base URL value');
+    unlike($output, qr/sk-test1234/, 'Dialog never renders the raw API key');
+    like($output, qr/\x{2022}/, 'Dialog shows masked dots for the API key');
+    like($output, qr/1234/, 'Dialog shows the last 4 chars of the API key (masked convention)');
 };
 
 subtest 'Dialog box characters' => sub {
@@ -318,11 +338,7 @@ subtest 'Dialog box characters' => sub {
         rows     => 24,
         cols     => 80,
         ui       => {
-            dialog => {
-                title  => 'Test',
-                prompt => 'Input:',
-                value  => '',
-            },
+            dialog => _make_test_ai_dialog(),
         },
     );
 

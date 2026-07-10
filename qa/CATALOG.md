@@ -19,10 +19,10 @@ make qa-coverage
 ## Coverage summary
 
 ```
-TOTAL: 588/713 (82.5%)
+TOTAL: 592/724 (81.8%)
 ```
 
-588 of the 713 documented test cases have at least one executable script in
+592 of the 724 documented test cases have at least one executable script in
 `qa/scripts/tier1/` or `qa/scripts/tier2/`. The remaining cases are
 documented-only (manual-QA-only) — most commonly because they require
 visual/subjective judgment (pixel-level rendering, color contrast, "looks
@@ -876,7 +876,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-TERM-013 | no script | CSI u keyboard support |
 | QA-TERM-014 | no script | Kitty graphics protocol detection |
 
-### `40_regression_bugs.txt` (93/105 scripted)
+### `40_regression_bugs.txt` (93/107 scripted)
 
 | ID | Status | Description |
 |----|--------|-------------|
@@ -986,4 +986,20 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-REG-104 | tier1 | QA state isolation survives hangon/tmux env laundering |
 | QA-REG-105 | no script | QA runs never write into the repository (verified by post-run `git status` — see 40_regression_bugs.txt) |
 | QA-REG-106 | tier1 | Esc after typed text in Find-in-Files does not race/glue into the input (fif_006_esc_close.sh, fif_015_esc_closes.sh) |
+| QA-REG-107 | no script | AI completion API key never appears on curl child argv (covered by tests/ai_http.t unit test; ai_002/ai_003 exercise the same secure transport end-to-end) |
+
+### `41_ai_completion.txt` (4/10 scripted)
+
+| ID | Status | Description |
+|----|--------|-------------|
+| QA-AI-001 | tier1 | Command palette -> AI: Configure opens the Settings dialog |
+| QA-AI-002 | tier1 | Configure against a server, consent flow, enable/disable |
+| QA-AI-003 | tier1 | Ghost-text completion sourced from the configured provider; Tab accepts |
+| QA-AI-004 | tier1 | Graceful degradation when curl is not installed |
+| QA-AI-005 | no script | Provider picker changes Base URL and Model defaults |
+| QA-AI-006 | no script | API Key field renders masked (dots + last 4 chars) |
+| QA-AI-007 | no script | Test Connection: auth failure shows a clear, distinct error |
+| QA-AI-008 | no script | Model field opens a filterable picker of live results |
+| QA-AI-009 | no script | Ollama / no-auth providers work without an API key |
+| QA-AI-010 | no script | Status pill reflects on/off/not-ready state |
 

@@ -58,6 +58,32 @@ If a file has never been saved, you'll be prompted for a filename.
 Press `Ctrl+Space` to open the command palette. Start typing to
 filter. This is the fastest way to discover everything Zepto can do.
 
+## AI Completion (Optional)
+
+Zepto can show AI-generated ghost-text suggestions as you type, similar to
+buffer-word completion. This is completely opt-in and off by default --
+Zepto makes no network calls unless you turn it on.
+
+To set it up:
+
+1. Open the command palette (`Ctrl+Space`) and run **AI: Configure**.
+2. Pick a provider (OpenAI, Anthropic, OpenRouter, Ollama, or others) --
+   the base URL fills in automatically.
+3. Enter your API key (shown masked). Ollama and other local/no-auth
+   servers don't need one.
+4. Click **Test Connection** to verify the key works and list the
+   provider's available models, then pick one.
+5. **Save**.
+6. Run **AI: Toggle Completion** from the palette to turn it on. The
+   first time (per endpoint), Zepto asks you to confirm: it names the
+   exact endpoint your cursor context will be sent to.
+
+Only a small window of text around your cursor is ever sent -- never the
+whole file. The status bar shows an `AI Completion` pill when it's on;
+if it's on but can't actually run (for example `curl` isn't installed, or
+the key was cleared), the pill shows a `!` so you know it's not silently
+working.
+
 ## Things to Try
 
 - **Find and Replace** - `Ctrl+F` to find, then toggle replace mode

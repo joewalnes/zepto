@@ -98,6 +98,16 @@ C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, G
 - Full mouse interaction on tab bar, status bar, file tree, minimap, and find bar
 - Drag to resize file tree panel
 
+## AI Completion (opt-in)
+
+- **Off by default.** Zepto makes zero network calls unless you turn this on.
+- **Multi-provider** -- OpenAI, Anthropic, OpenRouter, opencode zen, opencode go, DeepSeek, Ollama (local), Gemini, or any custom OpenAI-compatible endpoint
+- **`AI: Configure`** (command palette) -- pick a provider, edit the base URL, enter an API key (masked), test the connection, and pick a model from the provider's live model list
+- **`AI: Toggle Completion`** (command palette) -- enabling asks for explicit one-time consent naming the endpoint the text will be sent to; re-asks if you change endpoints
+- **Ghost-text suggestions** as you type, debounced and rate-limited (~12 requests/minute), Tab to accept
+- **Privacy** -- only a small window of text around your cursor is sent, never the whole file; the API key is never written to a file, environment variable, or process argument list (see `docs/SECURITY.md`)
+- **Status pill** -- shows on/off, and a `!` indicator if enabled but not actually able to fire (e.g. `curl` missing, or the key was cleared)
+
 ## Performance & Reliability
 
 - Viewport-first rendering for search and highlighting

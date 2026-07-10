@@ -279,16 +279,20 @@ ID:       QA-CPLT-018
 NAME:     AI completion enabled
 PRIORITY: P3
 FEATURE:  completion ai
+CROSS-REF: see qa/41_ai_completion.txt for the full AI Settings dialog /
+  consent / ghost-text test plan (QA-AI-001..010)
 
 SETUP
-  AI Completion configured (palette → "AI Completion: Setup").
+  AI Completion configured (palette → "AI: Configure" → provider, base
+  URL, API key, Test Connection, model, Save) and enabled (palette →
+  "AI Completion" → consent prompt → Y).
 
 STEPS
   1. Type in a source file, pause.
 
 VERIFY
   - AI suggestion appears as ghost text (may take longer than buffer
-    word completion).
+    word completion) — see QA-AI-003 for the full scripted flow.
   - Rate-limited to ~12 requests/minute per docs.
 
 --------------------------------------------------------------------------------

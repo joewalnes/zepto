@@ -64,6 +64,7 @@ use constant {
 # Load command and menu modules (they add methods to this package)
 use Zepto::Editor::Commands;
 use Zepto::Editor::Palette;
+use Zepto::Editor::Dialog;
 
 # Timing and UI settings
 use constant {
@@ -721,7 +722,8 @@ sub run {
                          || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
             my $completion_pending = $self->{_completion_pending_at} && $self->{_completion_pending_at} > 0;
             my $ai_active = $self->{_ai_complete} && ($self->{_ai_complete}->is_pending() || $self->{_ai_complete}->is_debouncing());
-            my $timeout = ($searching || $completion_pending || $ai_active) ? 0.01 : INPUT_TIMEOUT_SEC;
+            my $dialog_test_active = $self->dialog_test_active();
+            my $timeout = ($searching || $completion_pending || $ai_active || $dialog_test_active) ? 0.01 : INPUT_TIMEOUT_SEC;
 
             # Read input with timeout
             my $input = $self->{terminal}->read_blocking($timeout);
@@ -790,6 +792,11 @@ sub run {
                     if ($self->{_ai_complete}->poll()) {
                         $needs_render = 1;  # Show ghost text
                     }
+                }
+
+                # AI Settings dialog: poll an in-flight Test Connection request
+                if ($self->dialog_poll_test()) {
+                    $needs_render = 1;
                 }
 
                 # Deferred tree VCS: run on first idle after initial render
@@ -2192,82 +2199,11 @@ sub _close_any_modal {
 # =============================================================================
 # Dialog Handling
 # =============================================================================
-
-sub open_dialog {
-    my ($self, %opts) = @_;
-    $self->{state} = STATE_DIALOG;
-    $self->{dialog} = {
-        title   => $opts{title} // 'Dialog',
-        prompt  => $opts{prompt} // '',
-        value   => $opts{value} // '',
-        cursor  => length($opts{value} // ''),
-        on_submit => $opts{on_submit},
-        on_cancel => $opts{on_cancel},
-    };
-}
-
-sub close_dialog {
-    my ($self) = @_;
-    $self->{state} = STATE_EDITING;
-    $self->{dialog} = undef;
-}
-
-sub handle_dialog_event {
-    my ($self, $event) = @_;
-
-    my $dialog = $self->{dialog};
-    my $type = $event->{type};
-
-    if ($type eq 'key') {
-        my $key = $event->{key};
-
-        if ($key eq 'enter') {
-            my $value = $dialog->{value};
-            $self->close_dialog();
-            $dialog->{on_submit}->($value) if $dialog->{on_submit};
-        }
-        elsif ($key eq 'escape') {
-            $self->close_dialog();
-            $dialog->{on_cancel}->() if $dialog->{on_cancel};
-        }
-        elsif ($key eq 'backspace') {
-            if ($dialog->{cursor} > 0) {
-                my $val = $dialog->{value};
-                my $pos = $dialog->{cursor};
-                $dialog->{value} = substr($val, 0, $pos - 1) . substr($val, $pos);
-                $dialog->{cursor}--;
-            }
-        }
-        elsif ($key eq 'delete') {
-            if ($dialog->{cursor} < length($dialog->{value})) {
-                my $val = $dialog->{value};
-                my $pos = $dialog->{cursor};
-                $dialog->{value} = substr($val, 0, $pos) . substr($val, $pos + 1);
-            }
-        }
-        elsif ($key eq 'left') {
-            $dialog->{cursor}-- if $dialog->{cursor} > 0;
-        }
-        elsif ($key eq 'right') {
-            $dialog->{cursor}++ if $dialog->{cursor} < length($dialog->{value});
-        }
-        elsif ($key eq 'home') {
-            $dialog->{cursor} = 0;
-        }
-        elsif ($key eq 'end') {
-            $dialog->{cursor} = length($dialog->{value});
-        }
-    }
-    elsif ($type eq 'char') {
-        my $char = $event->{char};
-        unless (Zepto::InputParser::has_modifier($event, 'ctrl')) {
-            my $val = $dialog->{value};
-            my $pos = $dialog->{cursor};
-            $dialog->{value} = substr($val, 0, $pos) . $char . substr($val, $pos);
-            $dialog->{cursor}++;
-        }
-    }
-}
+#
+# open_dialog / close_dialog / handle_dialog_event live in
+# Zepto::Editor::Dialog (lib/Zepto/Editor/Dialog.pm) — a generic
+# multi-field modal dialog, currently used by the AI Settings dialog
+# (open_ai_dialog).
 
 # =============================================================================
 # Prompt Handling (status bar choices)
