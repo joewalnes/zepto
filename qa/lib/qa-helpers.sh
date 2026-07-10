@@ -284,8 +284,27 @@ qa_sed_i() {
 # Input
 # ---------------------------------------------------------------------------
 
+# hangon's session state (~/.hangon/state.json) is written non-atomically,
+# so under parallel runner load `hangon keys`/`hangon send` intermittently
+# fail with exit 1/2 ("session not found", torn-JSON reads) or misroute to
+# a stale "default" session — killing set -e scripts mid-run and producing
+# ghost CI failures (keys silently never delivered). Until hangon writes
+# state atomically, retry delivery a few times with backoff. See bugs.md
+# "[Testing hazard] hangon state.json races under parallel load".
+_qa_hangon_retry() {
+    local attempt
+    for attempt in 1 2 3; do
+        if hangon "$@"; then
+            return 0
+        fi
+        sleep 0.3
+    done
+    echo "qa-helpers: hangon $1 failed after 3 attempts (session=$QA_SESSION)" >&2
+    return 1
+}
+
 qa_send() {
-    hangon send "$QA_SESSION" "$1"
+    _qa_hangon_retry send "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
@@ -321,13 +340,13 @@ qa_send_safe() {
 }
 
 qa_keys() {
-    hangon keys "$QA_SESSION" "$1"
+    _qa_hangon_retry keys "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
 # Send raw escape sequences
 qa_raw() {
-    hangon send "$QA_SESSION" "$1"
+    _qa_hangon_retry send "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 

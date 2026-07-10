@@ -32,26 +32,6 @@ qa_keys "escape"
 # robust under load, and faster than a fixed sleep on a healthy run.
 qa_expect_screen "hello world" 5 -F || true
 
-# TEMP-DEBUG (CI only; remove after diagnosis): if the panel failed to
-# close, run recovery probes and report findings as FAIL lines so the
-# runner displays them in full.
-if [ "${CI:-}" = "true" ] && ! qa_screen | grep -qF "hello world"; then
-    ver="tmux=$(tmux -V 2>&1) hangon=$(hangon version 2>&1 | head -1)"
-    row=$(qa_screen | grep -m1 "hello" | od -An -c | tr -s ' ' | head -2 | tr -d '\n')
-    qa_fail "DEBUG1 $ver row=[$row]"
-    sleep 1; hangon keys "$QA_SESSION" escape; sleep 1.5
-    p1=$(qa_screen | grep -qF "hello world" && echo RECOVERED || echo still-stuck)
-    qa_fail "DEBUG2 probe1-second-hangon-escape=$p1"
-    if [ "$p1" = "still-stuck" ]; then
-        for t in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep hangon); do
-            tmux send-keys -t "$t" -H 1b 2>/dev/null
-        done
-        sleep 1.5
-        p2=$(qa_screen | grep -qF "hello world" && echo RECOVERED || echo still-stuck)
-        qa_fail "DEBUG3 probe2-raw-1b-byte=$p2"
-    fi
-fi
-
 # Should be back to editor
 qa_assert_screen "hello world" "editor visible after closing FIF"
 
