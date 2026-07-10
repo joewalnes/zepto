@@ -17,6 +17,10 @@ qa_send "find in" 0.3
 
 qa_assert_screen "Find in Files|Find in files|find.in.files" "find-in-files command visible in palette"
 
+# Settle before Escape so it's sent as its own cleanly-separated keystroke
+# rather than racing the tail of the typed query on a slow/loaded runner.
+qa_expect_screen "find in" 3 -iF || true
+
 qa_keys "escape"
 qa_keys "escape"
 qa_keys "ctrl-q"

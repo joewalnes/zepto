@@ -17,7 +17,8 @@ A modern, intuitive, terminal text editor. Single file. No dependencies. No conf
 - **Word wrap**, column selection, smart Home/End, location history
 - **Dark and light themes** (`⌃T`)
 - **Transform via shell** (`⌥T`) — pipe selected text through any command
-- **Single file, zero dependencies** — just Perl 5.10+ standard library
+- **AI completion** (opt-in) — ghost-text suggestions from OpenAI, Anthropic, OpenRouter, Ollama, and other OpenAI-compatible providers; off by default, asks for consent before sending anything ([details](FEATURES.md#ai-completion-opt-in))
+- **Single file, core-Perl-only** — just Perl 5.14+ standard library; the opt-in AI completion feature additionally needs `curl` if you turn it on
 
 ## Install
 
@@ -35,7 +36,7 @@ Or [download manually](https://github.com/joewalnes/zepto/releases/download/late
 
 ## Requirements
 
-- Perl 5.10+ (standard library only, no CPAN modules)
+- Perl 5.14+ (standard library only, no CPAN modules)
 - Any terminal with ANSI support
 
 ## Building from Source

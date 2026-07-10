@@ -149,4 +149,13 @@ subtest 'section order is consistent' => sub {
     is($order[3], 'VIEW', 'Fourth section is VIEW');
 };
 
+subtest 'Continue Lists command is discoverable in the palette (EDIT section)' => sub {
+    my $cmd = Zepto::CommandRegistry->find_command('toggle_continue_lists');
+    ok(defined $cmd, 'toggle_continue_lists command exists in registry');
+    is($cmd->{section}, 'EDIT', 'In EDIT section');
+    is($cmd->{type}, 'toggle', 'Is a toggle-type command');
+    is($cmd->{pref}, 'continue_lists', 'Backed by the continue_lists preference');
+    is($cmd->{method}, 'cmd_toggle_continue_lists', 'Correct method name');
+};
+
 done_testing();

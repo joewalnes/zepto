@@ -348,6 +348,46 @@ subtest 'paste_from_clipboard returns string' => sub {
     ok(!ref($result), 'paste_from_clipboard returns scalar');
 };
 
+subtest 'paste_from_clipboard times out on a wedged clipboard command' => sub {
+    # bugs.md P1 hang-fix follow-up: a clipboard command that never
+    # produces EOF (e.g. a paste helper blocked on an unresponsive display
+    # server) must not freeze the editor forever. Inject a fake "paste
+    # command" that just hangs, bypassing platform autodetection.
+    # Redirect output to a tempfile (not the default STDOUT) so this
+    # object's DESTROY-time cleanup() doesn't leak terminal escape codes
+    # into the test's own stdout.
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+    $term->{_clipboard_paste_cmd} = ['sleep', '30'];
+    # Speed up the test — ZEPTO_CLIPBOARD_TIMEOUT overrides the default 3s.
+    local $ENV{ZEPTO_CLIPBOARD_TIMEOUT} = 0.3;
+
+    my $start = time();
+    my $result = $term->paste_from_clipboard();
+    my $elapsed = time() - $start;
+
+    ok(defined $result, 'Returns a defined (empty) string rather than hanging forever');
+    ok($elapsed < 10, "Returned promptly (${elapsed}s), not after the full 30s sleep");
+};
+
+subtest 'copy_to_clipboard times out on a wedged clipboard command' => sub {
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+    # `cat > /dev/null; sleep 30` reads (and discards) stdin immediately
+    # so our write doesn't block, but then hangs before exiting — this
+    # exercises the close($pipe) timeout specifically (close() waits for
+    # the child to exit), not just the write.
+    $term->{_clipboard_copy_cmd} = ['sh', '-c', 'cat > /dev/null; sleep 30'];
+    local $ENV{ZEPTO_CLIPBOARD_TIMEOUT} = 0.3;
+
+    my $start = time();
+    my $ok = eval { $term->copy_to_clipboard("hello"); 1 };
+    my $elapsed = time() - $start;
+
+    ok($ok, 'copy_to_clipboard does not die');
+    ok($elapsed < 10, "Returned promptly (${elapsed}s), not after the full 30s sleep");
+};
+
 subtest 'paste_from_clipboard decodes UTF-8' => sub {
     plan skip_all => 'Requires macOS pbcopy/pbpaste' unless $^O eq 'darwin';
 

@@ -5,7 +5,9 @@ Technical decisions, architecture, and rationale.
 ## Design Goals
 
 1. **Single-file distribution** — The entire editor ships as one file you can copy anywhere.
-2. **Zero dependencies** — Perl standard library only. No CPAN, no external tools.
+2. **Core-only runtime** — Perl 5.14+ standard library only for the editor itself; no CPAN. The
+   opt-in AI completion feature (off by default) shells out to `curl` when enabled — see
+   `docs/SECURITY.md`.
 3. **Instant startup** — Under 100ms to first render.
 4. **Predictable behavior** — No modes, no surprises. Works like every other text field you've used.
 5. **Testable architecture** — Clean separation enables comprehensive automated testing.
@@ -22,7 +24,7 @@ Perl is the most portable scripting language for system environments:
 | Ruby     | Often missing on minimal systems                   | Yes          | Good               |
 | Go/Rust  | Requires compilation per platform                  | Binary       | Excellent          |
 
-Perl 5.10+ is installed by default on virtually every Unix-like system. It has:
+Perl 5.14+ is installed by default on virtually every Unix-like system. It has:
 - Native POSIX terminal control (termios)
 - Excellent UTF-8 support
 - Fast startup (~20ms)
@@ -72,7 +74,7 @@ it's the pragmatic choice.
 | **Buffer**           | Gap buffer text storage with line indexing         | Pure (no I/O)                |
 | **Document**         | File operations, undo/redo, VCS diff integration  | Stateful                     |
 | **View**             | Viewport position, cursor, selection state        | Stateful                     |
-| **Renderer**         | Converts editor state to ANSI escape sequences    | Pure function                |
+| **Renderer**         | Converts editor state to ANSI escape sequences    | Mostly pure — `stat()`s files for existence checks and reads image file headers for dimensions (both cached); no writes |
 | **InputParser**      | Decodes terminal input into semantic events       | Stateful (partial sequences) |
 | **Terminal**         | Raw mode, screen size, clipboard, low-level I/O   | Side effects                 |
 | **Theme**            | Color definitions for UI elements                 | Pure data                    |
@@ -92,6 +94,19 @@ it's the pragmatic choice.
 | **TabManager**       | Multi-tab state, ordering, MRU tracking           | Stateful                     |
 | **FilePicker**       | Fuzzy file finder with incremental scoring        | Stateful                     |
 | **Config**           | Global configuration constants                    | Pure data                    |
+| **StateStore**       | Persistent JSON state (prefs/history/secrets), cross-instance sync | Stateful (file I/O) |
+| **HangWatchdog**      | Forked watchdog that detects a wedged main loop and logs diagnostics | Side effects (fork, signals) |
+| **AIProviders**      | Per-provider request/response shaping for AI completion | Pure data + functions |
+| **AIHttp**            | Secure `curl`-based HTTP transport for AI completion (key never on argv) | Side effects (fork/exec) |
+| **Editor::Commands**  | Command methods (save, find, transform, etc.) mixed into `Zepto::Editor` | Stateful |
+| **Editor::Palette**   | Command palette, file picker, find-in-files UI logic | Stateful |
+| **Editor::Dialog**    | Modal dialog management (e.g. AI settings)        | Stateful                     |
+| **Editor::TabManager**| Tab collection, ordering, MRU tracking (backs the `TabManager` row above) | Stateful |
+| **VCS::Provider / VCS::Git** | VCS abstraction and git-backed implementation (diff, blame content, staged content) | Stateful (external process) |
+| **Completion::***    | Word/snippet/keyword/path/recent-file completion providers + controller | Stateful |
+| **AIComplete**        | AI ghost-text completion controller (debounce, rate limit, consent) | Stateful |
+| **HelpDocs**          | Built-in documentation registry, embedded at build time | Pure data |
+| **ImageConverter**    | Detects/uses `sips`/ImageMagick to convert images to PNG for preview | Side effects (external process, cache) |
 
 ### Data Flow
 
@@ -211,8 +226,8 @@ Vim's modal editing is powerful but has a learning curve. Zepto is modeless:
 
 Every feature is findable without reading documentation:
 
-1. **Menu bar** — Always visible, shows all commands
-2. **Keyboard shortcuts in menus** — Learn as you use
+1. **Command palette + status bar** — There is no menu bar. `⌃Space` opens a searchable command palette listing every command, and the status bar shows context-relevant interactive pills for the most-used actions.
+2. **Keyboard shortcuts shown everywhere** — Every palette item and status bar pill displays its shortcut. Learn as you use.
 3. **Status bar hints** — Shows context-relevant help
 4. **Standard conventions** — Ctrl+S saves, Ctrl+Z undoes, Ctrl+Q quits
 
@@ -252,7 +267,7 @@ Modern terminals support:
 - 24-bit RGB color: `\x1b[38;2;R;G;Bm` (foreground), `\x1b[48;2;R;G;Bm` (background)
 - Cursor positioning: `\x1b[row;colH`
 - Screen clearing: `\x1b[2J`
-- Mouse tracking: `\x1b[?1002h` (button events), `\x1b[?1006h` (SGR extended)
+- Mouse tracking: `\x1b[?1003h` (any-event, including motion for hover effects), `\x1b[?1006h` (SGR extended)
 
 We use RGB colors for rich theming while remaining compatible with any modern terminal emulator.
 
@@ -277,8 +292,10 @@ This allows consistent theming—change the theme, and every UI element updates 
 
 See `docs/CODE_QUALITY.md` for testing standards, test categories, and patterns.
 
-The key architectural enabler: keeping Renderer pure (state in → string out) means rendering can
-be tested without a terminal. `make test` runs the full suite; `make check` verifies Perl syntax.
+The key architectural enabler: Renderer takes state in and returns strings out, with I/O limited to
+read-only, cached `stat()`/file-header lookups (image dimensions, file existence) — no writes, no
+terminal access. That's what lets rendering be tested without a terminal. `make test` runs the full
+suite; `make check` verifies Perl syntax.
 
 ## Build System
 
@@ -298,5 +315,6 @@ The build process:
 
 ### Why Not Use a Perl Bundler?
 
-Tools like PAR or FatPacker add complexity and dependencies. Our build.pl is 50 lines of simple
-string manipulation. It does exactly what we need and nothing more.
+Tools like PAR or FatPacker add complexity and dependencies. Our `build.pl` is a few hundred lines
+of simple string manipulation (concatenation, embedding help docs, stripping `use Zepto::*` lines).
+It does exactly what we need and nothing more.

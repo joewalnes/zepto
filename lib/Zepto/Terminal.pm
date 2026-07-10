@@ -15,9 +15,64 @@ package Zepto::Terminal;
 
 use strict;
 use warnings;
-use POSIX qw(TCSANOW);
+use POSIX qw(TCSANOW WNOHANG);
 use IO::Select;
+# Time::HiRes's alarm() supports fractional seconds (core alarm() truncates
+# to an integer, and alarm(0) means "cancel" — a fractional
+# ZEPTO_CLIPBOARD_TIMEOUT, used to keep tests fast, would silently never
+# fire with core alarm(), hanging forever instead of timing out).
+use Time::HiRes qw(time alarm);
 use Zepto::ImageConverter;
+
+# Timeout (seconds) for external clipboard commands (pbcopy/xclip/wl-copy/
+# etc). A wedged or missing clipboard daemon must not freeze the whole UI —
+# see bugs.md P1 "cmd_transform open3 sequential-slurp can deadlock/hang UI
+# indefinitely" (same blocking-pipe-I/O class of bug, different call site).
+# Read at call time (not baked into a `use constant`) so
+# ZEPTO_CLIPBOARD_TIMEOUT can speed up tests that exercise the timeout path
+# itself — see tests/terminal.t.
+sub _clipboard_timeout { $ENV{ZEPTO_CLIPBOARD_TIMEOUT} || 3 }
+
+# Wait for $pid to exit, up to $grace seconds, without ever blocking
+# indefinitely; if it hasn't exited by then, kill it (and its process
+# group, in case it spawned children of its own) and reap synchronously.
+#
+# $grace=0 means "skip straight to killing" — use this when the caller
+# already knows the command timed out. A nonzero grace is for the SUCCESS
+# path: reaching EOF on the read pipe does NOT guarantee the process has
+# actually exited yet (e.g. a clipboard helper that daemonizes or closes
+# its fds before it's actually done) — a bare `close($fh)` there still
+# does an internal unbounded waitpid, silently re-introducing the exact
+# hang class this timeout exists to prevent, just moved to the success
+# path instead of the timeout path.
+sub _bounded_reap {
+    my ($pid, $grace) = @_;
+    return unless $pid;
+    $grace //= 0;
+
+    if ($grace > 0) {
+        my $deadline = time() + $grace;
+        while (time() < $deadline) {
+            my $ret = waitpid($pid, WNOHANG);
+            return if $ret == $pid;
+            select(undef, undef, undef, 0.05);
+        }
+    }
+
+    kill('TERM', $pid);
+    kill('TERM', -$pid);
+    my $deadline = time() + 1;
+    while (time() < $deadline) {
+        my $ret = waitpid($pid, WNOHANG);
+        last if $ret == $pid;
+        select(undef, undef, undef, 0.05);
+    }
+    if (waitpid($pid, WNOHANG) != $pid) {
+        kill('KILL', $pid);
+        kill('KILL', -$pid);
+        waitpid($pid, 0);
+    }
+}
 
 # Escape sequences for terminal control
 use constant {
@@ -191,16 +246,6 @@ sub enter_alt_screen {
     return 1;
 }
 
-# Set cursor color using OSC 12
-# Color should be in format "#RRGGBB" or a color name
-sub set_cursor_color {
-    my ($self, $color) = @_;
-    return unless $color;
-    # OSC 12 ; color ST
-    $self->write("\x1b]12;${color}\x1b\\");
-    return 1;
-}
-
 sub leave_alt_screen {
     my ($self) = @_;
     return unless $self->{_alt_screen};
@@ -351,28 +396,6 @@ sub refresh_size {
 # =============================================================================
 # Input
 # =============================================================================
-
-# Read available input (non-blocking)
-# Returns bytes read, or empty string if nothing available
-sub read_available {
-    my ($self, $timeout) = @_;
-    $timeout //= 0;
-
-    my $in_fh = $self->{in_fh};
-    my $select = IO::Select->new($in_fh);
-
-    my $input = '';
-
-    while ($select->can_read($timeout)) {
-        my $buf;
-        my $n = sysread($in_fh, $buf, READ_BUFFER_SIZE);
-        last unless defined $n && $n > 0;
-        $input .= $buf;
-        $timeout = 0;  # Don't wait on subsequent reads
-    }
-
-    return $input;
-}
 
 # Blocking read of at least one byte
 sub read_blocking {
@@ -580,13 +603,41 @@ sub copy_to_clipboard {
     # OSC 52 ; c ; base64-data ST (ST = \x1b\\)
     $self->write("\x1b]52;c;${encoded}\x1b\\");
 
-    # Method 2: Platform clipboard command (list-form exec, no shell)
+    # Method 2: Platform clipboard command (list-form exec, no shell).
+    # Wrapped in an alarm-based timeout — a wedged or non-responding
+    # clipboard daemon (e.g. an xclip left backgrounded with no X display)
+    # must not freeze the whole editor on `close($pipe)`, which blocks
+    # until the child exits.
     if ($self->{_clipboard_copy_cmd}) {
-        my $pid = open(my $pipe, '|-', @{$self->{_clipboard_copy_cmd}});
+        my @cmd = @{$self->{_clipboard_copy_cmd}};
+        # Bareword fork form (not list-form open) so we get a hook to run
+        # code in the child before exec — needed to setpgid it into its
+        # own process group, so _bounded_reap can kill the whole tree.
+        my $pid = open(my $pipe, '|-');
+        if (defined $pid && $pid == 0) {
+            eval { POSIX::setpgid(0, 0) };
+            open(STDERR, '>', '/dev/null');
+            exec(@cmd) or exit(127);
+        }
         if ($pid) {
             binmode($pipe, ':raw');
-            print $pipe $bytes;
-            close $pipe;
+            my $timed_out = 0;
+            eval {
+                local $SIG{ALRM} = sub { die "clipboard_timeout\n" };
+                alarm(_clipboard_timeout());
+                print $pipe $bytes;
+                close $pipe;
+                alarm(0);
+            };
+            if ($@) {
+                alarm(0);
+                $timed_out = 1;
+            }
+            # grace=0: we already know this needs killing (close() either
+            # succeeded above — no reap needed at all — or the alarm fired
+            # mid-close, in which case the child needs killing right away,
+            # not a grace period).
+            _bounded_reap($pid, 0) if $timed_out;
         }
     }
 
@@ -604,12 +655,38 @@ sub paste_from_clipboard {
     my $pid = open(my $fh, '-|');
     return '' unless defined $pid;
     if ($pid == 0) {
+        # Own process group — see the comment in copy_to_clipboard.
+        eval { POSIX::setpgid(0, 0) };
         open(STDERR, '>', '/dev/null');
         exec(@cmd) or exit(127);
     }
     binmode($fh, ':raw');
-    my $text = do { local $/; <$fh> };
+
+    # Alarm-based timeout — a wedged clipboard command (e.g. a paste helper
+    # blocked waiting on a display server that isn't responding) must not
+    # freeze the whole editor on this blocking read.
+    my $text;
+    my $timed_out = 0;
+    eval {
+        local $SIG{ALRM} = sub { die "clipboard_timeout\n" };
+        alarm(_clipboard_timeout());
+        $text = do { local $/; <$fh> };
+        alarm(0);
+    };
+    if ($@) {
+        alarm(0);
+        $timed_out = 1;
+    }
+    # Reap BEFORE close($fh) — close() on a pipe filehandle blocks waiting
+    # for the child to exit (it does an internal waitpid). Bounded either
+    # way: grace=0 (kill right away) on a known timeout; grace=2 on the
+    # success path, since reaching EOF on the read (what let us get here)
+    # does NOT guarantee the process has actually exited yet — a bare
+    # close() would silently re-introduce the exact hang class this
+    # timeout exists to prevent, just moved to the success path.
+    _bounded_reap($pid, $timed_out ? 0 : 2);
     close($fh);
+
     return '' unless defined $text;
     utf8::decode($text);
     return $text;

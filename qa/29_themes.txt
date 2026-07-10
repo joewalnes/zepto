@@ -179,3 +179,41 @@ STEPS
 VERIFY
   - Theme row shows current value ("dark" or "light") with sun/moon icon.
   - Enter toggles between them.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-012
+NAME:     Cross-instance theme sync — idle window repaints without input
+PRIORITY: P1
+FEATURE:  theme sync cross-instance
+RELATED:  QA-PREF-002, QA-THM-006
+
+STEPS
+  1. Open two Zepto windows/instances sharing the same state directory,
+     each with a different file.
+  2. Toggle the theme (⌃T) in instance A only.
+  3. WITHOUT sending any input to instance B, wait ~2s.
+  4. Capture instance B's screen with terminal escape codes intact (not
+     just text) and check its actual color values.
+
+VERIFY
+  - Instance B repaints with the new theme within ~2s, entirely on its
+    own — no keystroke, click, or resize was ever sent to it.
+  - Verified via actual color values (raw ANSI capture), not just text
+    content, since text is identical between themes.
+  - Fixed in Phase 2 (bugs.md item 4 "Cross-instance theme sync"):
+    `StateStore::check_for_changes()` (the mechanism that reloads
+    preferences an external process changed and fires listeners —
+    Preferences.pm's `on_change('preferences', ...)`, which in turn
+    drives Editor.pm's theme/nerd_font/minimap listener from `init()`)
+    was previously called ONLY from inside `render()`. An idle instance —
+    one that isn't typing and therefore isn't re-rendering — never
+    noticed the change at all, no matter how long it sat there. Now also
+    polled from the idle-timeout branch of the main loop via
+    `Editor::_poll_cross_instance_prefs` (throttled to ~1s), which sets
+    `$needs_render` when a change was actually applied so the repaint
+    happens promptly.
+  - Unit tests: `tests/editor.t` ("_poll_cross_instance_prefs" subtests —
+    picks up an external change, throttles correctly, no-ops outside
+    STATE_EDITING), `tests/state_store.t` (`check_for_changes` return
+    value).

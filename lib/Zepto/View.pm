@@ -86,7 +86,6 @@ sub invalidate_wrap_line {
     my ($self, $line_idx) = @_;
     $self->{_wrap_map}->invalidate_line($line_idx) if $self->{_wrap_map};
 }
-sub scroll_wrap_offset { $_[0]->{_scroll_wrap_offset} }
 sub cursor_affinity { $_[0]->{_cursor_affinity} // 'right' }
 
 sub word_wrap_override     { $_[0]->{_word_wrap} }
@@ -105,7 +104,6 @@ sub scroll_visual_row {
 # ============================================================================
 
 sub document { $_[0]->{document} }
-sub set_document { $_[0]->{document} = $_[1] }
 
 # ============================================================================
 # Cursor management

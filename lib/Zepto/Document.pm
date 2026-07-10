@@ -591,12 +591,6 @@ sub vcs_name {
     return $self->{_vcs_provider} ? $self->{_vcs_provider}->name : undef;
 }
 
-# Mark VCS diff as needing recomputation
-sub _mark_vcs_dirty {
-    my ($self) = @_;
-    $self->{_vcs_dirty} = 1;
-}
-
 # Compute VCS diff (call after edits, debounced)
 sub _compute_vcs_diff {
     my ($self) = @_;
@@ -706,17 +700,6 @@ sub vcs_line_status {
 sub vcs_diff {
     my ($self) = @_;
     return $self->{_vcs_diff};
-}
-
-# Invalidate VCS cache (call after save to refresh base content)
-sub invalidate_vcs_cache {
-    my ($self) = @_;
-    return unless $self->{_vcs_provider};
-
-    $self->{_vcs_provider}->invalidate_cache($self->{path});
-    $self->{_vcs_base} = $self->{_vcs_provider}->get_head_content($self->{path});
-    $self->{_vcs_base_lines} = undef;
-    $self->_compute_vcs_diff();
 }
 
 # Get base (HEAD) text split into lines (cached)

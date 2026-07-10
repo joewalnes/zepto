@@ -372,3 +372,40 @@ STEPS
 VERIFY
   - Buffer content reflects the typed characters, not remnants of find.
   - No find highlights left on screen.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-022
+NAME:     Enter continues Markdown/plain-text list items
+PRIORITY: P2
+FEATURE:  enter list-continuation
+RELATED:  QA-EDIT-009
+
+SETUP
+  A .txt or .md file (word wrap default doesn't matter here).
+
+STEPS
+  1. Type `- first item`, press Enter.
+  2. Type more text, press Enter again on the now-empty new marker line.
+  3. Type `1. numbered`, press Enter — check the marker increments.
+  4. Type `- [x] done`, press Enter — check the new marker is unchecked.
+
+VERIFY
+  - Step 1: new line starts with `- ` (same marker), cursor right after it.
+  - Step 2: pressing Enter on an EMPTY list item (just the marker, no
+    text) removes the marker instead of continuing the list — cursor
+    lands on a plain, unmarked line at the same indent.
+  - Step 3: new line starts with `2. ` (incremented).
+  - Step 4: new line starts with `- [ ] ` (always continues unchecked,
+    regardless of whether the original item was checked).
+  - Also works for `*`, `+` bullets and `> ` blockquotes.
+  - Does NOT fire on a non-Markdown/non-plain-text file (e.g. a .pl file
+    with a line that happens to start with `- `) — that file's Enter
+    behaves as plain auto-indent only.
+  - Does NOT fire during bracketed paste (pasting text that looks like a
+    list must not auto-continue markers line by line).
+  - Toggle via the "Continue Lists" command in the palette (EDIT
+    section) — turning it off disables all of the above.
+  - Fixed/added in Phase 2 (bugs.md "Markdown/plain-text list
+    continuation"). Unit tests: `tests/editor.t` ("List continuation:"
+    subtests), `tests/command_registry.t` (palette discoverability).

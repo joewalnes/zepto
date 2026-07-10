@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-10
+
+- AI completion (opt-in) — ghost-text suggestions from OpenAI, Anthropic, OpenRouter, opencode zen, opencode go, DeepSeek, Ollama, Gemini, or any custom OpenAI-compatible endpoint; off by default, with a settings dialog (`AI: Configure`) to pick a provider, test the connection, and choose a model
+- Markdown and plain-text files continue lists on Enter (bullets, numbered items, checkboxes, blockquotes); toggle via "Continue Lists" in the command palette
+- Theme changes now sync across all open windows, not just the one where you toggled it
+- Fixed: drag-selecting above the visible area jumped the selection/view to the end of the file instead of extending upward
+- Fixed: a stale completion suggestion could linger and re-render at the wrong spot after a mouse click
+- Fixed: completion ghost-text suggestions could render offset from the cursor on wrapped lines
+- Fixed: shell transforms, clipboard access, and slow git operations could hang the editor indefinitely — these now time out (configurable via `ZEPTO_TRANSFORM_TIMEOUT`, `ZEPTO_CLIPBOARD_TIMEOUT`, `ZEPTO_GIT_TIMEOUT`), and a new hang detector writes diagnostics if the editor ever does get wedged
+- Fixed: Escape was occasionally swallowed and the next keystroke lost on slow terminals
+- Fixed: column paste at the end of the document silently did nothing
+- Fixed: `--no-nerd-font` now renders fully ASCII, including the tab bar edges
+
 ## 2026-04-23
 
 - Fixed move-line undo corruption — Ctrl+Z after Alt+Up/Down now correctly restores line order

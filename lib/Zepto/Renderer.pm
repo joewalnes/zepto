@@ -77,6 +77,11 @@ use constant {
     MIN_TEXT_WIDTH     => 10,
     DIALOG_WIDTH       => 50,
     DIALOG_HEIGHT      => 5,
+    # AI Settings dialog (multi-field form) and its list-picker sub-mode.
+    AI_DIALOG_WIDTH    => 60,
+    AI_DIALOG_HEIGHT   => 11,   # border+title+7 fields+status+border
+    AI_LIST_HEIGHT     => 12,
+    AI_LIST_VISIBLE     => 8,   # visible option rows in list-picker mode
     MINIMAP_WIDTH         => Zepto::Minimap::MINIMAP_TOTAL_WIDTH,
     TREE_INDENT_PER_LEVEL => Zepto::FileTree::INDENT_PER_LEVEL,
     TREE_MAX_INDENT       => Zepto::FileTree::MAX_INDENT,
@@ -540,21 +545,46 @@ sub render {
         $cursor_seq .= _move_to($pal_y + 1, $pal_x + 4 + $query_cursor_in_view);
         $cursor_seq .= SHOW_CURSOR;
     } elsif ($ui->{dialog}) {
-        # Position cursor in dialog input field
+        # Position cursor in the AI Settings dialog. Geometry MUST match
+        # _ai_dialog_geometry / _render_dialog exactly.
         my $dialog = $ui->{dialog};
-        my $dialog_width = DIALOG_WIDTH;
-        $dialog_width = $cols - 4 if $dialog_width > $cols - 4;
-        my $dx = int(($cols - $dialog_width) / 2);
-        $dx = 1 if $dx < 1;
-        my $dy = int(($rows - DIALOG_HEIGHT) / 2);
-        $dy = 1 if $dy < 1;
-        my $cursor_pos = $dialog->{cursor} // length($dialog->{value} // '');
-        my $cursor_x = $dx + 2 + $cursor_pos;
-        if ($cursor_x > $dx + $dialog_width - 4) {
-            $cursor_x = $dx + $dialog_width - 4;
+        my ($dx, $dy, $dw, $dh) = $class->_ai_dialog_geometry($dialog, $rows, $cols);
+        my $inner_w = $dw - 2;
+
+        if ($dialog->{list_mode}) {
+            # _render_dialog draws this row as: " > $filter_val" — the
+            # literal 3-char " > " prefix precedes the filter text.
+            my $prefix = ' > ';
+            my $widget = $dialog->{list_widget};
+            my $avail = $inner_w - length($prefix);
+            $avail = 1 if $avail < 1;
+            my $vp = $widget ? $widget->viewport($avail) : { cursor_in_view => 0 };
+            $cursor_seq .= _move_to($dy + 2, $dx + 1 + length($prefix) + $vp->{cursor_in_view});
+            $cursor_seq .= SHOW_CURSOR;
         }
-        $cursor_seq .= _move_to($dy + 3, $cursor_x);
-        $cursor_seq .= SHOW_CURSOR;
+        else {
+            my $fields = $dialog->{fields};
+            my $focus  = $dialog->{focus} // 0;
+            my $field  = $fields->[$focus];
+            if ($field && ($field->{type} eq 'text' || $field->{type} eq 'masked')) {
+                # _render_dialog draws this row as: "$mark$label: $value"
+                # where $mark is the 2-char focus caret ("> " or "  ").
+                my $prefix = '  ' . "$field->{label}: ";
+                my $avail = $inner_w - length($prefix);
+                $avail = 1 if $avail < 1;
+                my $vp = $field->{widget}->viewport($avail);
+                # Masked fields never reveal a mid-string caret position
+                # (the rendered text is dots+last4, not the real value) —
+                # park the caret at the end of the masked display.
+                my $col_offset = $field->{type} eq 'masked'
+                    ? length(_render_masked_value($field->{widget}->value()))
+                    : $vp->{cursor_in_view};
+                $cursor_seq .= _move_to($dy + 2 + $focus, $dx + 1 + length($prefix) + $col_offset);
+                $cursor_seq .= SHOW_CURSOR;
+            } else {
+                $cursor_seq .= HIDE_CURSOR;
+            }
+        }
     } elsif ($ui->{footer_input}) {
         # Position cursor in footer input field
         my $input      = $ui->{footer_input};
@@ -847,9 +877,10 @@ sub _render_tab_bar {
     my $hover_tab_idx = $ui->{hover_tab_index};
 
     # Build cache key from inputs that affect tab bar output
+    # (includes nerd-font state — tab edge glyphs now vary with it)
     my $cache_key = join("\0",
         $theme->name(), $cols, $tree_width, $active_idx, scalar(@$tabs),
-        ($hover_tab_idx // -1),
+        ($hover_tab_idx // -1), (Zepto::Chars->enabled() ? 1 : 0),
         map { ($_->{display_name} // '') . ($_->{is_dirty} ? 'D' : '') . ($_->{has_vcs_changes} ? 'V' : '') } @$tabs
     );
     my $cached = $class->_tab_bar_cache_get($cache_key);
@@ -862,8 +893,9 @@ sub _render_tab_bar {
     # Geometric triangle edges for tab shape:
     # ◢ (U+25E2) lower-right triangle: fg fills lower-right → left edge of tab
     # ◣ (U+25E3) lower-left triangle: fg fills lower-left → right edge of tab
-    my $TAB_LEFT  = "\x{25e2}";  # ◢
-    my $TAB_RIGHT = "\x{25e3}";  # ◣
+    # Both fall back to plain ASCII slashes when nerd font is disabled.
+    my $TAB_LEFT  = Zepto::Chars->get('tab_edge_left');   # ◢ or /
+    my $TAB_RIGHT = Zepto::Chars->get('tab_edge_right');  # ◣ or \
     my $close_char = "\x{00d7}";  # × (multiplication sign, reliable single-width)
     my $modified_char = "\x{25cf}";  # ● (filled circle)
 
@@ -2528,19 +2560,39 @@ sub _render_text_area {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
                 }
             } elsif ($fill_remaining > 0) {
-                # Ghost text: render inline completion hint on cursor line
-                if ($is_cursor_line && $completion && $completion->{ghost_text}
-                    && length($completion->{ghost_text}) > 0
-                    && !$is_wrap_cont) {
+                # Ghost text: render inline completion hint anchored at the
+                # cursor's own wrap segment — NOT always segment 0. A
+                # wrapped line's cursor may sit on a continuation row (e.g.
+                # cursor at the document line's EOL, which can land past
+                # the first visual row), so gate on "does THIS row's
+                # segment actually contain the cursor" rather than "is this
+                # the first segment". The ghost only ever renders when the
+                # cursor is at the document line's EOL (ghost text is drawn
+                # in the fill area after all of the row's content), so the
+                # matching segment is unambiguous: it's the one whose
+                # [col_start, col_end) contains the cursor, or — at true
+                # EOL — the final segment, whose col_end equals the full
+                # line's length.
+                my $cursor_on_this_segment = 1;
+                if ($has_wrap_segment) {
+                    my $seg_col_start = $entry->{col_start};
+                    my $seg_col_end   = $entry->{col_end};
+                    my $cursor_line_len = length($cursor_line_content);
+                    $cursor_on_this_segment =
+                        ($cursor_col >= $seg_col_start && $cursor_col < $seg_col_end)
+                        || ($cursor_col == $seg_col_end && $seg_col_end == $cursor_line_len);
+                }
+
+                if ($is_cursor_line && $cursor_on_this_segment && $completion && $completion->{ghost_text}
+                    && length($completion->{ghost_text}) > 0) {
                     my $ghost = $completion->{ghost_text};
-                    my $ghost_len = length($ghost);
-                    if ($ghost_len > $fill_remaining) {
-                        $ghost = substr($ghost, 0, $fill_remaining);
-                        $ghost_len = $fill_remaining;
-                    }
+                    # Truncate by DISPLAY WIDTH, not character count —
+                    # $fill_remaining is in terminal columns, and wide
+                    # chars (CJK, emoji) occupy 2 columns per character.
+                    my ($truncated, $ghost_width) = _truncate_to_display_width($ghost, $fill_remaining);
                     my $ghost_fg = $theme->color('completion_ghost_fg');
-                    push @_out, $ghost_fg . $ghost . RESET . $fill_bg;
-                    my $after = $fill_remaining - $ghost_len;
+                    push @_out, $ghost_fg . $truncated . RESET . $fill_bg;
+                    my $after = $fill_remaining - $ghost_width;
                     push @_out, ' ' x $after if $after > 0;
                 } else {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
@@ -3751,36 +3803,6 @@ sub get_status_buttons { return @{$_status_buttons}; }
 # Context-Aware Status Bar with Pills
 # =============================================================================
 
-# Render a single pill and return (output_string, display_width)
-sub _render_pill {
-    my ($class, $theme, $icon, $label, $shortcut, $fg_key, $bg_key, $edge_key, $prev_bg_key) = @_;
-
-    my @_out;
-    my $rl = Zepto::Chars->get('round_left');
-    my $rr = Zepto::Chars->get('round_right');
-    my $nerd_font = Zepto::Chars->enabled();
-
-    my $text = '';
-    $text .= "$icon " if $icon;
-    $text .= $label if $label;
-    $text .= " $shortcut" if $shortcut;
-
-    my $width;
-
-    if ($nerd_font) {
-        # Nerd font pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;  # spaces
-    } else {
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;
-    }
-
-    return (join('', @_out), $width);
-}
-
 sub _render_context_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active) = @_;
 
@@ -4195,93 +4217,145 @@ sub _render_context_status_bar {
     return join('', @_out);
 }
 
-# Render dialog box
-sub _render_dialog {
-    my ($class, $theme, $dialog, $total_rows, $total_cols) = @_;
+# Geometry (position/size) of the AI Settings dialog, shared between the
+# renderer and the frame builder's cursor-positioning code so the two never
+# drift out of sync.
+#   Returns (x, y, width, height).
+sub _ai_dialog_geometry {
+    my ($class, $dialog, $total_rows, $total_cols) = @_;
+    my $list_mode = $dialog->{list_mode} ? 1 : 0;
 
-    my @_out;
+    my $width = AI_DIALOG_WIDTH;
+    $width = $total_cols - 4 if $width > $total_cols - 4;
+    $width = 20 if $width < 20;
 
-    my $title = $dialog->{title} // 'Dialog';
-    my $prompt = $dialog->{prompt} // '';
-    my $value = $dialog->{value} // '';
-    my $cursor_pos = $dialog->{cursor} // length($value);
+    my $height = $list_mode ? AI_LIST_HEIGHT : AI_DIALOG_HEIGHT;
+    $height = $total_rows - 2 if $height > $total_rows - 2;
+    $height = 6 if $height < 6;
 
-    # Dialog dimensions
-    my $dialog_width = DIALOG_WIDTH;
-    $dialog_width = $total_cols - 4 if $dialog_width > $total_cols - 4;
-    my $dialog_height = DIALOG_HEIGHT;
-
-    # Center dialog
-    my $x = int(($total_cols - $dialog_width) / 2);
-    my $y = int(($total_rows - $dialog_height) / 2);
+    my $x = int(($total_cols - $width) / 2);
+    my $y = int(($total_rows - $height) / 2);
     $x = 1 if $x < 1;
     $y = 1 if $y < 1;
 
-    # Get box drawing characters (rounded when nerd font enabled)
+    return ($x, $y, $width, $height);
+}
+
+# Render the AI Settings dialog (multi-field form, or its list-picker
+# sub-mode). $dialog is the hashref built by Zepto::Editor::open_ai_dialog
+# (see lib/Zepto/Editor/Dialog.pm).
+sub _render_dialog {
+    my ($class, $theme, $dialog, $total_rows, $total_cols) = @_;
+
+    my ($x, $y, $width, $height) = $class->_ai_dialog_geometry($dialog, $total_rows, $total_cols);
+
     my $box_tl = Zepto::Chars->get('box_tl');
     my $box_tr = Zepto::Chars->get('box_tr');
     my $box_bl = Zepto::Chars->get('box_bl');
     my $box_br = Zepto::Chars->get('box_br');
-    my $box_h = Zepto::Chars->get('box_h');
-    my $box_v = Zepto::Chars->get('box_v');
+    my $box_h  = Zepto::Chars->get('box_h');
+    my $box_v  = Zepto::Chars->get('box_v');
+    my $caret  = Zepto::Chars->get('tree_arrow_right');
 
-    # Draw dialog box
-    push @_out, $theme->color('dialog_bg');
-    push @_out, $theme->color('dialog_fg');
+    my @_out;
+    push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
 
     # Top border
-    push @_out, _move_to($y, $x);
-    push @_out, $theme->color('dialog_border');
-    push @_out, $box_tl;
-    push @_out, $box_h x ($dialog_width - 2);
-    push @_out, $box_tr;
+    push @_out, _move_to($y, $x), $theme->color('dialog_border');
+    push @_out, $box_tl, ($box_h x ($width - 2)), $box_tr;
 
-    # Title row
-    push @_out, _move_to($y + 1, $x);
-    push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    push @_out, $box_v;
-    my $title_text = " $title ";
-    my $title_pad = $dialog_width - 2 - length($title_text);
-    push @_out, $title_text . (' ' x $title_pad);
-    push @_out, $box_v;
+    my $inner_w = $width - 2;
 
-    # Prompt row
-    push @_out, _move_to($y + 2, $x);
-    push @_out, $box_v;
-    my $prompt_text = " $prompt";
-    if (length($prompt_text) > $dialog_width - 4) {
-        $prompt_text = substr($prompt_text, 0, $dialog_width - 4);
+    # A single content row: "| <text, padded to inner width> |"
+    my $row = sub {
+        my ($row_offset, $text, $selected) = @_;
+        push @_out, _move_to($y + $row_offset, $x);
+        push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
+        push @_out, $box_v;
+        my $t = $text // '';
+        $t = substr($t, 0, $inner_w) if length($t) > $inner_w;
+        if ($selected) {
+            push @_out, $theme->color('dropdown_selected_bg');
+        }
+        push @_out, $t . (' ' x ($inner_w - length($t)));
+        push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg') if $selected;
+        push @_out, $box_v;
+    };
+
+    if ($dialog->{list_mode}) {
+        my $field_id = $dialog->{list_field} // '';
+        my $title = $field_id eq 'model' ? 'Select Model' : 'Select Provider';
+        $row->(1, " $title");
+
+        my $filter_val = $dialog->{list_widget} ? $dialog->{list_widget}->value() : '';
+        $row->(2, " > $filter_val");
+
+        my $filtered = $dialog->{list_filtered} || [];
+        my $visible = AI_LIST_VISIBLE;
+        my $cursor = $dialog->{list_cursor} // 0;
+        my $scroll = 0;
+        $scroll = $cursor - $visible + 1 if $cursor >= $visible;
+        for my $i (0 .. $visible - 1) {
+            my $idx = $scroll + $i;
+            my $opt = $idx <= $#$filtered ? $filtered->[$idx] : undef;
+            my $text = $opt ? " $opt->{label}" : '';
+            $row->(3 + $i, $text, ($opt && $idx == $cursor) ? 1 : 0);
+        }
+        if (!@$filtered) {
+            $row->(3, '  (no matches)');
+        }
     }
-    push @_out, $prompt_text . (' ' x ($dialog_width - 2 - length($prompt_text)));
-    push @_out, $box_v;
+    else {
+        $row->(1, " $dialog->{title}");
 
-    # Input row
-    push @_out, _move_to($y + 3, $x);
-    push @_out, $box_v . " ";
-    push @_out, $theme->color('dialog_input_bg');
-    push @_out, $theme->color('dialog_input_fg');
+        my $fields = $dialog->{fields};
+        my $focus  = $dialog->{focus} // 0;
+        for my $i (0 .. $#$fields) {
+            my $f = $fields->[$i];
+            my $mark = ($i == $focus) ? "$caret " : '  ';
+            my $line;
+            if ($f->{type} eq 'text') {
+                $line = "$mark$f->{label}: " . $f->{widget}->value();
+            }
+            elsif ($f->{type} eq 'masked') {
+                $line = "$mark$f->{label}: " . _render_masked_value($f->{widget}->value());
+            }
+            elsif ($f->{type} eq 'select') {
+                $line = "$mark$f->{label}: " . ($f->{value} || '(none)');
+            }
+            elsif ($f->{type} eq 'button') {
+                $line = ($i == $focus ? "$mark\[ $f->{label} \]" : "  \[ $f->{label} \]");
+            }
+            $row->(2 + $i, $line, ($i == $focus && $f->{type} ne 'button') ? 1 : 0);
+        }
 
-    my $input_width = $dialog_width - 4;
-    my $display_value = $value;
-    if (length($display_value) > $input_width) {
-        $display_value = substr($display_value, length($display_value) - $input_width);
+        my $status_row = 2 + scalar(@$fields);
+        my $status = $dialog->{status_text} // '';
+        my $kind = $dialog->{status_kind} // '';
+        my $icon = $kind eq 'ok' ? Zepto::Chars->get('check')
+                 : $kind eq 'error' ? Zepto::Chars->get('warning')
+                 : '';
+        $row->($status_row, $status ? "  $icon $status" : '');
     }
-    push @_out, $display_value;
-    push @_out, ' ' x ($input_width - length($display_value));
-
-    push @_out, $theme->color('dialog_bg') . $theme->color('dialog_fg');
-    push @_out, " " . $box_v;
 
     # Bottom border
-    push @_out, _move_to($y + 4, $x);
-    push @_out, $theme->color('dialog_border');
-    push @_out, $box_bl;
-    push @_out, $box_h x ($dialog_width - 2);
-    push @_out, $box_br;
+    push @_out, _move_to($y + $height - 1, $x), $theme->color('dialog_border');
+    push @_out, $box_bl, ($box_h x ($width - 2)), $box_br;
 
     push @_out, RESET;
-
     return join('', @_out);
+}
+
+# Render an API key value as dots + the last 4 characters (never the full
+# plaintext), matching the Settings dialog spec.
+sub _render_masked_value {
+    my ($value) = @_;
+    $value //= '';
+    my $len = length($value);
+    return '(not set)' unless $len;
+    my $dot = "\x{2022}";
+    return ($dot x $len) if $len <= 4;
+    return ($dot x ($len - 4)) . substr($value, -4);
 }
 
 # Calculate screen position for cursor

@@ -13,6 +13,8 @@ use Zepto::View;
 use Zepto::Chars;
 use Zepto::Minimap;
 use Zepto::Preferences;
+use Zepto::WrapMap;
+use Zepto::InputWidget;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -281,6 +283,26 @@ subtest 'Status bar shows cursor position and palette trigger' => sub {
 # ============================================================================
 # Dialogs
 # ============================================================================
+sub _make_test_ai_dialog {
+    return {
+        title         => 'AI: Configure',
+        focus         => 0,
+        status_text   => '',
+        status_kind   => '',
+        list_mode     => 0,
+        model_options => [],
+        fields => [
+            { id => 'provider', label => 'Provider', type => 'select', value => 'openai' },
+            { id => 'base_url', label => 'Base URL', type => 'text',   widget => Zepto::InputWidget->new(value => 'https://api.openai.com/v1') },
+            { id => 'api_key',  label => 'API Key',  type => 'masked', widget => Zepto::InputWidget->new(value => 'sk-test1234') },
+            { id => 'test',     label => 'Test Connection', type => 'button' },
+            { id => 'model',    label => 'Model',     type => 'select', value => 'gpt-5-nano' },
+            { id => 'save',     label => 'Save',       type => 'button' },
+            { id => 'cancel',   label => 'Cancel',     type => 'button' },
+        ],
+    };
+}
+
 subtest 'Dialog rendering' => sub {
     my ($doc, $view) = create_test_state();
     my $theme = Zepto::Theme->dark_theme();
@@ -292,18 +314,17 @@ subtest 'Dialog rendering' => sub {
         rows     => 24,
         cols     => 80,
         ui       => {
-            dialog => {
-                title  => 'Find',
-                prompt => 'Search for:',
-                value  => 'test',
-                cursor => 4,
-            },
+            dialog => _make_test_ai_dialog(),
         },
     );
 
-    like($output, qr/Find/, 'Dialog shows title');
-    like($output, qr/Search for/, 'Dialog shows prompt');
-    like($output, qr/test/, 'Dialog shows value');
+    like($output, qr/AI: Configure/, 'Dialog shows title');
+    like($output, qr/Provider/, 'Dialog shows Provider field label');
+    like($output, qr/Base URL/, 'Dialog shows Base URL field label');
+    like($output, qr/api\.openai\.com/, 'Dialog shows the base URL value');
+    unlike($output, qr/sk-test1234/, 'Dialog never renders the raw API key');
+    like($output, qr/\x{2022}/, 'Dialog shows masked dots for the API key');
+    like($output, qr/1234/, 'Dialog shows the last 4 chars of the API key (masked convention)');
 };
 
 subtest 'Dialog box characters' => sub {
@@ -317,11 +338,7 @@ subtest 'Dialog box characters' => sub {
         rows     => 24,
         cols     => 80,
         ui       => {
-            dialog => {
-                title  => 'Test',
-                prompt => 'Input:',
-                value  => '',
-            },
+            dialog => _make_test_ai_dialog(),
         },
     );
 
@@ -1792,6 +1809,101 @@ subtest 'Tab bar cache invalidates on theme change' => sub {
     my $light_output = Zepto::Renderer->_render_tab_bar($light_theme, $cols, $ui, 0);
 
     isnt($dark_output, $light_output, 'Tab bar output differs between dark and light themes');
+};
+
+# ============================================================================
+# Ghost completion rendering (bugs.md P2 "Ghost completion renders offset
+# from cursor in wrapped/markdown lines")
+# ============================================================================
+subtest 'Ghost text renders on the wrap segment containing the cursor' => sub {
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+
+    my $line = "alpha beta gamma delta epsilon zeta eta theta";
+    my ($doc, $view) = create_test_state("$line\n");
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $wrap_width = 15;  # narrow enough to force multiple wrap segments
+    my $wm = Zepto::WrapMap->new(document => $doc, width => $wrap_width, tab_width => 4);
+    $view->set_wrap_map($wm);
+
+    my $segs = $wm->segments_for_line(0);
+    ok(scalar(@$segs) > 1, 'sanity check: line actually wraps into multiple segments');
+    my $last_seg_idx = $#$segs;
+
+    # Ghost text only ever renders when the cursor sits at the document
+    # line's true EOL — put it there. That EOL falls on the LAST wrap
+    # segment (a later visual row), not segment 0.
+    $view->set_cursor(0, length($line));
+
+    my $expected_vrow = $wm->doc_line_to_visual_row(0) + $last_seg_idx;
+    ok($expected_vrow > 0, 'sanity check: cursor lands on a continuation row, not row 0');
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width(1);
+    my $cols = $gutter_width + $wrap_width;
+    # Short marker — the continuation row's fill area is narrow (hanging
+    # indent eats into the wrap width), so keep this well under it.
+    my $ghost = 'Z9';
+
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => $cols,
+        ui       => { completion => { ghost_text => $ghost } },
+    );
+
+    my @rows = @{ $frame->{rows} };
+    # Text rows start at row_buf index 2 (screen row 3); visual row 0 of the
+    # wrap map is index 2, visual row N is index 2+N.
+    my $target_row = strip_escapes($rows[2 + $expected_vrow] // '');
+    like($target_row, qr/\Q$ghost\E/,
+        'ghost text appears on the visual row that actually contains the cursor');
+
+    my $segment0_row = strip_escapes($rows[2] // '');
+    unlike($segment0_row, qr/\Q$ghost\E/,
+        'ghost text does NOT leak onto wrap segment 0 (the old, wrong anchor)');
+};
+
+subtest 'Ghost text truncates by display width, not char count (wide CJK chars)' => sub {
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+
+    my $line = 'xxxxx';  # 5 narrow (1-column) chars
+    my ($doc, $view) = create_test_state("$line\n");
+    my $theme = Zepto::Theme->dark_theme();
+    $view->set_cursor(0, length($line));
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width(1);
+    my $avail_width = 10;
+    my $cols = $gutter_width + $avail_width;
+    my $fill_remaining = $avail_width - length($line);  # 10 - 5 = 5 display columns
+
+    # 3 wide (2-display-column) CJK characters: char-length 3, but display
+    # width 6. Under the old length()-based truncation, length($ghost)==3
+    # is <= fill_remaining==5, so it was never truncated even though it
+    # doesn't fit — it would overflow the fill area by a column.
+    my $ghost = "\x{4e2d}\x{6587}\x{4e2d}";
+    ok(Zepto::Renderer::_display_width($ghost) > $fill_remaining,
+        'sanity check: full ghost text is wider than the fill area in display columns');
+
+    my $frame = Zepto::Renderer->render(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => $cols,
+        ui       => { completion => { ghost_text => $ghost } },
+    );
+
+    my $row_text = strip_escapes($frame->{rows}[2] // '');
+
+    my $full_ghost_count = () = $row_text =~ /\Q$ghost\E/g;
+    is($full_ghost_count, 0,
+        'full 3-char-wide ghost text (which overflows the fill width) is not rendered whole');
+
+    my $first_two_chars = substr($ghost, 0, 2);  # display width 4, fits in 5 columns
+    like($row_text, qr/\Q$first_two_chars\E/,
+        'the wide chars that DO fit within the display-column budget are rendered');
 };
 
 done_testing();

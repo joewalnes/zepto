@@ -15,6 +15,7 @@ use Zepto::Preferences;
 use Zepto::StateStore;
 use Zepto::FindEngine;
 use Zepto::Highlighter;
+use Zepto::CommandRegistry;
 
 # Create a mock terminal for testing
 sub mock_terminal {
@@ -128,31 +129,55 @@ subtest 'Palette escape closes' => sub {
 # ============================================================================
 # Dialog operations
 # ============================================================================
-subtest 'Open dialog' => sub {
+subtest 'Open AI settings dialog' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_dialog(
-        title => 'Test',
-        prompt => 'Enter:',
-        value => 'initial',
-    );
+    $editor->open_ai_dialog();
 
     is($editor->{state}, 'dialog', 'State is dialog');
-    is($editor->{dialog}{title}, 'Test', 'Dialog title');
-    is($editor->{dialog}{prompt}, 'Enter:', 'Dialog prompt');
-    is($editor->{dialog}{value}, 'initial', 'Dialog value');
+    is($editor->{dialog}{title}, 'AI: Configure', 'Dialog title');
+    ok($editor->{dialog}{fields}, 'Dialog has a fields array');
+    my @ids = map { $_->{id} } @{$editor->{dialog}{fields}};
+    is_deeply(\@ids, [qw(provider base_url api_key test model save cancel)], 'Fields in expected order');
+    is($editor->{dialog}{focus}, 0, 'Provider field focused by default');
 };
 
 subtest 'Close dialog' => sub {
     my $term = mock_terminal();
     my $editor = Zepto::Editor->new(terminal => $term);
 
-    $editor->open_dialog(title => 'Test', prompt => 'Input:');
+    $editor->open_ai_dialog();
     $editor->close_dialog();
 
     is($editor->{state}, 'editing', 'State is editing');
     is($editor->{dialog}, undef, 'Dialog cleared');
+};
+
+subtest 'Dialog field navigation' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->open_ai_dialog();
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab' });
+    is($editor->{dialog}{focus}, 1, 'Tab advances focus');
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab', modifiers => ['shift'] });
+    is($editor->{dialog}{focus}, 0, 'Shift+Tab moves focus back');
+
+    $editor->handle_dialog_event({ type => 'key', key => 'escape' });
+    is($editor->{state}, 'editing', 'Escape cancels the dialog');
+};
+
+subtest 'Dialog text field accepts typed input' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->open_ai_dialog();
+
+    $editor->handle_dialog_event({ type => 'key', key => 'tab' });   # -> base_url
+    $editor->{dialog}{fields}[1]{widget}->set_value('');
+    $editor->handle_dialog_event({ type => 'char', char => 'x' });
+    is($editor->{dialog}{fields}[1]{widget}->value(), 'x', 'Typed char inserted into focused text field');
 };
 
 # ============================================================================
@@ -1581,6 +1606,278 @@ subtest 'Bracketed paste suppresses auto-indent' => sub {
 };
 
 # ============================================================================
+# List continuation (Markdown / plain text) — CLAUDE.md Phase 2 item 5
+# ============================================================================
+
+subtest 'List continuation: dash bullet continues to new line' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();  # untitled — no grammar detected, counts as plain text
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "- first item");
+    $view->set_cursor(0, length("- first item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '- ', 'New line gets the same bullet marker');
+    is($view->cursor_line(), 1, 'Cursor on new line');
+    is($view->cursor_col(), 2, 'Cursor lands right after the marker');
+};
+
+subtest 'List continuation: star and plus bullets both work' => sub {
+    my $term = mock_terminal();
+    for my $bullet (qw(* +)) {
+        my $editor = Zepto::Editor->new(terminal => mock_terminal());
+        $editor->cmd_new_file();
+        my $doc = $editor->active_doc();
+        my $view = $editor->active_view();
+
+        $doc->insert(0, "$bullet item text");
+        $view->set_cursor(0, length("$bullet item text"));
+        $editor->do_enter();
+
+        is($doc->get_line_content(1), "$bullet ", "'$bullet' bullet continues with the same marker");
+    }
+};
+
+subtest 'List continuation: blockquote continues' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "> quoted text");
+    $view->set_cursor(0, length("> quoted text"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '> ', 'New line gets the blockquote marker');
+};
+
+subtest 'List continuation: numbered list increments' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "3. third item");
+    $view->set_cursor(0, length("3. third item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '4. ', 'Numbered marker increments (3. -> 4.)');
+    is($view->cursor_col(), 3, 'Cursor lands after the incremented marker');
+};
+
+subtest 'List continuation: numbered list with paren separator increments' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "9) ninth item");
+    $view->set_cursor(0, length("9) ninth item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '10) ', 'Numbered marker increments and keeps the ) separator');
+};
+
+subtest 'List continuation: checkbox always continues unchecked' => sub {
+    my $term = mock_terminal();
+    for my $checkbox ('[ ]', '[x]', '[X]') {
+        my $editor = Zepto::Editor->new(terminal => mock_terminal());
+        $editor->cmd_new_file();
+        my $doc = $editor->active_doc();
+        my $view = $editor->active_view();
+
+        my $line = "- $checkbox task text";
+        $doc->insert(0, $line);
+        $view->set_cursor(0, length($line));
+        $editor->do_enter();
+
+        is($doc->get_line_content(1), '- [ ] ', "Checkbox '$checkbox' continues as unchecked '- [ ] '");
+    }
+};
+
+subtest 'List continuation: indented list item preserves indent' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "  - nested item");
+    $view->set_cursor(0, length("  - nested item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '  - ', 'New line keeps the 2-space indent plus the marker');
+};
+
+subtest 'List continuation: empty list item escapes the list' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    # Line is JUST the marker, nothing after it — pressing Enter here
+    # should remove the marker and produce a plain blank line instead of
+    # continuing the list indefinitely.
+    $doc->insert(0, "- ");
+    $view->set_cursor(0, 2);
+    $editor->do_enter();
+
+    is($doc->get_line_content(0), '', 'Marker removed from the (now-empty) original line');
+    is($doc->get_line_content(1), '', 'New line has no marker — list escaped');
+    is($view->cursor_line(), 1, 'Cursor on the new line');
+    is($view->cursor_col(), 0, 'Cursor at column 0 (no indent, no marker)');
+};
+
+subtest 'List continuation: empty numbered item escapes with indent preserved' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "  1. ");
+    $view->set_cursor(0, length("  1. "));
+    $editor->do_enter();
+
+    is($doc->get_line_content(0), '  ', 'Marker removed, indent preserved on original line');
+    is($doc->get_line_content(1), '  ', 'New line keeps the indent but has no marker');
+    is($view->cursor_col(), 2, 'Cursor lands after the preserved indent');
+};
+
+subtest 'List continuation: mid-line Enter does not insert a marker' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "- split here please");
+    # Cursor in the middle of the text, not at EOL
+    $view->set_cursor(0, length("- split he"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(0), '- split he', 'First line truncated at cursor, no marker duplicated');
+    is($doc->get_line_content(1), 're please', 'Second line is just the split remainder, no marker');
+};
+
+subtest 'List continuation: does not fire on a non-Markdown/non-plain-text file' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.pl');
+    print $fh "";
+    close $fh;
+
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+    $editor->active_highlighter()->set_file($filename);
+
+    $doc->insert(0, "- looks like a list but this is Perl");
+    $view->set_cursor(0, length("- looks like a list but this is Perl"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '', 'No marker inserted on a detected non-Markdown language file');
+    unlink $filename;
+};
+
+subtest 'List continuation: fires on a Markdown file' => sub {
+    my ($fh, $filename) = tempfile(UNLINK => 1, SUFFIX => '.md');
+    print $fh "";
+    close $fh;
+
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+    $editor->active_highlighter()->set_file($filename);
+
+    $doc->insert(0, "- a markdown list item");
+    $view->set_cursor(0, length("- a markdown list item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '- ', 'Marker continues on a detected Markdown file');
+    unlink $filename;
+};
+
+subtest 'List continuation: disabled via continue_lists preference' => sub {
+    my $term = mock_terminal();
+    my $prefs = Zepto::Preferences->new();
+    $prefs->set_continue_lists(0);
+    my $editor = Zepto::Editor->new(terminal => $term, prefs => $prefs);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "- an item");
+    $view->set_cursor(0, length("- an item"));
+    $editor->do_enter();
+
+    is($doc->get_line_content(1), '', 'No marker inserted when continue_lists preference is off');
+};
+
+subtest 'List continuation: does not fire during bracketed paste' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->cmd_new_file();
+    my $doc = $editor->active_doc();
+    my $view = $editor->active_view();
+
+    $doc->insert(0, "- an item");
+    $view->set_cursor(0, length("- an item"));
+    $editor->{_bracketed_paste} = 1;
+    $editor->do_enter();
+    $editor->{_bracketed_paste} = 0;
+
+    is($doc->get_line_content(1), '', 'No marker inserted during bracketed paste');
+};
+
+subtest 'cmd_toggle_continue_lists flips the preference and shows a status message' => sub {
+    # Isolated state store — must not read/write the real
+    # ~/.config/zepto (previous test runs would otherwise leave this
+    # flaky, since a real StateStore persists and is shared/reloaded
+    # across invocations).
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    ok($editor->{prefs}->continue_lists(), 'continue_lists defaults to on');
+
+    $editor->cmd_toggle_continue_lists();
+    ok(!$editor->{prefs}->continue_lists(), 'First toggle turns it off');
+    like($editor->{message}, qr/Continue Lists: OFF/, 'Status message shows OFF');
+
+    $editor->cmd_toggle_continue_lists();
+    ok($editor->{prefs}->continue_lists(), 'Second toggle turns it back on');
+    like($editor->{message}, qr/Continue Lists: ON/, 'Status message shows ON');
+};
+
+subtest 'Continue Lists toggle state is reflected via CommandRegistry (palette [on]/[off])' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    my $cmd = Zepto::CommandRegistry->find_command('toggle_continue_lists');
+
+    is(Zepto::CommandRegistry->get_toggle_display($cmd, $editor), 'on', 'Palette shows "on" by default');
+
+    $editor->cmd_toggle_continue_lists();
+    is(Zepto::CommandRegistry->get_toggle_display($cmd, $editor), 'off', 'Palette shows "off" after toggling');
+};
+
+# ============================================================================
 # Key event dispatch: Shift+Alt+Arrow = word select (not column select)
 # ============================================================================
 
@@ -2221,6 +2518,98 @@ subtest 'Save As activates syntax highlighting for new filename' => sub {
     like($hl->{grammar_class}, qr/Python/, 'Python grammar detected for .py file');
 
     unlink $py_file;
+};
+
+# ============================================================================
+# Cross-instance preference sync while idle (bugs.md/CLAUDE.md item 4:
+# StateStore::check_for_changes previously only ran inside render(), so an
+# idle instance — one that isn't typing and therefore isn't re-rendering —
+# never noticed another window's preference changes at all)
+# ============================================================================
+
+subtest '_poll_cross_instance_prefs picks up an external preference change' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs = Zepto::Preferences->new(state_store => $store);
+    my $editor = Zepto::Editor->new(
+        terminal     => mock_terminal(),
+        state_store  => $store,
+        prefs        => $prefs,
+    );
+
+    # Prime the cache so check_for_changes() has a baseline to compare
+    # against (mirrors what init()/get() do in real startup).
+    $store->get('preferences');
+    is($editor->{state}, 'editing', 'sanity check: default state is editing');
+
+    # Force the throttle window to have already elapsed.
+    $editor->{_last_prefs_check_at} = 0;
+
+    # Simulate a SECOND Zepto window writing a theme change to the shared
+    # state file — same file, different process, from this instance's
+    # point of view. sleep 1 for mtime resolution (StateStore relies on
+    # mtime to detect external changes, matching state_store.t's own
+    # "check_for_changes fires callback" test).
+    sleep 1;
+    open(my $fh, '>', "$tmpdir/preferences.json") or die $!;
+    print $fh '{"theme":"light"}';
+    close $fh;
+
+    my $changed = $editor->_poll_cross_instance_prefs();
+    ok($changed, '_poll_cross_instance_prefs reports a change was applied');
+    is($prefs->theme(), 'light', 'Preferences listener actually applied the external change');
+};
+
+subtest '_poll_cross_instance_prefs is throttled — does not re-check every call' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs = Zepto::Preferences->new(state_store => $store);
+    my $editor = Zepto::Editor->new(
+        terminal     => mock_terminal(),
+        state_store  => $store,
+        prefs        => $prefs,
+    );
+    $store->get('preferences');
+
+    # First call sets the throttle timestamp to "now".
+    $editor->{_last_prefs_check_at} = 0;
+    $editor->_poll_cross_instance_prefs();
+    my $set_at = $editor->{_last_prefs_check_at};
+    ok($set_at > 0, 'Throttle timestamp was set');
+
+    # A write immediately after should NOT be picked up by a second call
+    # within the same throttle window (no artificial sleep here — this is
+    # testing that the throttle itself, not mtime resolution, is what
+    # blocks the second check).
+    open(my $fh, '>', "$tmpdir/preferences.json") or die $!;
+    print $fh '{"theme":"dark"}';
+    close $fh;
+
+    my $changed = $editor->_poll_cross_instance_prefs();
+    ok(!$changed, 'Second call within the throttle window does not re-check');
+    is($editor->{_last_prefs_check_at}, $set_at, 'Throttle timestamp unchanged — check_for_changes was skipped entirely');
+};
+
+subtest '_poll_cross_instance_prefs is a no-op outside STATE_EDITING' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs = Zepto::Preferences->new(state_store => $store);
+    my $editor = Zepto::Editor->new(
+        terminal     => mock_terminal(),
+        state_store  => $store,
+        prefs        => $prefs,
+    );
+    $store->get('preferences');
+    $editor->{_last_prefs_check_at} = 0;
+    $editor->{state} = 'palette';
+
+    sleep 1;
+    open(my $fh, '>', "$tmpdir/preferences.json") or die $!;
+    print $fh '{"theme":"light"}';
+    close $fh;
+
+    my $changed = $editor->_poll_cross_instance_prefs();
+    ok(!$changed, 'No check performed while not in STATE_EDITING (e.g. palette open)');
 };
 
 done_testing();

@@ -279,16 +279,20 @@ ID:       QA-CPLT-018
 NAME:     AI completion enabled
 PRIORITY: P3
 FEATURE:  completion ai
+CROSS-REF: see qa/41_ai_completion.txt for the full AI Settings dialog /
+  consent / ghost-text test plan (QA-AI-001..010)
 
 SETUP
-  AI Completion configured (palette → "AI Completion: Setup").
+  AI Completion configured (palette → "AI: Configure" → provider, base
+  URL, API key, Test Connection, model, Save) and enabled (palette →
+  "AI Completion" → consent prompt → Y).
 
 STEPS
   1. Type in a source file, pause.
 
 VERIFY
   - AI suggestion appears as ghost text (may take longer than buffer
-    word completion).
+    word completion) — see QA-AI-003 for the full scripted flow.
   - Rate-limited to ~12 requests/minute per docs.
 
 --------------------------------------------------------------------------------
@@ -320,3 +324,60 @@ STEPS
 VERIFY
   - Paste goes through cleanly.
   - Completion does NOT trigger mid-paste with cascading suggestions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-021
+NAME:     Ctrl+Space is context-sensitive (completion vs. palette)
+PRIORITY: P2
+FEATURE:  completion palette
+RELATED:  QA-REG-021
+
+STEPS
+  1. On an empty line (cursor at col 0), press Ctrl+Space.
+  2. Escape, type a word so the cursor sits right after a word character,
+     press Ctrl+Space again.
+
+VERIFY
+  - Step 1: the command palette opens (default command list visible).
+  - Step 2: the completion menu opens instead — the palette's default
+    command list must NOT appear. (Editor.pm ~1292-1312: Ctrl+Space
+    triggers completion when the character immediately before the cursor
+    is a word character, and opens the palette otherwise.)
+  - Editor remains fully responsive to typing afterward either way.
+  - Discovered while writing QA-REG-021 (Save As via Ctrl+Space right
+    after typing content silently typed the command name into the
+    document instead of running it) — that script now uses Ctrl+S
+    instead to sidestep the ambiguity.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-022
+NAME:     Ghost completion renders at the cursor on wrapped lines
+PRIORITY: P2
+FEATURE:  completion ghost wrap
+RELATED:  QA-WRAP-001
+
+STEPS
+  1. Open a prose/Markdown file with word wrap on, containing a long line
+     that wraps into multiple visual rows.
+  2. Position the cursor at the true end of that (wrapped) line and type a
+     partial word that word-completes against something already in the
+     buffer, so ghost completion triggers.
+
+VERIFY
+  - The ghost suggestion renders immediately after the cursor on the
+    visual row the cursor is actually on (a continuation/wrapped row) —
+    NOT glued to the end of the line's first visual segment.
+  - Fixed in Phase 2 (bugs.md P2 "Ghost completion renders offset from
+    cursor in wrapped/markdown lines"): `Renderer.pm`'s ghost-render
+    branch previously guarded on `!$is_wrap_cont`, so it always rendered
+    on visual segment 0 regardless of which segment the cursor was
+    actually on. Now it checks whether the cursor's document column falls
+    within the CURRENT row's wrap segment range before rendering there.
+  - Also fixed: ghost text is truncated by display width (terminal
+    columns), not character count, so wide CJK/emoji ghost suggestions no
+    longer overflow their available fill area.
+  - Unit tests: `tests/renderer.t` ("Ghost text renders on the wrap
+    segment containing the cursor", "Ghost text truncates by display
+    width, not char count").

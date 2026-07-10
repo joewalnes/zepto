@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-VCS-011: Multiple VCS changes"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 content=""
 for i in $(seq 1 100); do content+="line $i original"$'\n'; done
 printf '%s' "$content" > test.txt

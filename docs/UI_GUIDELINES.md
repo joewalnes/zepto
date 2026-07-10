@@ -58,7 +58,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - All commands are defined in a single registry (`lib/Zepto/CommandRegistry.pm`).
 - The registry is the source of truth for: command palette display, status bar pills, and shortcut dispatch.
 - Every command has: id, label, icon, shortcut, section, type, priority, and method.
-- Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS.
+- Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, AI, DOCUMENTATION, DIAGNOSTICS.
 
 ## Mouse And Keyboard Behavior
 
@@ -88,7 +88,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - `Ctrl+letter` is reserved for primary commands and toggles.
 - `Ctrl+Space` is reserved for the command palette.
 - `Alt` modifies navigation or selection semantics (word movement, column selection, tab navigation).
-- Do not depend on `Shift+letter` or `Ctrl+Shift+letter`; terminals cannot distinguish these reliably.
+- Do not depend on `Shift+letter` or `Ctrl+Shift+letter`; terminals cannot distinguish these reliably. **Documented exception:** Find in Files uses `⌃⇧F`, which works in most modern terminals (they send a distinct CSI u sequence); the command palette (`⌃Space` → "Find in Files") is the guaranteed-discoverable fallback for terminals that can't distinguish it.
 - Avoid `Ctrl+M` (collides with `Enter`) and other terminal control collisions.
 
 ## Shortcut Labels
@@ -141,7 +141,7 @@ These guidelines define the user interface standards for Zepto. They are used to
 - Each tab shows: a Nerd Font file-type icon, the file name (or `[untitled]`), an `⌥N` shortcut label for direct access, and a `×` close button.
 - A `●` indicator appears in the tab title when the buffer has unsaved modifications. It is added on first edit and removed on save.
 - Tab names truncate with an ellipsis (`…`) when the terminal is too narrow to fit the full name.
-- When closing a tab with unsaved changes, a confirmation prompt appears in the status bar: `Save changes to <name>?  [Y]es  [N]o  [C]ancel`. `Y` saves and closes, `N` discards and closes, `C` (or `Esc`) cancels the close.
+- `⌃W` ("Save and Close Tab") saves the active tab (if dirty) and closes it directly — no prompt. When quitting (`⌃Q`) with one or more unsaved tabs, a confirmation prompt appears in the status bar for each dirty tab in turn: `Save changes to <name>?  [Y]es  [N]o  [C]ancel`. `Y` saves and continues, `N` discards and continues, `C` (or `Esc`) cancels the quit.
 
 ## Layout And Window Sizing
 

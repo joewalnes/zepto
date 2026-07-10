@@ -4,12 +4,15 @@ source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-FILE-014: Save with VCS gutter"
 
 # Create a temp git repo
-QA_ZEPTO="$(cd "$(dirname "$0")/../../.." && pwd)/zepto"
 
 gitdir="$QA_TMPDIR/repo014"
 mkdir -p "$gitdir"
-cd "$gitdir"
+cd "$gitdir" || exit 1
 git init -q
+# Local identity — must not depend on a global git user being configured
+# (fresh CI runners have none; see QA-REG-103 / bugs.md).
+git config user.email "test@test.com"
+git config user.name "Test"
 echo "original line" > test.txt
 git add test.txt
 git commit -q -m "init"

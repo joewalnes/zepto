@@ -298,3 +298,79 @@ VERIFY
   - Palette list scrolls.
   - Highlight remains visible.
   - No scroll leakage to editor behind palette.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-021
+NAME:     Drag selects text across multiple lines
+PRIORITY: P1
+FEATURE:  mouse drag select
+RELATED:  QA-MS-003
+
+STEPS
+  1. Open a multi-line file.
+  2. Press the mouse inside the text, drag to a different line/column
+     (upward, i.e. dragging from a later line to an earlier one), release.
+  3. Cut the resulting selection.
+
+VERIFY
+  - The selection spans exactly the dragged range (verified by what
+    remains after cut — lines fully inside the drag disappear, lines
+    outside it are untouched, and the two partial lines at the drag
+    endpoints merge as expected).
+  - Uses raw SGR mouse injection (qa_mouse_press/drag/release in
+    qa-helpers.sh) rather than hangon's `mouse-drag` subcommand — the
+    latter encodes the SGR press/release final byte backwards relative to
+    the xterm standard Zepto's parser expects, so presses/releases sent
+    through it land as the wrong event type. See qa-helpers.sh comments
+    above qa_mouse_press for the full writeup.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-022
+NAME:     Drag above the text viewport in word-wrap mode
+PRIORITY: P1
+FEATURE:  mouse drag select wrap
+RELATED:  QA-WRAP-001
+
+STEPS
+  1. Open a prose file (word wrap on by filetype default) with several
+     long, wrapping lines.
+  2. Press inside the text well below the top, drag UP past the top of
+     the text viewport (into the ruler/tab-bar rows), release.
+
+VERIFY
+  - Dragging above the viewport clamps the cursor/selection to the START
+    of the document (line 1, col 1) — it must NOT jump to the end.
+  - Fixed in Phase 2: `WrapMap::visual_to_doc` now clamps negative visual
+    rows to (0, 0) instead of falling through to the last-line clamp used
+    for past-the-end rows. Regression guarded by
+    `ms_022_drag_above_viewport.sh`'s hard `qa_assert_cursor_at "1:1"`
+    assertion and `qa/pixel/tests/mouse.spec.js`.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-MS-023
+NAME:     Mouse press/drag dismisses active ghost completion
+PRIORITY: P2
+FEATURE:  mouse ghost completion dismiss
+RELATED:  QA-CPLT-012
+
+STEPS
+  1. Open a file containing a word that a partial typed prefix will
+     word-complete against (e.g. `myFunction` already in the buffer).
+  2. Type the prefix (e.g. `myF`) so cross-buffer word ghost completion
+     triggers and the ghost suggestion is visible after the cursor.
+  3. Click elsewhere in the text area with the mouse (or drag), moving
+     the cursor away from the completion point.
+
+VERIFY
+  - The ghost suggestion is dismissed immediately on the mouse press/drag
+    — it does not linger or reappear anchored to the new cursor position.
+  - Cursor lands at the clicked position (confirms the click was handled
+    normally, not swallowed by completion key routing).
+  - Fixed in Phase 2 (bugs.md P2 "Mouse events never dismiss active ghost
+    completion"): `Editor::_dismiss_ghosts_for_mouse` is now called from
+    both the mouse press and mouse drag text-area code paths, dismissing
+    word completion (`Completion::Controller::dismiss`) and AI ghost
+    (`AIComplete::dismiss`) the same way key handling already did.

@@ -262,6 +262,20 @@ subtest 'visual_to_doc beyond document' => sub {
     is($line, 1, 'Clamped to last line (trailing empty)');
 };
 
+subtest 'visual_to_doc negative vrow clamps to document start' => sub {
+    my ($wm, $doc) = make_wm(10, "short", "x" x 25, "end");
+    # Dragging the mouse above the text viewport in wrap mode can produce a
+    # negative visual row. This must clamp to line 0, col 0 — not jump to
+    # the end of the document (regression for bugs.md P1 mouse drag bug).
+    my ($line, $col) = $wm->visual_to_doc(-1, 0);
+    is($line, 0, 'Negative vrow clamps to line 0');
+    is($col, 0, 'Negative vrow clamps to col 0');
+
+    ($line, $col) = $wm->visual_to_doc(-100, 50);
+    is($line, 0, 'Large negative vrow still clamps to line 0');
+    is($col, 0, 'Large negative vrow still clamps to col 0');
+};
+
 # =============================================================================
 # Invalidation
 # =============================================================================

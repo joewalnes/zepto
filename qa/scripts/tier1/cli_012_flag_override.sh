@@ -9,10 +9,14 @@ echo "content" > "$proj_dir/a.txt"
 echo "other" > "$proj_dir/b.txt"
 cd "$proj_dir"
 
-# ZEPTO_TREE=0 should hide tree, but --tree flag should override
+# ZEPTO_TREE=0 should hide tree, but --tree flag should override.
+# Must go through qa_start: it forwards ZEPTO_* env on the command line
+# (an `env` wrapper), because hangon's tmux backend does NOT propagate the
+# caller's environment to the spawned process — a bare `export ZEPTO_TREE=0`
+# before `hangon start` silently never reaches zepto (see qa-helpers.sh
+# qa_start comments). It also passes --state-dir for state isolation.
 export ZEPTO_TREE=0
-hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" --tree a.txt
-sleep "$QA_RENDER_WAIT"
+qa_start --tree a.txt
 
 qa_screen
 if echo "$QA_SCREEN" | grep -qE "b\.txt|a\.txt.*a\.txt"; then

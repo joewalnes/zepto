@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-PICK-010: Long path truncation"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 mkdir -p a/very/deeply/nested/directory/structure
 echo "deep file" > a/very/deeply/nested/directory/structure/target.txt
 echo "root" > root.txt

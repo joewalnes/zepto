@@ -192,6 +192,50 @@ subtest 'Secrets file gets mode 0600' => sub {
     is(sprintf('%04o', $mode), '0600', 'Secrets file is mode 0600');
 };
 
+# QA-REG: chmod-after-write race (StateStore.pm secrets write). The old
+# implementation did `open '>', $tmp` (default-permissive mode) then
+# `chmod 0600` AFTER writing the plaintext secret — a window existed where
+# the temp file briefly existed on disk with insecure permissions. The fix
+# uses sysopen(O_CREAT|O_EXCL|O_WRONLY, 0600) so the restricted mode is set
+# atomically at creation, before any bytes are written.
+subtest 'Secrets temp file is created with 0600 atomically (no permissive window)' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    mkdir $dir unless -d $dir;
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+
+    # Pre-create the exact predictable tmp path (base.tmp.$$) with
+    # attacker-style permissive content/permissions, simulating a stale
+    # leftover or a planted file. If the implementation still used a plain
+    # open() on this pre-existing path (no O_EXCL), the file could retain
+    # its pre-existing insecure mode for a window, or (worse) the
+    # attacker's content could linger via a symlink. The fix must not be
+    # fooled by this: it unlinks the stale path and creates fresh with
+    # mode 0600 from the start.
+    my $tmp_path = "$dir/secrets.json.tmp.$$";
+    open(my $fh, '>', $tmp_path) or die "setup: $!";
+    print $fh "PRE-EXISTING ATTACKER CONTENT";
+    close $fh;
+    chmod 0666, $tmp_path;
+
+    $store->put('secrets', { api_key => 'sk-fresh-456' });
+
+    ok(!-e $tmp_path, 'stale tmp path is gone (renamed away or replaced, not left insecure)');
+    my $mode = (stat("$dir/secrets.json"))[2] & 07777;
+    is(sprintf('%04o', $mode), '0600', 'final secrets file is 0600 even when a permissive file pre-existed at the tmp path');
+
+    my $data = $store->get('secrets');
+    is($data->{api_key}, 'sk-fresh-456', 'real secret data was written, not the attacker content');
+};
+
+subtest 'Non-secret categories are unaffected by the sysopen path (still plain open)' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+    $store->put('preferences', { theme => 'dark' });
+    ok(-f "$dir/preferences.json", 'preferences.json written normally');
+    my $data = $store->get('preferences');
+    is($data->{theme}, 'dark');
+};
+
 # ============================================================================
 # Category validation
 # ============================================================================
@@ -233,10 +277,11 @@ subtest 'check_for_changes fires callback on external modification' => sub {
     print $fh '{"theme":"light","word_wrap":1}';
     close $fh;
 
-    $store->check_for_changes();
+    my $changed_count = $store->check_for_changes();
     ok(defined $called_with, 'Callback fired');
     is($called_with->{theme}, 'light', 'Callback received new data');
     is($called_with->{word_wrap}, 1, 'Callback received all new data');
+    is($changed_count, 1, 'check_for_changes returns the number of changed categories (used by Editor::run to decide whether to re-render an idle instance)');
 };
 
 subtest 'check_for_changes does not fire for own writes' => sub {
@@ -265,8 +310,9 @@ subtest 'check_for_changes skips unchanged files' => sub {
     $store->on_change('preferences', sub { $called = 1 });
 
     # No external change
-    $store->check_for_changes();
+    my $changed_count = $store->check_for_changes();
     is($called, 0, 'No callback when unchanged');
+    is($changed_count, 0, 'check_for_changes returns 0 when nothing changed');
 };
 
 # ============================================================================

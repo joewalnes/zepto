@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-FIF-014: FIF shows relative paths"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 mkdir -p subdir
 echo "RELPATH content" > subdir/target.txt
 echo "other" > root.txt
@@ -31,6 +31,10 @@ if echo "$QA_SCREEN" | grep -qF "$abs_dir/subdir/target.txt"; then
 else
     qa_pass "FIF does not show full absolute path"
 fi
+
+# Settle before Escape so it's sent as its own cleanly-separated keystroke
+# rather than racing the tail of the typed query on a slow/loaded runner.
+qa_expect_screen "RELPATH" 3 -F || true
 
 qa_keys "escape"
 qa_keys "ctrl-q"

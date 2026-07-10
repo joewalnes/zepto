@@ -1,0 +1,1152 @@
+# Bugs Archive
+
+This file holds every **closed** bug entry (FIXED, SKIPPED, WON'T FIX,
+AUDITED, PARTIALLY FIXED, or superseded by later work) that previously
+lived in `bugs.md`, moved out during the 2026-07-10 docs/QA closeout to
+keep `bugs.md` focused on what's actually still open. Content is preserved
+verbatim from the original entries (plus, for two entries that had gone
+stale without ever being marked FIXED, a short **Resolution** note
+explaining what superseded them).
+
+See `bugs.md` for the priority legend and the current open worklist.
+
+---
+
+## Feature requests (implemented)
+
+### ~~P2: Markdown/plain-text list continuation~~ FIXED
+
+Pressing Enter at the end of a list item (`- `, `* `, `+ `, `> ` blockquote, `- [ ] `/`- [x] ` checkbox, `1. `/`1) ` numbered) in a Markdown or plain-text file should continue the list on the new line — auto-inserting the same (or incremented, for numbered lists) marker. Pressing Enter on an EMPTY list item (just the marker, no content) should remove the marker instead, escaping the list — the standard behavior in most editors (VS Code, Obsidian, etc.).
+
+**Fix:** Hooked `Editor::do_enter` right after its existing auto-indent computation. New `Editor::_detect_list_prefix($line)` regex-matches the five marker forms (checkbox checked FIRST since it's a stricter match than plain bullet) and returns `($leading_whitespace, $marker_for_next_line, $rest_of_line)`; checkboxes always continue as unchecked (`- [ ] `) regardless of the original checked state, numbered items increment (keeping `.` or `)` separator), bullets/blockquotes repeat verbatim. Only engages when the cursor is at the TRUE end of the line (mid-line Enter just splits text normally, matching every mainstream editor's behavior) and `$rest_of_line eq ''` distinguishes "continue" (non-empty item) from "escape" (empty item — marker stripped from the current line and a plain, unmarked, same-indent line inserted, in a single edit/undo step). Gated on: new `continue_lists` preference (default on, in `%GLOBAL_PREFS`), not during bracketed paste (matches the existing auto-indent guard), and file type — Markdown or plain text only, where "plain text" means no grammar detected at all (same language-derivation logic as `AIComplete.pm`'s `_build_context`: strip the `Zepto::Syntax::` prefix off the grammar class name; empty string = no grammar). Discoverable via a new "Continue Lists" toggle command in the command palette EDIT section (follows the existing `toggle_auto_pairs` pattern — `pref => 'continue_lists'` drives the palette's `[on]`/`[off]` display automatically through `CommandRegistry::get_toggle_state`/`get_toggle_display`, no special-case needed).
+
+Unit tests (`tests/editor.t`): each marker type (dash/star/plus bullets, blockquote, numbered with `.` and `)`, checkbox in all three checked-states), indented items preserve indent, empty-item escape (plain and numbered-with-indent), mid-line Enter doesn't insert a marker, non-Markdown/non-plain-text file is unaffected (Perl file with a line that *looks* like a list), Markdown file *is* affected, pref-off disables it, bracketed paste disables it, plus toggle-command behavior and palette `[on]`/`[off]` display (`tests/command_registry.t`). Verified interactively via `hangon`: typed a bullet item, Enter continued it with a fresh `- ` marker, Enter on the now-empty marker escaped the list (plain line, no marker), verified numbered-list increment (`3.` → `4.`) and checkbox continuation (`[x]` → `- [ ] `) live in a running editor.
+
+### ~~P1: Hang watchdog — detect and recover from a wedged main loop~~ FIXED
+
+The editor has no way to detect or recover from a truly wedged main loop (e.g. a bug in a future code path that blocks forever with no timeout). Add a watchdog that detects the wedge, logs diagnostics (what was happening, where it was stuck), and lets the editor recover with a visible notice rather than sitting frozen with no explanation.
+
+**Fix:** `lib/Zepto/HangWatchdog.pm` — fork-only design (no threads anywhere in this codebase). `Editor::run` forks a watchdog child connected to the parent via a pipe. The main loop calls `HangWatchdog::heartbeat()` once per iteration, plus tagged before/after known-blocking operations (shell transform, clipboard copy/paste), so a diagnostic log can report what was in progress, not just "somewhere in the loop". The watchdog blocks in `IO::Select::can_read($threshold)` (default 10s, `ZEPTO_HANG_THRESHOLD` env-overridable for testing); a timeout with no heartbeat means the parent is wedged, so it writes `hang-YYYYMMDD-HHMMSS.log` under the state directory (`StateStore::base_dir`, not a hardcoded `~/.config` path) and sends `SIGUSR2` to the parent. It won't re-fire repeatedly for the same stretch of silence, only after a heartbeat resumes and later stops again. The parent's `SIGUSR2` handler (installed for the duration of the main loop; Perl's default "safe signals" make file I/O in the handler safe) appends a `Carp::longmess` stack trace and a state summary (file, editor state, cursor, doc size — refactored out of `_print_crash_report` into a shared `_state_summary_fields` helper) to the SAME log file, located via `HangWatchdog::most_recent_log()` (by mtime — a plain signal carries no direct payload to communicate the exact filename). On recovery, the status bar shows "Zepto was unresponsive — diagnostics: &lt;path&gt;" once. The watchdog exits cleanly on pipe EOF (parent's `Editor::cleanup` calls `HangWatchdog::stop`, which closes the pipe and reaps the child with a KILL fallback — never leaves a zombie) or if orphaned (`getppid()` changed). Verified it does NOT fire during legitimately-blocking foreground UI (footer input, prompts, find bar) — those are all still driven through the same main loop, so heartbeats keep flowing. Toggle: `hang_detector` preference (default on), added to `%GLOBAL_PREFS` in `Preferences.pm`.
+
+Found and fixed during testing: the `Zepto::HangWatchdog::HANG_THRESHOLD()` fully-qualified constant reference in `Editor.pm` compiled fine in every individual `.pm` file (`make check`) but failed to compile in the single-file **bundled** `./zepto` binary (`Bareword "Zepto::HangWatchdog::HANG_THRESHOLD" not allowed while "strict subs" in use`) — bundling concatenates all modules into one file, and a fully-qualified bareword constant call without parens isn't reliably recognized as a sub call across that boundary. Fixed by adding explicit parens (`Zepto::HangWatchdog::HANG_THRESHOLD()`). This is exactly why Rule 1 requires `make build` (not just `make check`) before every commit — caught via `perl -c zepto` on the actual bundled binary, not the per-module syntax check.
+
+Unit tests: `tests/hang_watchdog.t` (fork lifecycle, no zombies, heartbeats suppress firing, timeout triggers log + SIGUSR2, no repeated firing for one stretch of silence, `most_recent_log` lookup). QA-PERF-016 added for interactive/tier1 coverage — since Phase 6a's transform timeout would otherwise recover a hung transform before the watchdog's own threshold could be demonstrated, the test uses `ZEPTO_HANG_THRESHOLD` (low) with `ZEPTO_TRANSFORM_TIMEOUT` (higher) so a `sleep` transform genuinely blocks the main loop past the watchdog threshold while still completing on its own; verified interactively via `hangon` that the diagnostic log appears independently of (and before) the transform's own completion, the recovery notice appears once, and the editor is fully responsive afterward — not just unfrozen-but-wedged.
+
+### ~~P1: Multi-cursor editing~~ FIXED
+
+`Ctrl+D` to select next occurrence of the current word/selection, then type/delete at all cursors simultaneously.
+
+**Fix:** Added full multi-cursor editing support. First `⌃D` selects word under cursor. Subsequent presses add the next occurrence as a secondary cursor. All typing and backspace affects all cursors simultaneously, processed in reverse document order for offset stability. Same-line cursor position adjustment handles multiple occurrences on one line. Escape clears multi-cursors; arrow keys also exit multi-cursor mode. Status bar shows cursor count indicator. Data model: `_multi_cursors` array in View.pm, editing via `_multi_cursor_insert_char`/`_multi_cursor_backspace` in Editor.pm with undo grouping. Duplicate Line Down moved to palette-only (was `⌃D`). Added `cmd_select_next_occurrence` to CommandRegistry. 9 tests added.
+
+### ~~P2: Mouse hover effects~~ FIXED
+
+When moving the mouse over interactive elements (status bar pills, tab bar tabs, file tree items), highlight the hovered element with a visual effect.
+
+**Fix:** Switched mouse tracking from `?1002h` (button-event) to `?1003h` (any-event) in Terminal.pm to receive motion events without button press. Added `MOUSE_MOVE` action to InputParser.pm. Editor.pm tracks hover state (`_hover_tab_index`, `_hover_pill_index`, `_hover_tree_row`) via `_handle_mouse_hover()` hit-testing against stored button positions. Renderer applies hover colors (brighter bg/fg) to hovered tabs, status bar pills, and file tree items. Only re-renders when hover target changes (not on every pixel of motion). Added hover theme colors (`tab_hover_*`, `pill_hover_*`, `tree_hover_*`) for both dark and light themes.
+
+### ~~P2: Markdown table pretty-rendering~~ FIXED
+
+When viewing `.md` files, render tables with continuous Unicode box-drawing lines (e.g. `─`, `│`, `┌`, `┬`), striped row backgrounds for readability, and column alignment. Do not add any extra rows — render the same number of rows as the source. When the cursor enters a table region, switch to raw source mode so the original pipe-delimited Markdown is visible for editing and copying.
+
+**Fix:** Added `_detect_markdown_tables()` in Renderer.pm that scans visible lines for pipe-delimited table blocks, parses cells, computes column widths and alignment (left/center/right from separator row). `_render_table_line()` produces box-drawing output: header rows with bold text and highlighted background, separator rows as `├───┼───┤`, data rows with alternating stripe backgrounds. When cursor enters any table, that table reverts to raw source for editing. Copy always gets raw source (document model is never modified). Toggleable via `render_markdown_tables` preference (on by default). Added theme colors: `table_border_fg`, `table_header_bg/fg`, `table_stripe_bg` for both dark and light themes. Table detection is cached by content version for performance.
+
+### ~~P2: Buffer word completion~~ FIXED
+
+Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
+
+**Resolution:** Already implemented — cross-buffer word completion with ghost-text and a dropdown menu shipped 2026-03-15 (see `docs/help/changelog.md`), well before this archive pass. See `lib/Zepto/Completion/` (`Controller.pm`, `CrossBufferWordProvider.pm`, `KeywordProvider.pm`, `SnippetProvider.pm`, `PathProvider.pm`, `RecentProvider.pm`). This entry was stale — left open in `bugs.md` long after the feature landed — and is archived here as resolved.
+
+### ~~P2: Persistent config file~~ FIXED
+
+Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
+
+**Resolution:** Already implemented — `Zepto::StateStore` persists preferences (theme, tab width, minimap, word wrap, etc.) as JSON under `~/.config/zepto/` (or `$XDG_CONFIG_HOME/zepto/`) with atomic writes and cross-instance sync — not the TOML file originally envisioned, but functionally equivalent. This entry predates that work and was stale; archived here as resolved.
+
+---
+
+## Existing bugs
+
+### ~~P1: Cross-instance theme sync silently doesn't work for idle windows~~ FIXED
+
+`StateStore::check_for_changes()` — the mechanism that reloads preferences another process changed and fires listeners (`Preferences.pm`'s `on_change('preferences', ...)`, which drives `Editor.pm`'s theme/nerd_font/minimap listener registered in `init()`) — all exist and work correctly. But `check_for_changes()` was only ever called from inside `render()` (`Editor.pm` ~4586-4589). An idle instance — one that isn't typing and therefore isn't re-rendering — never called `render()` again after its initial draw, so it never noticed another window's preference change no matter how long it sat there. Toggling the theme in one window would only reach a second, idle window once the user did something to it (typed, moved the mouse, resized) — at which point the render triggered by THAT action would happen to also pick up the stale change, making the bug easy to miss in casual testing (it looks like it works, as long as you touch the other window at all).
+
+**Fix:** Added `Editor::_poll_cross_instance_prefs`, called from the idle-timeout branch of the main loop (`Editor::run`'s `while` loop, `else` branch when `read_blocking()` times out with no input) in addition to the existing render()-path call. Throttled to ~1s (via `$self->{_last_prefs_check_at}`) so it doesn't add per-iteration `stat()` overhead, and gated on `STATE_EDITING` to match the render()-path check. Returns whether a change was actually applied, so the idle branch can set `$needs_render = 1` and repaint promptly. `StateStore::check_for_changes()` now also returns the number of changed categories (previously returned nothing) so callers can make this decision. Verified live with two real `hangon` sessions sharing a state directory: toggling the theme in window A repaints window B within ~2s with zero input sent to B — confirmed via raw ANSI color capture (`tmux capture-pane -e`), not just text content (which is identical between themes and wouldn't catch a real regression). Unit tests: `tests/editor.t` (`_poll_cross_instance_prefs` — picks up an external change, throttles correctly, no-ops outside `STATE_EDITING`), `tests/state_store.t` (`check_for_changes` return value). QA-THM-012 added, using a new `qa_raw_screen` helper in `qa-helpers.sh` for raw-ANSI two-instance color comparison (verified failing before the fix — instance B stayed on the old theme — and passing after).
+
+### ~~P2: Binary file tab looks editable~~ FIXED
+
+When opening a binary file, there was no visual indication that the file was read-only.
+
+**Fix:** Added a "READ ONLY" indicator segment in the status bar for binary files (Renderer.pm), styled with warning colors. The indicator renders as a pill between the file path and the middle fill area, using the same arrow-transition pattern as the column selection indicator. Added regression test.
+
+### ~~P1: Incorrect cursor placement in Open File dialog~~ FIXED
+
+When opening the file picker (`⌃O`), the terminal cursor was not aligned with the text input position. The cursor appeared offset from where typed characters actually rendered in the filter field.
+
+**Root cause:** The cursor positioning code in `Renderer.pm` (line ~475) only applied the wide 120-column palette width for `find_in_files` mode, but the rendering code (line ~4139) applied it for `find_in_files`, `files`, AND `recent_files`. The file picker rendered at 120 columns wide while the cursor was positioned using the command palette width (60 or 80 depending on terminal width), causing a 20-40 column offset.
+
+**Fix:** Added `files` and `recent_files` to the wide-width condition in the cursor positioning code, matching the rendering code exactly.
+
+### ~~P1: Editor becomes sluggish when opening large files~~ FIXED
+
+Opening a ~1MB / 13K+ line file caused the editor to become sluggish — slow tab opening, laggy cursor navigation, general unresponsiveness.
+
+**Root cause:** Three compounding bottlenecks: (1) `vcs_change_status()` and `vcs_deletion_status()` in Document.pm used O(n) linear array scans, called for every visible line every frame. (2) Renderer.pm rebuilt VCS lookup hashes from scratch every frame. (3) Minimap.pm cache key included `undo_size`/`redo_size` which change every keystroke, defeating the cache and causing full minimap recomputation on every frame.
+
+**Fix:** (1) Added `_rebuild_vcs_lookup()` in Document.pm that builds O(1) hash lookups once when the VCS diff is computed, not per-frame. `vcs_change_status()` and `vcs_deletion_status()` are now single hash lookups. (2) Renderer.pm now uses Document's cached hashrefs directly instead of rebuilding per-frame. (3) Minimap cache key uses `content_version` (incremented only on edits) instead of undo/redo sizes. Also added adaptive VCS diff debounce: 1.0s for files >5000 lines vs 0.3s for smaller files.
+
+### ~~P1: File tree doesn't always expand to opened file~~ FIXED
+
+When opening a file or switching tabs, the file tree should always expand to and select the corresponding entry. Previously didn't work reliably — the tree showed stale selection or collapsed parents after opening a file via file picker, recent files, or find-in-files.
+
+**Root cause:** Two missing tree-update sites: (1) `_load_file()` in Commands.pm created new tabs via `add_tab()` without calling `set_current_file()`/`expand_to_path()`. (2) `_jump_to_location()` in Editor.pm called non-existent `switch_to()` on TabManager instead of using `_switch_to_tab()`, so find-in-files tab switching silently failed AND the tree never updated.
+
+**Fix:** Added `set_current_file()` + `expand_to_path()` after `add_tab()` in `_load_file()`. Changed `_jump_to_location()` to use `_switch_to_tab()` which already includes tree reveal logic. Added 2 tests verifying tree updates after both code paths.
+
+### ~~P1: [Usability] Global shortcuts should work from any state~~ FIXED
+
+Several core shortcuts were swallowed when in find/replace (`⌃F`), footer input, or other modal states.
+
+**Fix:** Extended the global shortcut intercept in `handle_event()` to cover 6 additional shortcuts beyond the existing ⌃Q/⌃S/⌃T: `⌃O` (Open File), `⌃W` (Close Tab), `⌃N` (New File), `⌃E` (Recent Files), `⌃Space`/`⌃⇧P` (Command Palette), and `⌃⇧F` (Find in Files). All close the current modal first via `_close_any_modal()`, then execute. `⌃Space` toggles the palette (closes if already open). Removed `_in_modal_state()` guards from `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `cmd_open_palette`. Updated tests to reflect the new behavior.
+
+### ~~P1: [Security] Shell injection in VCS/Git.pm via backtick execution~~ FIXED
+
+`VCS/Git.pm` constructs shell commands as strings and executes via backticks (`\`$cmd\``). While `_shell_quote()` is used for arguments, the `cd ... && git ...` pattern with string interpolation is inherently risky. Should use git's `-C` flag and list-form execution (`open()` with pipes) to eliminate shell interpretation entirely. Same pattern appears in multiple functions (~lines 80, 101, 132, 200).
+
+**Fix:** Replaced all 5 backtick executions with a `_run_git()` helper that uses `open(FH, '-|')` + `exec('git', @args)` list-form execution (no shell interpretation). Added `_git()` instance method that prepends `-C <repo_root>` to avoid `cd && git` pattern. Removed the now-unnecessary `_shell_quote()` function. All git operations (version check, ls-files, show, status) now use safe list-form exec.
+
+### ~~P1: [Security] Shell injection in Terminal.pm clipboard and command detection~~ FIXED
+
+`Terminal.pm` uses backtick execution in two places: `paste_from_clipboard()` (line ~524: `` `$self->{_clipboard_paste_cmd} 2>/dev/null` ``) and `_command_exists()` (line ~487: `` `which $cmd 2>/dev/null` ``). While the command strings are currently hardcoded, backtick execution is unsafe by default. Should replace with list-form `system()` or `open()` with pipes.
+
+**Fix:** Added `_safe_backtick()` helper that uses `open(FH, '-|')` + list-form `exec()` (no shell interpretation). Converted `_command_exists()`, `paste_from_clipboard()`, `stty size`, and `tput cols/lines` to use it. Changed clipboard command storage from strings to arrayrefs so `copy_to_clipboard()` and `paste_from_clipboard()` can use list-form `open()`/`exec()`. Updated test to use `is_deeply` for arrayref comparison.
+
+### ~~P1: [Documentation] Stale references to deleted TODO.md~~ FIXED
+
+`TODO.md` was deleted in commit `90a4c38` but is still referenced in `CLAUDE.md` (line 143, "Keeping Docs Current" table) and `docs/CODE_QUALITY.md` (line 31, "Remove from `TODO.md` if listed"). Anyone following the documented workflow will try to update a non-existent file.
+
+**Fix:** Removed `TODO.md` row from the "Keeping Docs Current" table in `CLAUDE.md` and removed step 6 "Remove from `TODO.md` if listed" from the feature completion checklist in `docs/CODE_QUALITY.md`.
+
+### ~~P1: [Documentation] UI_GUIDELINES.md palette sections are wrong~~ FIXED
+
+`UI_GUIDELINES.md` says palette sections are "DOCUMENT, APP, NAVIGATE, TOGGLES" but the actual sections in `CommandRegistry.pm` are FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS. The sections were reorganized (see P2 "Command palette re-org" FIXED entry) but the guidelines were never updated.
+
+**Fix:** Updated line 61 in `docs/UI_GUIDELINES.md` from "DOCUMENT, APP, NAVIGATE, TOGGLES" to "FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS" to match the actual `@SECTION_ORDER` in `CommandRegistry.pm`.
+
+### ~~P1: [Performance] Character width computed per-character with no caching~~ FIXED
+
+`_char_display_width()` in `Renderer.pm` (130+ lines of Unicode range checks) is called for every character on every visible line on every frame. For a 40-line, 200-column viewport that's ~160,000 function calls per frame. Should memoize by codepoint or use a lookup table.
+
+**Fix:** Added memoization cache (`%_cdw_cache`) keyed by codepoint. Extracted range-check logic into `_compute_char_width()` which is only called on cache miss. Added fast path: printable ASCII (0x20-0x7E) returns 1 immediately without cache lookup, covering ~99% of typical source code characters.
+
+### ~~P2: [Bug] Shift+Tab does same thing as Tab in find-in-files palette~~ FIXED
+
+`Palette.pm` lines 85-90: both Tab and Shift+Tab call `_file_search_cycle_scope()` with no direction parameter. Shift+Tab should cycle backward through scopes but currently cycles forward, identical to Tab.
+
+**Fix:** Added `$direction` parameter to `_file_search_cycle_scope()`. Shift+Tab now passes -1 (backward), Tab passes no direction (forward). With the current 2-scope setup (project, file dir) the visible behavior is identical, but the code is now correct for future scope additions.
+
+### ~~P2: [Bug] Missing `use File::Spec` in Palette.pm~~ FIXED
+
+`Palette.pm` line 286 calls `File::Spec->rel2abs()` but never imports `File::Spec`. It works by accident because `Editor.pm` imports it, but this is fragile and violates the module's own import conventions.
+
+**Fix:** Already fixed in commit 4f3c5a0 (Find in Files). `use File::Spec;` is now at line 20.
+
+### ~~P2: [Security] ReDoS vulnerability via user search input~~ FIXED
+
+User-supplied regex patterns are compiled dynamically in `FindEngine.pm` (line ~455) and `FileSearchEngine.pm` (line ~268, ~449) via `eval { qr/$query/ }`. A crafted pattern like `(a+)+$` could cause catastrophic backtracking and freeze the editor. Should add regex complexity validation or a timeout mechanism.
+
+**Fix:** Added 1000-character pattern length limit to `FileSearchEngine.pm` (matching `FindEngine.pm`'s existing limit). Also fixed `_find_match_in_content` to use the pre-compiled regex from `_perl_regex` instead of re-compiling from the query string on every line match — this also fixes the P3 "regex recompilation in inner loop" bug.
+
+### ~~P2: [Security] Predictable temp file names in Document.pm atomic save~~ FIXED
+
+`Document.pm` line ~138 uses `"$path.zepto.tmp.$$"` (PID-based) for temp files during atomic save. On multi-user systems this is predictable and vulnerable to symlink attacks (TOCTOU). Should use `File::Temp` for secure temporary file creation.
+
+**Fix:** Replaced PID-based temp filename with `File::Temp::tempfile()` which creates files with unpredictable names via exclusive `O_EXCL` open, preventing symlink attacks. Temp file is created in the same directory as the target file (required for same-filesystem `rename`).
+
+### ~~P2: [Performance] Renderer uses 381+ string concatenations in hot path~~ FIXED
+
+`Renderer.pm` used 391 `$output .=` operations per frame. In Perl, repeated string concatenation triggers reallocation.
+
+**Fix:** Refactored all 19 render methods from `$output .= EXPR` to `push @_out, EXPR` with `join('', @_out)` at return. 426 lines changed across all render methods including `_render_command_palette` (87 concat ops), `_render_context_status_bar` (63), `_render_tree_node_content` (32), `_render_dialog` (30), `_render_tab_bar` (28), and 14 others. Array accumulation avoids per-append reallocation — Perl's `join()` pre-calculates total size and allocates once.
+
+### ~~P2: [Documentation] CODE_QUALITY.md "Open Items" are all resolved~~ FIXED
+
+`docs/CODE_QUALITY.md` lines 173-180 lists four items as "Open" (unified input widget, global nav keys audit, theme contrast, mouse parity) but all four are marked FIXED or AUDITED in bugs.md. The audit list is stale and creates a false impression of outstanding work.
+
+**Fix:** Removed the entire "Open Items" section from `docs/CODE_QUALITY.md` since all four items are resolved in bugs.md.
+
+### ~~P2: [Documentation] README.md lists zero features~~ FIXED
+
+README.md is 32 lines with no feature list despite the editor having command palette, 52-language syntax highlighting, file tree, find/replace, git diff, minimap, tabs, etc. This violates CLAUDE.md Rule 7 which says to update README when features change.
+
+**Fix:** Added a "Features" section to README.md with 12 bullet points covering command palette, syntax highlighting, find/replace, find in files, file tree, tabs, git integration, minimap, view modes, themes, shell transform, and zero-dependency architecture.
+
+### ~~P2: [Build] build.pl not in Makefile dependency list~~ FIXED
+
+`Makefile` line ~53: `zepto: $(MODULES)` doesn't depend on `build.pl`. Changing the build script won't trigger a rebuild. Should be `zepto: $(MODULES) build.pl`.
+
+**Fix:** Added `build.pl` to the dependency list: `zepto: $(MODULES) build.pl`.
+
+### P2: [Architecture] Editor is a 6000-line god object across 3 files — SKIPPED
+
+`Editor.pm`, `Commands.pm`, and `Palette.pm` all declare `package Zepto::Editor;` and inject 162 methods into a single class. The class directly manages event loop, file I/O, find/replace, command palette, dialogs, tabs, mouse handling, VCS, and more. No encapsulation boundary — any method can mutate any `$self` field. State transitions are ad-hoc string assignments with no validation.
+
+**Skipped — 6000 lines, 162 methods, 929 tests touching `$editor` objects directly. Extracting subsystems (find/replace, dialog management, scroll handling) requires defining stable interfaces, migrating shared `$self` state to composition, and updating tests. Multi-session project. Recommended approach: extract one subsystem at a time (start with dialog/prompt/footer — most self-contained), validate tests between each extraction.**
+
+### ~~P2: [Code Quality] Inconsistent error handling across commands~~ FIXED
+
+`cmd_save` showed raw `$@` with Perl stack traces to users. `cmd_transform` stripped location info. `_load_file` showed "Error opening file: $@" with internal paths.
+
+**Fix:** Added `_user_error($action, $@)` helper that strips Perl file/line info from `$@` and formats as `"$action: $reason"`. Applied to all 5 error paths: Save As, Save, file open, transform, and file reload (2 locations in Editor.pm). All errors now use `show_error_message()` for consistent styling. Format: "Save failed: Permission denied", "Could not open file: No such file or directory", etc.
+
+### ~~P3: [Security] Terminal escape sequence injection via filenames~~ FIXED
+
+`Terminal.pm` line ~540 sanitizes titles by stripping `[\x00-\x1f]` (ASCII control chars only). UTF-8 sequences or characters outside this range could potentially manipulate terminal state. Should consider a whitelist of allowed characters.
+
+**Fix:** Extended the title sanitizer to also strip DEL (0x7F) and C1 control characters (0x80-0x9F), which can trigger terminal-specific escape sequences.
+
+### ~~P3: [Performance] Tab bar geometry recalculated every frame~~ FIXED
+
+`Renderer.pm` recalculated tab pill widths, progressive name truncation, and tab range visibility every frame — even when only the cursor moved.
+
+**Fix:** Added class-level cache for `_render_tab_bar()` keyed on tab count, active index, terminal width, and per-tab state (name, dirty, VCS). Cache includes both the rendered string and button positions for mouse clicks. Returns cached result on hit, skipping all geometry computation.
+
+### ~~P3: [Performance] VCS status checked per visible line per frame~~ FIXED
+
+`Renderer.pm` called `vcs_deletion_status()` and `vcs_change_status()` for every visible line on every frame. These methods do linear array scans, resulting in O(visible × changes) per frame.
+
+**Fix:** Pre-build `%vcs_change` and `%vcs_deletion` lookup hashes from `$doc->{_vcs_diff}` arrays once before the rendering loop. Per-line lookups are now O(1) hash access instead of O(n) array scans.
+
+### ~~P3: [Performance] Palette filtering rescans all files on every keystroke~~ FIXED
+
+`_filter_recent_files` and `_filter_all_files` iterated the entire file list and called `_fuzzy_score` twice per item on every keystroke.
+
+**Fix:** `_filter_all_files` already had incremental substring filtering and a 5000-item scoring cap. Extracted shared `_build_file_item()` and `_fuzzy_rank_file_items()` helpers, reducing code duplication and consolidating the scoring logic. The recent files list is typically <50 items so no further optimization needed.
+
+### ~~P3: [Performance] Regex recompilation in FileSearchEngine inner loop~~ FIXED
+
+`FileSearchEngine.pm` line ~449: `_find_match_in_content` compiles the search regex via `eval { qr/$query/ }` on every per-line match check. Should pre-compile once at search start.
+
+**Fix:** Fixed as part of the P2 ReDoS fix. `_find_match_in_content` now uses the pre-compiled regex from `$self->{_perl_regex}` instead of re-compiling via `eval { qr/$query/ }` on every line.
+
+### ~~P3: [Code Quality] _filter_recent_files and _filter_all_files are 90% identical~~ FIXED
+
+`Palette.pm` lines 205-315: two ~55-line functions with nearly identical item-building and scoring logic. Only the data source differs. Should extract to a shared `_filter_file_items()` helper.
+
+**Fix:** Extracted shared `_build_file_item()` and `_fuzzy_rank_file_items()` helpers. Both `_filter_recent_files` and `_filter_all_files` now use these for item construction and scoring, eliminating the duplicated logic. Fixed as part of the P3 palette filtering performance fix.
+
+### P3: [Code Quality] Display path normalization duplicated in 5+ locations — NO LONGER APPLICABLE
+
+The pattern `if (index($path, "$cwd/") == 0) { substr(...) }` appears in `Palette.pm`, `FileSearchEngine.pm` (`_parse_lines` twice, `_tick_perl`), and elsewhere. Should be a utility function.
+
+**Resolution:** After the palette filter refactoring (P3 palette dedup fix), only 2 occurrences remain — not enough to justify extracting a utility function.
+
+### ~~P3: [Code Quality] State guard clauses copy-pasted 4+ times~~ FIXED
+
+`Commands.pm` repeats the same 4-line guard block (`return if $self->{state} eq 'footer_input'` etc.) in `cmd_open_file`, `cmd_recent_files`, `cmd_find_in_files`, and `_column_paste`. Should extract to `_in_modal_state()` helper.
+
+**Fix:** Added `_in_modal_state()` helper that checks for footer_input, prompt, find, and dialog states. Replaced the 4-line guard blocks in `cmd_open_file`, `cmd_recent_files`, and `cmd_find_in_files` with single-line `return if $self->_in_modal_state()`. Note: `_column_paste` did not have the guard pattern.
+
+### ~~P3: [Bug] No user feedback for invalid goto_line input~~ FIXED
+
+`Commands.pm` lines ~682-699: if the user enters something like `abc` or `1:2:3` in the Go To Line input, the function silently returns with no message. Should display an error or hint about expected format.
+
+**Fix:** Added status message "Invalid format. Use: line, line:col, or :col" when the input doesn't match any valid pattern.
+
+### ~~P3: [Documentation] DESIGN.md architecture diagram is stale~~ FIXED
+
+The architecture diagram references "Commands/Menu/Preferences" module layout and doesn't reflect the current pill-based status bar, progressive disclosure, or the FILE/EDIT/NAVIGATE/VIEW section organization.
+
+**Fix:** Completely rewrote the architecture diagram to show all 22 modules in their correct layers. Updated the module responsibilities table from 9 to 21 entries (added CommandRegistry, FindEngine, Highlighter, FileTree, FileSearchEngine, Diff, InputWidget, WrapMap, LineMap, Minimap, Chars, Config). Updated the data flow diagram to include FileTree, FindEngine, and Diff.
+
+### ~~P3: [Documentation] Unverified "95%+ coverage" claim in DESIGN.md~~ FIXED
+
+DESIGN.md claims "95%+ automated test coverage" but no coverage metrics exist. Several modules (`Config.pm`, VCS integration paths) have little or no direct test coverage.
+
+**Fix:** Replaced unsubstantiated "95%+ automated test coverage" with "comprehensive automated testing" — accurate without making a specific claim.
+
+### ~~P3: [Tests] Tautological tests verify messages not behavior~~ FIXED
+
+`editor.t` tests like `cmd_undo` check that a status message is set but don't verify the edit was actually reversed. If `cmd_undo()` is broken but still sets a message, the test passes.
+
+**Fix:** Strengthened the undo/redo test in `editor.t` to verify actual document state changes: insert text → verify document changed → undo → verify document reverted to original → redo → verify document restored to edited state. Previously only checked that status messages were set.
+
+### ~~P3: [Tests] Performance tests with hard timing thresholds are flaky~~ FIXED
+
+`find_engine_perf.t` uses `ok($median < 5, ...)` which will fail on slow CI or loaded machines. Should use `diag()` to report timing without failing the test.
+
+**Fix:** Relaxed the two hard timing thresholds from 10ms to 50ms. The actual times are typically 1-4ms, so 50ms gives ample headroom for slow CI machines while still catching genuine regressions. Timing details continue to be reported via `diag()`.
+
+### ~~P3: [Tests] No test for CommandRegistry consistency~~ FIXED
+
+No test verifies that all commands have unique IDs, all shortcuts are unique, or all section names in `@SECTION_ORDER` are valid. If someone breaks CommandRegistry, all 33 commands silently disappear from the palette.
+
+**Fix:** Added two new subtests to `tests/command_registry.t`: "All shortcuts are unique" (verifies no two commands share a shortcut) and "All command sections are in SECTION_ORDER" (verifies every command's section is valid). Note: unique IDs were already tested.
+
+### ~~P3: [Repo Hygiene] Junk files not gitignored~~ FIXED
+
+11 `perflog*.txt` files, `foo.txt`, and `lib/Zepto/goo.js` are untracked in the working directory. These should be `.gitignore`d to prevent accidental commits.
+
+**Fix:** Added `perflog*.txt` and `foo.txt` to `.gitignore`. `lib/Zepto/goo.js` was not present in working directory (already removed).
+
+### ~~P3: long filenames in open file dialog~~ FIXED
+
+Long filenames bust out of the box. Actually it's kinda useful to use more of the screenspace, but it leaves screen artifacts. Also useful to widen the picker, like with find across files picker.
+
+**Fix:** Widened Open File and Recent Files pickers to 120 chars (matching Find in Files). Long directory paths (shortcuts) are now truncated from the start with ellipsis to prevent overflow past the box border.
+
+### ~~P1: Search should jump to first~~ FIXED
+
+When searching for a string that's not currently in view, screen/cursor should jump to match.
+
+**Fix:** Removed `skip_jump` from `_find_value_changed()` so typing in the find bar triggers `_find_nearest_match()` on each keystroke. For matches outside the viewport, the background search completion in the main loop now also triggers a jump when it finds new matches that weren't available during the synchronous viewport-only search.
+
+### ~~P3: Transform feature~~ FIXED
+
+I'd like the ability to use cmd line tools to transform fragments of text. For example, select some text, press transform, type "sort | uniq", and have the selected text replaced with the result of piping it through those process. If no text selected, auto select current line (or maybe entire doc, WDYT?). Also give option to put output in clipboard instead of replacing inline. Give hints in UI as to how to use the functionality. e.g. "sort | uniq", "tac", "python3 -m json.tool"
+
+**Fix:** Added `⌥T` "Transform via Shell" command. Opens a footer input with hint showing example commands (`sort | uniq`, `tac`, `python3 -m json.tool`). Pipes the selected text (or current line if no selection) through `sh -c "$command"` via `IPC::Open2` and replaces inline. Registered in command palette under EDIT section. **Decision:** No selection defaults to current line (not entire doc) — more predictable and less destructive. Clipboard output option deferred — users can use `pbcopy`/`xclip` in the command itself.
+
+### ~~P2: Syntax highlighting misaligned on lines with ⌥, ⚠, and similar Unicode symbols~~ FIXED
+
+`_char_display_width()` used overly broad Unicode ranges (U+231A-23FF, U+2600-27BF, U+2B50-2B55) that returned width 2 for hundreds of narrow (EAW=N) characters like ⌥ (U+2325), ⚠ (U+26A0), ✔ (U+2714). These are width 1 in terminals. On lines with these characters (common in bugs.md keyboard shortcuts), syntax tokens were shifted right by 1 per such char, word wrap broke at wrong positions, and the minimap viewport alignment was off.
+
+**Fix:** Replaced the three broad ranges with precise sub-ranges listing only the characters that are actually East Asian Wide (EAW=W/F) per Unicode. For example, the Misc Technical range (U+231A-23FF) now only matches ⌚⌛ (U+231A-231B), 〈〉 (U+2329-232A), ⏩⏪⏫⏬ (U+23E9-23EC), ⏰ (U+23F0), ⏳ (U+23F3). Added regression tests for both the wide and narrow characters.
+
+### ~~P2: Smart sort~~ FIXED
+
+Sort files in tree/search results by human friendly numbers, not ascii. e.g. file7.txt, file8.txt, file9.txt, file10.txt (10 after 7).
+
+**Fix:** Added `_natural_cmp()` function that splits filenames into text and numeric chunks and compares numbers numerically. Applied to all four sort locations: FileTree `_scan_dir_one_level` and `_walk_for_files`, FilePicker `_discover_files` and `_apply_filter`.
+
+### ~~P0: Slight lag on typing~~ FIXED
+
+I notice it when typing and it's annoying. Figure out the bottleneck. Particularly visible when holding down a key to repeat chars.
+
+**Fix:** Multiple optimizations across several commits: (1) Debounced `head_changed()` file I/O to every 2s and `check_external_changes()` stat to every 1s. (2) Made WrapMap incremental — only rebuilds when content version changes, with content-keyed cache for full rebuilds. (3) Added minimap caching keyed on content version. (4) Implemented differential rendering — Renderer returns per-row array, Editor diffs against previous frame and only emits changed rows to terminal. Reduced terminal I/O from ~27KB to ~1-2KB per frame for typical edits. Net result: char/none frame times dropped from ~55ms to ~45ms median (~18% improvement).
+
+### ~~P1: New files dont appear in tree.~~ FIXED
+
+Open zepto, see tree. Create new tab. Save it. New file should be visible in tree.
+
+**Fix:** Added `$self->{file_tree}->refresh()` call after successful Save As in `cmd_save()`. The file tree's `refresh()` method re-scans the filesystem while preserving expand/collapse state, so the newly saved file appears immediately.
+
+### ~~P3: Ruler does not extend to width of screen~~ FIXED
+
+Currently it stops 1 char short of end of screen. Particularly visible in light mode as it's a black filler.
+
+**Fix:** Swapped `RESET . CLEAR_LINE` to `CLEAR_LINE . RESET` in `_render_ruler_bar`. Same fix pattern as the earlier screen-width fix — `CLEAR_LINE` must happen before `RESET` so it erases to end-of-line using the ruler's background color, not the terminal default.
+
+### ~~P1: Cursor off by one in palette filter~~ FIXED
+
+The cursor position is 1 char to the right of where it should be in palette filter. Actually, it may be correct, and the text rendering
+is 1 to the left. Shouldn't this be using the standard input text widget, and if so, how is just this one broken?
+
+**Fix:** The cursor positioning in `render()` used `$pal_x + 5` but the filter text renders at `$pal_x + 4` (box border + space + icon + space = 4 chars before query text). Changed to `$pal_x + 4` to align cursor with text.
+
+### ~~P2: Diff view discoverability~~ FIXED
+
+When in diff view, make it visible on screen how to move to next/prev diff. If attempting to diff on a line that has no diff, jump to next one (if exists). Put a green/yellow/red/grey indicator in the diff view button on the status bar that matches diff status of where line is currently placed (grey is none). This is a subtle indicator of what this button's for to help users discover it.
+
+**Fix:** Three changes: (1) The Diff View pill in the status bar now changes color based on the current line's VCS status — green (added), amber (modified), red (deleted), or default grey (no change). Added `pill_diff_added/modified/deleted` theme colors for both dark and light themes. (2) Pressing ⌥D on a line with no change now auto-jumps to the next change instead of showing "No change at cursor". (3) Next/Prev Change commands (⌥N/⌥P) remain accessible via the command palette for discoverability.
+
+### ~~P3: Tree hide~~ FIXED
+
+Ability to competely hide tree. Sometimes I really just care about editing a single file and want minimal screen clutter. e.g. a git commit msg. There should be a cmd to completely toggle it. If using ctrl-o to open a file, the sidebar should vanish once the file is opened (assuming tree is meant to be hidden). Make it clear in UI how to toggle the tree - should be visible at all times. Add cli options to force opening mode. If opening a single file from CLI, default to tree hidden.
+
+**Fix:** ⌃B now toggles tree visibility (show/hide) instead of just focus. When tree is hidden and ⌃O is pressed, tree temporarily appears with filter for file picking, then auto-hides after file selection or Esc. Opening specific files from CLI defaults to tree hidden; no-args or directory launch keeps tree visible. Added `--no-tree` CLI flag and `ZEPTO_TREE=0` env var for explicit control.
+
+### ~~P1: Incorrect cursor placement in command palette~~ FIXED
+
+When opening command paletted, terminal cursor is not placed in text field
+
+**Fix:** The cursor positioning code in the renderer used hardcoded width (60) and height (20) values that didn't match the actual palette rendering, which uses responsive widths (120/80/60) based on terminal width and dynamic height based on terminal rows. Synchronized the cursor positioning calculations to match the palette rendering dimensions exactly.
+
+### ~~P1: Clicking document editor should unfocus file tree~~ FIXED
+
+If navigating file tree, and user clicks in main editor area, unfocus tree and return to editing.
+
+**Fix:** Added tree unfocus check at the beginning of the "Click in text area" section of `handle_mouse_event`. When the file tree is focused and the user clicks anywhere in the document area (gutter or text), `_tree_unfocus()` is called to cancel any preview, restore the original tab, and unfocus the tree. The view reference is also refreshed after unfocus in case the active tab changed.
+
+### ~~P3: Toggle comment enhancements~~ FIXED
+
+Support HTML which is both prefix and suffix. <!-- xxx -->. In HTML be aware of nested script or style and switch commenting char appropriately. Move the comment
+definitions outside of Base.pm into their respective syntax files.
+
+**Fix:** Three changes: (1) Moved comment prefix definitions from the centralized `%COMMENT_PREFIX` hash in Base.pm to individual `sub line_comment_prefix` overrides in each of the 42 syntax files. Base.pm now returns `undef` by default. (2) Added `comment_style($state)` API to Base.pm that returns `{ prefix => ..., suffix => ... }` — suffix is optional for line-prefix comments. HTML.pm overrides this for context-aware commenting: normal HTML uses `<!-- -->`, `<script>` blocks use `//` (JavaScript), `<style>` blocks use `/* */` (CSS). CSS.pm overrides to use `/* */` block comments (was incorrectly mapped to `//`). (3) Updated `cmd_toggle_comment` in Commands.pm to handle prefix+suffix block comments: inserts/removes suffix at line end and prefix at indentation, with correct offset handling (processes end-to-start).
+
+### ~~P2: Scroll wheel cannot scroll more than a page~~ FIXED
+
+When using scroll wheel, the doc offset scrolls, but gets stuck when the selected line hits top or bottom, preventing scrolling more than a page at a time.
+
+**Fix:** The `_explicit_scroll` flag was being consumed (deleted) on a single render cycle, so the viewport snapped back to the cursor as soon as scrolling stopped. Changed the flag to persist across renders until a non-scroll user event occurs. The flag is now cleared at the start of `handle_event()` in Editor.pm — scroll events immediately re-set it via `scroll_up`/`scroll_down`, so it persists during scrolling but clears on any other action (typing, arrow keys, clicking). This allows unlimited scrolling away from the cursor, with the viewport snapping back only when the user takes a non-scroll action.
+
+### ~~P2: "More" home/end~~ FIXED
+
+Pressing home once on line should jump to first non-whitespace char (e.g. where code is indented). Pressing again should jump to start of actual line (in front of whitespace). Pressing one more time should jump to start of doc (line 1). Similar for End.
+
+**Fix:** Smart Home cycles three states: first-nonws → col 0 → document start. Smart End cycles: line end → document end. Both work in normal and word-wrap modes. Also fixed `do_enter()` to set cursor position directly instead of using `move_to_line_start()` (which now has smart cycling that would send the cursor to doc start on empty new lines).
+
+### ~~P3: Move forward/back~~ FIXED
+
+Keep a history of major locations visited across files and within files. Many editors support something like this. Keyboard shortcuts to quickly move back forward throught location histor.
+
+**Fix:** Added location history with `⌥-` (Go Back) and `⌥=` (Go Forward) shortcuts. Uses dual-stack model: back stack and forward stack. Location is recorded automatically before major jumps: Go to Line, Find Next/Prev, Next/Prev Change, and file opens. Each entry stores file path + line + col. Back navigation pushes current position to forward stack and pops from back stack. Forward does the reverse. New jumps clear the forward stack (new branch of history). Cross-file navigation switches tabs or reopens files as needed. History limited to 100 entries. Both commands registered in command palette under NAVIGATE section.
+
+### ~~P2: Recent files~~ FIXED
+
+Like ^O open, but list of recently visited files. Sorted by most recent first.
+
+**Fix:** Added `⌃E` shortcut for Recent Files. Files are tracked when opened (via file tree, command line, or the recent files picker itself) and persisted to `~/.config/zepto/recent_files`. The picker reuses the command palette overlay with mode-specific title ("⌃E Recent Files"), fuzzy filtering, and file-type icons. Files are shown with filename as label and directory as secondary text. Most recently opened file appears first. Registered in CommandRegistry under FILE section.
+
+### ~~P0: Reports of sluggishness~~ FIXED
+
+Some users have reported a delay between typing and seeing results on screen. Hard to reproduce. Go explore and figure out likely cause.
+
+**Fix:** Found three per-render bottlenecks: (1) WrapMap was unconditionally invalidated and rebuilt from scratch on every render, even when content hadn't changed — added `_content_version` counter to Document so WrapMap auto-detects changes and only rebuilds when needed. (2) `head_changed()` did file I/O (open + read + stat on `.git/HEAD`) on every render — debounced to every 2 seconds. (3) `check_external_changes()` did `stat()` on the active file every render — debounced to every 1 second.
+
+### ~~P3: Lightmode glitches~~ FIXED
+
+In lightmode. On short docs, the space beyond the final line is grey and looks out of place.
+
+**Fix:** Changed light theme `empty_line_bg` from `bg_rgb(225, 228, 235)` (grey) to `bg_rgb(250, 250, 252)` (near-white) so empty lines beyond the document blend with the white editor background.
+
+### ~~P3: Screen width~~ FIXED
+
+The ruler, minimap, and bottom status bar all stop one char short of the end of the window. The tab bar does not. Ensure all reach end of window so entire screen is filled.
+
+**Fix:** Swapped the order of `RESET` and `CLEAR_LINE` escape sequences in all rendering functions (text rows, status bar, find bar, footer input, prompt). Previously `RESET . CLEAR_LINE` cleared the styling first, then erased to end-of-line using the terminal's default background — causing any residual gap to appear in the wrong color. Now `CLEAR_LINE . RESET` erases first using the editor's current background color, then resets. Applied to 8 locations across the renderer.
+
+### ~~P3: Status bar spacing~~ FIXED
+
+No space between the Line number pill (first in status bar) and word wrap, whereas all others have spaces.
+
+**Fix:** Added explicit gap space before the first center pill in the status bar, matching the spacing between other pills. Also adjusted the available space calculation to account for the extra space.
+
+### ~~P2: Go-to-line new UI~~ FIXED
+
+The status bar starts with a line number pill, and also has a go to line pill. Collapse these into a single element.
+The line number pill (first), should also sho the ^G shortcut. When pressing this key, or clicking the pill, the line:col
+string should become editable. Initially the entire text should be selected, allowing user to start typing and replace selection, or to move the cursor and edit existing. User may end XX, XX:YY, or :YY to move line, line and col, or just col (on same line) respectively - there should be text hints displayed to explain this. Use standard text input component used elsewhere. Ensure this box is wide enough to support docs of at least 9999:999. Beyond that, ok to scroll.
+
+**Fix:** Merged the separate "Go to Line" pill into the cursor position pill. The pill now shows `⌃G` shortcut and is clickable. Pressing ⌃G or clicking the pill opens an inline input pre-filled with the current `line:col` (all selected, so typing replaces). Hint text shows "line, line:col, or :col" format guide. Input is 10 chars wide (enough for 9999:999 with scrolling for larger). The "Go to Line" command remains in the command palette for discoverability.
+
+### ~~P3: Theme ^T should be global shortcut~~ FIXED
+
+For example, should work when in find dialog.
+
+**Fix:** Added `⌃T` to the top-level global shortcuts in `handle_event()`, alongside `⌃Q` and `⌃S`. Theme toggle now works from any UI state: find bar, command palette, footer input, dialog, and prompt.
+
+### ~~P2: Comment/uncomment line~~ FIXED
+
+Ctrl+/ should comment or uncomment the current line. If no text selected, current line. If text selected, all lines this selection spans. Language specific comments, e.g. # or // or <!-- .. -->. For languages that support multiline comment blocks, dont use this, only single lines (e.g. yes on //, no on /* .. */). Handle cases for mixed language documents (e.g. HTML with embedded CSS or JS).
+
+**Fix:** Added `line_comment_prefix()` to `Zepto::Syntax::Base` with a lookup table covering all 42 syntax languages. `cmd_toggle_comment` in Commands.pm detects the language from the active highlighter's grammar, determines the line range (single line or selection), checks if all non-blank lines are already commented, and toggles accordingly. Comments are aligned at the minimum indentation of the selected lines. Wired to `⌃/` (Ctrl+/) and registered in CommandRegistry under DOCUMENT section.
+
+### ~~P3: Close empty start tab when opening first file.~~ FIXED
+
+A common scenario is: open zepto (which shows an untitled empty tab), then navigate to a file to edit. In this case, if the initial empty tab has not been edited, automatically close it to reduce clutter.
+
+**Fix:** Added `_empty_untitled_tab_index()` helper that checks if a tab is empty, unedited, and has no file. When opening a file via `_load_file()` (⌃O, recent files, command palette) or confirming a tree preview (Enter), if the previous tab was an empty untitled tab, it's automatically closed. Edited untitled tabs are preserved.
+
+### ~~P2: Line by line scrolling in editor.~~ FIXED
+
+When using mouse scrolling (wheel or touchpad gesture), the file tree scrolls item by item, which feels precise and smooth. However the editor has different behavior which feels janky. Make editor mouse scroll behave same way as tree.
+
+**Fix:** Changed editor mouse scroll from 3 lines per event to 1 line per event, matching the file tree's behavior.
+
+### ~~P3: Diff view does not preserve line wrap~~ FIXED
+
+If word wrap enabled, and diffing a hunk with long line, the word wrap is disabled in the diff, which is jarring. Preserve word wrap settings.
+
+**Fix:** Three changes: (1) Removed the conditional in Editor.pm that disabled WrapMap when diff hunks were expanded — word wrap now stays active in diff view. (2) Added a combined WrapMap+LineMap entry-building path in Renderer.pm: when both are active, LineMap provides the entry ordering (doc lines + old/base lines from expanded hunks) while WrapMap provides word wrapping for each entry. Old/base lines are wrapped using `wrap_line()` and doc lines use `segments_for_line()`. (3) Updated `_render_old_line_row` to handle wrap segments — continuation rows get indent prefix with `↪` indicator, and content is sliced to the segment's visual range instead of the full viewport width. Gutter markers extend across all wrap continuation rows of old lines.
+
+### ~~P2: Find/replace pills should be clickable~~ FIXED
+
+Regex, case sensitivie, ok, cancel: mouse clicks should activate.
+
+**Fix:** Already implemented — `handle_find_bar_click()` in Editor.pm computes click regions matching the renderer layout and handles clicks on all four pills: regex toggle, case toggle, cancel (Esc), and OK (Enter). Click regions are calculated from the same layout formula as the renderer to stay in sync.
+
+### ~~P3: Column mode mouse selection~~ FIXED
+
+After activating col selection mode, dragging with mouse should select col based selection, but it defaults to line.
+
+**Fix:** Updated the drag handler's "start selection on first drag" logic to check `$view->column_select()` in addition to the Alt modifier. When column mode is already active (via ⌥C toggle), dragging now starts a column selection instead of a linear one. Alt+drag continues to start column selection from scratch as before.
+
+### ~~P2: Line number indicator resizing~~ FIXED
+
+The left pill constantly resizes as moving across lines due to empty lines (e.g. :60 -> :1). This makes the whole bar jiggle.
+
+**Fix:** Added minimum width padding to the cursor position pill so it doesn't shrink below a reasonable size. The pill text is right-padded with spaces to keep surrounding pills stable.
+
+### ~~P2: More prominent ctrl-space hint~~ FIXED
+
+This is the most important key to know about, but it's hidden in corner, with no real clue as to what it means. How to make this obvious for first time users?
+
+**Fix:** Added "Commands" label to the palette pill in the status bar. Previously showed only `{icon} ⌃␣` — now shows `{icon} Commands ⌃␣`. Updated in both document-context and tree-context status bars. The pill already uses a distinctive blue background that differentiates it from other pills.
+
+### ~~P3: Command palette too wide.~~ FIXED
+
+Doesn't need to be as wide and ends up with shortcut keys too far from respective action. Pick a reasonable max width.
+
+**Fix:** Reduced palette max width from 120 to 80 columns at wide terminals (>=120 cols). Standard terminals (<120 cols) keep the 60-column max. Removed the 160-col breakpoint that created an overly wide 120-column palette. Shortcuts now stay close to labels at all terminal widths.
+
+### ~~P2: Non-obvious tab keys~~ FIXED
+
+Close tab, next tab, prev tab are common actions. Succinctly display these hints somewhere, maybe in tab bar.
+
+**Fix:** Added right-aligned tab navigation hints in the tab bar's remaining space: `⌃W × ⌥, ← ⌥. →` showing close tab, previous tab, and next tab shortcuts. Hints only appear when there's enough room, using the same dim shortcut color as the per-tab ⌥N hints.
+
+### ~~P2: Command palette re-org~~ FIXED
+
+Organize by:
+- File: tree, new, open, save, close, quit, next/prev tab, etc
+- Edit: cut, copy, paste, move line up/down, duplicate up/down
+- Navigate...
+- View: minimap, nerd, wrap
+- etc.
+Where should find/replace go
+
+**Fix:** Reorganized command palette from DOCUMENT/APP/NAVIGATE/TOGGLES to FILE/EDIT/NAVIGATE/VIEW. FILE: New, Open, Save, Close Tab, Quit, Next/Prev Tab, File Tree. EDIT: Undo, Redo, Cut, Copy, Paste, Select All, Move/Duplicate Lines, Toggle Comment. NAVIGATE: Find/Replace, Go to Line, Find Next/Prev, Next/Prev Change. VIEW: Word Wrap, Column Mode, Diff View, Minimap, Nerd Font, Theme. Find/Replace goes in NAVIGATE (it's a search/navigation action).
+
+### ~~P2: Command palette rendering~~ FIXED
+
+Highlighted row in command palette extends too far on right, overlapping border.
+
+**Fix:** Reset background to `$bg` before rendering the right border `$box_v` on each item row. The selection highlight (`$sel_bg`) was bleeding into the border character because only `$border_fg` (foreground) was set.
+
+### ~~P3: Nerd icon overhaul~~ FIXED
+
+Re-evaluate current icon selection. Many duplicates. Pick familiar feeling icons for actions.
+
+**Fix:** Audited all 52 icon definitions in Chars.pm. Found 3 duplicate codepoints: (1) NF_CLOSE (\x{f00d}) duplicated NF_TIMES — removed NF_CLOSE (was unused in %CHARS mapping). (2) NF_WRAP (\x{f0ea}) duplicated NF_PASTE — changed NF_WRAP to \x{f036} (fa-align-left, text lines icon). (3) NF_PALETTE (\x{f0c9}) duplicates NF_MENU — left as-is since both semantically represent the same hamburger menu concept. No other icon issues found; existing selections are appropriate for their actions.
+
+### ~~P2: Fuzzy find text overflow~~ FIXED
+
+Open fuzzy find with ^O and type long string - it overflows out of tree into main doc. Ensure its constrained to text box.
+
+**Fix:** Two changes in Renderer.pm: (1) When query exceeds available width, show the tail of the string (`substr($query, -$max_query_width)`) so the cursor stays visible. (2) Cap cursor position to panel width so it doesn't escape beyond the border.
+
+### ~~P2: Save changes prompt: more prominent~~ FIXED
+
+Often when closign a tab, the save changes prompt appears at bottom, but it's hard to notice. Make this harder to miss, e.g. with
+a intense background color. Also make yes/no/cancel into pill buttons with icons.
+
+**Fix:** Replaced plain-text prompt with pill-style buttons on an amber/warning background. Added prompt-specific theme colors (`prompt_bg`, `prompt_fg`, `prompt_pill_*`) for both dark and light themes. Buttons now show icons: Save (floppy), Discard (✗), Cancel. Added warning icon (⚠) to Chars.pm. Updated all three prompt call sites (close tab, quit with dirty tabs, file changed on disk).
+
+### ~~P0: New file Enter key puts cursor at beginning of current line instead of next line~~ FIXED
+
+Create new doc, type a line of text on the last line (which for a new doc is also the first line), press Enter. Cursor jumps to beginning of current line, not next line.
+
+**Fix:** Invalidate WrapMap after inserting newline so `move_down()` sees the updated line count. Root cause was stale WrapMap state when word wrap is active.
+
+### ~~P0: File tree click on tab should unfocus tree and focus document~~ FIXED
+
+When file explorer or file fuzzy find is focused, clicking on a document/tab should unfocus the tree and focus on the document.
+
+**Fix:** Added tree unfocus + preview cleanup at the start of `handle_tab_bar_click()`. Any click on the tab bar area now returns focus to the editor.
+
+### ~~P0: File tree preview hides for certain files~~ FIXED
+
+When exploring files in the zepto src dir, moving cursor over `lib/Zepto/Editor.pm` and `Renderer.pm` hides the preview. Other files seem fine.
+
+**Fix:** Used `File::Spec->rel2abs()` with the tree's root_path when checking file size for the preview limit. The `-s` operator was failing on relative paths. **Note:** Large files (>100KB) are intentionally skipped for preview — Editor.pm (111KB) and Renderer.pm (147KB) will now correctly show "no preview" instead of glitching. Manual test: navigate to these files in the tree and verify they don't cause the preview to disappear entirely.
+
+### ~~P0: Saving one new file also saves another new file~~ FIXED
+
+Open editor, create new file, create another new file. Save the second file with a name. The first file also seems to be saved.
+
+**Fix:** After Save As, update the tab's `file_path` and clear `untitled_name` so the tab manager correctly tracks which file belongs to which tab. Root cause was Document getting a path but the Tab staying as untitled. **Manual test:** Create two untitled tabs, save tab 2 as "test.txt", verify tab 1 still shows as [untitled].
+
+### ~~P0: Editor does not detect or reload externally changed files~~ FIXED
+
+When a file open in zepto is modified outside the editor (e.g. by `git checkout`, another editor, a build script, or `save` from a second zepto instance), the buffer keeps the stale content with no indication that the disk version has changed. This leads to silent data loss: the user overwrites the newer external changes on the next save.
+
+**Expected behavior — no local modifications (clean buffer):**
+Silently reload the file from disk on the next focus/interaction. Restore the cursor to the same line and column (clamping if the file shrank). No prompt needed since there is nothing to lose.
+
+**Expected behavior — local modifications (dirty buffer):**
+Show a persistent status bar message (not time-based) such as:
+`File changed on disk. [R]eload  [K]eep local  [D]iff`
+- **Reload** discards local edits and loads the disk version (cursor restored best-effort).
+- **Keep local** dismisses the warning and keeps the in-memory buffer. The next save overwrites the disk version.
+- **Diff** opens diff view between the local buffer and the disk version so the user can decide.
+
+The warning should reappear on every subsequent focus until the user chooses an action. It must not auto-dismiss.
+
+**Detection:** Poll `stat()` mtime on each render cycle or input event (cheap). Compare against the mtime recorded at last load/save. No filesystem watchers needed for a minimal editor.
+
+**Fix:** Added mtime tracking to Document (captured at load and save). On each render cycle, check if the file's mtime has changed. Clean buffers are silently reloaded with cursor restored. Dirty buffers show a prompt: `[R]eload [K]eep local`. Undo/redo stacks are cleared on reload. **Decisions:** Skipped `[D]iff` option from the original spec to keep the prompt simple — can add later. **Manual test:** Open a file, modify it externally (e.g. `echo "new" > file`), press any key in zepto — should reload silently if clean, or prompt if dirty.
+
+### ~~P1: Diff gutter markers should extend across wrapped continuation lines~~ FIXED
+
+When word wrap is enabled, diff gutter markers only appear on the first display row of a wrapped line. They should extend across all continuation lines.
+
+**Fix:** Updated wrap_cont gutter rendering in Renderer.pm to check VCS change status for the underlying doc line and apply the same diff markers (added/modified/modified_whitespace). **Manual test:** Open a git-tracked file, make changes, enable word wrap — diff markers should now extend across all wrapped rows of changed lines.
+
+### ~~P2: Mouse scroll in editor is janky compared to file tree~~ FIXED
+
+When using mouse scroll wheel (macOS touchpad) in file tree it's buttery smooth, but in the editor it seems janky and skips lines, often gets caught in a loop.
+
+**Fix:** Changed mouse scroll from `move_up()`/`move_down()` (cursor movement with viewport recalc) to `scroll_up(3)`/`scroll_down(3)` (viewport-only scrolling). This avoids moving the cursor and recalculating the viewport 3 times per scroll event. **Manual test:** Open a long file and scroll with the trackpad — should now be smooth, matching the file tree behavior.
+
+### ~~P2: `^O` in fuzzy find search does not match status bar styling~~ FIXED
+
+The `^O` label in the fuzzy file search does not match the visual styling of status bar pills.
+
+**Fix:** Replaced all caret notation (`^O`, `^R`, `^C`) with compact glyph notation (`⌃O`, `⌃R`, `⌃C`) using `SYM_CTRL` constant from CommandRegistry. Updated in Renderer.pm for the file tree header, Find bar regex toggle, and Find bar case toggle.
+
+### ~~P2: Don't show diff gutter markers in new files~~ FIXED
+
+New untitled files show diff gutter markers even though there is no baseline to diff against.
+
+**Fix:** In `_compute_vcs_diff()`, return early with `_vcs_diff = undef` when `_vcs_base` is undefined or empty. New untitled files have no VCS base content, so the diff computation is skipped entirely. **Manual test:** Create a new file (⌃N), type some text — no diff gutter markers should appear.
+
+### ~~P3: Column selection should skip continuation lines when word wrap is enabled~~ FIXED
+
+When word wrap and column selection are both enabled, column selection should skip over continuation lines (both mouse and arrow-based selections).
+
+**Fix:** Updated `do_column_select_up/down` in Editor.pm to move by document line instead of visual row. Updated Renderer.pm `_render_line_with_highlights` to accept an `$is_wrap_cont` parameter — column selection rendering now skips wrap continuation rows entirely. **Manual test:** Enable word wrap (⌥Z) on a long file, enter column select mode (⌥C), use ⌥↓/⌥↑ — selection should skip continuation lines and select from real document lines only.
+
+### ~~P2: Unified input widget missing~~ FIXED
+
+
+Find bar, Go To Line, Save As prompt, and command palette filter are separate input implementations with inconsistent editing semantics. They should share a common input widget supporting: left/right, word left/right, home/end, select all, selection with Shift, cut/copy/paste, mouse click to place cursor.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Inputs And Text Editing.
+
+**Fix:** Created `Zepto::InputWidget` — a shared text input widget with full editing semantics. All three input surfaces (footer input / Go To Line / Save As, Find/Replace bar, command palette filter) now delegate to this widget. New features added to all inputs: Alt+Left/Right word movement, Shift+arrow/home/end selection, Ctrl+A select all, Ctrl+X cut, Ctrl+V paste (find bar keeps Ctrl+C as "toggle case" per its context-specific shortcut). Visual selection highlight is functional at the state level; selection-aware editing (replace-on-type, backspace/delete selection) works in all inputs. **Decision:** Mouse click cursor placement within input fields left as a P3 item (tracked separately). **Manual test:** Open find bar (⌃F), type "hello world", press Alt+Left — cursor should jump to "world". Press Ctrl+A — selects all. Open Go to Line (⌃G), type text, use Home/End/word movement — all consistent.
+
+### ~~P2: Global navigation keys not audited across all UI states~~ FIXED
+
+
+Core shortcuts (⌃Q, ⌃S, Esc) may not work from every UI state (dialogs, prompts, find mode, file tree, palette). An audit is needed to verify each one works from every surface.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Navigation And Focus: "Core global shortcuts work in every UI state."
+
+**Fix:** Added early interception in `handle_event()` — ⌃Q and ⌃S are now caught before routing to any state-specific handler, so they work in PALETTE, PROMPT, FOOTER_INPUT, FIND, and DIALOG states. Also removed the Esc-opens-palette fallback per user request (was triggering accidentally). **Manual test:** Open find bar (⌃F), press ⌃Q — quits. Open command palette (⌃␣), press ⌃Q — quits.
+
+### ~~P3: Mouse parity incomplete~~ FIXED
+
+
+~~Double-click word selection, triple-click line selection~~, and ~~mouse cursor placement inside input fields (find/replace, go to line)~~ are not implemented.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Mouse And Keyboard Behavior.
+
+**Fix (partial):** Added multi-click detection in the document area press handler. Tracks last click time, line, and click count. Double-click (within 400ms on same line) calls `select_word()` to select the word under cursor. Triple-click calls `select_line()` to select the entire line including newline. Click count cycles back to 1 after triple.
+
+**Fix (complete):** Mouse cursor placement in input fields was already implemented for find/replace bar and footer input (Go to Line, Save As, Transform). Added the missing piece: command palette filter input now supports mouse click cursor placement via `get_palette_geometry()` in Renderer.pm and click detection in `_handle_palette_mouse()` in Palette.pm.
+
+### ~~P3: Light theme `status_accent` used `bg_rgb` instead of `fg_rgb`~~ FIXED
+
+
+`status_accent` in the light theme was defined with `bg_rgb(30, 102, 245)` — a background color escape sequence — when it is semantically a foreground accent color (consistent with the dark theme's `fg_rgb(125, 207, 255)`). Any future use of this color for text rendering would have produced an invisible or incorrectly styled result.
+
+**Fix:** Changed to `fg_rgb(30, 102, 245)`. Added a regression test to `tests/theme.t` asserting that `status_accent` produces a foreground escape sequence (`ESC[38;2;...`) in the light theme.
+
+### ~~P3: Theme contrast not verified~~ AUDITED — OK
+
+
+Dark and light themes have not been formally audited for readability or contrast. Non-color cues (icons, text) for state changes (VCS markers, selection, errors) should be verified in both modes.
+
+**Guideline**: `docs/UI_GUIDELINES.md` → Colors And Readability.
+
+**Audit result:** Both themes pass contrast review. Dark theme uses light text (192,202,245) on deep blue-black (26,27,38) — excellent contrast. Light theme uses dark text (76,79,105) on white — excellent contrast. Syntax colors are deep/saturated in both themes for readability. Intentionally subdued elements (gutter line numbers, VCS indicator blocks) have lower contrast by design to avoid distraction. Non-color cues are present: VCS uses colored block shapes (▎), errors use warning icon (⚠), status bar uses text labels + keyboard shortcuts, selections use cursor position + background color.
+
+### ~~P1: Shift+Alt+Left/Right should select by word, not column select~~ FIXED
+
+Alt+Left/Right moves by word. The expected behavior for Shift+Alt+Left/Right is word movement with selection (standard across most editors). Instead, it triggers column selection mode. Column selection needs an alternative keybinding.
+
+**Fix:** Removed all modifier-combo triggers for column selection from arrow handling. Column selection now works exclusively through toggle: press `⌥C` to enter column mode, then plain arrows extend the rectangular selection. Press `⌥C` or `Esc` to exit. In normal mode, arrows behave as standard: bare arrows move cursor, `Shift+Arrow` extends selection, `Alt+Left/Right` moves by word, `Shift+Alt+Left/Right` selects by word, `Alt+Up/Down` moves line. Also fixed a latent bug in `View::enter_column_mode` where `clear_selection()` was resetting `column_select` back to 0 (reordered so the flag is set after the clear). **Manual test:** `⌥C` then arrows → column rect selection shown in status bar as `COL RxC`. `Shift+Alt+Right` without column mode → word selection. `Esc` from column mode → exits column mode.
+
+### ~~P3: Add Shift+Ctrl+D for duplicate line up~~ WON'T FIX
+
+Ctrl+D duplicates the current line down. Shift+Ctrl+D should duplicate the line up — easy to remember since Shift is the "reverse direction" modifier.
+
+**Resolution:** Terminals cannot distinguish `Ctrl+D` from `Ctrl+Shift+D` — both send byte `0x04`. This is documented in `docs/UI_GUIDELINES.md`: "Do not depend on `Shift+letter` or `Ctrl+Shift+letter`." Duplicate-up already exists as `⌃U` (mnemonic: U=up) paired with `⌃D` (D=down). Both are visible in the command palette under DOCUMENT section.
+
+---
+
+## UI guideline audit bugs
+
+Bugs found by auditing the running UI against `docs/UI_GUIDELINES.md`.
+
+### ~~P1: Time-based temporary messages violate "no time-based messages" rule~~ FIXED
+
+**Guideline**: "No time-based temporary messages. Messages persist until user dismisses them or they are replaced by a newer message."
+
+Multiple status bar messages disappear after ~3 seconds with no user interaction:
+- "No change at cursor" (from Diff View toggle when no git changes)
+- "Nothing to undo" (from Ctrl+Z when undo stack is empty)
+- "Saved: README.md" (from Ctrl+S after successful save)
+
+These should persist until dismissed by the user or replaced by a newer message.
+
+**Fix:** Removed MESSAGE_DISPLAY_SEC timer. Messages now persist until the next user input clears them or a new message replaces them. **Decision:** Messages clear on any user input (keystroke or mouse) so the status bar returns to normal once the user takes any action.
+
+### ~~P1: Esc does not open command palette as final fallback~~ FIXED
+
+**Guideline**: "Esc priority: close palette, exit column mode, clear selection, collapse diff, open command palette (final fallback when nothing to cancel)."
+
+When nothing is open (no palette, no selection, no column mode, no diff), pressing Esc does nothing. It should open the command palette as the documented last-resort fallback.
+
+**Fix:** Added `cmd_open_palette()` call as the else-branch in the Escape key handler. Esc priority is now: exit column mode → clear selection → collapse diff → open command palette.
+
+### ~~P2: Inconsistent shortcut notation — `^O`/`^R`/`^C` vs `⌃O`/`⌃R`/`⌃C`~~ FIXED
+
+**Guideline**: "Use compact, single-glyph modifiers in UI labels: `⌃` for Ctrl, `⌥` for Alt, `⇧` for Shift, `␣` for Space. Use the same label format everywhere."
+
+The tab bar shows `^O` (caret notation) instead of `⌃O`. The Find bar shows `^R` and `^C` instead of `⌃R` and `⌃C`. The status bar and command palette correctly use `⌃` notation. These should all use the same compact glyph format.
+
+**Fix:** See "`^O` in fuzzy find search" fix above — same change covers all instances.
+
+### ~~P2: Powerline toggle has no keyboard shortcut~~ FIXED
+
+**Guideline**: "Every command has: a Nerd Font icon, a shortcut label, and a human-readable label."
+
+In the command palette, "Powerline" shows `[on]` with no keyboard shortcut. Every other toggle (Theme, Minimap, File Tree, Word Wrap, Column Mode, Diff View) has a shortcut. Powerline is only accessible via the command palette with mouse or arrow navigation.
+
+**Fix:** Added `⌥I` as the keyboard shortcut for Powerline toggle. Registered in CommandRegistry.pm (`shortcut => SYM_ALT . 'I'`) and handled in Editor.pm `handle_alt_char`. **Manual test:** Press ⌥I — should toggle Powerline on/off. Command palette should show `⌥I` next to Powerline.
+
+### ~~P2: Command palette has no section headers~~ FIXED
+
+**Guideline**: "Sections group commands in the palette: DOCUMENT, APP, NAVIGATE, TOGGLES."
+
+The palette displays a flat list of 30 commands with no visible section headings or separators. Commands are loosely grouped by category but there are no "DOCUMENT", "APP", "NAVIGATE", or "TOGGLES" labels. This hurts scannability for users looking for a specific category.
+
+**Fix:** When no filter query is active, section header rows are injected into the palette list (DOCUMENT, APP, NAVIGATE, TOGGLES). Headers render as dimmed label with horizontal rule fill. Arrow navigation skips headers automatically. Headers are removed when the user types a filter query (fuzzy matching only returns commands). **Manual test:** Open palette (⌃␣) — should see section headings. Type a letter — headers disappear. Backspace to clear — headers return.
+
+### ~~P2: Minimap does not drop off at narrow terminal widths~~ FIXED
+
+**Guideline**: "Layout adapts to constrained sizes using priority-based progressive disclosure: lower-priority status bar pills drop off first, then minimap, then file tree."
+
+At 25 columns the minimap is still visible and consumes roughly half the editor area. The file tree drops off correctly, but the minimap persists at all widths. Per the guideline, minimap should disappear before the file tree.
+
+**Fix:** Reversed the priority order in the layout calculation: tree width is now computed first (has priority to stay visible), minimap is computed second using remaining space. The minimap now correctly drops before the file tree at narrow widths. Updated in both Renderer.pm `render()` and Editor.pm word wrap width calculation. `get_minimap_width()` now accepts an optional `tree_width` parameter. **Manual test:** Open zepto, toggle file tree on, shrink terminal width — minimap should disappear first, then file tree.
+
+### ~~P2: File tree status bar hints are plain text, not pills~~ FIXED
+
+**Guideline**: "The status bar shows context-specific interactive pills. Every pill has: a Nerd Font icon, a label or value, a key shortcut — and is clickable."
+
+When the file tree is focused the status bar shows plain text hints (`↑↓ nav  ←→ fold  Enter open  / filter  Esc back`) instead of styled pills with icons, rounded shape, and consistent padding. This is a different visual treatment from the DOCUMENT-mode status bar.
+
+**Fix:** Replaced the plain text hint string with styled pills using the same rendering pattern as the document-context status bar. Each hint (↑↓, ←→ fold, ↵ open, / filter, Esc back) is now a separate pill with background color, rounded caps, and consistent padding. Pills drop off progressively if the terminal is too narrow. **Manual test:** Focus the file tree (⌃B) — status bar should show styled pills instead of plain text.
+
+### ~~P2: `⌃⇧↑`/`⌃⇧↓` (Duplicate Up/Down) uses Shift for non-selection purpose~~ FIXED
+
+**Guideline**: "Shift is only used with navigation keys to extend selection or reverse direction."
+
+Duplicate Up (`⌃⇧↑`) and Duplicate Down (`⌃⇧↓`) use Shift+arrow to duplicate lines, not to extend a selection or reverse a direction. This contradicts the documented Shift modifier policy.
+
+**Fix:** Changed duplicate line shortcuts to `⌃U` (duplicate up) and `⌃D` (duplicate down). Removed the `Ctrl+Shift+Arrow` bindings. Updated CommandRegistry.pm shortcut labels and Editor.pm keybindings. **Decision:** Chose `⌃U`/`⌃D` as mnemonic (U=up, D=down) and consistent with Ctrl+letter pattern. **Manual test:** Place cursor on a line, press ⌃D — should duplicate the line below. Press ⌃U — should duplicate above.
+
+### ~~P3: Command palette does not use multi-column layout at wide terminals~~ FIXED
+
+**Guideline**: "The palette adapts its layout (multi-column vs single-column) based on terminal width."
+
+At 160 columns the palette remains single-column with the same width as at 100 columns. No multi-column layout is ever triggered.
+
+**Fix:** Made palette width adaptive based on terminal width: 60 cols (standard), 80 cols at 120+ terminal width, 120 cols at 160+. Full multi-column layout was avoided as the 2D cursor navigation complexity outweighs the benefit. **Decision:** Single-column with wider box is simpler and still provides better use of space. **Manual test:** Open command palette at different terminal widths — palette should be wider at wider terminals.
+
+### ~~P3: Rename "Powerline" to "Nerd Font" throughout the codebase~~ FIXED
+
+The feature that toggles Nerd Font glyph rendering is called "Powerline" everywhere — command palette label, preference key, variable names, CLI flags, comments, docs, and tests. The correct term is "Nerd Font" (Powerline refers specifically to the status line plugin whose glyph range is a small subset of Nerd Fonts). Occurrences span:
+- **UI-visible**: command palette label (`Powerline`), `README.md` references, `UI_GUIDELINES.md`, `website/src/index.html`
+- **Preferences/config**: `powerline` pref key, `--no-powerline` CLI flag, `ZEPTO_POWERLINE` env var
+- **Code internals**: `Zepto::Chars` (`$_powerline_enabled`, `powerline_round_left/right`), `Zepto::Preferences` (`powerline`/`set_powerline`), `Zepto::CommandRegistry` (`toggle_powerline`), `Zepto::Editor::Commands` (`cmd_toggle_powerline`), `Zepto::Renderer` (many local `$powerline` variables and comments), `Zepto::Theme` (comments), `build.pl` (`$no_powerline`, `$powerline`)
+- **Tests**: `tests/chars.t`, `tests/renderer.t`, `tests/syntax_rendering.t`
+
+**Fix:** Renamed across all files: command palette label now says "Nerd Font", preference key is `nerd_font`, CLI flag is `--no-nerd-font` (with `--no-powerline` kept as backwards-compat alias), env var is `ZEPTO_NERD_FONT`, all internal variables/methods/comments updated. Also fixed a latent bug in Renderer.pm where `Zepto::Chars->get('powerline_round_left')` referenced a non-existent key (should be `round_left`). **Manual test:** Open command palette — should show "Nerd Font" not "Powerline". Run `./zepto --no-nerd-font` — should start without nerd font glyphs.
+
+### ~~P1: [Bug] Ctrl+O file open doesn't unfocus file tree~~ FIXED
+
+When launching zepto in directory mode (`./zepto .`), the file tree gets focus. After pressing Ctrl+O and selecting a file from the palette, focus remains on the file tree instead of transferring to the document. The status bar continues showing tree navigation hints instead of document editing pills.
+
+**Fix:** Added tree unfocus logic to `_load_file()` in Commands.pm. After opening a file, if the file tree is focused, `set_focused(0)` is called to transfer focus back to the document editor.
+
+### ~~P2: Markdown underscore emphasis renders inside identifiers~~ FIXED
+
+Text like `NF_CLOSE (\x{f00d}) duplicated NF_TIMES` renders the substring between underscores as italic. Per CommonMark spec, `_` emphasis delimiters must not be intraword — an opening `_` must not be preceded by an alphanumeric character, and a closing `_` must not be followed by one. Only `*` allows intraword emphasis.
+
+**Fix:** Split the combined `(\*|_)` emphasis regexes in Markdown.pm into separate `*` and `_` branches. The `_`, `__`, and `___` branches now check that the character before the opening delimiter and after the closing delimiter are not `\w` (word characters), matching CommonMark's intraword restriction. `*` branches remain unrestricted.
+
+### ~~P2: [Bug] Binary files should not be previewed or naively opened~~ FIXED
+
+Binary files (images, executables, .o files, etc.) currently get previewed in the file tree and can be opened as a tab, displaying garbage. Preview should detect binary content (e.g. NUL bytes in the first few KB) and show a "Binary file — cannot preview" message instead. Opening a binary file should show a read-only notice rather than dumping raw bytes into an editable buffer.
+
+**Fix:** Added `_is_binary_file()` check in `Document::load()` that reads the first 8KB of raw bytes and looks for NUL characters. Binary files load a placeholder "(Binary file — size)" instead of the actual content. Insert and delete operations are blocked on binary documents. Save is blocked with "Cannot save binary file" error. Tree preview shows the placeholder. Pressing Enter on a binary file in the tree shows "Binary file — read only" status message. Added `_format_file_size()` helper for human-readable sizes.
+
+### ~~P2: [Feature] Render images in terminal via Kitty graphics protocol~~ FIXED
+
+On terminals that support the Kitty graphics protocol (e.g. Ghostty, Kitty), previewing or opening an image file (PNG, JPEG, GIF, BMP, SVG, etc.) should render the image inline in the terminal instead of showing binary garbage or a "cannot preview" message. Detect protocol support via the `TERM`/`TERM_PROGRAM` env var or a DA1/graphics query. Fall back gracefully to a text placeholder on unsupported terminals.
+
+**Fix:** Added Kitty graphics protocol support to Terminal.pm: `supports_kitty_graphics()` detects support via `TERM_PROGRAM` (ghostty, kitty) and `TERM`/`KITTY_WINDOW_ID` env vars. `kitty_display_image()` transmits PNG/JPEG images using chunked base64 APC escape sequences (4096-byte chunks). `kitty_clear_image()` clears specific or all images. Image files are detected by extension (png, jpg, jpeg, gif, bmp, webp, svg, ico, tiff) on binary files. Editor renders images in the text area after the regular frame, with caching to avoid re-transmission when image/size hasn't changed. Images are cleared on tab switch and editor cleanup. Uses MIME::Base64 (Perl core module). Falls back to "(Image file — size)" placeholder on unsupported terminals.
+
+### ~~P2: Syntax highlighting doesn't activate after Save As on new file~~ FIXED
+
+Creating a new file and using Save As with a file extension didn't activate syntax highlighting.
+
+**Fix:** Added `$self->active_highlighter()->set_file($filename)` in the Save As callback in `Commands.pm:65`, triggering grammar detection for the new filename. Added regression test.
+
+### ~~P1: File picker (`⌃O`) doesn't find untracked files~~ FIXED
+
+The Open File picker only showed git-tracked files. Untracked files (new images, scratch files) were invisible.
+
+**Fix:** Added a second `git ls-files --others --exclude-standard` call in `FileTree::_build_all_files_list()` alongside the existing `git ls-files` for tracked files. Both results are combined. The two commands produce non-overlapping sets by design (tracked vs untracked-but-not-ignored).
+
+### ~~P1: Native terminal paste (Cmd+V) causes cascading indentation~~ FIXED
+
+When pasting multiline text from an external program using the terminal's native paste (Cmd+V), each line got progressively more indented due to auto-indent compounding.
+
+**Fix:** Enabled bracketed paste mode. Added `enable_bracketed_paste()` / `disable_bracketed_paste()` to Terminal.pm (using the existing PASTE_MODE_ON/OFF constants). Added `paste_start` / `paste_end` key event detection in InputParser.pm for `\x1b[200~` / `\x1b[201~` sequences. Editor.pm tracks `_bracketed_paste` flag — `do_enter()` skips auto-indent while the flag is set. Added tests for both the escape sequence parsing and the auto-indent suppression.
+
+### ~~P1: Pasting from system clipboard corrupts Unicode characters~~ FIXED
+
+When pasting text containing non-ASCII characters (accented characters, CJK, emoji) via `⌃V`, the characters appear corrupted — multi-byte UTF-8 sequences are treated as individual bytes instead of proper characters.
+
+**Root cause:** `paste_from_clipboard()` in `Terminal.pm:539-554` reads raw bytes from the clipboard command pipe (`pbpaste`, `xclip`, etc.) with no UTF-8 decoding. The copy direction (`copy_to_clipboard()`) correctly uses `utf8::encode()`, but the paste direction had no corresponding decode.
+
+**Fix:** Added `binmode($fh, ':raw')` on the clipboard read pipe and `utf8::decode($text)` on the returned string, matching the encode/decode symmetry with `copy_to_clipboard()`. Added test verifying UTF-8 round-trip through the system clipboard (box drawing, emoji).
+
+### ~~P1: Clicking previewed file content dismisses it instead of opening it~~ FIXED
+
+When launching zepto with no args, clicking a file in the tree shows a preview. Clicking the previewed content in the main editor area dismissed the preview instead of confirming it.
+
+**Fix:** Changed the document-area click handler in `handle_mouse_event()` to check for `preview_active` on the tree. When a preview is active, the click now confirms the preview (initializes VCS, cleans up preview state, closes empty untitled pre-preview tab) instead of calling `_tree_unfocus()` which cancelled it. Added regression test.
+
+### ~~P2: [Bug] YAML syntax highlighting matches literals inside bare words~~ FIXED
+
+In YAML files, substrings like `on`, `no`, `off` were incorrectly highlighted as keyword literals when inside unquoted bare words (e.g. `region`, `information`).
+
+**Fix:** Added a bare word consumer rule `[a-zA-Z_][a-zA-Z0-9_.-]*` before the `$pos++` fallback in `Syntax/YAML.pm`. This consumes entire bare words in one go, preventing the tokenizer from creating substrings that partially match literals. Standalone literals (`on`, `true`, `false`) are still correctly matched since the `$LITERALS` check comes earlier. Regenerated YAML expected tokens. Added regression tests.
+
+### P3: [Feature] Inline image rendering in Markdown preview — SKIPPED
+
+On Kitty-protocol-capable terminals (e.g. Ghostty, Kitty), Markdown files containing image references (`![alt](path)`) should render the referenced images inline when the file is being previewed or edited. Images should be rendered at a reasonable size within the text flow. Fall back to showing the Markdown syntax as-is on unsupported terminals.
+
+**Skipped — requires significant renderer architecture changes. Inline images interleaved with text need: (1) Markdown parser extension for `![alt](path)` tokens, (2) image row height calculation that displaces subsequent text rows, (3) per-image Kitty graphics ID management for multiple images on screen, (4) scroll-aware image repositioning. The P2 Kitty graphics fix handles whole-file image tabs, but inline images in flowing text is architecturally different. Recommend as a separate dedicated feature.**
+
+### ~~P0: [Crash] Copying double-width characters crashes editor~~ FIXED
+
+Copying text containing double-width characters (CJK, emoji) crashes with `Wide character in subroutine entry`. Reported crash in `copy_to_clipboard` when base64-encoding wide character strings for OSC 52.
+
+**Root cause:** `MIME::Base64::encode_base64()` expects raw bytes, but `copy_to_clipboard()` passed Perl's internal wide-character strings directly. The pipe write to clipboard commands (`print $pipe $text`) had the same issue.
+
+**Fix:** Added `utf8::encode()` to convert wide-character strings to UTF-8 bytes before passing to `encode_base64()` and the clipboard pipe. Added `binmode($pipe, ':raw')` on the clipboard command pipe. Added tests for CJK characters and emoji.
+
+---
+
+## Scorecard audit bugs (2026-03-06)
+
+Bugs found by running `/scorecard` codebase audit.
+
+### ~~P2: [Bug] `_char_to_visual_col()` doesn't handle wide characters~~ FIXED
+
+`Renderer.pm:224` — increments `$visual_col` by 1 for all non-tab characters instead of calling `_char_display_width()`. Cursor positioning is wrong for lines containing CJK or emoji characters.
+
+**Fix:** Replaced `$visual_col++` with `$visual_col += _char_display_width($char)` in both `_char_to_visual_col()` and `visual_to_char_col()`. Both functions now correctly handle CJK characters (width 2) and emoji. Added 15 tests covering CJK, emoji, and mixed ASCII+wide content in both directions.
+
+### ~~P2: [Security] Symlink traversal in FileTree and FilePicker~~ FIXED
+
+`FileTree.pm:123-547`, `FilePicker.pm` — `-d` and `-f` operators follow symlinks without `realpath()` bounds checking. A symlink inside the project directory could point outside the project root (e.g. `/etc/passwd`).
+
+**Fix:** Added `_path_within_root()` helper to FileTree.pm that resolves symlinks via `Cwd::realpath()` and verifies the resolved path starts with the root. Applied to both `_scan_dir_one_level()` and `_walk_for_files()`. FilePicker.pm gets the same check in its `_discover_files()` walk. Root paths are resolved with `realpath()` at construction time. Symlinks that stay within the project root are preserved. Added test with escape symlink and safe symlink.
+
+### ~~P2: [Security] ReDoS protection is length-only, no timeout~~ FIXED
+
+`FindEngine.pm:455`, `FileSearchEngine.pm:296` — user regex patterns are compiled via `eval { qr/$pattern/ }` with a 1000-character length limit but no execution timeout.
+
+**Fix:** Added `alarm(1)` (1-second SIGALRM) timeout around regex compilation in both `FindEngine::_compile_regex()` and `FileSearchEngine` startup. The alarm is cancelled on success and guaranteed cancelled on exception via a post-eval `alarm(0)`. Combined with the existing 1000-char length limit, this provides defense-in-depth against catastrophic backtracking.
+
+### ~~P2: [DRY] Truncate-with-ellipsis duplicated 7+ times~~ FIXED
+
+`Renderer.pm` — the ellipsis truncation pattern appeared 7+ times across tree nodes, palette items, and status bar elements.
+
+**Fix:** Extracted `_ellipsis($str, $max_width, $mode)` helper supporting both end-truncation (default) and start-truncation (`'start'` mode). Replaced 5 of 7 occurrences — 2 remain where the truncation is interleaved with other calculations (`$trim_offset` tracking, `$ELLIPSIS` constant in progressive tab name truncation).
+
+### ~~P3: [Bug] Scrollbar thumb boundary inconsistency~~ FIXED
+
+`Renderer.pm` — one scrollbar rendering path used `<` (exclusive) while another used `<=` (inclusive) for `thumb_end`.
+
+**Fix:** `thumb_end` is computed as `thumb_start + thumb_size - 1` (inclusive), so `<=` is correct. Changed the filter-flat tree scrollbar path to use `<=` to match the normal tree path.
+
+### ~~P3: [Tests] Tautological test in terminal.t~~ FIXED
+
+`terminal.t:346` — `ok(1, 'Kitty graphics detection exists')` always passed regardless of actual behavior.
+
+**Fix:** Replaced with actual assertion: calls `supports_kitty_graphics()` and verifies it returns a defined 0/1 value. Note: `syntax_samples.t:120` and `syntax_samples.t:195` use `pass()` inside conditional branches (with `fail()` on the other branch) and are NOT tautological — the audit agent misidentified them.
+
+### ~~P3: [Tests] Config.pm has no dedicated test~~ FIXED
+
+`Config.pm` had implicit coverage through Document loading but no direct test file.
+
+**Fix:** Added `tests/config.t` with 5 subtests covering `skip_directories()`, `skip_directories_hash()`, `max_files()`, `max_depth()`, and `picker_visible_rows()` — verifying both return types and default values.
+
+### ~~P3: [Tests] Missing coverage for complex interactions~~ PARTIALLY FIXED
+
+Palette header-skipping navigation now tested (5 new subtests in command_palette.t). WrapMap invalidation already well-covered (wrapmap.t:269-406). Mouse coordinate mapping and file tree preview→open→tab transitions skipped — require full integration test setup, not suitable for bug bash.
+
+### ~~P3: [Documentation] TabManager.pm missing from DESIGN.md module inventory~~ FIXED
+
+`DESIGN.md` module table omitted `TabManager.pm` and `FilePicker.pm`.
+
+**Fix:** Added both TabManager and FilePicker to the Module Responsibilities table in DESIGN.md.
+
+### ~~P2: [Bug] Light mode: tab bar stays dark after theme switch~~ FIXED
+
+Switching from dark to light mode with `⌃T` leaves the tab bar rendered with dark theme colors. The tab bar appears visually dark against the light editor background.
+
+**Root cause:** The tab bar cache in `Renderer.pm` (line ~722) builds its cache key from `$cols`, `$tree_width`, `$active_idx`, tab count, and per-tab state (display name, dirty flag, VCS changes) — but does not include the current theme. When the user toggles themes, the cache key is unchanged, so `_tab_bar_cache_get()` returns the stale dark-themed rendering.
+
+**Fix:** Added `$theme->name()` as the first component of the tab bar cache key. Theme changes now cause a cache miss, triggering a full re-render with the correct theme colors. Added regression test verifying dark and light theme tab bars produce different output.
+
+---
+
+## TUI usability testing bugs (2026-03-23)
+
+Bugs found during hands-on TUI usability testing via tmux session.
+
+### ~~P1: [Usability] Enter in Find mode triggers Replace All — no separate find-only mode~~ FIXED
+
+When opening Find with `⌃F`, the Replace field was always visible and pressing Enter always executed Replace All.
+
+**Fix:** Restored find-only vs find-and-replace mode distinction per the spec. `⌃F` now opens find-only mode (no Replace field). Enter dismisses find and keeps cursor on current match. Tab activates the Replace field. Only when in Replace mode does Enter trigger Replace All. Added `↑↓` navigation hint to match count display. Added "Find and Replace" as separate command in palette. Updated renderer to conditionally show/hide Replace field and adjusted all click region calculations.
+
+### ~~P2: [Bug] Auto-pair quote skip-over is disabled — typing closing quote adds duplicate~~ FIXED
+
+Typing `"hello"` produced `"hello""` because quote skip-over was explicitly disabled.
+
+**Fix:** Removed the `!_is_quote($char)` exclusion from the skip-over logic. For quotes, uses an odd-count heuristic: counts occurrences of the same quote character before the cursor on the current line. If the count is odd (cursor is inside an unclosed string), the closing quote is skipped over. If even (cursor is outside a string), a new quote is inserted normally. Brackets continue to always skip over.
+
+### ~~P2: [Usability] Find bar text field doesn't clear or select-all on reopen~~ FIXED
+
+Reopening `⌃F` kept previous text but didn't select it, requiring manual deletion before typing a new search.
+
+**Fix:** `enter_find_mode()` now pre-selects all text in the find widget when reopening with a previous search term. Typing immediately replaces the selection (like VS Code).
+
+### ~~P3: [Cosmetic] Find bar "$0" label: shown when regex off, and capture group replacement not discoverable~~ PARTIALLY FIXED
+
+`$0` label appeared even when regex mode was off and there were no capture groups.
+
+**Fix:** Capture group hints (`$0 $1 $2...`) now only appear when regex mode is ON AND the search pattern contains capture groups. Updated both the cursor positioning code and `_render_find_bar` in Renderer.pm. The hints use color-coded `$N` tokens matching the capture group colors in the find input. **Remaining:** A more explicit tooltip explaining how to use `$1` in the replace field would improve discoverability further.
+
+### ~~P2: [Usability] Right arrow accepts entire ghost text completion — unexpected behavior~~ FIXED
+
+Right arrow accepted the entire ghost text suggestion at once, which was unexpected (VS Code dismisses ghost text on Right arrow).
+
+**Fix:** Changed Right arrow from accepting the entire ghost text to accepting one character at a time (like GitHub Copilot). Added `accept_char()` method to `Completion::Controller` that advances the prefix by one character while keeping the ghost active for the remaining text. When the last character is accepted, the completion is dismissed and recorded for RecentProvider. Tab continues to accept the full suggestion.
+
+### ~~P3: [Usability] Ghost text completion does not re-trigger after undo~~ FIXED
+
+After accepting ghost text and pressing `⌃Z` to undo, the ghost text did not reappear.
+
+**Fix:** Added `_retrigger_completion_if_word()` helper that checks if the cursor is at a word character and sets `_completion_pending_at` to trigger the debounced completion. Called after both `cmd_undo()` and `cmd_redo()`. Ghost text now reappears after undo if the cursor position warrants it.
+
+### ~~P0: [Bug] Perl warning on undo/redo near end-of-line~~ FIXED
+
+`Use of uninitialized value $char_before in pattern match` printed to stderr after undo when cursor was at/past the line length boundary.
+
+**Root cause:** `_retrigger_completion_if_word()` did not check that the cursor column was within the actual line length before calling `substr()`.
+
+**Fix:** Added `return unless $col <= length($line)` guard and `defined $char_before` check.
+
+### ~~P2: [Bug] history.json recent_files cluttered with temp files~~ FIXED
+
+`_track_recent_file` in Editor.pm records every file opened — including temp files from test runs (`/tmp/...`, `/private/tmp/...`). The recent files list (max 50) gets filled with ephemeral files that no longer exist, pushing out real files.
+
+**Fix:** Added early return in `_track_recent_file()` for paths matching `/tmp/`, `/private/tmp/`, and `/var/folders/` (macOS per-user temp). Added regression test. Updated existing tests to use non-temp paths.
+
+### ~~P2: [Bug] Screen artifacts remain above cursor position after quitting~~ FIXED
+
+When quitting zepto (`⌃Q`), everything above the cursor's vertical position remains visible on the terminal — the upper portion of the editor's alternate screen buffer content bleeds into the main screen.
+
+**Root cause:** `leave_alt_screen()` in Terminal.pm only sent `ALT_SCREEN_OFF` (`\x1b[?1049l`). Some terminals don't fully restore the main screen buffer from the saved state, leaving alternate screen content visible.
+
+**Fix:** Added `CLEAR_SCREEN` + `CURSOR_HOME` before `ALT_SCREEN_OFF` in `leave_alt_screen()`. This clears the alternate screen buffer before switching back to the main screen, so even terminals with imperfect `?1049l` handling show a clean exit.
+
+### ~~P2: [Tests] diff_constraint.t spews debug output to console~~ FIXED
+
+`tests/diff_constraint.t` prints `# Added: [...]`, `# Modified: [...]`, `# Deleted: [...]` lines to stdout during `make test`. These are debug/diagnostic prints left in the test, not TAP comments. They produce ~99 noise lines in the test output, making it harder to spot real issues.
+
+**Fix:** Guarded the three `diag()` calls behind `$ENV{VERBOSE}`. Debug output now only appears when running with `VERBOSE=1 prove -v tests/diff_constraint.t`.
+
+### ~~P1: [Bug] Undo of move-line corrupts buffer~~ FIXED
+
+Moving a line with `⌥↓` or `⌥↑` then pressing `⌃Z` to undo corrupts the buffer — only one line remains visible, others disappear. Root cause: `_move_lines()` performs delete + insert as two separate undo actions; undoing only reverses the insert, leaving the delete in place.
+
+**Fix:** Wrapped the delete and insert calls in `_move_lines()` with `$doc->begin_undo_group()` / `$doc->end_undo_group()` so the entire move is one atomic undo operation. QA-LINE-009 unskipped.
+
+### ~~P2: [Bug] File tree Page Down/Up and Home/End don't trigger preview~~ FIXED
+
+In the file tree, pressing Page Down, Page Up, Home, or End moves the cursor but doesn't show the preview of the newly highlighted file. Regular Up/Down arrows do trigger preview correctly. The `pageup`/`pagedown`/`home`/`end` handlers in `handle_tree_event()` (`Editor.pm:4215-4218`) call the tree navigation methods but omit `$self->_tree_preview_current()` which Up/Down include.
+
+**Fix:** Added `$self->_tree_preview_current()` to all four handlers. QA-TREE-024 and QA-TREE-025 verify the fix.
+
+---
+
+## Repo audit / hygiene bugs (2026-07-09)
+
+Bugs found during a repo-wide hygiene and quality audit (Phase 0). Filing only — fixes deferred to Phase 2.
+
+### ~~P1: Mouse drag above first visual row in word-wrap mode jumps selection/view to end of document~~ FIXED
+
+With word wrap enabled, dragging the mouse above the first visible row (e.g. dragging a selection upward past the top of the viewport) jumps the selection/view to the *end* of the document instead of extending toward the start. `WrapMap::visual_to_doc` (`WrapMap.pm:386-393`) returns the last document line whenever `segment_at_visual_row($vrow)` fails to find a segment — which happens both when `$vrow` is beyond the last row (correct) and when `$vrow` is negative, i.e. above the first row (incorrect: should clamp to line 0, col 0). Any caller that passes a negative vrow during an upward drag inherits this failure.
+
+**Fix:** `WrapMap::visual_to_doc` now explicitly checks `$vrow < 0` and clamps to `(0, 0)` before falling through to the "beyond document" last-line clamp. Added unit tests in `tests/wrapmap.t` for negative and large-negative vrow. `qa/scripts/tier1/ms_022_drag_above_viewport.sh` converted from an adaptive skip to a hard `qa_assert_cursor_at "1:1"` regression assertion. `qa/pixel/tests/mouse.spec.js`'s `test.fixme` activated to a real `test`.
+
+### ~~P2: Ghost completion renders offset from cursor in wrapped/markdown lines~~ FIXED
+
+Inline ghost-text completion is anchored to the end of wrap-segment-0 content and rendered by character count rather than display width. In `Renderer.pm` (~2531-2544), the fill/ghost-text render path guards on `!$is_wrap_cont`, so on a wrapped line the ghost text only renders in the fill area after the *first* visual segment, not necessarily after the actual cursor position if the cursor has moved into a later wrap segment. Combined with `length($ghost)` / `substr($ghost, 0, $fill_remaining)` truncation using character counts instead of display-width-aware truncation, wide characters (CJK, emoji) or Markdown-rendered lines (table cells, etc.) cause the ghost suggestion to visually land in the wrong column, offset from where the cursor actually is.
+
+**Fix:** Root cause confirmed by direct repro: a line wrapped into 4 segments with the cursor at the document line's true EOL (landing on segment 3) rendered the ghost text on segment 0's row instead ("alpha beta GHOS..." on row 2 instead of "...eta thetaGHOST..." on row 5). `Renderer.pm`'s ghost-render branch (~2532-2565) now gates on "does THIS row's wrap segment actually contain the cursor" (comparing `$entry->{col_start}`/`{col_end}` against the cursor's char column, with the last-segment special case for true EOL) instead of `!$is_wrap_cont`, so the ghost renders on whichever visual row the cursor is actually on. Truncation now uses `_truncate_to_display_width()` (terminal columns) instead of `length()`/`substr()` (character count), fixing overflow with wide CJK/emoji ghost suggestions. Unit tests added in `tests/renderer.t`: wrapped line with cursor on a continuation row (verified failing before the fix — ghost leaked onto segment 0 — and passing after), and a wide-CJK-character truncation test (verified the old code let a too-wide ghost render whole, overflowing its fill area).
+
+### ~~P1: cmd_transform open3 sequential-slurp can deadlock/hang UI indefinitely~~ FIXED
+
+`cmd_transform` in `Editor/Commands.pm` (~1006-1018) pipes buffer content through a user shell command via `IPC::Open3::open3`, then reads stdout and stderr sequentially: `$output = <$out_fh>; $stderr_text = <$err_fh>;` with no `select()`/`IO::Select` loop and no timeout. If the child process writes enough to stderr to fill its pipe buffer before the stdout read completes (or vice versa — e.g. a command that alternates output and interleaves large stderr output), both processes can block forever: the child blocks writing to a full stderr pipe, and the parent blocks waiting to finish reading stdout before it ever reads stderr. There is no way to cancel or time out, so the whole UI hangs indefinitely. The same pattern (blocking pipe I/O with no timeout) also affects clipboard pipe helpers and render-path git invocations elsewhere in the codebase — worth a broader audit, not just this call site.
+
+**Fix (all three sites, Phase 2):**
+- **`cmd_transform`** (`lib/Zepto/Editor/Commands.pm`): replaced `IPC::Open3::open3` + sequential blocking reads with `_run_shell_pump()` — a manual fork (not open3, to get a pre-exec hook) with three pipes, non-blocking I/O via `IO::Select`, and a hard wall-clock timeout (default 10s, `ZEPTO_TRANSFORM_TIMEOUT` env-overridable — needed by the Phase 2 hang-watchdog QA test). On timeout the child is killed with TERM then KILL, a "Transform timed out" status message is shown, and the buffer is left unchanged. The child is put in its own process group (`setpgid(0,0)`) before exec and killed by process group, not just by pid — `sh -c $cmd` can spawn a pipeline of its own children (e.g. `sort | uniq`) that would otherwise be orphaned and keep running after the immediate `sh` was killed (verified live: without the group-kill, a `sh -c 'sleep 30 & wait'`-style pipeline left an orphaned `sleep` process running after "timeout" was reported).
+- **Clipboard** (`lib/Zepto/Terminal.pm` `copy_to_clipboard`/`paste_from_clipboard`): wrapped the external clipboard command I/O in an alarm-based timeout (3s). Same process-group kill treatment. Found and fixed a subtle ordering bug during testing: the timeout cleanup originally called `close($fh)` before killing the child — `close()` on a pipe filehandle blocks waiting for the child to exit, so closing before killing silently re-introduced the exact hang the timeout was meant to prevent. Kill-then-close is now enforced at both clipboard call sites and in `VCS::Git::_run_git`.
+- **VCS git calls** (`lib/Zepto/VCS/Git.pm` `_run_git`, reachable from the render path via status-bar/gutter VCS markers): same alarm-based timeout (3s) and process-group kill. On timeout, returns `(undef, -1)` — the same "spawn failed" sentinel `_run_git` already used, which every existing caller was already guarding against — and caches the failure for 5s so a wedged git isn't retried (and re-blocked-on) every render tick.
+
+Unit tests: `tests/transform.t` (fast path, stderr-heavy deadlock repro, >64KB bidirectional round-trip, timeout + orphaned-grandchild-process repro, `cmd_transform` integration via the editor object), `tests/terminal.t` (clipboard command timeout, both directions), `tests/vcs.t` (`_run_git` timeout + failure-cache). All verified failing before the fix and passing after. QA-XFM-014 added for interactive/tier1 coverage of the transform hang recovery; interactive `hangon` verification confirmed the editor recovers and remains fully responsive (not just unfrozen-but-wedged) after a hung transform.
+
+**Security review flag (Rule 4):** all three fixes touch shell-exec / process-management code paths (transform's `sh -c $cmd`, clipboard external commands, git invocation). No new shell interpretation was introduced — `_run_shell_pump` still execs `sh -c $cmd` exactly as before (the shell interpretation there is intentional/by-design for the transform feature, unchanged), and the clipboard/git paths remain list-form `exec()` with no shell involved, same as before. The only behavioral additions are: non-blocking I/O, a hard timeout, and killing the process group instead of just the immediate pid.
+
+Requested an independent security review of these three sites; verdict was **safe to ship**, plus four findings, three addressed:
+- **[Medium, availability] FIXED** — the success-path tail at all three sites (and the hang-watchdog's diagnostic log write) did a bare, unbounded `waitpid($pid, 0)` / `close($fh)` after seeing EOF on the read side. Reaching EOF does NOT guarantee the process itself has exited (e.g. a daemonizing clipboard helper, a git pager/credential-helper still attached, or a transform script that closes its own stdout/stderr fds and keeps running) — this silently reintroduced the exact class of hang the whole fix exists to prevent, just moved to the "success" path. Fixed with a shared `_bounded_reap($pid, $grace)` helper (added independently to `Commands.pm`, `Terminal.pm`, and `VCS/Git.pm`): wait up to `$grace` seconds for a natural exit, then escalate to TERM/KILL + process-group signal, same as the existing timeout-path logic. Found and fixed a follow-on bug while doing this: `VCS::Git::_run_git`'s success path read `$?` *after* `close($fh)`, but `close()` on an `open($fh,'-|')`-style filehandle does its own internal `waitpid` — since `_bounded_reap` already reaped the child, that internal reap failed (ECHILD) and clobbered `$?`, making every successful git call falsely report a non-zero exit status. Fixed by capturing `$?` immediately after `_bounded_reap`, before `close()`. New regression test in `tests/transform.t` ("Success path: process that closes its pipes but lingers does not hang the pump" — verified hanging indefinitely with the old bare `waitpid`, bounded to ~2s with the fix).
+- **[Low] FIXED** — the hang-watchdog's diagnostic log (`HangWatchdog.pm`) wrote the heartbeat tag verbatim, which can contain arbitrary user-typed text (e.g. `"transform:$cmd"` for a shell transform command) — an embedded ANSI/OSC escape sequence would reach a human's terminal unneutralized if they later `cat`'d the log, which `docs/SECURITY.md` flags as a rule ("terminal escape sequences ... must be stripped or neutralized before display"). Fixed with `HangWatchdog::_sanitize_tag()`, stripping C0 controls + DEL before the tag is written. Regression test added to `tests/hang_watchdog.t`.
+- **[Low] not fixed, flagging** — `eval { POSIX::setpgid(0, 0) }`'s return value is never checked at any of the three sites; a silent failure would make the negative-pid group-kill a harmless no-op (child stays in the parent's process group, not its own) rather than a security risk, but is cheap to close by checking the return value in a future pass.
+- **[Low] not fixed, flagging** — `_run_shell_pump`'s `pipe()`/`fork()` failure path doesn't close already-successfully-opened pipe fds before returning `spawn_error`; only reachable near fd exhaustion, low practical impact.
+
+Independently discovered while making the tests for this fix fast (see "no sloppy assumptions"): core Perl `alarm()` truncates to an integer and `alarm(0)` means "cancel" — a fractional `ZEPTO_GIT_TIMEOUT`/`ZEPTO_CLIPBOARD_TIMEOUT` (used to keep `tests/vcs.t`/`tests/terminal.t` fast) would have silently never fired, hanging the test suite indefinitely on the very timeout mechanism being tested. Fixed by importing `Time::HiRes::alarm` (fractional-second-capable) in both `VCS/Git.pm` and `Terminal.pm` instead of relying on core `alarm()`.
+
+### ~~P2: Mouse events never dismiss active ghost completion; stale suggestion re-renders at new cursor position~~ FIXED
+
+Ghost-text completion is dismissed by various keyboard actions (see the P3 "re-trigger after undo" fix history above) but mouse clicks and drags are never checked. Clicking or dragging the mouse to reposition the cursor while a ghost suggestion is showing leaves the stale suggestion in `Completion::Controller` state; on the next render it reappears anchored to the new cursor position, showing a completion that was computed for a different location/context than where the cursor now is.
+
+**Fix:** Added `Editor::_dismiss_ghosts_for_mouse`, called from both the mouse press and mouse drag text-area code paths in `handle_mouse_event`. It dismisses word completion (`Completion::Controller::dismiss`, when `is_active()`) and AI ghost (`AIComplete::dismiss`, when `has_result()`) the same way key handling already did. Root cause confirmed interactively: `Completion::Controller::state_for_render()` renders the ghost suffix at whatever the *current* cursor position is (it never anchors/validates against where the ghost was triggered), so an undismissed ghost reappeared glued onto unrelated text at the new cursor location — e.g. clicking to the end of an unrelated line rendered that line's text with the stale suggestion appended. QA test `ms_023_ghost_dismiss.sh` reproduces this exact glued-suffix symptom (verified failing before the fix, passing after).
+
+---
+
+## QA test harness bugs (Phase 1, 2026-07-10)
+
+Bugs found while rewriting tautological QA assertions to check real product
+behavior (see `qa/KNOWN_WEAK_TESTS.md` for the broader weak-test sweep).
+
+### ~~P1: [Testing] QA script created a git repo without a local git identity, breaking on fresh CI runners~~ FIXED
+
+`qa/scripts/tier1/file_014_save_vcs_gutter.sh` ran `git init` + `git add` + `git commit` directly without ever setting `git config user.email`/`user.name`. It happened to pass in this dev environment (which has a global git identity already configured) but fails on any runner without one — reported from a fresh GitHub Actions runner as `git commit` exit 128, "Author identity unknown / Please tell me who you are". Every *other* QA script that creates a git repo either sets local identity inline or goes through the `qa_git_repo()` helper (which already does), so this was an isolated gap, not a systemic pattern — audited via `grep -l "git commit"` across `qa/scripts` and `tests/*.t`.
+
+**Fix:** Added `git config user.email "test@test.com"` / `git config user.name "Test"` right after `git init` in file_014, matching the established pattern used everywhere else. Verified by running the script with `HOME` pointed at a fresh empty temp dir and no `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env vars set — passes. See QA-REG-103.
+
+### ~~P1: [Bug] Column paste silently does nothing when pasted rows extend past end of document~~ FIXED
+
+`_column_paste` in `Editor/Commands.pm` (~507-509) walks target lines bottom-to-top (`reverse 0 .. $num_target_lines - 1`) and used `last if $target_line >= $doc->line_count()` to stop once a row fell past the end of the document. Because the loop visits the *bottom-most* row first, hitting one out-of-bounds row aborted the entire paste before any of the valid, higher rows were ever processed — e.g. column-copying 3 rows and pasting at the very last line of the document pasted nothing at all (status bar still claimed "Pasted (column)"). Found via QA-CLIP-007 and QA-COL-004, both of which paste a multi-row column onto the document's last line and were previously asserting on unrelated, always-present text (their original row 1-3 content) so this silent no-op went undetected.
+
+**Fix:** Changed `last` to `next` so an out-of-bounds row is skipped, not treated as a stop condition, letting the remaining in-bounds rows still get pasted. QA-CLIP-007 and QA-COL-004 now assert on the saved file's mutated line-4 content instead of tautological screen greps.
+
+### ~~P2: [Bug] Tab bar corner triangles (◢/◣) ignored --no-nerd-font~~ FIXED
+
+QA-CLI-007 (`--no-nerd-font disables nerd font icons`) was failing: the tab bar's pill-shaped tab edges (`◢` U+25E2 and `◣` U+25E3 in `Renderer.pm`'s `render_tab_bar`) were hardcoded constants that never checked `Zepto::Chars->enabled()`, unlike every other decorative glyph in the file (e.g. the tab-scroll arrow a few lines above them, which already does `Zepto::Chars->enabled() ? "\x{25c2}" : '<'`). So `--no-nerd-font` (and `ZEPTO_NERD_FONT=0`) left these two glyphs showing regardless. File tree icons were already correctly routed through `Zepto::Chars->file_icon()` and its ASCII bullet fallback — only the tab bar edges were unfallback'd.
+
+Separately, the QA-CLI-007 test's own PUA detector was a raw *byte*-range regex (`[\xEE\x80-\xEF\xA3]`) that matched almost any multi-byte UTF-8 lead/continuation byte, not just the Private Use Area — it would false-positive on unrelated Unicode symbols the editor intentionally keeps even in ASCII-fallback mode (•, ×, ←, →, ⌃, ⌥, ␣), and (being byte-range, not code-point-range) wasn't even guaranteed to correctly bound true PUA either.
+
+**Fix:** Added `tab_edge_left`/`tab_edge_right` entries to `Chars.pm`'s fallback table (`◢`→`/`, `◣`→`\`) and routed the tab bar through `Zepto::Chars->get(...)` instead of hardcoding. Also added the nerd-font-enabled flag to the tab bar's render cache key (`Renderer.pm` `render_tab_bar` cache_key) since the cache previously didn't vary with it and would otherwise serve stale glyphs after a runtime nerd-font toggle. Rewrote QA-CLI-007's detector to decode the screen as UTF-8 and check real code points (`\x{E000}-\x{F8FF}`, plus `\x{25E2}`/`\x{25E3}` explicitly as a regression guard even though they're technically outside the PUA block). See QA-REG-102.
+
+### ~~P0: [Testing] hangon/tmux env laundering silently broke ALL per-test state isolation — the real root cause of edit_020/ms_012 flakiness~~ FIXED
+
+`hangon`'s tmux backend spawns the target command via `tmux new-session -d -s NAME CMD` with **no environment forwarding** (`backend_process.go` in joewalnes/hangon). tmux gives new panes the tmux **server's** environment — captured once, when the first-ever hangon invocation started the server — not the calling process's. Verified empirically: `export ZEPTO_STATE_DIR=/tmp/my_fresh_dir; hangon start ... sh -c 'env | grep ZEPTO'` printed a *stale* `ZEPTO_STATE_DIR` belonging to a long-finished test, not the exported value.
+
+Consequences, all confirmed during the Phase 1 full `make qa` runs:
+1. **Every test's `ZEPTO_STATE_DIR` isolation (qa_setup) was a no-op.** All zeptos shared whatever stale state dir the tmux server captured; the dir gets deleted by its owner's cleanup trap but StateStore recreates it on the next preference write, so the shared path lives for the whole run.
+2. **Persisted-pref cross-poisoning, including *live* mid-session.** `zepto --no-nerd-font` *persists* `nerd_font=0` (build.pl calls `$prefs->set_nerd_font(0)`, which writes through to the store since `nerd_font` is a persisted key), so cli_007 running early in a parallel batch poisoned the shared store for the rest of the run. Worse, `StateStore` does cross-instance mtime-sync and `Preferences` subscribes via `on_change('preferences', ...)` — so when any concurrent test toggled a pref (cplt_007 turns auto-pairs off; nf_002/reg_081 toggle nerd font), every *currently running* zepto live-applied it mid-test. This is the actual root cause of the historically flaky baseline failures: **edit_020** (auto-pairs going off mid-test → brackets stop auto-closing) and **ms_012** (nerd font off → tree separator renders as ASCII `|`, the test's `│` search finds nothing). Both passed reliably standalone (verified 8x parallel in isolation) because nothing else was writing concurrently.
+3. **Env-var CLI tests were testing nothing.** cli_010 (`ZEPTO_NERD_FONT=0`) and cli_011 (`ZEPTO_TREE=0`) exported vars that never reached zepto; they "passed" only when the shared poisoned state happened to match their expectation.
+
+**Fix (harness-level, in `qa-helpers.sh` `qa_start`):** (a) pass `--state-dir "$QA_STATE_DIR"` on zepto's **command line**, which is immune to env laundering; (b) wrap the command in `env -u ZEPTO_NERD_FONT -u ZEPTO_TREE -u ZEPTO_STATE_DIR <caller's ZEPTO_* vars> ...` so stale server-env vars are cleared and the calling test's exported ZEPTO_* vars are re-applied explicitly through the command line. Also converted the three scripts that bypassed qa_start (`cli_012`, `cli_017`, tier2 `sbar_009`) to use it. Regression-guarded by QA-REG-104 (`reg_104_state_isolation.sh`), which asserts both directions: fresh-default state with nothing exported, and env-var propagation when exported.
+
+Possible follow-up product question (not changed in this phase): should `--no-nerd-font` / `ZEPTO_NERD_FONT=0` *persist* `nerd_font=0` to the preferences store, or only apply for that invocation? Persisting means one `zepto --no-nerd-font` run permanently changes future plain `zepto` runs.
+
+### ~~P0: [Testing] qa_project/qa_git_repo's documented command-substitution API subshelled the cd — tests wrote into (and COMMITTED into) the zepto repo itself~~ FIXED
+
+`qa-helpers.sh`'s `qa_project()`/`qa_git_repo()` documented (and had all 19 call sites using) the pattern `dir=$(qa_project)`. `$(...)` runs the function in a **subshell**, so the `cd` into the fresh temp dir — and the `_QA_PROJECT_DIR` assignment used by the cleanup trap — never affected the calling script. Every one of those 19 scripts kept running in its original cwd, which under `make qa` is the repo root. Consequences, observed live during the Phase 1 verification runs:
+
+1. Relative-path scratch writes (`echo ... > test.txt`) clobbered files in the repo root — the true source of the historical "scratch files leaking into the repo root" problem (the `/file_*.txt`, `/item_*.txt` .gitignore safety-net patterns, and Phase 0's "Remove leaked test files" commit).
+2. `qa_git_repo` callers then ran `git add . && git commit` **in the zepto repository itself**: a full `make qa` run created 10 stray commits titled "init"/"initial" on the working branch — the first of which swallowed the entire uncommitted Phase 1 working tree — plus stray junk files (`root.txt`, `alpha.txt`, `subdir/`, `a/very/deeply/nested/...`, etc.) and a rewrite of the repo's local `git config user.email/user.name` to the test identity. All recovered via `git reset --mixed` to the true tip (commits were unpushed) and manual cleanup; nothing was lost.
+3. Because `_QA_PROJECT_DIR` was set only in the subshell, the cleanup trap never deleted the actual temp project dirs either — a slow `/tmp` leak on top.
+
+**Fix (three layers):**
+- `qa_project`/`qa_git_repo` are now called **directly** (never via `$(...)`) and communicate the path via `QA_PROJECT_DIR`; all 19 call sites converted to `qa_project; dir="$QA_PROJECT_DIR"`. The functions deliberately echo nothing, so any future legacy-style `dir=$(qa_project)` gets an empty string and fails fast on first use instead of silently polluting the repo.
+- `qa_setup` now ends with `cd "$QA_TMPDIR"` — every test starts inside its own auto-cleaned tmpdir, so even a buggy script writing bare relative paths without cd-ing leaks into the wiped-on-exit tmpdir, never the repository. (`QA_ZEPTO` is resolved to an absolute path before this cd, so the `./zepto` default still works.)
+- `git init` in `qa_git_repo` now runs in the parent shell inside the project dir, so its local `git config user.*` lands in the test repo, not wherever the caller happened to be.
+
+Verified: converted scripts pass, and a full `make qa` leaves `git status` clean (no stray commits, no junk files, no git-config mutation).
+
+---
+
+## CI-only failure (Phase 2 add-on, 2026-07-10)
+
+### ~~P2: [Testing hazard] fif_006/fif_015 flaked on GitHub runners with a literal ESC in the FIF input~~ FIXED
+
+CI run 29063232193 (GitHub runner, not reproduced locally at first try) reported `fif_015_esc_closes.sh` failing with the FIF search input showing a literal `hello^[` — i.e. the Escape keypress appeared to insert as text instead of closing the panel — and a second script (`fif_006_esc_close.sh`, which types no query and just opens then immediately closes FIF) failing the same way with a bare `^[` in the input.
+
+**Investigation:** Both scripts used a fixed-sleep-then-assert pattern: type text (or open FIF), `sleep N`, send Escape as its own `hangon keys` call, `sleep 0.3`, then assert the panel closed. Traced `InputParser::_parse_one` / `_parse_escape`: a lone trailing ESC byte in the read buffer (e.g. `"hello\x1b"` arriving as one chunk) is correctly held pending (`EVT_NONE`, length 1) and only resolved into a proper `KEY_ESCAPE` event on the next read timeout via `Editor::flush_pending_input` — it can never leak through as a literal `'char'` event under the parser's own logic, since ESC is intercepted before the `ord < 32` branch that would otherwise route it to `_parse_char`. So the literal-ESC symptom is best explained as a **test-harness timing race** (assertions running before the ESC-flush timeout resolved on a slow/loaded runner, not deterministically reproducible locally), not an InputParser bug — but investigated and hardened at the widget level regardless (see below), since a defense-in-depth guard there is cheap and removes the *possibility* structurally, whatever the true trigger turns out to be.
+
+**Fix:**
+- **Scripts** (`fif_006_esc_close.sh`, `fif_015_esc_closes.sh`, and for consistency every other `fif_*.sh` script that types a query and later sends Escape): replaced fixed `sleep` calls around Escape with `qa_expect_screen` settling — wait for the typed text to actually render before sending Escape as its own cleanly-separated keystroke, then poll for the panel-closed marker instead of a fixed sleep before asserting.
+- **Product hardening (defense in depth):** `InputWidget::_handle_char` (`lib/Zepto/InputWidget.pm`) now explicitly rejects any `'char'` event carrying a C0 control byte or DEL (`/[\x00-\x1f\x7f]/`) instead of unconditionally inserting whatever the caller hands it, and paste (Ctrl+V) now strips control characters from clipboard text before inserting via a new `_sanitize_text` helper. A single-line input field must never render a raw control character regardless of how one might reach it.
+- Verified: `fif_006_esc_close.sh` and `fif_015_esc_closes.sh` pass reliably, including 3 iterations of both run concurrently against each other under artificial background CPU load (`yes >/dev/null`). New unit tests in `tests/input_widget.t` ("control character hardening" subtests: raw ESC/control-byte char events rejected, tab rejected, paste sanitized, normal/unicode chars unaffected). QA-REG-106 added to `qa/40_regression_bugs.txt`.
+
+---
+
+## Phase 3: AI provider feature — security fixes found during the rebuild (2026-07-10)
+
+The owner explicitly sanctioned rebuilding AI ghost-text completion as a
+first-class, opt-in, multi-provider feature (previously `AIComplete.pm` was
+a single-provider, streaming-only implementation with two known security
+issues, found and fixed as part of the rebuild rather than left in place).
+
+### ~~P1: [Security] AI completion API key visible on `curl` child argv via `ps`~~ FIXED
+
+The old `AIComplete::_child_http_request` execed `curl ... -H "Authorization: Bearer $api_key" -d $payload ...` — both the API key and the full request body (including cursor-context source text) were passed directly on the child process's argv. Any other user on the same machine could read them for the lifetime of the request via `ps -ef` / `ps aux` / `/proc/<pid>/cmdline`. Zepto runs on users' desktops with their real API keys; this is a real credential-leak vector, not theoretical.
+
+**Fix:** Rebuilt the HTTP transport as `lib/Zepto/AIHttp.pm`. The forked child's argv is now exactly `curl -sS --config -` — flags only, no URL, no key, no body. The parent writes a curl config document (`url`, `header`, `data` directives, correctly escaped per curl's `-K` config-file quoting rules) to the child's stdin over a pipe. Regression-tested in `tests/ai_http.t`: a subtest fires a real request against a local mock server and, while the request is deliberately kept in flight (mock server sleeps before responding), reads the curl child's actual argv via `/proc/<pid>/cmdline` (or `ps -o args=`) and asserts the secret key string never appears in it. See `docs/SECURITY.md` "Network: AI Completion" and QA-REG-107 in `qa/40_regression_bugs.txt`.
+
+### ~~P2: [Security] AI API key briefly stored with permissive file permissions (chmod-after-write race)~~ FIXED
+
+`StateStore::put()` wrote the `secrets` category with `open my $fh, '>', $tmp_path` (default-permissive create mode) and only called `chmod 0600, $tmp_path` *after* the plaintext key was already written to disk — a real, if narrow, window where the temp file existed world/group-readable (subject to umask) before being locked down.
+
+**Fix:** `secrets` category writes now use `sysopen($fh, $tmp_path, O_CREAT|O_EXCL|O_WRONLY, 0600)`, which creates the file with the restricted mode atomically — there is no window between "file exists" and "permissions restricted". Also defensively `unlink`s any stale leftover at the predictable tmp path first (handles both a crashed-process leftover and a symlink-planting attack, since `unlink` removes the symlink itself rather than following it). Regression-tested in `tests/state_store.t` ("Secrets temp file is created with 0600 atomically" — pre-plants an insecure file at the exact tmp path and asserts the final file is still 0600 with the real content, not the planted content).
+
+### ~~P3: [Testing hazard] `dirname "${BASH_SOURCE[0]}"` inside a qa-helpers.sh function breaks once qa_setup() has cd'd away~~ FIXED
+
+Found while adding `qa_ai_mock_start` (new helper for the AI completion QA scripts): `qa_llm_judge()` resolved its own script directory via `script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"` INSIDE the function body, evaluated at call time. `BASH_SOURCE[0]` preserves whatever (often relative, e.g. `../../lib/qa-helpers.sh`) path the file was originally `source`d with from the calling script — and by the time any test function actually runs, `qa_setup()` (which runs automatically at the bottom of qa-helpers.sh, immediately on source) has already `cd`d into a per-test tmpdir, so re-resolving that same relative path at call time resolves relative to the WRONG directory and fails with `cd: ... No such file or directory`. Never triggered before because `qa_llm_judge` is only reachable via `qa_assert_visual`, which the whole test suite treats as an opt-in Tier 2 LLM-judged visual check that no CI run exercises without an API key configured.
+
+**Fix:** Resolve the helpers directory ONCE, at source time (before `qa_setup()`'s `cd`), into a new `_QA_HELPERS_DIR` global; `qa_llm_judge()` and the new `qa_ai_mock_start()` both use it instead of re-deriving `BASH_SOURCE[0]` at call time.
+
+### ~~P2: [Bug] Old SSE regex parser could be defeated by completion content containing `"delta":{"content":"`~~ FIXED
+
+`AIComplete::_parse_streaming_buffer` extracted completion text with a hand-rolled regex (`/"delta"\s*:\s*\{[^}]*"content"\s*:\s*"((?:[^"\\]|\\.)*)"/s`) against the raw SSE byte stream. Because it doesn't understand JSON string boundaries, a completion whose *content* happened to contain text that looked like another `"delta":{"content":"..."}` fragment (plausible for code-completion suggestions, which often echo JSON/config snippets) could be misparsed.
+
+**Fix:** Replaced with `JSON::PP` (core, real JSON parsing) end to end — `Zepto::AIProviders::parse_completion_response`/`parse_models_response` operate on a fully-decoded Perl data structure, so string boundaries are never ambiguous. Non-streaming only (`stream:false`), simplifying the response shape further. Regression-tested in `tests/ai_complete.t` ("adversarial content (quotes, escapes, embedded delta) parses correctly").
+
+---
+
+## Phase 4: LLM visual judging — QA test harness bug found while first-running tier2 (2026-07-10)
+
+Tier 2 (`qa/scripts/tier2/*.sh`) had never actually been executed end to
+end before this phase — no CI wiring, and every local run silently `SKIP`ed
+every `qa_assert_visual` for lack of an API key, so a script could be
+broken and nobody would know. Standing up the LLM judge for real (mock
+server, `perl qa/runner.pl --tier 2`) surfaced exactly that.
+
+### ~~P2: [Testing hazard] Two `qa_assert_visual` prompts crashed their whole script under `set -u` — unescaped `$var` in a double-quoted prompt string~~ FIXED
+
+`qa/scripts/tier2/syn_007_shell.sh` and `qa/scripts/tier2/syn_010_perl.sh` both build their `qa_assert_visual` prompt as a **double-quoted** bash string that includes literal fixture-syntax fragments like `$1, $target, $MAX_RETRIES, $count`, `$(date ...)` (shell script) and `$filename, @colors, %config, $fh` (Perl script) — text meant to tell the judge "these variable references should be highlighted," not real shell variables. Because the string is double-quoted, bash parameter-expands `$1`/`$target`/`$filename`/etc. and command-substitutes `$(date ...)` *before* the string ever becomes an argument. `qa-helpers.sh` runs under `set -euo pipefail`; `$1` (an unset positional parameter — these scripts take no args) and `$filename`/`$target`/etc. (never-assigned bash variables) are unbound under `-u`, so the script died immediately with `line N: $1: unbound variable` / `line N: filename: unbound variable` the instant the `qa_assert_visual` line was reached — before capturing any real judge verdict. `@colors`/`%config`/`#`-style tokens are not special in bash double quotes so didn't trigger `-u`, but `$filename`/`$1`/etc. did.
+
+Never caught before because, per the summary above, nothing had ever actually run these two scripts far enough to reach the crashing line — tier1-only `make qa` never touches tier2 at all, and the old tier2-without-a-key path (`qa_llm_available` returning false) also never got there since these are `qa_assert_visual` calls whose *arguments* are evaluated by bash before `qa_llm_available`/`qa_assert_visual` ever runs.
+
+**Fix:** escaped every literal `$` in both prompts (`\$1`, `\$target`, `\$MAX_RETRIES`, `\$count`, `\$(date ...)`, `\$filename`, `\$fh`) so bash passes them through as literal text instead of expanding them. `@` and `%` needed no escaping (not special in bash double-quoted strings). Verified by running both scripts against `qa/lib/judge_mock_server.pl` (no longer crash; judge receives the literal `$var` text, confirmed by echoing the same prompt construction in isolation with `set -u` active) — see `qa/scripts/tier1/judge_001_wiring.sh` for the harness-wiring regression coverage and `qa/runner.pl --tier 2` for the fix verification. No product code touched; this is a QA-script-only bug, not a Zepto editor bug.
+
+**Lesson for future tier2 prompts:** any `qa_assert_visual` prompt that quotes fixture source code verbatim (variable names, command substitutions, anything starting with `$`) MUST escape `$` (and backticks, if used) — the prompt argument is itself a double-quoted bash string and is expanded like any other.
+
+---

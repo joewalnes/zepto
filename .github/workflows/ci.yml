@@ -3,6 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Nightly tier-2 LLM visual QA run (see the qa-visual job below). This
+    # also re-triggers test/qa/qa-pixel at the workflow level since they
+    # have no event-type restriction of their own — harmless free
+    # re-validation of main overnight, not redundant work anyone pays for
+    # beyond CI minutes.
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
@@ -59,10 +68,121 @@ jobs:
       - name: Run QA tests
         run: make qa
 
+  qa-pixel:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - name: Install ttyd
+        run: sudo apt-get update && sudo apt-get install -y ttyd
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build zepto
+        run: make build
+
+      - name: Install pixel tier dependencies
+        run: cd qa/pixel && npm install --no-fund --no-audit
+
+      - name: Install Playwright Chromium
+        run: cd qa/pixel && npx playwright install chromium --with-deps
+
+      - name: Run pixel QA tests
+        # Screenshot-diff baselines are platform-specific (see
+        # qa/pixel/README.md) — deliberately NOT setting
+        # ZEPTO_PIXEL_SNAPSHOTS here so the opt-in visual-diff test stays
+        # skipped in CI rather than failing on a baseline nobody captured
+        # for this runner image.
+        run: make qa-pixel
+
+  # Gates qa-visual on the judge secret actually being configured. Job-level
+  # `if:` conditions CANNOT reference the secrets context directly (GitHub
+  # Actions restriction — https://github.com/actions/runner/issues/520), so
+  # this tiny job resolves "is it set" into a plain job OUTPUT in a `run:`
+  # step (where secrets ARE usable), and qa-visual's own `if:` below
+  # consumes that output instead of secrets.* directly.
+  check-judge-secret:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check whether ZEPTO_JUDGE_API_KEY is set
+        id: check
+        env:
+          KEY_PRESENT: ${{ secrets.ZEPTO_JUDGE_API_KEY != '' }}
+        run: echo "configured=$KEY_PRESENT" >> "$GITHUB_OUTPUT"
+
+  # Tier-2 LLM visual QA. Deliberately narrow trigger: only a push straight
+  # to main, or the nightly schedule — NOT every PR — because it spends a
+  # real (if small: ~$0.10-0.30/run on Haiku) API budget and pull requests
+  # already get full tier1 coverage from the `qa` job above. Also gated on
+  # the judge secret actually being present (via check-judge-secret above)
+  # so a run before the secret is configured can't produce a red job for a
+  # reason nobody can fix from the PR/commit itself.
+  #
+  # Secret hygiene: ZEPTO_JUDGE_API_KEY is scoped to THIS job's `env:`
+  # only — test/qa/qa-pixel above never see it.
+  qa-visual:
+    runs-on: ubuntu-latest
+    needs: [test, check-judge-secret]
+    if: needs.check-judge-secret.outputs.configured == 'true'
+    env:
+      ZEPTO_JUDGE_API_KEY: ${{ secrets.ZEPTO_JUDGE_API_KEY }}
+      ZEPTO_JUDGE_PROVIDER: ${{ vars.ZEPTO_JUDGE_PROVIDER || 'anthropic' }}
+      ZEPTO_JUDGE_MODEL: ${{ vars.ZEPTO_JUDGE_MODEL || 'claude-haiku-4-5' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+
+      - name: Install tmux
+        run: sudo apt-get install -y tmux
+
+      - name: Install hangon
+        run: |
+          go install github.com/joewalnes/hangon@main
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Install librsvg (PNG screenshot rendering for the LLM judge)
+        run: sudo apt-get install -y librsvg2-bin
+
+      - name: Build zepto
+        run: make build
+
+      - name: Probe judge — fail loudly if misconfigured, no fake green
+        run: perl qa/runner.pl --probe-judge
+
+      - name: Run tier-2 visual QA
+        run: perl qa/runner.pl --tier 2
+
   notify-failure:
     runs-on: ubuntu-latest
-    needs: [test, qa]
-    if: failure()
+    needs: [test, qa, qa-pixel, qa-visual]
+    # Failures on PR runs are visible on the PR itself; only pushes to main
+    # and the nightly schedule run should file/append to the ci-failure
+    # issue (PRs never reach here since qa-visual's own trigger already
+    # excludes them, and test/qa/qa-pixel failures on a PR are surfaced on
+    # the PR's own checks, not worth filing an issue for).
+    if: failure() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     steps:
       - name: Create failure issue
         uses: actions/github-script@v7

@@ -72,10 +72,25 @@ sub detect_backend {
 
     # 1. Check for git repo
     if (-d "$root_path/.git") {
-        my $ok = system('git', '--version') == 0;
-        if ($ok) {
-            $self->{_backend} = 'git_grep';
-            return 'git_grep';
+        # Redirect stdout/stderr to /dev/null — a bare system('git', '--version')
+        # would print "git version X.Y.Z" straight to the raw-mode terminal.
+        GIT_CHECK: {
+            open my $devnull, '>', '/dev/null' or last GIT_CHECK;
+            my $pid = fork();
+            if (defined $pid && $pid == 0) {
+                open STDOUT, '>&', $devnull;
+                open STDERR, '>&', $devnull;
+                exec('git', '--version');
+                exit 1;
+            }
+            close $devnull;
+            if (defined $pid) {
+                waitpid($pid, 0);
+                if ($? == 0) {
+                    $self->{_backend} = 'git_grep';
+                    return 'git_grep';
+                }
+            }
         }
     }
 

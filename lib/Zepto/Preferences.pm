@@ -31,6 +31,7 @@ my %DEFAULTS = (
     tab_width        => 4,
     soft_tabs        => 1,        # Use spaces instead of tabs
     auto_indent      => 1,        # Copy indentation from previous line
+    continue_lists   => 1,        # Enter continues Markdown/plain-text list items
 
     # Search
     search_case_sensitive => 0,
@@ -49,14 +50,20 @@ my %DEFAULTS = (
     mouse_enabled    => 1,
     scroll_margin    => 3,        # Lines to keep above/below cursor
 
-    # AI completion
-    ai_api_url       => 'https://openrouter.ai/api/v1',
-    ai_model         => 'anthropic/claude-haiku-4-5-20251001',
+    # AI completion — ships disabled/unconfigured. Defaults come from the
+    # provider preset the user picks in the Settings dialog (see
+    # Zepto::AIProviders), not a hardcoded value here.
+    ai_provider      => '',
+    ai_api_url       => '',
+    ai_model         => '',
 
     # File handling
     backup_on_save   => 0,        # Create .bak files
     trim_trailing_whitespace => 0,
     ensure_final_newline => 1,
+
+    # Diagnostics
+    hang_detector    => 1,        # Watchdog: detect a wedged main loop and log diagnostics
 );
 
 # Preferences that are persisted globally and synced across instances.
@@ -71,11 +78,14 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     tab_width
     soft_tabs
     auto_indent
+    continue_lists
     auto_complete
     auto_pairs
     mouse_enabled
+    ai_provider
     ai_api_url
     ai_model
+    hang_detector
 );
 
 sub new {
@@ -219,19 +229,17 @@ sub soft_tabs { $_[0]->get('soft_tabs') }
 sub set_soft_tabs { $_[0]->set('soft_tabs', $_[1]) }
 
 sub auto_indent { $_[0]->get('auto_indent') }
-sub set_auto_indent { $_[0]->set('auto_indent', $_[1]) }
+
+sub continue_lists { $_[0]->get('continue_lists') }
+sub set_continue_lists { $_[0]->set('continue_lists', $_[1]) }
 
 sub show_line_numbers { $_[0]->get('show_line_numbers') }
-sub set_show_line_numbers { $_[0]->set('show_line_numbers', $_[1]) }
 
 sub mouse_enabled { $_[0]->get('mouse_enabled') }
-sub set_mouse_enabled { $_[0]->set('mouse_enabled', $_[1]) }
 
 sub search_case_sensitive { $_[0]->get('search_case_sensitive') }
-sub set_search_case_sensitive { $_[0]->set('search_case_sensitive', $_[1]) }
 
 sub search_wrap { $_[0]->get('search_wrap') }
-sub set_search_wrap { $_[0]->set('search_wrap', $_[1]) }
 
 sub nerd_font { $_[0]->get('nerd_font') }
 sub set_nerd_font { $_[0]->set('nerd_font', $_[1]) }
@@ -240,19 +248,18 @@ sub show_minimap { $_[0]->get('show_minimap') }
 sub set_show_minimap { $_[0]->set('show_minimap', $_[1]) }
 
 sub show_tree { $_[0]->get('show_tree') }
-sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
 
 sub word_wrap { $_[0]->get('word_wrap') }
-sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
 
 sub render_markdown_tables { $_[0]->get('render_markdown_tables') }
-sub set_render_markdown_tables { $_[0]->set('render_markdown_tables', $_[1]) }
 
 sub auto_complete { $_[0]->get('auto_complete') }
 sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }
 
 sub auto_pairs { $_[0]->get('auto_pairs') }
 sub set_auto_pairs { $_[0]->set('auto_pairs', $_[1]) }
+
+sub hang_detector { $_[0]->get('hang_detector') }
 
 # Extensions that default to word wrap on (prose file types)
 my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);

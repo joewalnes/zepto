@@ -77,14 +77,6 @@ sub get_head_content {
     die "Subclass must implement get_head_content()";
 }
 
-# Get the content of a file in the staging area (index)
-# Returns undef if file is not staged or VCS doesn't support staging
-sub get_staged_content {
-    my ($self, $file_path) = @_;
-    # Default: staging not supported, return undef
-    return undef;
-}
-
 # Check if HEAD has changed since last check (for cache invalidation)
 # Returns true if changed, false otherwise
 # Default: always returns false (subclasses override with actual check)

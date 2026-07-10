@@ -2,13 +2,15 @@
 40 — Regression Tests (Every Fixed Bug)
 ================================================================================
 
-One regression test per bug marked FIXED in bugs.md. Many of these duplicate
-coverage from the feature files; that's intentional — this file is a
-single flat index for "run every regression" workflows.
+One regression test per bug marked FIXED (now archived in bugs-archive.md
+when closed; see bugs.md for the currently-open worklist). Many of these
+duplicate coverage from the feature files; that's intentional — this file
+is a single flat index for "run every regression" workflows.
 
 Each entry cross-references the primary test case (QA-xxx-###) and summarizes
-what to check. Keep this file in sync with bugs.md: when a new bug is
-FIXED, add a corresponding REG entry here.
+what to check. Keep this file in sync with bugs.md/bugs-archive.md: when a
+new bug is FIXED (and its entry moved to bugs-archive.md), add a
+corresponding REG entry here.
 
 Legend:
   CROSS-REF — the main feature-file test case that covers this bug.
@@ -932,3 +934,151 @@ PRIORITY: P2
 BUG:      P2 "More prominent ctrl-space hint"
 CROSS-REF: QA-PAL-019, QA-REG-045
 VERIFY    Rightmost pill shows `⌘ Commands ⌃␣` in distinctive color.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-101
+NAME:     Column paste onto last document line pastes all in-bounds rows
+PRIORITY: P1
+BUG:      P1 "Column paste silently does nothing when pasted rows extend
+          past end of document"
+CROSS-REF: QA-CLIP-007, QA-COL-004
+VERIFY    Column-copy 3 rows x N cols from the top of a short document,
+          paste at the document's last line: the target line's content is
+          mutated (pasted text visible in the saved file), not left
+          unchanged. Regresses if `_column_paste`'s bounds check in
+          `Editor/Commands.pm` reverts to `last` instead of `next` — that
+          aborts the whole paste the instant the bottom-most pasted row
+          falls past end-of-document, discarding every valid row above it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-102
+NAME:     --no-nerd-font eliminates tab bar corner triangle glyphs
+PRIORITY: P2
+BUG:      P2 "Tab bar corner triangles (◢/◣) ignored --no-nerd-font"
+CROSS-REF: QA-CLI-007
+VERIFY    With --no-nerd-font, no Private Use Area glyphs (U+E000-U+F8FF)
+          or the U+25E2/U+25E3 tab-pill corner triangles appear anywhere on
+          screen. Regresses if Renderer.pm's tab bar hardcodes
+          "\x{25e2}"/"\x{25e3}" again instead of going through
+          Zepto::Chars->get('tab_edge_left'/'tab_edge_right'), or if the
+          tab bar's render cache key stops including the nerd-font-enabled
+          state (stale cached glyphs would survive a runtime toggle).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-103
+NAME:     QA scripts that create git repos configure a local git identity
+PRIORITY: P1
+BUG:      P1 "QA scripts creating git repos must not depend on a global
+          git user being configured"
+CROSS-REF: QA-FILE-014
+VERIFY    On a machine/CI runner with NO global git user.name/user.email
+          configured (fresh HOME, no GIT_AUTHOR_*/GIT_COMMITTER_* env
+          vars), every QA script that runs `git init` + `git commit`
+          still passes — `git commit` must not fail with "Author identity
+          unknown". file_014_save_vcs_gutter.sh was the one script that
+          ran `git init`/`git commit` directly without setting local
+          `git config user.email`/`user.name` first (every other
+          git-repo-creating script either does this inline or goes
+          through the qa_git_repo() helper, which already sets it).
+          Regresses if a new script creates a git repo without local
+          identity config or without routing through qa_git_repo().
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-104
+NAME:     QA state isolation survives hangon/tmux environment laundering
+PRIORITY: P0
+BUG:      P0 "[Testing] hangon/tmux does not forward the caller's
+          environment — per-test ZEPTO_STATE_DIR isolation was silently
+          broken, cross-poisoning concurrent tests' preferences"
+CROSS-REF: QA-CLI-010, QA-CLI-011, QA-EDIT-020, QA-MS-012
+VERIFY    reg_104_state_isolation.sh: (1) a test with no ZEPTO_NERD_FONT
+          exported gets zepto's default (nerd font ON) — no stale env or
+          shared-state leak; (2) a ZEPTO_* var exported by the test
+          actually reaches zepto. Regresses if qa_start stops passing
+          --state-dir on the command line, stops clearing/forwarding
+          ZEPTO_* vars via its `env` wrapper, or if scripts start zepto
+          via `hangon start process` directly instead of qa_start.
+          Mechanism: hangon's tmux backend runs `tmux new-session` with
+          no env forwarding, so panes get the tmux SERVER's environment
+          (from whichever long-dead test started the server), not the
+          caller's; combined with StateStore's cross-instance mtime sync,
+          one test toggling a persisted pref (auto-pairs, nerd font)
+          live-poisoned every concurrently-running test's zepto.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-105
+NAME:     QA runs never write into the repository (project-dir subshell bug)
+PRIORITY: P0
+BUG:      P0 "[Testing] qa_project/qa_git_repo's documented
+          command-substitution API subshelled the cd — tests wrote into
+          (and COMMITTED into) the zepto repo itself"
+CROSS-REF: QA-WRAP-009, QA-VCS-007, QA-PICK-009
+VERIFY    After a full `make qa` run, `git status` in the repo is clean:
+          no stray commits (reflog shows no test-authored "init"/"initial"
+          commits), no junk files in the repo root (test.txt, root.txt,
+          alpha.txt, subdir/, ...), and `git config --local user.email`
+          is not the test identity (test@test.com). Regresses if
+          qa_project/qa_git_repo are ever called via command substitution
+          (`dir=$(qa_project)` — the subshell swallows the cd), if
+          qa_setup stops cd-ing into $QA_TMPDIR, or if the functions
+          start echoing their path again (which invites the $() pattern
+          back).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-106
+NAME:     Esc after typed text in Find-in-Files does not race/glue into the input
+PRIORITY: P2
+BUG:      P2 "[Testing hazard] fif_006/fif_015 flaked on CI runners with a
+          literal ESC control byte appearing inside the FIF input" — a
+          fixed-sleep-then-assert pattern (type text, sleep, send Escape,
+          sleep, assert) raced slow/loaded CI runners: Escape could be read
+          in the same terminal update as the tail of the typed text, and
+          the post-Escape assertion could fire before the panel finished
+          closing.
+CROSS-REF: QA-FIF-006, QA-FIF-015, QA-MS-023
+VERIFY    fif_006_esc_close.sh and fif_015_esc_closes.sh pass reliably when
+          run concurrently under artificial CPU load (verified: 3 iterations
+          of both scripts run in parallel against each other with `yes
+          >/dev/null` background load, 0 failures). Regresses if either
+          script goes back to a fixed sleep between typing and sending
+          Escape, or between sending Escape and asserting the panel closed,
+          instead of settling via `qa_expect_screen`.
+          Also hardened at the product level as defense in depth:
+          `InputWidget::_handle_char` now rejects any 'char' event carrying
+          a C0 control byte or DEL instead of trusting that the caller
+          (InputParser) never produces one, and pasted clipboard text is
+          stripped of control characters before insertion — a single-line
+          input field must never render a raw control char regardless of
+          how one might reach it. Covered by tests/input_widget.t
+          ("control character hardening" subtests).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-107
+NAME:     AI completion API key never appears on the curl child's argv
+PRIORITY: P1
+BUG:      P1 "[Security] AI completion API key visible on `curl` child argv
+          via `ps`" — the original AIComplete implementation passed
+          `-H "Authorization: Bearer $key"` and the request body directly
+          on curl's argv, readable by any other user on the machine via
+          `ps` for the lifetime of the request.
+CROSS-REF: QA-AI-001, QA-AI-002, QA-AI-003, QA-SEC-008
+VERIFY    tests/ai_http.t ("POST request: headers and body arrive intact;
+          key never on curl argv" subtest): fires a real request against a
+          local mock server, keeps it deliberately in flight, and reads the
+          curl child's actual argv via /proc/<pid>/cmdline (falling back to
+          `ps -o args=`) — asserts the secret key string never appears in
+          it, and that argv is exactly `curl -sS --config -` (flags only,
+          no URL, no key). Regresses if Zepto::AIHttp::start_request ever
+          passes the key, URL, or body as an argv element instead of over
+          the --config stdin pipe. The curl config-string escaping that
+          makes this pipe-based approach safe against adversarial content
+          (quotes, backslashes, newlines, unicode, braces) is covered by
+          the same test file's "escape_config_string" subtests and an
+          end-to-end adversarial round-trip test.

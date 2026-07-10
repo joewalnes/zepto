@@ -128,18 +128,6 @@ sub active_file_path {
 }
 
 
-sub replace_active_tab {
-    my ($self, %opts) = @_;
-    my $tab = $self->active_tab();
-    return unless $tab;
-
-    $tab->{document}    = $opts{document}    if exists $opts{document};
-    $tab->{view}        = $opts{view}        if exists $opts{view};
-    $tab->{find_engine} = $opts{find_engine} if exists $opts{find_engine};
-    $tab->{highlighter} = $opts{highlighter} if exists $opts{highlighter};
-    $tab->{file_path}   = $opts{file_path}   if exists $opts{file_path};
-}
-
 # --- Tab switching ---
 
 sub set_active {

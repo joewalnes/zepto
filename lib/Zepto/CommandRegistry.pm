@@ -7,7 +7,8 @@ package Zepto::CommandRegistry;
 # and keyboard shortcut dispatch. Each command has an id, label, icon,
 # shortcut, section, type, priority, and method.
 #
-# Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW
+# Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, AI,
+# DOCUMENTATION, DIAGNOSTICS
 # Types: action (one-shot), toggle (binary on/off), setting (multi-value)
 # Priority: 1 = always on status bar, 5 = only if wide terminal
 # =============================================================================
@@ -252,6 +253,17 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_transform',
     },
+    {
+        id       => 'toggle_continue_lists',
+        label    => 'Continue Lists',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'EDIT',
+        type     => 'toggle',
+        pref     => 'continue_lists',
+        priority => 0,
+        method   => 'cmd_toggle_continue_lists',
+    },
 
     # === NAVIGATE section ===
     {
@@ -448,7 +460,7 @@ my @COMMANDS = (
     # === AI section ===
     {
         id       => 'ai_setup',
-        label    => 'AI Completion: Setup',
+        label    => 'AI: Configure',
         icon     => 'keyboard',
         shortcut => '',
         section  => 'AI',
@@ -640,7 +652,10 @@ sub get_toggle_state {
     if ($cmd->{id} eq 'toggle_tree') {
         return $editor->{_show_tree} ? 1 : 0;
     }
-    # AI completion: check AIComplete module
+    # AI completion: check AIComplete module. Pill stays "on"-colored once
+    # the user has enabled it, even if it's currently inert (curl missing /
+    # key cleared) — get_toggle_display below adds a "!" suffix for that
+    # case so the pill is visually distinguishable without a third color.
     if ($cmd->{id} eq 'toggle_ai') {
         return ($editor->{_ai_complete} && $editor->{_ai_complete}->is_enabled()) ? 1 : 0;
     }
@@ -668,6 +683,17 @@ sub get_toggle_display {
     if ($cmd->{pref} && $cmd->{pref} eq 'theme') {
         return $state;  # 'dark' or 'light'
     }
+
+    # AI completion: enabled but currently unable to fire (curl missing,
+    # or key/config cleared out from under it) — surface a "!" suffix so
+    # the pill reads "AI Completion:!" instead of silently doing nothing.
+    if ($cmd->{id} eq 'toggle_ai' && $state) {
+        my $ai = $editor->{_ai_complete};
+        if ($ai && !$ai->ready()) {
+            return '!';
+        }
+    }
+
     return $state ? 'on' : 'off';
 }
 

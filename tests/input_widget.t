@@ -560,4 +560,51 @@ subtest 'drag_update with no drag_anchor is a no-op' => sub {
     ok(!$w->has_selection(), 'No selection created');
 };
 
+# =============================================================================
+# Control character hardening (QA-REG regression: raw ESC/control bytes must
+# never render inside an input field — see bugs.md CI add-on, Phase 2)
+# =============================================================================
+
+subtest 'raw control char in a char event is rejected, not inserted' => sub {
+    my $w = Zepto::InputWidget->new(value => 'hello');
+    # This should never happen via the real InputParser (ESC and other C0
+    # controls are routed as 'key' events, not 'char' events — see
+    # InputParser::_parse_one), but the widget must not trust that
+    # invariant blindly: a literal ESC byte handed to it as a 'char' event
+    # must be rejected rather than rendered.
+    my $handled = $w->handle_event(char_event("\x1b"));
+    is($w->value(), 'hello', 'Value unchanged — ESC byte not inserted');
+    ok(!$handled, 'handle_event reports the control char was not handled');
+};
+
+subtest 'other C0 control chars and DEL are rejected as char events' => sub {
+    for my $byte (0x00, 0x01, 0x07, 0x0b, 0x1f, 0x7f) {
+        my $w = Zepto::InputWidget->new(value => 'x');
+        $w->handle_event(char_event(chr($byte)));
+        is($w->value(), 'x', sprintf('Control byte 0x%02x not inserted', $byte));
+    }
+};
+
+subtest 'tab is a control char and is also rejected (single-line widget)' => sub {
+    my $w = Zepto::InputWidget->new(value => 'ab');
+    $w->handle_event(char_event("\t"));
+    is($w->value(), 'ab', 'Tab not inserted into single-line widget');
+};
+
+subtest 'pasted clipboard text is sanitized of control chars' => sub {
+    my $w = Zepto::InputWidget->new(value => '');
+    my $clipboard = "hello\x1bworld\nmore";
+    $w->handle_event(char_event('v', 'ctrl'), \$clipboard);
+    is($w->value(), 'helloworldmore', 'Control chars stripped from pasted text');
+};
+
+subtest 'normal printable and unicode chars still insert fine' => sub {
+    my $w = Zepto::InputWidget->new(value => '');
+    $w->handle_event(char_event('a'));
+    $w->handle_event(char_event(' '));
+    $w->handle_event(char_event('~'));
+    $w->handle_event(char_event("\x{00e9}"));  # e-acute, printable non-ASCII
+    is($w->value(), "a ~\x{00e9}", 'Printable and unicode chars unaffected by hardening');
+};
+
 done_testing;

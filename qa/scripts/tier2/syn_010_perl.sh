@@ -47,7 +47,7 @@ shot="$QA_TMPDIR/perl_syntax.png"
 qa_screenshot "$shot"
 
 qa_assert_visual "$shot" \
-    "This shows a Perl script in a terminal text editor with syntax highlighting. Verify ALL of these: (1) Keywords like 'use', 'my', 'sub', 'return', 'unless', 'while', 'if', 'for', 'open', 'close', 'print', 'die' are highlighted in a distinct color. (2) Strings in double quotes like '3.2.1', 'red' and the print strings are in a string color. (3) Variables with sigils ($filename, @colors, %config, $fh) are highlighted — the $ @ % sigils should be colored. (4) The comment lines starting with # are in a muted/gray color. (5) The regex /^#\\s*.../ is highlighted distinctly. (6) Numbers like 1024, 0, 1 are in their own color. (7) The shebang line is highlighted. (8) At least 4 distinct colors are used." \
+    "This shows a Perl script in a terminal text editor with syntax highlighting. Verify ALL of these: (1) Keywords like 'use', 'my', 'sub', 'return', 'unless', 'while', 'if', 'for', 'open', 'close', 'print', 'die' are highlighted in a distinct color. (2) Strings in double quotes like '3.2.1', 'red' and the print strings are in a string color. (3) Variables with sigils (\$filename, @colors, %config, \$fh) are highlighted — the \$ @ % sigils should be colored. (4) The comment lines starting with # are in a muted/gray color. (5) The regex /^#\\s*.../ is highlighted distinctly. (6) Numbers like 1024, 0, 1 are in their own color. (7) The shebang line is highlighted. (8) At least 4 distinct colors are used." \
     "Perl syntax highlighting with keywords, sigils, regex, strings"
 
 qa_keys "ctrl-q"

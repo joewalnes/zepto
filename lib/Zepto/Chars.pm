@@ -255,6 +255,10 @@ my %CHARS = (
     # Directory expand/collapse arrows (Nerd Font carets)
     tree_arrow_right    => [ NF_CARET_RIGHT,      '>' ],  #  (collapsed)
     tree_arrow_down     => [ NF_CARET_DOWN,        'v' ],  #  (expanded)
+
+    # Tab bar pill edges (slanted "parallelogram" tab shape)
+    tab_edge_left       => [ "\x{25e2}",          '/'  ],  # ◢
+    tab_edge_right      => [ "\x{25e3}",          '\\' ],  # ◣
 );
 
 # Module state
@@ -311,16 +315,6 @@ sub get {
     return $_nerd_font_enabled ? $entry->[0] : $entry->[1];
 }
 
-# Get multiple characters as a hash
-sub get_all {
-    my ($class, @names) = @_;
-    my %result;
-    for my $name (@names) {
-        $result{$name} = $class->get($name);
-    }
-    return %result;
-}
-
 # =============================================================================
 # Convenience accessors
 # =============================================================================
@@ -352,18 +346,6 @@ sub box_v        { shift->get('box_v') }
 sub pill {
     my ($class, $content) = @_;
     return $class->get('round_left') . $content . $class->get('round_right');
-}
-
-# Create an arrow segment pointing right: content AR
-sub segment_right {
-    my ($class, $content) = @_;
-    return $content . $class->get('arrow_right');
-}
-
-# Create an arrow segment pointing left: AL content
-sub segment_left {
-    my ($class, $content) = @_;
-    return $class->get('arrow_left') . $content;
 }
 
 # File extension to icon mapping

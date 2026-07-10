@@ -31,16 +31,19 @@ qa_keys "ctrl-g"
 qa_send "4:1" 0.2
 qa_keys "enter"
 
-# Paste
+# Paste. NOTE: "abcd"/"klmn"/"uvwx" are the original rows 1-3 and remain on
+# screen unconditionally, so grepping for them alone would pass even if
+# paste did nothing. Assert the actual mutated line-4 content instead — the
+# pasted column's first row ("abcd") gets inserted before the existing
+# "0000000000" content on the target line.
+#
+# Verified via the saved file rather than the screen — see QA-CLIP-007 for
+# why (a horizontal-scroll rendering quirk can leave stale trailing
+# characters in the tmux screen capture near end-of-document pastes).
 qa_keys "ctrl-v"
+qa_keys "ctrl-s" 0.5
 
-qa_screen
-# Line 4 should have the pasted column data
-if echo "$QA_SCREEN" | grep -qE "abcd|klmn|uvwx"; then
-    qa_pass "column paste visible"
-else
-    qa_fail "column paste not visible"
-fi
+qa_assert_file_contains "$file" "^abcd0000000000\$" "column paste visible on target line"
 
 qa_keys "ctrl-q"
 sleep 0.2

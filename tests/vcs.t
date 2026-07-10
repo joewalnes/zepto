@@ -7,6 +7,7 @@ use lib 'lib';
 use File::Temp qw(tempdir);
 use File::Path qw(make_path);
 use Cwd qw(getcwd abs_path);
+use Time::HiRes qw(time);
 
 use Zepto::VCS::Provider;
 use Zepto::VCS::Git;
@@ -244,5 +245,70 @@ SKIP: {
         ok(-d $provider->repo_root . '/.git', 'Repo root has .git directory');
     };
 }
+
+# =============================================================================
+# _run_git timeout (bugs.md P1 hang-fix: a wedged git process reachable
+# from the render path must not freeze the whole editor UI)
+# =============================================================================
+
+subtest '_run_git times out on a wedged git process' => sub {
+    # Install a fake `git` on PATH that just hangs, so we exercise the
+    # real timeout/kill machinery without depending on being able to
+    # actually wedge the real git binary.
+    my $fake_bin_dir = tempdir(CLEANUP => 1);
+    my $fake_git = "$fake_bin_dir/git";
+    open(my $fh, '>', $fake_git) or die "Cannot create fake git: $!";
+    print $fh "#!/bin/sh\nsleep 30\n";
+    close $fh;
+    chmod 0755, $fake_git;
+
+    local $ENV{PATH} = "$fake_bin_dir:$ENV{PATH}";
+    # Speed up the test — ZEPTO_GIT_TIMEOUT overrides the default 3s so
+    # this doesn't need to wait 3+ real seconds to prove the mechanism.
+    local $ENV{ZEPTO_GIT_TIMEOUT} = 0.3;
+
+    my $start = time();
+    my ($output, $status) = Zepto::VCS::Git::_run_git('status');
+    my $elapsed = time() - $start;
+
+    is($output, undef, 'Output is undef on timeout');
+    is($status, -1, 'Status is -1 (same sentinel as spawn failure) on timeout');
+    ok($elapsed < 10, "Returned promptly (${elapsed}s), not after the full 30s sleep");
+};
+
+subtest '_run_git caches a timeout briefly to avoid re-blocking on every call' => sub {
+    my $fake_bin_dir = tempdir(CLEANUP => 1);
+    my $fake_git = "$fake_bin_dir/git";
+    open(my $fh, '>', $fake_git) or die "Cannot create fake git: $!";
+    print $fh "#!/bin/sh\nsleep 30\n";
+    close $fh;
+    chmod 0755, $fake_git;
+
+    local $ENV{PATH} = "$fake_bin_dir:$ENV{PATH}";
+    local $ENV{ZEPTO_GIT_TIMEOUT} = 0.3;
+
+    # First call pays the timeout cost.
+    my $start = time();
+    Zepto::VCS::Git::_run_git('cached-timeout-test-marker');
+    my $first_elapsed = time() - $start;
+    ok($first_elapsed > 0.2, "First call actually waited out the timeout (${first_elapsed}s)");
+
+    # Second call with the SAME args should hit the short-lived failure
+    # cache and return near-instantly instead of blocking again.
+    $start = time();
+    my ($output, $status) = Zepto::VCS::Git::_run_git('cached-timeout-test-marker');
+    my $second_elapsed = time() - $start;
+
+    is($output, undef, 'Cached timeout still reports undef output');
+    is($status, -1, 'Cached timeout still reports -1 status');
+    ok($second_elapsed < 1, "Second call was near-instant (${second_elapsed}s) — served from failure cache");
+};
+
+subtest '_run_git works normally for fast commands (no regression)' => sub {
+    plan skip_all => "git not available" unless $git_available;
+    my ($output, $status) = Zepto::VCS::Git::_run_git('--version');
+    is($status, 0, 'Fast git --version still succeeds');
+    like($output, qr/git version/, 'Output looks like git --version output');
+};
 
 done_testing();

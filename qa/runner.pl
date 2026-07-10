@@ -49,27 +49,29 @@ my $SYM_RUNNING = "${DIM}\x{22EF}${RESET}";
 # CLI arguments
 # ---------------------------------------------------------------------------
 
-my $tiers      = '1';
-my $filter     = '';
-my $list_only  = 0;
-my $report     = '';
-my $serial     = 0;
-my $max_jobs   = 4;
-my $help       = 0;
-my $single     = '';
+my $tiers        = '1';
+my $filter       = '';
+my $list_only    = 0;
+my $report       = '';
+my $serial       = 0;
+my $max_jobs     = 4;
+my $help         = 0;
+my $single       = '';
+my $probe_judge  = 0;
 
 GetOptions(
-    'tier=s'   => \$tiers,
-    'filter=s' => \$filter,
-    'list'     => \$list_only,
-    'report=s' => \$report,
-    'serial'   => \$serial,
-    'jobs=i'   => \$max_jobs,
-    'help|h'   => \$help,
+    'tier=s'      => \$tiers,
+    'filter=s'    => \$filter,
+    'list'        => \$list_only,
+    'report=s'    => \$report,
+    'serial'      => \$serial,
+    'jobs=i'      => \$max_jobs,
+    'probe-judge' => \$probe_judge,
+    'help|h'      => \$help,
 ) or die "Bad options\n";
 
 if ($help) {
-    print "Usage: runner.pl [--tier 1,2,3] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [SCRIPT]\n";
+    print "Usage: runner.pl [--tier 1,2] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [--probe-judge] [SCRIPT]\n";
     exit 0;
 }
 
@@ -77,10 +79,54 @@ $single = shift @ARGV if @ARGV;
 $serial = 1 if $single;
 
 # ---------------------------------------------------------------------------
+# Tier-2 LLM judge probe
+# ---------------------------------------------------------------------------
+# Tier 2 scripts drive an LLM visual judge (qa/lib/llm-judge.sh) that needs
+# provider config (env, ~/.config/zepto-qa/judge.json, or interactive
+# first-run setup). Rather than let each script silently SKIP its visual
+# assertions one at a time with no overall signal, probe ONCE up front and
+# either run tier2 for real or skip it loudly with one clear reason.
+use Cwd qw(abs_path);
+my $qa_dir = abs_path(dirname(__FILE__));
+
+sub judge_probe {
+    my $judge = "$qa_dir/lib/llm-judge.sh";
+    return (0, "llm-judge.sh not found at $judge") unless -f $judge;
+    my $out = `bash \Q$judge\E probe 2>&1`;
+    my $rc  = $? >> 8;
+    chomp $out;
+    (my $reason = $out) =~ s/^PROBE_(?:OK|FAIL):\s*//;
+    return ($rc == 0, $reason || $out || "probe failed (exit $rc)");
+}
+
+sub print_judge_banner {
+    my ($reason) = @_;
+    my $line = '=' x 70;
+    print "\n${YELLOW}${BOLD}${line}${RESET}\n";
+    print "${YELLOW}${BOLD}  tier 2 skipped: ${reason}${RESET}\n";
+    print "${YELLOW}${BOLD}${line}${RESET}\n\n";
+}
+
+if ($probe_judge) {
+    my ($ok, $reason) = judge_probe();
+    if ($ok) {
+        print "${GREEN}${BOLD}tier 2 judge probe OK${RESET} ${DIM}($reason)${RESET}\n";
+        exit 0;
+    } else {
+        print_judge_banner($reason);
+        exit 1;
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Discover scripts
 # ---------------------------------------------------------------------------
 
-my $qa_dir = dirname(__FILE__);
+# Absolutized so every script receives an absolute $0: test scripts (and
+# qa-helpers.sh) may cd away from the invocation directory, after which any
+# relative-$0-derived path silently breaks (see QA-FILE-014/QA-FIF-015
+# history — instant set -e death when the runner was invoked as
+# `perl qa/runner.pl` from the repo root).
 
 sub discover_scripts {
     my @scripts;
@@ -283,10 +329,12 @@ sub finish_script {
         $total_err++;
         $status = 'error';
         push @failures, { name => $name, duration => $duration, output => $output,
+                          pass => $pass, fail => $fail, skip => $skip,
                           error => "Script exited with code $rc" };
     } elsif ($fail > 0) {
         $status = 'fail';
-        push @failures, { name => $name, duration => $duration, output => $output };
+        push @failures, { name => $name, duration => $duration, output => $output,
+                          pass => $pass, fail => $fail, skip => $skip };
     } elsif ($skip > 0 && $pass == 0) {
         $status = 'skip';
     } else {
@@ -294,6 +342,33 @@ sub finish_script {
     }
 
     print_result($name, $status, $duration);
+}
+
+# ---------------------------------------------------------------------------
+# Tier-2 judge probe: skip loudly (not silently) if unconfigured
+# ---------------------------------------------------------------------------
+# One probe for the whole run rather than one silent per-assertion SKIP per
+# script (the old behavior — see CLAUDE.md task history: tier 2 "has never
+# actually run" because a missing key made every assertion vanish quietly).
+# Scripts under tier2/ are pulled out of @scripts entirely and resolved as
+# SKIPPED right here, without spawning hangon/zepto at all, so an
+# unconfigured run stays fast AND visible.
+my $tier2_requested = grep { $_ eq '2' } split /,/, $tiers;
+if ($tier2_requested) {
+    my ($judge_ok, $judge_reason) = judge_probe();
+    unless ($judge_ok) {
+        print_judge_banner($judge_reason);
+        my @remaining;
+        for my $s (@scripts) {
+            if ($s =~ m{/tier2/}) {
+                $total_skip++;
+                print_result(basename($s, '.sh'), 'skip', 0);
+            } else {
+                push @remaining, $s;
+            }
+        }
+        @scripts = @remaining;
+    }
 }
 
 if ($serial) {
@@ -366,6 +441,61 @@ if ($serial) {
 
 hangon_quiet('stopall');
 clear_status();
+
+# ---------------------------------------------------------------------------
+# Serial retry of failures — harness flake guard
+# ---------------------------------------------------------------------------
+# hangon's session registry races under parallel load (non-atomic
+# state.json writes; see bugs.md), so a small number of scripts can fail
+# for harness reasons unrelated to Zepto. Each failed script gets ONE
+# serial re-run with no concurrent load; a clean pass converts the
+# failure and is reported loudly so persistent flakiness stays visible.
+# Disable with ZEPTO_QA_NO_RETRY=1 (used when debugging the harness).
+# A handful of failures looks like flake; dozens means the environment
+# collapsed mid-run (dead tmux server, exhausted disk/sessions) — retrying
+# each serially would only burn the CI job's time budget and suppress the
+# failure details. Cap the guard and fail fast with full detail instead.
+my $RETRY_CAP = $ENV{ZEPTO_QA_RETRY_CAP} // 8;
+if (@failures > $RETRY_CAP) {
+    printf "\n ${RED}${BOLD}%d scripts failed — above the flake-retry cap (%d); systemic failure, skipping retries.${RESET}\n",
+        scalar @failures, $RETRY_CAP;
+}
+elsif (@failures && !$ENV{ZEPTO_QA_NO_RETRY}) {
+    my %path_of = map { basename($_, '.sh') => $_ } @scripts;
+    my @still_failing;
+    my @retried_ok;
+    printf "\n ${YELLOW}retrying %d failed script(s) serially (harness flake guard)...${RESET}\n",
+        scalar @failures;
+    for my $f (@failures) {
+        my $script = $path_of{ $f->{name} };
+        unless ($script) { push @still_failing, $f; next }
+        my $out = "$tmpdir/retry_$f->{name}.out";
+        my $t0  = time();
+        system("bash \Q$script\E >\Q$out\E 2>&1");
+        my $rc     = $? >> 8;
+        my $output = '';
+        if (open my $fh, '<', $out) { local $/; $output = <$fh> // ''; close $fh }
+        my ($pass, $fail, $skip) = parse_output($output);
+        if ($rc == 0 && $fail == 0 && ($pass > 0 || $skip > 0)) {
+            $total_pass += $pass - ($f->{pass} // 0);
+            $total_fail -= ($f->{fail} // 0);
+            $total_skip += $skip - ($f->{skip} // 0);
+            $total_err-- if $f->{error};
+            push @retried_ok, { name => $f->{name}, duration => time() - $t0 };
+        } else {
+            push @still_failing, $f;
+        }
+    }
+    @failures = @still_failing;
+    for my $r (@retried_ok) {
+        printf " ${YELLOW}\x{27f3}${RESET}  %-36s ${YELLOW}passed on serial retry${RESET} ${DIM}(%s)${RESET}\n",
+            $r->{name}, fmt_dur($r->{duration});
+    }
+    if (@retried_ok) {
+        printf " ${DIM}%d script(s) recovered on retry - harness flakes, not product failures.${RESET}\n",
+            scalar @retried_ok;
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Failure details

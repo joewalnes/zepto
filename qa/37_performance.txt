@@ -249,3 +249,64 @@ STEPS
 VERIFY
   - Startup reasonable (<1s typical).
   - VCS diff deferred; doesn't block first render.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-016
+NAME:     Hang watchdog detects a wedged main loop and recovers
+PRIORITY: P1
+FEATURE:  perf hang watchdog diagnostics
+RELATED:  QA-XFM-014
+
+SETUP
+  ZEPTO_HANG_THRESHOLD set low (e.g. 2s) and ZEPTO_TRANSFORM_TIMEOUT set
+  higher than that (e.g. 15s), so a transform command that runs past the
+  watchdog threshold — but still returns on its own before the (Phase-6a)
+  transform timeout would kick in — genuinely blocks the main loop for
+  longer than the watchdog allows, without the transform timeout itself
+  intervening first.
+
+STEPS
+  1. Select text, open Transform via Shell (⌥T), run a command that
+     blocks for longer than ZEPTO_HANG_THRESHOLD but less than
+     ZEPTO_TRANSFORM_TIMEOUT (e.g. `sleep 8` with threshold=2,
+     timeout=15).
+  2. After the threshold elapses, check the state directory for a
+     `hang-YYYYMMDD-HHMMSS.log` file.
+  3. Wait for the command to finish naturally and the editor to recover.
+  4. Type something to confirm full responsiveness.
+
+VERIFY
+  - A `hang-*.log` diagnostic file appears in the state directory shortly
+    after the threshold elapses — it exists BEFORE the transform command
+    itself finishes, proving the watchdog (a separate forked process)
+    detected the wedge independently of the transform's own eventual
+    completion.
+  - The log contains: the last heartbeat tag (e.g. `transform:sleep 8`),
+    the parent pid, a timestamp, AND (appended by the parent's SIGUSR2
+    handler once it recovers) a stack trace showing exactly where the
+    main loop was blocked, plus a state summary (file, editor state,
+    cursor position, doc info).
+  - Once the transform naturally completes and the main loop resumes,
+    the status bar shows "Zepto was unresponsive — diagnostics: <path>"
+    exactly once.
+  - The editor is fully responsive after recovery (typing works
+    normally) — not just unfrozen-but-wedged.
+  - No zombie process is left behind — the watchdog is reaped cleanly on
+    quit (`Editor::cleanup` calls `HangWatchdog::stop`).
+  - Design (bugs.md Phase 2, feature "hang watchdog"): fork-only, no
+    threads anywhere in this codebase. `Editor::run` forks a watchdog
+    (`lib/Zepto/HangWatchdog.pm`) connected via a pipe; the main loop
+    calls `HangWatchdog::heartbeat()` once per iteration and around
+    known-blocking operations (transform, clipboard copy/paste) with a
+    tag identifying what's in progress. The watchdog blocks in
+    `IO::Select::can_read($threshold)`; a timeout with no heartbeat means
+    a hang, so it writes the log and sends SIGUSR2 to the parent, whose
+    handler appends a `Carp::longmess` stack trace (Perl's default "safe
+    signals" make file I/O in the handler safe) plus state summary to the
+    SAME log file (located by mtime, since a plain signal carries no
+    payload). Toggle: `hang_detector` preference (default on).
+  - Never fires during legitimately-blocking foreground UI (footer input,
+    prompts, find bar) — those are all still driven through the same main
+    loop, so heartbeats keep flowing; only a truly wedged loop (no
+    heartbeat at all) triggers it.
