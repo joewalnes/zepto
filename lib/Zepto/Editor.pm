@@ -48,6 +48,7 @@ use Zepto::Completion::CrossBufferWordProvider;
 use Zepto::Completion::PathProvider;
 use Zepto::Completion::SnippetProvider;
 use Zepto::Completion::RecentProvider;
+use Zepto::HangWatchdog;
 
 # Editor states
 use constant {
@@ -658,6 +659,27 @@ sub init {
 # Main Loop
 # =============================================================================
 
+# Poll StateStore for external changes (another Zepto window/instance
+# writing a shared preference, e.g. toggling the theme) and apply them via
+# StateStore's listener mechanism (already wired — see Preferences.pm's
+# on_change registration and Editor::init's theme/nerd_font/minimap
+# listener). Throttled to ~1/sec so it doesn't add per-iteration stat()
+# overhead; only relevant while actively editing, matching the same gate
+# render() already uses for its own (per-render) check_for_changes() call.
+# Returns true if a change was applied (caller should re-render).
+sub _poll_cross_instance_prefs {
+    my ($self) = @_;
+
+    return 0 unless $self->{state} eq STATE_EDITING;
+
+    my $now_ts = time();
+    my $last_check = $self->{_last_prefs_check_at} // 0;
+    return 0 if ($now_ts - $last_check) < 1.0;
+
+    $self->{_last_prefs_check_at} = $now_ts;
+    return $self->{state_store}->check_for_changes() ? 1 : 0;
+}
+
 sub run {
     my ($self) = @_;
 
@@ -665,11 +687,35 @@ sub run {
     my $error;
     eval {
         $self->init();
+
+        # Hang watchdog: fork a child that watches for heartbeats from the
+        # main loop below. If none arrive for >10s, it writes a diagnostic
+        # log and signals us so we can append a stack trace and recover
+        # gracefully instead of just sitting frozen with no explanation.
+        # See lib/Zepto/HangWatchdog.pm for the full design.
+        if ($self->{prefs}->hang_detector()) {
+            $self->{_watchdog} = Zepto::HangWatchdog::start(
+                log_dir   => $self->{state_store}->base_dir(),
+                # Env-overridable so QA can exercise real hang-detection
+                # timing without waiting out the full 10s default.
+                threshold => $ENV{ZEPTO_HANG_THRESHOLD} || Zepto::HangWatchdog::HANG_THRESHOLD(),
+            );
+        }
+        local $SIG{USR2} = sub { $self->_handle_hang_signal(); };
+
         $self->render();
 
         my $last_search_render = 0;  # Track last render during search
 
         while ($self->{state} ne STATE_QUIT) {
+            # Prove to the watchdog that the main loop is alive. The footer
+            # input / prompts / find bar are all still driven through this
+            # same loop (they're just different $self->{state} values
+            # handled by handle_input()), so heartbeats keep flowing while
+            # any of those are open — the watchdog only fires for a truly
+            # wedged loop, never for legitimately-blocking foreground UI.
+            Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'loop');
+
             # Use shorter timeout when background search or completion debounce is active
             my $searching = ($self->active_find_engine() && $self->active_find_engine()->is_searching)
                          || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
@@ -692,6 +738,15 @@ sub run {
             if ($self->{message} && length $input) {
                 $self->{message} = '';
                 $self->{message_is_error} = 0;
+            }
+
+            # If a hang was detected and recovered from since the last
+            # render, surface it once as a status-bar warning. Checked
+            # after the input-driven message clear above so it isn't wiped
+            # out in the very same iteration that includes new input.
+            if (my $diag_path = delete $self->{_hang_recovered_diagnostic}) {
+                $self->show_error_message("Zepto was unresponsive — diagnostics: $diag_path");
+                $needs_render = 1;
             }
 
             if (length $input) {
@@ -741,6 +796,16 @@ sub run {
                 if ($self->{_tree_vcs_deferred}) {
                     $self->{_tree_vcs_deferred} = 0;
                     $self->{_tree_vcs_ready} = 1;
+                    $needs_render = 1;
+                }
+
+                # Cross-instance preference sync (e.g. another window
+                # toggling the theme): check_for_changes() previously only
+                # ran inside render(), so an idle instance — one that
+                # isn't typing and therefore isn't re-rendering — never
+                # noticed external changes at all. Poll here too, on the
+                # idle-timeout path.
+                if ($self->_poll_cross_instance_prefs()) {
                     $needs_render = 1;
                 }
             }
@@ -839,16 +904,13 @@ sub run {
     }
 }
 
-sub _print_crash_report {
-    my ($self, $error) = @_;
+# Gather a short summary of what the editor is doing right now — file,
+# state, cursor position, doc size. Returns (file, state, cursor_info,
+# doc_info); the latter two may be ''. Shared by the crash report and the
+# hang-watchdog signal handler.
+sub _state_summary_fields {
+    my ($self) = @_;
 
-    # Get stack trace if not already present
-    my $trace = $error;
-    unless ($trace =~ /\n\s+at\s+\S+\s+line\s+\d+/) {
-        $trace = Carp::longmess($error);
-    }
-
-    # Gather context
     my $file = $self->active_file_path() // '[no file]';
     my $state = $self->{state} // 'unknown';
     my $cursor_info = '';
@@ -863,6 +925,49 @@ sub _print_crash_report {
         my $dirty = $self->active_doc()->is_dirty() ? ' (modified)' : '';
         $doc_info = "Document: $lines lines$dirty";
     }
+
+    return ($file, $state, $cursor_info, $doc_info);
+}
+
+# Append a stack trace and state summary to the hang log the watchdog just
+# wrote (located by mtime — see HangWatchdog::most_recent_log). Installed
+# as the SIGUSR2 handler for the duration of run()'s main loop. Perl's
+# "safe signals" (default since 5.8) defer actual dispatch of this handler
+# to the next opcode boundary, so it's safe to do file I/O here.
+sub _handle_hang_signal {
+    my ($self) = @_;
+
+    my $log_dir = $self->{state_store} ? $self->{state_store}->base_dir() : undef;
+    my $log_path = Zepto::HangWatchdog::most_recent_log($log_dir);
+    return unless $log_path;
+
+    my $trace = Carp::longmess('Hang detected — stack at time of signal');
+    my ($file, $state, $cursor_info, $doc_info) = $self->_state_summary_fields();
+
+    if (open(my $fh, '>>', $log_path)) {
+        print $fh "\n=== Parent-side diagnostics (SIGUSR2 handler) ===\n";
+        print $fh "File: $file\n";
+        print $fh "State: $state\n";
+        print $fh "$cursor_info\n" if length $cursor_info;
+        print $fh "$doc_info\n" if length $doc_info;
+        print $fh "\n$trace\n";
+        close($fh);
+    }
+
+    # Show a recovery notice on the next render, once.
+    $self->{_hang_recovered_diagnostic} = $log_path;
+}
+
+sub _print_crash_report {
+    my ($self, $error) = @_;
+
+    # Get stack trace if not already present
+    my $trace = $error;
+    unless ($trace =~ /\n\s+at\s+\S+\s+line\s+\d+/) {
+        $trace = Carp::longmess($error);
+    }
+
+    my ($file, $state, $cursor_info, $doc_info) = $self->_state_summary_fields();
 
     print STDERR <<EOF;
 
@@ -884,6 +989,15 @@ EOF
 
 sub cleanup {
     my ($self) = @_;
+
+    # Stop the hang watchdog (if running): closes the heartbeat pipe
+    # (signals EOF so the watchdog child exits its own select loop) and
+    # reaps it without blocking indefinitely — never leaves a zombie.
+    # Runs on both normal quit and crash (see run()'s eval/cleanup).
+    if ($self->{_watchdog}) {
+        Zepto::HangWatchdog::stop($self->{_watchdog});
+        $self->{_watchdog} = undef;
+    }
 
     # Clear any Kitty graphics images before leaving alt screen
     if ($self->{_kitty_image_path}) {
@@ -1373,6 +1487,24 @@ sub handle_alt_char {
     }
 }
 
+# Dismiss any active ghost/menu completion (word completion + AI) the same
+# way key handling does. Mouse press/drag that repositions the cursor makes
+# any in-flight suggestion stale — it was computed for a different cursor
+# location — so it must not linger or reappear anchored to the new spot.
+sub _dismiss_ghosts_for_mouse {
+    my ($self) = @_;
+
+    my $_comp = $self->{_completion};
+    if ($_comp && $_comp->is_active()) {
+        $_comp->dismiss();
+    }
+
+    my $_ai = $self->{_ai_complete};
+    if ($_ai && $_ai->has_result()) {
+        $_ai->dismiss();
+    }
+}
+
 sub handle_mouse_event {
     my ($self, $event) = @_;
 
@@ -1604,6 +1736,10 @@ sub handle_mouse_event {
                 return;
             }
 
+            # Clicking into the text area repositions the cursor — dismiss
+            # any active ghost/menu completion the same way key handling does.
+            $self->_dismiss_ghosts_for_mouse();
+
             my ($doc_line, $doc_col);
             my $wm = $view->wrap_map();
             if ($wm) {
@@ -1819,6 +1955,12 @@ sub handle_mouse_event {
             my $absolute_visual_col = $view->scroll_col() + $visual_col;
             my $line_content = $self->active_doc()->get_line($doc_line) // '';
             $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
+        }
+
+        if ($visual_col >= 0) {
+            # Dragging in the text area repositions the cursor — dismiss any
+            # active ghost/menu completion the same way key handling does.
+            $self->_dismiss_ghosts_for_mouse();
         }
 
         if ($visual_col >= 0 && !$view->has_selection()) {
@@ -3300,6 +3442,48 @@ sub do_enter {
         }
     }
 
+    # List continuation (Markdown / plain text): pressing Enter at the end
+    # of a list item continues the list on the new line with the same (or
+    # incremented) marker; pressing Enter on an EMPTY list item removes
+    # the marker instead — the standard way to "escape" out of a list.
+    # Skipped during bracketed paste (same reasoning as auto-indent above)
+    # and gated on file type: only Markdown and plain text (no grammar
+    # detected at all — matches how AIComplete.pm derives language names).
+    if ($self->{prefs}->continue_lists() && !$self->{_bracketed_paste}
+        && $self->_list_continuation_applies_to_current_file()) {
+        my $cursor_line = $view->cursor_line();
+        my $cursor_col = $view->cursor_col();
+        my $line_content = $doc->get_line_content($cursor_line);
+
+        # Only engage at the true end of the line — Enter in the middle of
+        # a list item's text just splits it normally (falls through).
+        if ($cursor_col == length($line_content)) {
+            my ($ws, $marker, $rest) = _detect_list_prefix($line_content);
+            if (defined $ws) {
+                if ($rest eq '') {
+                    # Empty list item: strip the marker in the same edit
+                    # that inserts the newline (single undo step). The
+                    # whole line is exactly "$ws$marker" here (rest is
+                    # empty and cursor is at EOL), so replacing that whole
+                    # range removes the marker and starts a plain,
+                    # unmarked line at the same indent.
+                    my $line_start = $doc->line_start_offset($cursor_line);
+                    $doc->replace($line_start, $offset, $ws . "\n" . $ws);
+                    $view->invalidate_wrap_map();
+                    $view->set_cursor($cursor_line + 1, length($ws));
+                    return;
+                } else {
+                    # Non-empty item: continue the list with the (possibly
+                    # incremented) marker. Cursor lands right after it.
+                    $doc->insert($offset, "\n" . $ws . $marker);
+                    $view->invalidate_wrap_map();
+                    $view->set_cursor($cursor_line + 1, length($ws) + length($marker));
+                    return;
+                }
+            }
+        }
+    }
+
     # Auto-pair: expand {|} to {\n  |\n} on Enter
     my $between_pair = 0;
     if ($self->{prefs}->get('auto_pairs') && !$self->{_bracketed_paste}) {
@@ -3331,6 +3515,55 @@ sub do_enter {
         my $new_line = $view->cursor_line() + 1;
         $view->set_cursor($new_line, length($indent));
     }
+}
+
+# List continuation only applies to Markdown and plain text — files with
+# no detected grammar at all (untitled scratch buffers, .txt, etc.) count
+# as "plain text". Language derivation matches AIComplete.pm's
+# _build_context (~271-277): strip the Zepto::Syntax:: prefix off the
+# grammar class name.
+sub _list_continuation_applies_to_current_file {
+    my ($self) = @_;
+
+    my $hl = $self->active_highlighter();
+    my $language = '';
+    if ($hl && $hl->{grammar}) {
+        $language = ref($hl->{grammar});
+        $language =~ s/^Zepto::Syntax:://;
+    }
+
+    return $language eq '' || $language eq 'Markdown';
+}
+
+# Detect a list-item prefix on $line: `- `/`* `/`+ ` bullets (including
+# `- [ ] `/`- [x] ` checkboxes), `> ` blockquotes, and `\d+[.)] ` numbered
+# items. Returns ($leading_whitespace, $marker_for_next_line, $rest_of_line)
+# on a match, or an empty list if $line isn't a list item.
+#
+# $marker_for_next_line is what do_enter repeats on the continuation line:
+# checkboxes always continue as unchecked (`- [ ] `), numbered items
+# increment, bullets/blockquotes repeat verbatim. $rest_of_line is
+# everything after the marker — callers use `$rest_of_line eq ''` to
+# detect an EMPTY list item (escape the list instead of continuing it).
+sub _detect_list_prefix {
+    my ($line) = @_;
+    return () unless defined $line;
+
+    if ($line =~ /^(\s*)([-*+])\s+\[([ xX])\]\s+(.*)$/) {
+        return ($1, '- [ ] ', $4);
+    }
+    if ($line =~ /^(\s*)([-*+])\s+(.*)$/) {
+        return ($1, "$2 ", $3);
+    }
+    if ($line =~ /^(\s*)(>)\s+(.*)$/) {
+        return ($1, "$2 ", $3);
+    }
+    if ($line =~ /^(\s*)(\d+)([.)])\s+(.*)$/) {
+        my $next_num = $2 + 1;
+        return ($1, "$next_num$3 ", $4);
+    }
+
+    return ();
 }
 
 sub do_indent {

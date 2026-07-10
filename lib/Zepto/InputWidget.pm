@@ -360,8 +360,11 @@ sub _handle_char {
         }
 
         if ($lc eq 'v' && $clipboard_ref) {
-            # Paste: inserts clipboard at cursor, replacing any selection
-            my $text = $$clipboard_ref // '';
+            # Paste: inserts clipboard at cursor, replacing any selection.
+            # Sanitize first — this is a single-line widget, so control
+            # characters (including stray newlines) must never appear in
+            # the rendered value regardless of what the clipboard contains.
+            my $text = _sanitize_text($$clipboard_ref // '');
             if (length($text)) {
                 $self->_delete_selection() if $self->has_selection();
                 my $pos = $self->{cursor};
@@ -374,12 +377,28 @@ sub _handle_char {
         return 0;  # Other ctrl chars: not handled by widget
     }
 
-    # Printable char: insert at cursor, replacing any selection
+    # Printable char: insert at cursor, replacing any selection.
+    # Defense in depth: the input parser should never hand this path a
+    # control character (ESC and friends are routed as 'key' events, not
+    # 'char' events — see InputParser::_parse_one), but an input field must
+    # never render a raw control char under any circumstance, so guard here
+    # too rather than trusting the caller.
+    return 0 unless length($char) && $char !~ /[\x00-\x1f\x7f]/;
+
     $self->_delete_selection() if $self->has_selection();
     my $pos = $self->{cursor};
     $self->{value}  = substr($self->{value}, 0, $pos) . $char . substr($self->{value}, $pos);
     $self->{cursor}++;
     return 1;
+}
+
+# Strip ASCII control characters (C0 + DEL) from text before it's inserted
+# into the widget. This is a single-line input — control chars (stray ESC,
+# embedded newlines, etc.) must never end up in the rendered value.
+sub _sanitize_text {
+    my ($text) = @_;
+    $text =~ s/[\x00-\x1f\x7f]//g;
+    return $text;
 }
 
 1;

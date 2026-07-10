@@ -141,8 +141,13 @@ sub on_change {
 
 # Poll for external changes. Call from event loop (~1/sec).
 # Fires on_change callbacks for categories modified by other processes.
+# Returns the number of categories that changed, so callers can decide
+# whether a re-render is needed (e.g. an idle instance picking up a theme
+# toggle from another window — see Editor::run's idle-timeout branch).
 sub check_for_changes {
     my ($self) = @_;
+
+    my $changed_count = 0;
 
     for my $category (keys %{$self->{_cache}}) {
         my $path = $self->_file_path($category);
@@ -164,6 +169,7 @@ sub check_for_changes {
         # External change detected — reload
         my $data = $self->_read_file($path);
         $self->{_cache}{$category} = { data => $data, mtime => $mtime };
+        $changed_count++;
 
         # Fire listeners
         my $listeners = $self->{_listeners}{$category} || [];
@@ -171,6 +177,8 @@ sub check_for_changes {
             eval { $cb->($data) };
         }
     }
+
+    return $changed_count;
 }
 
 # --- Private helpers ---

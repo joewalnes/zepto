@@ -18,6 +18,29 @@ use utf8;
 use parent 'Zepto::VCS::Provider';
 use File::Basename qw(dirname);
 use Cwd qw(abs_path getcwd);
+use POSIX qw(WNOHANG);
+# Time::HiRes's alarm() supports fractional seconds (core alarm() truncates
+# to an integer, and alarm(0) means "cancel" — a fractional ZEPTO_GIT_TIMEOUT
+# like 0.3, used to keep tests fast, would silently never fire with core
+# alarm(), hanging forever on a wedged git process instead of timing out).
+use Time::HiRes qw(time alarm);
+
+# Hard timeout (seconds) for a single `git` invocation. VCS calls are
+# reachable from the render path (status bar / gutter markers), so a
+# wedged git process (e.g. a stale lock file prompting an interactive
+# hang, or a network-mounted .git directory that's gone unresponsive)
+# must not freeze the whole editor UI — see bugs.md P1 "cmd_transform
+# open3 sequential-slurp can deadlock/hang UI indefinitely" (same
+# blocking-pipe-I/O class of bug, different call site). Read at call time
+# (not baked into a `use constant`) so ZEPTO_GIT_TIMEOUT can speed up
+# tests that exercise the timeout path itself — see tests/vcs.t.
+sub _git_timeout { $ENV{ZEPTO_GIT_TIMEOUT} || 3 }
+
+# After a timeout, remember it briefly so a wedged git command isn't
+# retried (and re-blocked-on) on every single render tick.
+use constant GIT_FAILURE_CACHE_TTL => 5;
+
+my %_git_timeout_until;  # "joined args" => time() until which we skip retrying
 
 # Check if git is available (cached)
 my $_git_available;
@@ -34,23 +57,106 @@ sub _git_available {
 # Register with the provider system
 Zepto::VCS::Provider->register(__PACKAGE__);
 
+# Wait for $pid to exit, up to $grace seconds, without ever blocking
+# indefinitely; if it hasn't exited by then, kill it (and its process
+# group — see setpgid in _run_git) and reap synchronously. $grace=0 means
+# "skip straight to killing" (caller already knows this needs killing).
+sub _bounded_reap {
+    my ($pid, $grace) = @_;
+    return unless $pid;
+    $grace //= 0;
+
+    if ($grace > 0) {
+        my $deadline = time() + $grace;
+        while (time() < $deadline) {
+            my $ret = waitpid($pid, WNOHANG);
+            return if $ret == $pid;
+            select(undef, undef, undef, 0.05);
+        }
+    }
+
+    kill('TERM', $pid);
+    kill('TERM', -$pid);
+    my $deadline = time() + 1;
+    while (time() < $deadline) {
+        my $ret = waitpid($pid, WNOHANG);
+        return if $ret == $pid;
+        select(undef, undef, undef, 0.05);
+    }
+    kill('KILL', $pid);
+    kill('KILL', -$pid);
+    waitpid($pid, 0);
+}
+
 # =============================================================================
 # Safe git execution (no shell interpretation)
 # =============================================================================
 
 # Run a git command with list-form exec, suppressing stderr.
 # Returns ($output, $exit_status) where exit_status is $? from waitpid.
+# On timeout, returns (undef, -1) — same "spawn failed" sentinel already
+# used elsewhere in this function — and every existing caller already
+# guards on exit_status != 0 before touching $output, so this is safe.
 sub _run_git {
     my (@args) = @_;
+
+    my $cache_key = join("\x00", @args);
+    if (my $until = $_git_timeout_until{$cache_key}) {
+        if (time() < $until) {
+            return (undef, -1);
+        }
+        delete $_git_timeout_until{$cache_key};
+    }
+
     my $pid = open(my $fh, '-|');
     return ('', -1) unless defined $pid;
     if ($pid == 0) {
+        # Own process group — git can spawn children of its own (pager,
+        # credential helper, hooks); putting it in its own group lets a
+        # timeout kill the whole tree, not just the immediate git process.
+        eval { POSIX::setpgid(0, 0) };
         open(STDERR, '>', '/dev/null');
         exec('git', @args) or exit(127);
     }
-    my $output = do { local $/; <$fh> };
+
+    my $output;
+    my $timed_out = 0;
+    eval {
+        local $SIG{ALRM} = sub { die "git_timeout\n" };
+        alarm(_git_timeout());
+        $output = do { local $/; <$fh> };
+        alarm(0);
+    };
+    if ($@) {
+        alarm(0);
+        $timed_out = 1;
+    }
+
+    if ($timed_out) {
+        # Reap BEFORE close() — close() on a pipe filehandle blocks
+        # waiting for the child to exit (it does an internal waitpid), so
+        # closing first would silently re-introduce the exact hang this
+        # timeout exists to prevent. grace=0: we already know this needs
+        # killing, no point waiting for a natural exit first.
+        _bounded_reap($pid, 0);
+        close($fh);
+        $_git_timeout_until{$cache_key} = time() + GIT_FAILURE_CACHE_TTL;
+        return (undef, -1);
+    }
+
+    # Bounded reap here too, not a bare close()/waitpid — reaching EOF on
+    # the read does NOT guarantee git has actually exited yet (e.g. it
+    # spawned a pager or credential helper that's still attached). A bare
+    # close() would silently re-introduce the exact hang class this
+    # timeout exists to prevent, just moved to the success path.
+    _bounded_reap($pid, 2);
+    # Capture $? BEFORE close($fh) — close() on this kind of filehandle
+    # (opened via `open($fh, '-|')`) does its own internal waitpid, which
+    # would fail (ECHILD, since _bounded_reap already reaped the child
+    # above) and clobber $? with a bogus value.
+    my $exit_status = $?;
     close($fh);
-    return (defined $output ? $output : '', $?);
+    return (defined $output ? $output : '', $exit_status);
 }
 
 # Instance helper: run git -C <repo_root> with given args

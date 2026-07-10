@@ -31,6 +31,7 @@ my %DEFAULTS = (
     tab_width        => 4,
     soft_tabs        => 1,        # Use spaces instead of tabs
     auto_indent      => 1,        # Copy indentation from previous line
+    continue_lists   => 1,        # Enter continues Markdown/plain-text list items
 
     # Search
     search_case_sensitive => 0,
@@ -57,6 +58,9 @@ my %DEFAULTS = (
     backup_on_save   => 0,        # Create .bak files
     trim_trailing_whitespace => 0,
     ensure_final_newline => 1,
+
+    # Diagnostics
+    hang_detector    => 1,        # Watchdog: detect a wedged main loop and log diagnostics
 );
 
 # Preferences that are persisted globally and synced across instances.
@@ -71,11 +75,13 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     tab_width
     soft_tabs
     auto_indent
+    continue_lists
     auto_complete
     auto_pairs
     mouse_enabled
     ai_api_url
     ai_model
+    hang_detector
 );
 
 sub new {
@@ -221,6 +227,9 @@ sub set_soft_tabs { $_[0]->set('soft_tabs', $_[1]) }
 sub auto_indent { $_[0]->get('auto_indent') }
 sub set_auto_indent { $_[0]->set('auto_indent', $_[1]) }
 
+sub continue_lists { $_[0]->get('continue_lists') }
+sub set_continue_lists { $_[0]->set('continue_lists', $_[1]) }
+
 sub show_line_numbers { $_[0]->get('show_line_numbers') }
 sub set_show_line_numbers { $_[0]->set('show_line_numbers', $_[1]) }
 
@@ -253,6 +262,9 @@ sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }
 
 sub auto_pairs { $_[0]->get('auto_pairs') }
 sub set_auto_pairs { $_[0]->set('auto_pairs', $_[1]) }
+
+sub hang_detector { $_[0]->get('hang_detector') }
+sub set_hang_detector { $_[0]->set('hang_detector', $_[1]) }
 
 # Extensions that default to word wrap on (prose file types)
 my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);

@@ -17,9 +17,17 @@ qa_keys "enter" 0.3
 
 qa_assert_screen "Find|Search|find" "find-in-files opened"
 
+# Settle before sending Escape as its own, cleanly separated keystroke —
+# the assert above already forced a screen capture, but poll explicitly so
+# this doesn't race a slow/loaded CI runner that hasn't finished rendering.
+qa_expect_screen "Find|Search|find" 5 -F || true
+
 # Close with Esc
 qa_keys "escape"
-sleep 0.3
+
+# Poll for the panel to actually close instead of a fixed sleep — more
+# robust under load, and faster than a fixed sleep on a healthy run.
+qa_expect_screen "content" 5 -F || true
 
 # Should be back to normal editor
 qa_assert_screen "content" "back to editor after Esc"

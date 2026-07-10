@@ -26,6 +26,10 @@ else
     qa_fail "find in files regex search works"
 fi
 
+# Settle before Escape so it's sent as its own cleanly-separated keystroke
+# rather than racing the tail of the typed query on a slow/loaded runner.
+qa_expect_screen "foo123" 3 -F || true
+
 qa_keys "escape"
 qa_keys "ctrl-q"
 

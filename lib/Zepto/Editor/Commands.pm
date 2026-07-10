@@ -12,7 +12,10 @@ use warnings;
 
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
-use IPC::Open3;
+use IO::Select;
+use POSIX qw(WNOHANG setpgid);
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
+use Time::HiRes qw(time);
 
 # Check if editor is in a modal input state (footer_input, prompt, find, dialog)
 sub _in_modal_state {
@@ -20,7 +23,6 @@ sub _in_modal_state {
     my $s = $self->{state};
     return $s eq 'footer_input' || $s eq 'prompt' || $s eq 'find' || $s eq 'dialog';
 }
-use Symbol 'gensym';
 
 use Zepto::Theme;
 use Zepto::FileSearchEngine;
@@ -344,6 +346,25 @@ sub cmd_redo {
     }
 }
 
+# Clipboard helpers — tag the hang watchdog around the external clipboard
+# command, same idea as the transform pump: this is already independently
+# timeout-protected (Terminal.pm), but tagging gives a diagnostic log
+# something more useful than "loop" to report if it ever wedges anyway.
+sub _clipboard_copy {
+    my ($self, $text) = @_;
+    Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'clipboard:copy');
+    $self->{terminal}->copy_to_clipboard($text);
+    Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'loop');
+}
+
+sub _clipboard_paste {
+    my ($self) = @_;
+    Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'clipboard:paste');
+    my $text = $self->{terminal}->paste_from_clipboard();
+    Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'loop');
+    return $text;
+}
+
 sub cmd_cut {
     my ($self) = @_;
 
@@ -354,7 +375,7 @@ sub cmd_cut {
         my $lines = $view->column_selected_text();
         $self->{clipboard} = join("\n", @$lines);
         $self->{clipboard_columnar} = 1;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->_clipboard_copy($self->{clipboard});
         $self->delete_selection();
         $self->show_message("Cut " . scalar(@$lines) . " lines (column)");
         return;
@@ -366,7 +387,7 @@ sub cmd_cut {
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
         $self->{clipboard_columnar} = 0;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->_clipboard_copy($self->{clipboard});
         $self->delete_selection();
         $self->show_message("Cut");
     }
@@ -383,7 +404,7 @@ sub cmd_copy {
         my $lines = $view->column_selected_text();
         $self->{clipboard} = join("\n", @$lines);
         $self->{clipboard_columnar} = 1;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->_clipboard_copy($self->{clipboard});
         $self->show_message("Copied " . scalar(@$lines) . " lines (column)");
         return;
     }
@@ -400,7 +421,7 @@ sub cmd_copy {
 
         $self->{clipboard} = $content;
         $self->{clipboard_columnar} = 0;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        $self->_clipboard_copy($self->{clipboard});
 
         # Select the line visually (cursor stays at end of line)
         my $line_len = $doc->line_length($line);
@@ -413,7 +434,7 @@ sub cmd_copy {
 
     $self->{clipboard} = $view->selected_text();
     $self->{clipboard_columnar} = 0;
-    $self->{terminal}->copy_to_clipboard($self->{clipboard});
+    $self->_clipboard_copy($self->{clipboard});
     $self->show_message("Copied");
 }
 
@@ -421,7 +442,7 @@ sub cmd_paste {
     my ($self) = @_;
 
     # Try system clipboard first, fall back to internal clipboard
-    my $text = $self->{terminal}->paste_from_clipboard();
+    my $text = $self->_clipboard_paste();
     if (length $text) {
         $self->{clipboard} = $text;
         $self->{clipboard_columnar} = 0;  # System clipboard is always linear
@@ -964,6 +985,226 @@ sub cmd_toggle_comment {
     $view->invalidate_wrap_map();
 }
 
+# Wait for $pid to exit, up to $grace seconds, without ever blocking
+# indefinitely. If it hasn't exited on its own within that window, kill it
+# (and its process group) and reap synchronously. Shared by every
+# subprocess call site in this file that needs a bounded wait — both
+# "we're deliberately killing this on timeout" and "both pipes hit EOF,
+# but that doesn't guarantee the process itself has exited yet" (e.g. a
+# daemonizing helper, or something that dup2'd its fds away and kept
+# running) need this; a bare `waitpid($pid, 0)` in either case would
+# reintroduce the exact class of hang this whole pump exists to prevent.
+sub _bounded_reap {
+    my ($pid, $grace) = @_;
+    $grace //= 1;
+
+    if ($grace > 0) {
+        my $deadline = time() + $grace;
+        while (time() < $deadline) {
+            my $ret = waitpid($pid, WNOHANG);
+            return 1 if $ret == $pid;
+            select(undef, undef, undef, 0.05);
+        }
+    }
+
+    # Still not reaped after the grace period (or none was requested —
+    # caller already knows this needs killing, e.g. a timeout) — force it.
+    # Signal both the pid and its process group: `sh -c $cmd` may have
+    # spawned a pipeline of its own children (e.g. `sort | uniq`), which
+    # would otherwise be orphaned and keep running after we kill just the
+    # immediate process. setpgid(0,0) in the child made it its own group
+    # leader; the direct pid signal is a harmless fallback if that
+    # somehow didn't take.
+    kill('TERM', $pid);
+    kill('TERM', -$pid);
+    my $deadline = time() + 1;
+    while (time() < $deadline) {
+        my $ret = waitpid($pid, WNOHANG);
+        return 1 if $ret == $pid;
+        select(undef, undef, undef, 0.05);
+    }
+    kill('KILL', $pid);
+    kill('KILL', -$pid);
+    waitpid($pid, 0);
+    return 1;
+}
+
+# =============================================================================
+# Shell pump — used by cmd_transform
+# =============================================================================
+#
+# Pipe $input through `sh -c $cmd`, capturing stdout+stderr, WITHOUT the
+# deadlock risk of sequential blocking I/O. IPC::Open3 pipes have a small,
+# fixed OS buffer (commonly 64KB on Linux). The naive approach — write all
+# of stdin, close it, then read all of stdout, then all of stderr — can
+# wedge forever two different ways: (1) if the child writes enough to
+# stderr to fill its pipe before we finish reading stdout, the child
+# blocks writing to a full stderr pipe while we're still blocked reading
+# stdout, and neither side can proceed; (2) if $input is larger than the
+# stdin pipe buffer and the child doesn't drain it while producing output,
+# our blocking write to stdin never returns.
+#
+# This pump avoids both: stdin is written in non-blocking chunks while
+# stdout/stderr are drained concurrently via select(), all bounded by a
+# hard wall-clock timeout. On timeout the child is killed (TERM, then KILL
+# if it doesn't exit) and the caller is expected to leave the buffer
+# unchanged.
+#
+# Returns a hashref:
+#   { output => ..., stderr => ..., exit_code => ..., timed_out => 0 }
+#   { timed_out => 1 }                                  (killed on timeout)
+#   { spawn_error => "..." }                             (open3 itself failed)
+sub _run_shell_pump {
+    my ($cmd, $input, $timeout) = @_;
+    $timeout //= 10;
+    $input //= '';
+
+    # A child that closes its stdin-read end early (e.g. `head -1`) would
+    # otherwise deliver SIGPIPE to us on the next stdin write and kill the
+    # whole editor process — ignore it locally and rely on syswrite's
+    # EPIPE return instead.
+    local $SIG{PIPE} = 'IGNORE';
+
+    # Manual fork + pipes instead of IPC::Open3::open3 — open3 gives no
+    # hook to run code in the child before exec, and `sh -c $cmd` can
+    # spawn a whole pipeline of grandchildren (e.g. `sort | uniq`).
+    # Killing just the immediate `sh` pid on timeout would leave those
+    # orphaned and still running. Put the child in its own process group
+    # so a timeout can kill the whole tree at once.
+    my ($in_fh, $out_fh, $err_fh, $pid);
+    {
+        my ($child_in_r, $parent_in_w, $parent_out_r, $child_out_w, $parent_err_r, $child_err_w);
+        unless (pipe($child_in_r, $parent_in_w)
+             && pipe($parent_out_r, $child_out_w)
+             && pipe($parent_err_r, $child_err_w)) {
+            return { spawn_error => "pipe: $!" };
+        }
+
+        $pid = fork();
+        if (!defined $pid) {
+            return { spawn_error => "fork: $!" };
+        }
+
+        if ($pid == 0) {
+            # Child
+            eval { POSIX::setpgid(0, 0) };
+            open(STDIN,  '<&', $child_in_r)  or POSIX::_exit(126);
+            open(STDOUT, '>&', $child_out_w) or POSIX::_exit(126);
+            open(STDERR, '>&', $child_err_w) or POSIX::_exit(126);
+            close($_) for ($child_in_r, $parent_in_w, $parent_out_r, $child_out_w, $parent_err_r, $child_err_w);
+            exec('sh', '-c', $cmd) or POSIX::_exit(127);
+        }
+
+        # Parent
+        close($child_in_r);
+        close($child_out_w);
+        close($child_err_w);
+        ($in_fh, $out_fh, $err_fh) = ($parent_in_w, $parent_out_r, $parent_err_r);
+    }
+
+    for my $fh ($in_fh, $out_fh, $err_fh) {
+        my $flags = fcntl($fh, F_GETFL, 0) // 0;
+        fcntl($fh, F_SETFL, $flags | O_NONBLOCK);
+    }
+
+    my $read_sel = IO::Select->new($out_fh, $err_fh);
+    my $write_sel = IO::Select->new();
+
+    my $out_buf = '';
+    my $err_buf = '';
+    my $in_pos = 0;
+    my $in_len = length($input);
+    my $in_closed = 0;
+    my $out_eof = 0;
+    my $err_eof = 0;
+
+    if ($in_len) {
+        $write_sel->add($in_fh);
+    } else {
+        # Nothing to write — close immediately so line-oriented tools that
+        # wait for EOF on stdin (e.g. `sort`, `cat`) don't hang forever.
+        close($in_fh);
+        $in_closed = 1;
+    }
+
+    my $deadline = time() + $timeout;
+    my $timed_out = 0;
+
+    while (!($out_eof && $err_eof)) {
+        if (time() >= $deadline) {
+            $timed_out = 1;
+            last;
+        }
+
+        my @writable = $write_sel->handles ? $write_sel->can_write(0) : ();
+        for my $fh (@writable) {
+            if ($in_pos < $in_len) {
+                my $chunk = substr($input, $in_pos, 65536);
+                my $n = syswrite($fh, $chunk);
+                if (defined $n) {
+                    $in_pos += $n;
+                } elsif (!$!{EAGAIN} && !$!{EWOULDBLOCK}) {
+                    # Broken pipe or other write error — child stopped
+                    # reading stdin. Stop trying to write the rest.
+                    $in_pos = $in_len;
+                }
+            }
+            if ($in_pos >= $in_len && !$in_closed) {
+                close($fh);
+                $write_sel->remove($fh);
+                $in_closed = 1;
+            }
+        }
+
+        my @readable = $read_sel->can_read(0.1);
+        for my $fh (@readable) {
+            my $buf;
+            my $n = sysread($fh, $buf, 65536);
+            if (!defined $n) {
+                next if $!{EAGAIN} || $!{EWOULDBLOCK};
+                $n = 0;  # treat other read errors as EOF
+            }
+            if ($n == 0) {
+                $read_sel->remove($fh);
+                if ($fh == $out_fh) { $out_eof = 1; }
+                else                { $err_eof = 1; }
+                next;
+            }
+            if ($fh == $out_fh) { $out_buf .= $buf; }
+            else                { $err_buf .= $buf; }
+        }
+    }
+
+    close($in_fh) unless $in_closed;
+
+    if ($timed_out) {
+        # grace=0: skip the "wait for natural exit" phase and kill right
+        # away — we already know this needs killing.
+        _bounded_reap($pid, 0);
+        close($out_fh);
+        close($err_fh);
+        return { timed_out => 1 };
+    }
+
+    close($out_fh);
+    close($err_fh);
+    # Bounded reap, not a bare `waitpid($pid, 0)` — reaching EOF on both
+    # pipes does NOT guarantee the process has actually exited yet (e.g. a
+    # daemonizing helper, or something that dup2'd its fds away and kept
+    # running). An unbounded wait here would reintroduce the exact class
+    # of hang this whole pump exists to prevent, just moved to the
+    # "success" path instead of the timeout path.
+    _bounded_reap($pid, 2);
+    my $exit_code = $? >> 8;
+
+    return {
+        output    => $out_buf,
+        stderr    => $err_buf,
+        exit_code => $exit_code,
+        timed_out => 0,
+    };
+}
+
 sub cmd_transform {
     my ($self) = @_;
 
@@ -1008,28 +1249,33 @@ sub cmd_transform {
                 $added_newline = 1;
             }
 
-            # Pipe through shell command, capturing both stdout and stderr
-            my ($output, $stderr_text);
-            eval {
-                my $err_fh = gensym;
-                my $pid = open3(my $in_fh, my $out_fh, $err_fh, 'sh', '-c', $cmd);
-                print $in_fh $input;
-                close $in_fh;
-                local $/;
-                $output = <$out_fh>;
-                $stderr_text = <$err_fh>;
-                close $out_fh;
-                close $err_fh;
-                waitpid($pid, 0);
-            };
+            # Pipe through shell command, capturing both stdout and stderr.
+            # _run_shell_pump uses a select()-driven pump with a hard
+            # timeout instead of sequential blocking reads — see its doc
+            # comment for why the old code could deadlock or hang forever.
+            # Tag the hang watchdog before/after so a diagnostic log (if
+            # this somehow still wedges — e.g. a future regression) shows
+            # what the main loop was doing, not just "loop".
+            my $timeout = $ENV{ZEPTO_TRANSFORM_TIMEOUT} || 10;
+            Zepto::HangWatchdog::heartbeat($self->{_watchdog}, "transform:$cmd");
+            my $result = _run_shell_pump($cmd, $input, $timeout);
+            Zepto::HangWatchdog::heartbeat($self->{_watchdog}, 'loop');
 
-            if ($@) {
-                $self->show_error_message(_user_error("Transform failed", $@));
+            if ($result->{spawn_error}) {
+                $self->show_error_message(_user_error("Transform failed", $result->{spawn_error}));
                 return;
             }
 
+            if ($result->{timed_out}) {
+                $self->show_error_message("Transform timed out");
+                return;
+            }
+
+            my $output = $result->{output};
+            my $stderr_text = $result->{stderr};
+
             # Check for command failure (non-zero exit)
-            my $exit_code = $? >> 8;
+            my $exit_code = $result->{exit_code};
             if ($exit_code != 0) {
                 my $err = $stderr_text // '';
                 chomp $err;
@@ -1121,6 +1367,13 @@ sub cmd_toggle_auto_pairs {
     my $new = !$self->{prefs}->auto_pairs();
     $self->{prefs}->set_auto_pairs($new);
     $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_toggle_continue_lists {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->continue_lists();
+    $self->{prefs}->set_continue_lists($new);
+    $self->{message} = "Continue Lists: " . ($new ? "ON" : "OFF");
 }
 
 sub cmd_toggle_ai {

@@ -215,3 +215,39 @@ STEPS
 VERIFY
   - "Transform via Shell" command present under EDIT section with ⌥T
     shortcut.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-014
+NAME:     Hung transform command times out instead of freezing the editor
+PRIORITY: P1
+FEATURE:  transform hang timeout
+RELATED:  QA-SEC-008
+
+STEPS
+  1. Select text, open Transform via Shell (⌥T).
+  2. Run a command that hangs forever, e.g. `sleep 30`.
+  3. Wait past the timeout (~10s default, overridable via
+     ZEPTO_TRANSFORM_TIMEOUT).
+  4. Once recovered, type a character to confirm the editor is responsive.
+  5. Separately: transform with a command that produces a LOT of stdout
+     and stderr concurrently (e.g. a command writing >64KB to both) —
+     confirm it still completes correctly and quickly (no deadlock).
+
+VERIFY
+  - The editor does NOT freeze for the command's full duration — it
+    recovers automatically once the timeout elapses.
+  - Status bar shows "Transform timed out".
+  - The selection/buffer content is UNCHANGED (the hung command's
+    nonexistent output is never applied).
+  - Typing immediately after recovery works normally — the editor is
+    fully responsive, not just "unfrozen but wedged".
+  - The heavy-output round trip completes correctly and quickly,
+    confirming the fix didn't regress the normal (non-hung) case.
+  - Fixed in Phase 2 (bugs.md P1 "cmd_transform open3 sequential-slurp
+    can deadlock/hang UI indefinitely"): `Editor::_run_shell_pump`
+    replaced sequential blocking `IPC::Open3` reads/writes with a
+    select()-driven pump plus a hard wall-clock timeout (default 10s,
+    `ZEPTO_TRANSFORM_TIMEOUT` env-overridable). On timeout, the child
+    (and its whole process group, since `sh -c` can spawn pipelines) is
+    killed with TERM then KILL. Unit tests: `tests/transform.t`.

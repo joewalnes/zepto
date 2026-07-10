@@ -384,6 +384,10 @@ sub visual_to_doc {
 
     my $seg = $self->segment_at_visual_row($vrow);
     unless ($seg) {
+        # Negative/underflow vrow (e.g. dragging above the text viewport in
+        # wrap mode) clamps to document start, not end.
+        return (0, 0) if $vrow < 0;
+
         # Beyond document — return last valid position
         my $doc = $self->{document};
         if ($doc && $doc->line_count() > 0) {

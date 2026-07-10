@@ -49,14 +49,13 @@ test('mouse drag selects text across lines (verified via cut)', async ({ browser
     }
 });
 
-// KNOWN BUG (bugs.md P1 "Mouse drag above first visual row in word-wrap
-// mode jumps selection/view to end of document") — same underlying issue as
-// qa/scripts/tier1/ms_022_drag_above_viewport.sh, exercised here through
-// real browser pixels instead of raw SGR injection. Scheduled for Phase 2;
-// flip this to a real assertion once WrapMap::visual_to_doc clamps
-// negative visual rows to document start instead of falling through to the
-// last line.
-test.fixme(
+// Regression test for bugs.md P1 "Mouse drag above first visual row in
+// word-wrap mode jumps selection/view to end of document" — same underlying
+// issue as qa/scripts/tier1/ms_022_drag_above_viewport.sh, exercised here
+// through real browser pixels instead of raw SGR injection. Fixed in
+// Phase 2: WrapMap::visual_to_doc now clamps negative visual rows to
+// document start instead of falling through to the last line.
+test(
     'drag above the viewport in wrap mode clamps to document start, not end',
     async ({ browser }) => {
         const file = path.join(tmpDir, 'wrap.txt'); // .txt defaults word wrap on

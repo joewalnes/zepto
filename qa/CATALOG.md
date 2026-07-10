@@ -19,10 +19,10 @@ make qa-coverage
 ## Coverage summary
 
 ```
-TOTAL: 578/698 (82.8%)
+TOTAL: 588/713 (82.5%)
 ```
 
-578 of the 698 documented test cases have at least one executable script in
+588 of the 713 documented test cases have at least one executable script in
 `qa/scripts/tier1/` or `qa/scripts/tier2/`. The remaining cases are
 documented-only (manual-QA-only) — most commonly because they require
 visual/subjective judgment (pixel-level rendering, color contrast, "looks
@@ -139,6 +139,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-EDIT-019 | tier1 | Cursor clamps at line/document bounds |
 | QA-EDIT-020 | tier1 | Long horizontal line scrolls viewport |
 | QA-EDIT-021 | tier1 | Typing during active find preview does not corrupt buffer |
+| QA-EDIT-022 | tier1 | Enter continues Markdown/plain-text list items |
 
 ### `04_undo_redo.txt` (12/12 scripted)
 
@@ -403,6 +404,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-XFM-011 | tier1 | Shell with pipes/redirects works |
 | QA-XFM-012 | tier1 | Preserves trailing newline behavior |
 | QA-XFM-013 | tier1 | Transform command is discoverable |
+| QA-XFM-014 | tier1 | Hung transform command times out instead of freezing the editor |
 
 ### `17_auto_pair_and_completion.txt` (20/21 scripted)
 
@@ -429,6 +431,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-CPLT-019 | tier1 | Completion off by toggle |
 | QA-CPLT-020 | tier1 | Completion doesn't interfere with paste (REGRESSION) |
 | QA-CPLT-021 | tier1 | Ctrl+Space is context-sensitive (completion vs. palette) |
+| QA-CPLT-022 | tier1 | Ghost completion renders at the cursor on wrapped lines |
 
 ### `18_file_open_save.txt` (15/17 scripted)
 
@@ -683,6 +686,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-THM-009 | no script | Light theme status_accent uses fg, not bg (REGRESSION) |
 | QA-THM-010 | no script | Syntax colors map in both themes |
 | QA-THM-011 | tier1 | Theme name visible in palette |
+| QA-THM-012 | tier1 | Cross-instance theme sync — idle window repaints without input |
 
 ### `30_nerd_font.txt` (6/8 scripted)
 
@@ -722,7 +726,8 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-MS-019 | tier1 | Scroll wheel in file tree |
 | QA-MS-020 | no script | Scroll wheel in command palette |
 | QA-MS-021 | tier1 | Drag selects text across multiple lines |
-| QA-MS-022 | tier1 | Drag above viewport in wrap mode (KNOWN BUG repro) |
+| QA-MS-022 | tier1 | Drag above viewport in wrap mode |
+| QA-MS-023 | tier1 | Mouse press/drag dismisses active ghost completion |
 
 ### `32_syntax_highlighting.txt` (20/22 scripted)
 
@@ -834,6 +839,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-PERF-013 | no script | Find engine regex pre-compiled once (REGRESSION) |
 | QA-PERF-014 | no script | Performance log command |
 | QA-PERF-015 | no script | Startup on large git repo (REGRESSION) |
+| QA-PERF-016 | tier1 | Hang watchdog detects a wedged main loop and recovers |
 
 ### `38_security.txt` (11/11 scripted)
 
@@ -979,4 +985,5 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-REG-103 | no script | QA git-repo scripts configure local git identity (covered by QA-FILE-014 script) |
 | QA-REG-104 | tier1 | QA state isolation survives hangon/tmux env laundering |
 | QA-REG-105 | no script | QA runs never write into the repository (verified by post-run `git status` — see 40_regression_bugs.txt) |
+| QA-REG-106 | tier1 | Esc after typed text in Find-in-Files does not race/glue into the input (fif_006_esc_close.sh, fif_015_esc_closes.sh) |
 

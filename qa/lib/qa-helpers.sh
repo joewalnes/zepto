@@ -223,6 +223,37 @@ qa_send() {
     sleep "${2:-$QA_RENDER_WAIT}"
 }
 
+# hangon's `send` (both argv and --stdin forms) fails outright — exit
+# status 2, "exit status 1" printed to stderr, nothing sent — whenever the
+# text to type STARTS WITH A HYPHEN ('-'), e.g. typing a Markdown bullet
+# "- item" or any leading flag-like text. Confirmed on both forms; `--`
+# as an explicit end-of-flags marker does not help. Under this file's
+# `set -e`, calling plain `qa_send` with such text silently aborts the
+# whole script (see bugs.md "[Testing hazard] hangon send fails on
+# leading-hyphen text").
+#
+# Workaround: type a harmless one-char prefix first (so the string hangon
+# sees doesn't start with '-'), then step back and remove just that
+# prefix char via Left*N + Backspace + Right*N — NOT Home+Delete, which
+# would jump to column 0 and delete the wrong character if the cursor
+# didn't start the line (Home always jumps to the line's start, not to
+# "where we started typing"). This way the cursor ends up in the same
+# place it would have if the leading-hyphen text had been typed directly.
+# Use this instead of qa_send whenever the text might start with '-'.
+qa_send_safe() {
+    local text="$1"
+    if [[ "$text" == -* ]]; then
+        local len=${#text}
+        hangon send "$QA_SESSION" "x$text"
+        for ((i = 0; i < len; i++)); do hangon keys "$QA_SESSION" "left" >/dev/null; done
+        hangon keys "$QA_SESSION" "backspace" >/dev/null
+        for ((i = 0; i < len; i++)); do hangon keys "$QA_SESSION" "right" >/dev/null; done
+    else
+        hangon send "$QA_SESSION" "$text"
+    fi
+    sleep "${2:-$QA_RENDER_WAIT}"
+}
+
 qa_keys() {
     hangon keys "$QA_SESSION" "$1"
     sleep "${2:-$QA_RENDER_WAIT}"
@@ -379,6 +410,26 @@ qa_mouse_scroll() {
 QA_SCREEN=""
 qa_screen() {
     QA_SCREEN=$(hangon screen "$QA_SESSION" 2>/dev/null || echo "")
+}
+
+# Raw ANSI screen capture (colors/escape codes intact), for tests that
+# need to assert an actual visual change (e.g. a theme toggle's color
+# values) rather than just text content — `hangon screen` strips escapes.
+# hangon's tmux backend names the underlying tmux session "hangon-<PID>"
+# where PID is the "Holder PID" reported by `hangon status`.
+#   qa_raw_screen SESSION_NAME
+# Sets QA_RAW_SCREEN. Returns empty string (not a failure) if the session
+# or its tmux pane can't be found, so callers should check for emptiness.
+QA_RAW_SCREEN=""
+qa_raw_screen() {
+    local session="$1"
+    local pid
+    pid=$(hangon status "$session" 2>/dev/null | awk '/^Holder PID:/ {print $3}')
+    if [[ -z "$pid" ]]; then
+        QA_RAW_SCREEN=""
+        return
+    fi
+    QA_RAW_SCREEN=$(tmux capture-pane -t "hangon-$pid" -e -p 2>/dev/null || echo "")
 }
 
 qa_screenshot() {

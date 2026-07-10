@@ -252,6 +252,17 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_transform',
     },
+    {
+        id       => 'toggle_continue_lists',
+        label    => 'Continue Lists',
+        icon     => 'keyboard',
+        shortcut => '',
+        section  => 'EDIT',
+        type     => 'toggle',
+        pref     => 'continue_lists',
+        priority => 0,
+        method   => 'cmd_toggle_continue_lists',
+    },
 
     # === NAVIGATE section ===
     {

@@ -1026,3 +1026,32 @@ VERIFY    After a full `make qa` run, `git status` in the repo is clean:
           qa_setup stops cd-ing into $QA_TMPDIR, or if the functions
           start echoing their path again (which invites the $() pattern
           back).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-106
+NAME:     Esc after typed text in Find-in-Files does not race/glue into the input
+PRIORITY: P2
+BUG:      P2 "[Testing hazard] fif_006/fif_015 flaked on CI runners with a
+          literal ESC control byte appearing inside the FIF input" — a
+          fixed-sleep-then-assert pattern (type text, sleep, send Escape,
+          sleep, assert) raced slow/loaded CI runners: Escape could be read
+          in the same terminal update as the tail of the typed text, and
+          the post-Escape assertion could fire before the panel finished
+          closing.
+CROSS-REF: QA-FIF-006, QA-FIF-015, QA-MS-023
+VERIFY    fif_006_esc_close.sh and fif_015_esc_closes.sh pass reliably when
+          run concurrently under artificial CPU load (verified: 3 iterations
+          of both scripts run in parallel against each other with `yes
+          >/dev/null` background load, 0 failures). Regresses if either
+          script goes back to a fixed sleep between typing and sending
+          Escape, or between sending Escape and asserting the panel closed,
+          instead of settling via `qa_expect_screen`.
+          Also hardened at the product level as defense in depth:
+          `InputWidget::_handle_char` now rejects any 'char' event carrying
+          a C0 control byte or DEL instead of trusting that the caller
+          (InputParser) never produces one, and pasted clipboard text is
+          stripped of control characters before insertion — a single-line
+          input field must never render a raw control char regardless of
+          how one might reach it. Covered by tests/input_widget.t
+          ("control character hardening" subtests).

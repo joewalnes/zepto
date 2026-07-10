@@ -1,25 +1,17 @@
 #!/usr/bin/env bash
 # QA-MS-022: Drag above the text viewport in word-wrap mode should clamp to
-# document start, not jump to the end (KNOWN BUG reproduction).
+# document start, not jump to the end.
 #
 # bugs.md: "P1: Mouse drag above first visual row in word-wrap mode jumps
 # selection/view to end of document" — WrapMap::visual_to_doc
-# (WrapMap.pm:386-393) returns the LAST document line whenever
-# segment_at_visual_row($vrow) fails to find a segment, which happens both
-# when $vrow is beyond the last row (correct clamp) and when $vrow is
+# (WrapMap.pm:386-393) returned the LAST document line whenever
+# segment_at_visual_row($vrow) failed to find a segment, which happened both
+# when $vrow was beyond the last row (correct clamp) and when $vrow was
 # negative, i.e. above the first row (incorrect — should clamp to line 0,
 # col 0 instead).
 #
-# This bug is scheduled to be fixed in Phase 2, not Phase 1. Per CLAUDE.md
-# Rule 5 (test before, fix, test after) we still need the reproduction
-# committed now so Phase 2 has a red/green signal — but a test that is
-# *expected* to fail would violate "make test/make qa must pass" and would
-# sit permanently red. So this script self-adapts: it reports the bug via
-# qa_skip (not qa_fail) for as long as the buggy behavior is present, and
-# automatically starts reporting qa_pass once Phase 2 fixes it (no manual
-# flip required for the adaptive check). A dormant strict assertion is
-# provided below, commented out, for Phase 2 to swap in once the bug is
-# fixed, to turn this into a real regression guard instead of a skip.
+# Fixed in Phase 2: negative/underflow $vrow now clamps to (0, 0) in
+# WrapMap::visual_to_doc. This is now a hard regression assertion.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-MS-022: Drag above viewport in wrap mode (KNOWN-BUG repro)"
 
@@ -52,23 +44,7 @@ qa_mouse_drag 10 4 0 0.1
 qa_mouse_drag 10 2 0 0.1
 qa_mouse_release 10 2 0 0.2
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE '\b5:[0-9]+'; then
-    # Bug still present: cursor/selection jumped to the last document line
-    # (line 5) instead of clamping to the start (line 1, col 1).
-    qa_skip "KNOWN-BUG: drag above viewport clamps to document end, not start" \
-        "see bugs.md P1 'Mouse drag above first visual row...'; fix scheduled for Phase 2"
-elif echo "$QA_SCREEN" | grep -qE '\b1:1\b'; then
-    qa_pass "drag above viewport clamped to document start (bug appears fixed)"
-else
-    qa_fail "drag above viewport landed somewhere unexpected" "$(echo "$QA_SCREEN" | tail -1)"
-fi
-
-# --- Phase 2: once WrapMap::visual_to_doc clamps negative $vrow to line 0,
-# col 0, delete the adaptive qa_skip/qa_pass block above and replace it with
-# this strict assertion instead:
-#
-#   qa_assert_cursor_at "1:1" "drag above viewport clamps to document start"
+qa_assert_cursor_at "1:1" "drag above viewport clamps to document start"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -345,3 +345,35 @@ VERIFY
     after typing content silently typed the command name into the
     document instead of running it) — that script now uses Ctrl+S
     instead to sidestep the ambiguity.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-022
+NAME:     Ghost completion renders at the cursor on wrapped lines
+PRIORITY: P2
+FEATURE:  completion ghost wrap
+RELATED:  QA-WRAP-001
+
+STEPS
+  1. Open a prose/Markdown file with word wrap on, containing a long line
+     that wraps into multiple visual rows.
+  2. Position the cursor at the true end of that (wrapped) line and type a
+     partial word that word-completes against something already in the
+     buffer, so ghost completion triggers.
+
+VERIFY
+  - The ghost suggestion renders immediately after the cursor on the
+    visual row the cursor is actually on (a continuation/wrapped row) —
+    NOT glued to the end of the line's first visual segment.
+  - Fixed in Phase 2 (bugs.md P2 "Ghost completion renders offset from
+    cursor in wrapped/markdown lines"): `Renderer.pm`'s ghost-render
+    branch previously guarded on `!$is_wrap_cont`, so it always rendered
+    on visual segment 0 regardless of which segment the cursor was
+    actually on. Now it checks whether the cursor's document column falls
+    within the CURRENT row's wrap segment range before rendering there.
+  - Also fixed: ghost text is truncated by display width (terminal
+    columns), not character count, so wide CJK/emoji ghost suggestions no
+    longer overflow their available fill area.
+  - Unit tests: `tests/renderer.t` ("Ghost text renders on the wrap
+    segment containing the cursor", "Ghost text truncates by display
+    width, not char count").

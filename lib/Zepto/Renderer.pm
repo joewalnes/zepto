@@ -2530,19 +2530,39 @@ sub _render_text_area {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
                 }
             } elsif ($fill_remaining > 0) {
-                # Ghost text: render inline completion hint on cursor line
-                if ($is_cursor_line && $completion && $completion->{ghost_text}
-                    && length($completion->{ghost_text}) > 0
-                    && !$is_wrap_cont) {
+                # Ghost text: render inline completion hint anchored at the
+                # cursor's own wrap segment — NOT always segment 0. A
+                # wrapped line's cursor may sit on a continuation row (e.g.
+                # cursor at the document line's EOL, which can land past
+                # the first visual row), so gate on "does THIS row's
+                # segment actually contain the cursor" rather than "is this
+                # the first segment". The ghost only ever renders when the
+                # cursor is at the document line's EOL (ghost text is drawn
+                # in the fill area after all of the row's content), so the
+                # matching segment is unambiguous: it's the one whose
+                # [col_start, col_end) contains the cursor, or — at true
+                # EOL — the final segment, whose col_end equals the full
+                # line's length.
+                my $cursor_on_this_segment = 1;
+                if ($has_wrap_segment) {
+                    my $seg_col_start = $entry->{col_start};
+                    my $seg_col_end   = $entry->{col_end};
+                    my $cursor_line_len = length($cursor_line_content);
+                    $cursor_on_this_segment =
+                        ($cursor_col >= $seg_col_start && $cursor_col < $seg_col_end)
+                        || ($cursor_col == $seg_col_end && $seg_col_end == $cursor_line_len);
+                }
+
+                if ($is_cursor_line && $cursor_on_this_segment && $completion && $completion->{ghost_text}
+                    && length($completion->{ghost_text}) > 0) {
                     my $ghost = $completion->{ghost_text};
-                    my $ghost_len = length($ghost);
-                    if ($ghost_len > $fill_remaining) {
-                        $ghost = substr($ghost, 0, $fill_remaining);
-                        $ghost_len = $fill_remaining;
-                    }
+                    # Truncate by DISPLAY WIDTH, not character count —
+                    # $fill_remaining is in terminal columns, and wide
+                    # chars (CJK, emoji) occupy 2 columns per character.
+                    my ($truncated, $ghost_width) = _truncate_to_display_width($ghost, $fill_remaining);
                     my $ghost_fg = $theme->color('completion_ghost_fg');
-                    push @_out, $ghost_fg . $ghost . RESET . $fill_bg;
-                    my $after = $fill_remaining - $ghost_len;
+                    push @_out, $ghost_fg . $truncated . RESET . $fill_bg;
+                    my $after = $fill_remaining - $ghost_width;
                     push @_out, ' ' x $after if $after > 0;
                 } else {
                     push @_out, $fill_bg . (' ' x $fill_remaining);

@@ -100,7 +100,9 @@ jobs:
   notify-failure:
     runs-on: ubuntu-latest
     needs: [test, qa, qa-pixel]
-    if: failure()
+    # Failures on PR runs are visible on the PR itself; only pushes to main
+    # should file/append to the ci-failure issue.
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Create failure issue
         uses: actions/github-script@v7

@@ -40,6 +40,10 @@ If a file has never been saved, you'll be prompted for a filename.
 - **Alt+Up / Alt+Down** - Move line up/down
 - **Ctrl+U** - Duplicate line
 - **Ctrl+/** - Toggle comment
+- In Markdown and plain-text files, pressing **Enter** at the end of a
+  list item (`- `, `1. `, `> `, `- [ ] `) continues the list on the new
+  line; pressing Enter on an empty item removes the marker instead.
+  Toggle via "Continue Lists" in the command palette.
 
 ## Selection
 

@@ -233,10 +233,11 @@ subtest 'check_for_changes fires callback on external modification' => sub {
     print $fh '{"theme":"light","word_wrap":1}';
     close $fh;
 
-    $store->check_for_changes();
+    my $changed_count = $store->check_for_changes();
     ok(defined $called_with, 'Callback fired');
     is($called_with->{theme}, 'light', 'Callback received new data');
     is($called_with->{word_wrap}, 1, 'Callback received all new data');
+    is($changed_count, 1, 'check_for_changes returns the number of changed categories (used by Editor::run to decide whether to re-render an idle instance)');
 };
 
 subtest 'check_for_changes does not fire for own writes' => sub {
@@ -265,8 +266,9 @@ subtest 'check_for_changes skips unchanged files' => sub {
     $store->on_change('preferences', sub { $called = 1 });
 
     # No external change
-    $store->check_for_changes();
+    my $changed_count = $store->check_for_changes();
     is($called, 0, 'No callback when unchanged');
+    is($changed_count, 0, 'check_for_changes returns 0 when nothing changed');
 };
 
 # ============================================================================
