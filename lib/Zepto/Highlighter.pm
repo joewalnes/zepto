@@ -598,16 +598,6 @@ sub grammar_name {
     return $name;
 }
 
-# Get list of supported extensions
-sub supported_extensions {
-    return sort keys %EXTENSION_MAP;
-}
-
-# Get list of supported filenames
-sub supported_filenames {
-    return sort keys %FILENAME_MAP;
-}
-
 # =============================================================================
 # Private methods
 # =============================================================================

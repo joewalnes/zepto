@@ -229,22 +229,17 @@ sub soft_tabs { $_[0]->get('soft_tabs') }
 sub set_soft_tabs { $_[0]->set('soft_tabs', $_[1]) }
 
 sub auto_indent { $_[0]->get('auto_indent') }
-sub set_auto_indent { $_[0]->set('auto_indent', $_[1]) }
 
 sub continue_lists { $_[0]->get('continue_lists') }
 sub set_continue_lists { $_[0]->set('continue_lists', $_[1]) }
 
 sub show_line_numbers { $_[0]->get('show_line_numbers') }
-sub set_show_line_numbers { $_[0]->set('show_line_numbers', $_[1]) }
 
 sub mouse_enabled { $_[0]->get('mouse_enabled') }
-sub set_mouse_enabled { $_[0]->set('mouse_enabled', $_[1]) }
 
 sub search_case_sensitive { $_[0]->get('search_case_sensitive') }
-sub set_search_case_sensitive { $_[0]->set('search_case_sensitive', $_[1]) }
 
 sub search_wrap { $_[0]->get('search_wrap') }
-sub set_search_wrap { $_[0]->set('search_wrap', $_[1]) }
 
 sub nerd_font { $_[0]->get('nerd_font') }
 sub set_nerd_font { $_[0]->set('nerd_font', $_[1]) }
@@ -253,13 +248,10 @@ sub show_minimap { $_[0]->get('show_minimap') }
 sub set_show_minimap { $_[0]->set('show_minimap', $_[1]) }
 
 sub show_tree { $_[0]->get('show_tree') }
-sub set_show_tree { $_[0]->set('show_tree', $_[1]) }
 
 sub word_wrap { $_[0]->get('word_wrap') }
-sub set_word_wrap { $_[0]->set('word_wrap', $_[1]) }
 
 sub render_markdown_tables { $_[0]->get('render_markdown_tables') }
-sub set_render_markdown_tables { $_[0]->set('render_markdown_tables', $_[1]) }
 
 sub auto_complete { $_[0]->get('auto_complete') }
 sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }
@@ -268,7 +260,6 @@ sub auto_pairs { $_[0]->get('auto_pairs') }
 sub set_auto_pairs { $_[0]->set('auto_pairs', $_[1]) }
 
 sub hang_detector { $_[0]->get('hang_detector') }
-sub set_hang_detector { $_[0]->set('hang_detector', $_[1]) }
 
 # Extensions that default to word wrap on (prose file types)
 my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);

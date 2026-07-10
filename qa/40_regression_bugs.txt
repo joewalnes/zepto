@@ -2,13 +2,15 @@
 40 — Regression Tests (Every Fixed Bug)
 ================================================================================
 
-One regression test per bug marked FIXED in bugs.md. Many of these duplicate
-coverage from the feature files; that's intentional — this file is a
-single flat index for "run every regression" workflows.
+One regression test per bug marked FIXED (now archived in bugs-archive.md
+when closed; see bugs.md for the currently-open worklist). Many of these
+duplicate coverage from the feature files; that's intentional — this file
+is a single flat index for "run every regression" workflows.
 
 Each entry cross-references the primary test case (QA-xxx-###) and summarizes
-what to check. Keep this file in sync with bugs.md: when a new bug is
-FIXED, add a corresponding REG entry here.
+what to check. Keep this file in sync with bugs.md/bugs-archive.md: when a
+new bug is FIXED (and its entry moved to bugs-archive.md), add a
+corresponding REG entry here.
 
 Legend:
   CROSS-REF — the main feature-file test case that covers this bug.

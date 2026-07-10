@@ -7,7 +7,8 @@ package Zepto::CommandRegistry;
 # and keyboard shortcut dispatch. Each command has an id, label, icon,
 # shortcut, section, type, priority, and method.
 #
-# Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW
+# Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, AI,
+# DOCUMENTATION, DIAGNOSTICS
 # Types: action (one-shot), toggle (binary on/off), setting (multi-value)
 # Priority: 1 = always on status bar, 5 = only if wide terminal
 # =============================================================================

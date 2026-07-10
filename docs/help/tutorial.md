@@ -15,7 +15,7 @@ Or from inside the editor, press `Ctrl+O` to open the file picker.
 ## Saving and Quitting
 
 - `Ctrl+S` - Save
-- `Ctrl+W` - Close tab
+- `Ctrl+W` - Save and close tab
 - `Ctrl+Q` - Quit
 
 If a file has never been saved, you'll be prompted for a filename.

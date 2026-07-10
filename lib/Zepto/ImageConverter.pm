@@ -37,11 +37,6 @@ use warnings;
         return $_image_converter;
     }
 
-    # Reset cached converter detection (for testing).
-    sub _reset_converter_cache {
-        $_image_converter = undef;
-    }
-
     # Ensure the given image path is a PNG. If it already is, returns it as-is.
     # Otherwise, converts via sips or convert. Returns '' on failure.
     # Results are cached per source path + mtime.

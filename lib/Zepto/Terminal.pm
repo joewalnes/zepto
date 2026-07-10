@@ -246,16 +246,6 @@ sub enter_alt_screen {
     return 1;
 }
 
-# Set cursor color using OSC 12
-# Color should be in format "#RRGGBB" or a color name
-sub set_cursor_color {
-    my ($self, $color) = @_;
-    return unless $color;
-    # OSC 12 ; color ST
-    $self->write("\x1b]12;${color}\x1b\\");
-    return 1;
-}
-
 sub leave_alt_screen {
     my ($self) = @_;
     return unless $self->{_alt_screen};
@@ -406,28 +396,6 @@ sub refresh_size {
 # =============================================================================
 # Input
 # =============================================================================
-
-# Read available input (non-blocking)
-# Returns bytes read, or empty string if nothing available
-sub read_available {
-    my ($self, $timeout) = @_;
-    $timeout //= 0;
-
-    my $in_fh = $self->{in_fh};
-    my $select = IO::Select->new($in_fh);
-
-    my $input = '';
-
-    while ($select->can_read($timeout)) {
-        my $buf;
-        my $n = sysread($in_fh, $buf, READ_BUFFER_SIZE);
-        last unless defined $n && $n > 0;
-        $input .= $buf;
-        $timeout = 0;  # Don't wait on subsequent reads
-    }
-
-    return $input;
-}
 
 # Blocking read of at least one byte
 sub read_blocking {

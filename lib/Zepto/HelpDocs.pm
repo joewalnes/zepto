@@ -25,10 +25,6 @@ my %DOCS = (
 my %EMBEDDED;
 # __EMBED_DOCS__
 
-sub doc_ids {
-    return @DOC_ORDER;
-}
-
 sub doc_label {
     my ($class, $id) = @_;
     return $DOCS{$id}{label};

@@ -1,8 +1,15 @@
 # Zepto QA Test Plan
 
-End-to-end test plans for the Zepto terminal text editor, intended to be
-executed manually by a human QA engineer. Each plan is a plain-text file
-containing a set of numbered test cases organized by feature area.
+End-to-end test plans for the Zepto terminal text editor. Each plan is a
+plain-text file containing a set of numbered test cases organized by
+feature area — the human-readable spec. Nearly every test case also has an
+automated, executable counterpart under `qa/scripts/` (see "Test Tiers"
+below): tier1 scripts drive the editor via `hangon` and assert on screen
+text, cursor position, and file contents with no human involved; tier2
+scripts add LLM-judged visual assertions for things only a screenshot can
+verify. `make qa` (tier1) and `make qa-visual` (tier1+tier2) run the full
+automated suite; a test case without an automated script is the exception,
+not the norm, and should get one.
 
 The plan is designed to be comprehensive — every user-visible feature,
 every keybinding, every visual surface, and every bug that has ever been
@@ -52,7 +59,7 @@ fixed should have at least one test case that would catch a regression.
 | `37_performance.txt` | Large files, startup, scroll/type smoothness |
 | `38_security.txt` | Shell injection, symlink, ReDoS, temp files, escapes |
 | `39_terminal_rendering.txt` | Alt screen, clean exit, resize, edge fill |
-| `40_regression_bugs.txt` | Every fixed bug in bugs.md as a regression test |
+| `40_regression_bugs.txt` | Every fixed bug (archived in `bugs-archive.md`) as a regression test |
 
 ## Test Case Format
 
@@ -207,7 +214,7 @@ Some tests require a specific environment:
 
 Per `CLAUDE.md`, every new feature, every bug fix, and every meaningful
 behavioral discovery must add a test case to this plan. See CLAUDE.md
-"QA plan maintenance" section for the required checklist.
+Rule 8 ("QA plan is kept current") for the required checklist.
 
 The QA plan is the executable spec of Zepto's visible behavior.
 

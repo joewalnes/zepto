@@ -18,7 +18,7 @@ A modern, intuitive, terminal text editor. Single file. No dependencies. No conf
 - **Dark and light themes** (`⌃T`)
 - **Transform via shell** (`⌥T`) — pipe selected text through any command
 - **AI completion** (opt-in) — ghost-text suggestions from OpenAI, Anthropic, OpenRouter, Ollama, and other OpenAI-compatible providers; off by default, asks for consent before sending anything ([details](FEATURES.md#ai-completion-opt-in))
-- **Single file, zero dependencies** — just Perl 5.14+ standard library
+- **Single file, core-Perl-only** — just Perl 5.14+ standard library; the opt-in AI completion feature additionally needs `curl` if you turn it on
 
 ## Install
 

@@ -12,6 +12,10 @@
 - **Indent/Unindent** selection with Tab/Shift+Tab
 - **Column (rectangular) selection** with columnar cut/copy/paste
 - **Transform via Shell** -- pipe any selection through an arbitrary shell command
+- **Multi-cursor editing** -- `⌃D` selects the next occurrence of the word/selection under the cursor; type or delete at all cursors simultaneously
+- **Word completion** -- ghost-text and dropdown suggestions from open buffers, keywords, snippets, paths, and recently-used words as you type; `Tab` to accept
+- **Auto-pairs** -- typing an opening bracket or quote inserts the matching closer; typing the closer again skips over it instead of duplicating
+- **List continuation** -- in Markdown and plain-text files, pressing Enter at the end of a list item (`- `, `1. `, `> `, `- [ ] `) continues the list; Enter on an empty item removes the marker. Toggle via "Continue Lists" in the command palette
 
 ## Search & Replace
 
@@ -38,17 +42,20 @@
 - **Atomic saves** -- writes to temp file then renames, preventing data corruption
 - **Line ending detection** -- auto-detects and preserves LF vs CRLF
 - **External change detection** -- notices when files are modified outside the editor
+- **Binary file detection** -- shows a read-only placeholder instead of garbage bytes
+- **Inline image preview** -- PNG/JPEG/GIF/BMP/WebP/SVG render in-terminal (Kitty graphics protocol, e.g. Ghostty/Kitty), with a text placeholder fallback elsewhere
 
 ## Tabs
 
 - Full tab bar with click, drag-to-reorder, close buttons, and scroll arrows
 - Switch tabs by number, keyboard, or mouse
 - Modified indicator and git status tinting on tab labels
-- Unsaved-changes prompt on close (Save / Discard / Cancel)
+- **⌃W** ("Save and Close Tab") saves the tab (if dirty) and closes it — no prompt. Quitting
+  (**⌃Q**) with any unsaved tabs shows a Save / Discard / Cancel prompt per dirty tab
 
 ## Syntax Highlighting -- 52 Languages
 
-C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, Groovy, HTML, INI, Java, JavaScript/JSX, JSON, Kotlin, LaTeX, Logfile, Lua, Makefile, Markdown, Nginx, Nix, Objective-C, Perl, PHP, Properties, Protobuf, Python, R, ReStructuredText, Ruby, Rust, Scala, SCSS, Shell, SQL, SSHConfig, Swift, Systemd, Terraform/HCL, Thrift, TOML, TypeScript/TSX, XML, YAML, Zig
+AsciiDoc, C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, Groovy, HTML, INI, Java, JavaScript/JSX, JSON, KDL, Kotlin, LaTeX, Logfile, Lua, Makefile, Markdown, Nginx, Nix, Objective-C, Perl, PHP, Properties, Protobuf, Python, R, ReStructuredText, Ruby, Rust, Scala, SCSS, Shell, SQL, SSHConfig, Swift, Systemd, Terraform/HCL, Thrift, TOML, TypeScript/TSX, XML, YAML, Zig
 
 - Handles multi-line constructs (strings, comments, heredocs)
 - Incremental re-highlighting from the edited line forward
@@ -73,7 +80,7 @@ C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, G
 ## Command Palette
 
 - Every feature searchable by name or shortcut
-- Organized sections (File, Edit, Navigate, View, Diagnostics)
+- Organized sections (File, Edit, Navigate, View, AI, Documentation, Diagnostics)
 - Shows toggle states, icons, and keyboard shortcuts
 - Mouse-clickable; typing a shortcut while open executes it directly
 

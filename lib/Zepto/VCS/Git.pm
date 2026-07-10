@@ -245,27 +245,6 @@ sub get_head_content {
     return $content;
 }
 
-# Get the content of a file in the staging area
-sub get_staged_content {
-    my ($self, $file_path) = @_;
-    return undef unless defined $file_path;
-
-    my $rel_path = $self->_relative_path($file_path);
-
-    # Use git show :path to get staged content
-    my ($content, $status) = $self->_git('show', ":$rel_path");
-
-    if ($status != 0) {
-        return undef;
-    }
-
-    $content =~ s/\r\n/\n/g;
-    $content =~ s/\n$//;
-    utf8::decode($content);
-
-    return $content;
-}
-
 # Invalidate cache (call after save or external changes)
 sub invalidate_cache {
     my ($self, $file_path) = @_;

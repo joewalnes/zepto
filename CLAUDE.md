@@ -40,7 +40,7 @@ This editor runs on users' desktops with access to their files. They trust it. S
 
 - Read `docs/SECURITY.md` before touching file I/O, shell execution, or rendering
 - Flag any new shell exec, path handling, or file operation for security review
-- Never add network calls — Zepto is intentionally offline
+- Zepto is offline by design; the one sanctioned exception is the opt-in AI completion feature (off by default, explicit consent, see `docs/SECURITY.md` "Network: AI Completion"). Do not add any other network call.
 
 ### 5. Test before, fix, test after
 
@@ -62,6 +62,11 @@ Known bugs live in `bugs.md` with priorities P0–P3.
 - **P3**: Cosmetic / edge case
 
 When you find a bug (even while working on something else), add it to `bugs.md` immediately. During a bug bash: work through bugs in priority order, fix and verify each one before moving to the next.
+
+`bugs.md` holds only currently-open bugs, open feature requests, and active
+QA testing-hazard notes. When a bug is fixed, move its entry to
+`bugs-archive.md` (with a **Fix:** note) instead of leaving it struck
+through in `bugs.md` — that keeps the open worklist short and scannable.
 
 ### 7. Code quality
 
@@ -122,7 +127,7 @@ These are required for development/CI but not for end users:
 
 | Tool | Purpose |
 |------|---------|
-| Perl 5.20+ | Runtime + unit tests (`make test`) |
+| Perl 5.14+ | Runtime + unit tests (`make test`) |
 | `prove` | Test harness (ships with Perl) |
 | `hangon` | QA session automation (`make qa`) |
 | `tmux` | Required by hangon |
@@ -263,7 +268,7 @@ If any rule is not satisfied:
 | File | Update when |
 |------|-------------|
 | `CLAUDE.md` | Rules change, workflow improves, new communication preferences |
-| `bugs.md` | Bug found or fixed |
+| `bugs.md` | Bug found (add here) or fixed (move entry to `bugs-archive.md`) |
 | `qa/*.txt` | **Every new feature, fix, or behavioral discovery** — see Rule 8 |
 | `qa/CATALOG.md` | Any new or retired QA test ID |
 | `docs/CODE_QUALITY.md` | New patterns, pitfalls, testing lessons |

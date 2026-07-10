@@ -3803,36 +3803,6 @@ sub get_status_buttons { return @{$_status_buttons}; }
 # Context-Aware Status Bar with Pills
 # =============================================================================
 
-# Render a single pill and return (output_string, display_width)
-sub _render_pill {
-    my ($class, $theme, $icon, $label, $shortcut, $fg_key, $bg_key, $edge_key, $prev_bg_key) = @_;
-
-    my @_out;
-    my $rl = Zepto::Chars->get('round_left');
-    my $rr = Zepto::Chars->get('round_right');
-    my $nerd_font = Zepto::Chars->enabled();
-
-    my $text = '';
-    $text .= "$icon " if $icon;
-    $text .= $label if $label;
-    $text .= " $shortcut" if $shortcut;
-
-    my $width;
-
-    if ($nerd_font) {
-        # Nerd font pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;  # spaces
-    } else {
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;
-    }
-
-    return (join('', @_out), $width);
-}
-
 sub _render_context_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active) = @_;
 
