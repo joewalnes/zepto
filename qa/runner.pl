@@ -451,7 +451,16 @@ clear_status();
 # serial re-run with no concurrent load; a clean pass converts the
 # failure and is reported loudly so persistent flakiness stays visible.
 # Disable with ZEPTO_QA_NO_RETRY=1 (used when debugging the harness).
-if (@failures && !$ENV{ZEPTO_QA_NO_RETRY}) {
+# A handful of failures looks like flake; dozens means the environment
+# collapsed mid-run (dead tmux server, exhausted disk/sessions) — retrying
+# each serially would only burn the CI job's time budget and suppress the
+# failure details. Cap the guard and fail fast with full detail instead.
+my $RETRY_CAP = $ENV{ZEPTO_QA_RETRY_CAP} // 8;
+if (@failures > $RETRY_CAP) {
+    printf "\n ${RED}${BOLD}%d scripts failed — above the flake-retry cap (%d); systemic failure, skipping retries.${RESET}\n",
+        scalar @failures, $RETRY_CAP;
+}
+elsif (@failures && !$ENV{ZEPTO_QA_NO_RETRY}) {
     my %path_of = map { basename($_, '.sh') => $_ } @scripts;
     my @still_failing;
     my @retried_ok;
