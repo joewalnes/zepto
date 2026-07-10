@@ -81,6 +81,7 @@ qa_setup() {
 qa_cleanup() {
     hangon stop "$QA_SESSION" 2>/dev/null || true
     qa_ai_mock_stop
+    qa_judge_mock_stop
     # Restore original directory if we cd'd somewhere
     if [[ -n "$_QA_ORIG_DIR" ]]; then
         cd "$_QA_ORIG_DIR" 2>/dev/null || true
@@ -268,6 +269,66 @@ qa_ai_mock_stop() {
         kill "$_QA_AI_MOCK_PID" 2>/dev/null || true
         wait "$_QA_AI_MOCK_PID" 2>/dev/null || true
         _QA_AI_MOCK_PID=""
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# LLM judge mock server (tier1 wiring test only — see judge_001_wiring.sh)
+# ---------------------------------------------------------------------------
+# Starts a local, plain-HTTP mock (qa/lib/judge_mock_server.pl — core Perl,
+# no CPAN) that speaks both the Anthropic and OpenAI-compatible wire shapes
+# used by qa/lib/llm-judge.sh. Never touches the real network or a real key.
+#
+#   qa_judge_mock_start [behavior] [reason] [request_log]
+#     behavior: pass | fail | malformed | unauth | empty (default: pass)
+#     Sets QA_JUDGE_MOCK_URL (e.g. "http://127.0.0.1:54321") and
+#     QA_JUDGE_MOCK_REQLOG (path to a per-request header-presence log —
+#     see judge_mock_server.pl's header comment; it never logs key VALUES).
+#     Auto-stopped by qa_cleanup on exit.
+#
+#   qa_judge_mock_stop
+#     Stops the server early (also called automatically at exit).
+QA_JUDGE_MOCK_URL=""
+QA_JUDGE_MOCK_REQLOG=""
+_QA_JUDGE_MOCK_PID=""
+qa_judge_mock_start() {
+    local behavior="${1:-pass}"
+    local reason="${2:-criteria met}"
+    local reqlog="${3:-$QA_TMPDIR/judge_mock_requests.log}"
+    local delay="${4:-0}"
+    local server_script="$_QA_HELPERS_DIR/judge_mock_server.pl"
+
+    local port attempt
+    for attempt in 1 2 3; do
+        port=$(perl -MIO::Socket::INET -e '
+            my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1", LocalPort => 0, ReuseAddr => 1);
+            print $s->sockport(); ')
+        local log="$QA_TMPDIR/judge_mock_server.$port.log"
+        perl "$server_script" "$port" "$behavior" "$reason" "$reqlog" "$delay" > "$log" 2>&1 &
+        _QA_JUDGE_MOCK_PID=$!
+        local deadline=$(( $(date +%s) + 5 ))
+        while [[ $(date +%s) -lt $deadline ]]; do
+            grep -q "^READY$" "$log" 2>/dev/null && break
+            kill -0 "$_QA_JUDGE_MOCK_PID" 2>/dev/null || break
+            sleep 0.05
+        done
+        if grep -q "^READY$" "$log" 2>/dev/null; then
+            QA_JUDGE_MOCK_URL="http://127.0.0.1:$port"
+            QA_JUDGE_MOCK_REQLOG="$reqlog"
+            return 0
+        fi
+        kill "$_QA_JUDGE_MOCK_PID" 2>/dev/null || true
+        _QA_JUDGE_MOCK_PID=""
+    done
+    echo "${_RED}ERROR: could not start judge_mock_server.pl${_RESET}" >&2
+    return 1
+}
+
+qa_judge_mock_stop() {
+    if [[ -n "$_QA_JUDGE_MOCK_PID" ]]; then
+        kill "$_QA_JUDGE_MOCK_PID" 2>/dev/null || true
+        wait "$_QA_JUDGE_MOCK_PID" 2>/dev/null || true
+        _QA_JUDGE_MOCK_PID=""
     fi
 }
 
@@ -517,8 +578,24 @@ qa_raw_screen() {
     QA_RAW_SCREEN=$(tmux capture-pane -t "hangon-$pid" -e -p 2>/dev/null || echo "")
 }
 
+# Captures a PNG screenshot via hangon. hangon can render SVG->PNG only if
+# rsvg-convert (librsvg2-bin / `brew install librsvg`) or ImageMagick is on
+# PATH -- otherwise it silently FALLS BACK TO SVG (see `hangon screenshot
+# --help`), which would leave $1 (a .png path) never created. Tier2 visual
+# QA needs a real PNG to hand to the LLM judge, so fail loudly here with an
+# actionable message instead of letting every subsequent qa_assert_visual
+# in the script quietly report a generic "screenshot not found".
 qa_screenshot() {
-    hangon screenshot "$QA_SESSION" "$1" 2>/dev/null
+    local target="$1"
+    hangon screenshot "$QA_SESSION" "$target" 2>/dev/null
+    if [[ ! -f "$target" ]]; then
+        local svg_fallback="${target%.png}.svg"
+        if [[ -f "$svg_fallback" ]]; then
+            echo "${_RED}ERROR: qa_screenshot: hangon produced SVG instead of PNG ($svg_fallback) -- no PNG renderer found on PATH. Tier 2 visual QA needs one: install rsvg-convert (apt: librsvg2-bin, brew: librsvg) or ImageMagick.${_RESET}" >&2
+        else
+            echo "${_RED}ERROR: qa_screenshot: hangon did not produce $target (renderer missing or capture failed).${_RESET}" >&2
+        fi
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -722,10 +799,24 @@ qa_tmpfile_nl() {
 # ---------------------------------------------------------------------------
 # LLM judge (Tier 2)
 # ---------------------------------------------------------------------------
-
+# Config comes from qa/lib/llm-judge.sh's own resolution order (env ->
+# ~/.config/zepto-qa/judge.json -> interactive first-run setup, tty only —
+# see that file's header comment). Availability is determined by actually
+# probing it (cheap text-only call), cached for the lifetime of this
+# script so N visual assertions in one test only pay the probe cost once.
+QA_LLM_PROBE_DONE=0
+QA_LLM_PROBE_OK=0
 qa_llm_available() {
-    [[ "${ZEPTO_QA_SKIP_LLM:-0}" != "1" ]] && \
-    [[ -n "${ZEPTO_QA_API_KEY:-}${ANTHROPIC_API_KEY:-}${OPENAI_API_KEY:-}" ]]
+    [[ "${ZEPTO_QA_SKIP_LLM:-0}" == "1" ]] && return 1
+    if [[ "$QA_LLM_PROBE_DONE" != "1" ]]; then
+        QA_LLM_PROBE_DONE=1
+        if "$_QA_HELPERS_DIR/llm-judge.sh" probe >/dev/null 2>&1; then
+            QA_LLM_PROBE_OK=1
+        else
+            QA_LLM_PROBE_OK=0
+        fi
+    fi
+    [[ "$QA_LLM_PROBE_OK" == "1" ]]
 }
 
 qa_llm_judge() {

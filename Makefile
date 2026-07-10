@@ -81,8 +81,14 @@ loc:
 qa: build
 	@perl qa/runner.pl --tier 1
 
-# Tier 1 + Tier 2 — includes LLM visual checks (requires API key)
+# Tier 1 + Tier 2 — includes LLM visual checks. Judge config comes from
+# env (ZEPTO_JUDGE_*), ~/.config/zepto-qa/judge.json, or interactive
+# first-run setup (tty only) — see qa/README.md. --probe-judge here is a
+# non-fatal pre-flight: it just prints an early banner so an unconfigured
+# run tells you immediately rather than after tier1 finishes; the runner
+# itself re-probes and loudly SKIPS (not silently) tier2 either way.
 qa-visual: build
+	@-perl qa/runner.pl --probe-judge
 	@perl qa/runner.pl --tier 1,2
 
 # All automated tiers

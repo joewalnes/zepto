@@ -21,8 +21,8 @@ shot="$QA_TMPDIR/tree_hover.png"
 qa_screenshot "$shot"
 
 qa_assert_visual "$shot" \
-    "This shows a text editor with a file tree panel on the left. Verify: (1) A file tree with at least 2-3 files is visible. (2) One row in the tree may appear highlighted or have a slightly different background from the others. If any tree row shows visual distinction, that's a PASS." \
-    "tree row hover highlight"
+    "This shows a text editor with a file tree panel on the left, with the mouse cursor currently positioned over one row in the tree. MUST be visible: (1) A file tree with at least 2-3 file/folder rows. (2) EXACTLY the row under the mouse position has a visibly different background than the other tree rows (a highlight/hover fill). MUST NOT be true: all tree rows must NOT look identical — if every row has the same background with none standing out, FAIL. If the hovered row's highlight is not clearly distinguishable from the other rows in the screenshot, FAIL." \
+    "the hovered tree row is visually distinct from its non-hovered neighbors"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

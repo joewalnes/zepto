@@ -21,8 +21,8 @@ shot_hover="$QA_TMPDIR/hover.png"
 qa_screenshot "$shot_hover"
 
 qa_assert_visual "$shot_hover" \
-    "This shows a text editor with multiple tabs at the top. Verify: (1) A tab bar with at least 2-3 tabs is visible at the top. (2) One tab may appear highlighted or slightly different from the others (brighter, different background). If all tabs look the same, that's a FAIL — at least one should show a hover/highlight effect." \
-    "tab hover shows highlight effect"
+    "This shows a text editor with multiple tabs at the top, with the mouse cursor currently positioned over one of the tabs. MUST be visible: (1) A tab bar with at least 2-3 tabs. (2) EXACTLY the tab under the mouse position has a visibly different background/brightness than the other, non-hovered tabs. MUST NOT be true: all tabs must NOT look identical — if every tab has the same styling with none standing out, FAIL. If the hover effect is not clearly distinguishable in the screenshot, FAIL." \
+    "the hovered tab is visually distinct from its non-hovered neighbors"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -127,10 +127,12 @@ These are required for development/CI but not for end users:
 | `hangon` | QA session automation (`make qa`) |
 | `tmux` | Required by hangon |
 | `git` | VCS integration tests |
+| `python3` | Tier2 QA tooling only (`qa/lib/llm-judge.sh` JSON parsing/HTTP transport) — dev-side, never shipped in `./zepto` |
+| `librsvg2-bin` (`rsvg-convert`) or ImageMagick | PNG screenshot rendering for tier2 visual QA (`hangon screenshot`); falls back to SVG (and tier2 fails loudly) without it |
 
 ### Verification
 
-When in doubt, ask: "would this work on a fresh Ubuntu runner with just Perl, tmux, hangon, and git?"
+When in doubt, ask: "would this work on a fresh Ubuntu runner with just Perl, tmux, hangon, and git?" (tier1/`make qa`) — or "...plus python3 and librsvg2-bin?" (tier2/`make qa-visual`).
 
 ---
 

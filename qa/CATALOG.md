@@ -59,6 +59,19 @@ angles):
 `perl qa/coverage.pl` reports these under "IDs with more than one script"
 on every run so they don't silently disappear.
 
+### Intentional orphan script: `QA-JUDGE-001`
+
+`qa/scripts/tier1/judge_001_wiring.sh` has no corresponding `ID:` entry in
+any `qa/NN_*.txt` file, and `perl qa/coverage.pl` correctly flags it under
+"Scripts referencing an ID with no documented test case". This is
+deliberate: it tests the QA *harness itself* (`qa/lib/llm-judge.sh`'s
+provider wiring, config resolution, and key hygiene against
+`qa/lib/judge_mock_server.pl`) rather than a user-visible Zepto editor
+behavior, so it doesn't fit the `qa/NN_*.txt` test-plan format (one case
+per editor-visible behavior — see `qa/README.md`). It's tier1 (no LLM
+call — pure mock-server wiring) despite the `judge_` prefix suggesting
+tier2.
+
 ## Status legend
 
 - `[tier1]` — covered by a fast, headless-friendly tier1 script.

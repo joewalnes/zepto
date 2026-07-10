@@ -49,32 +49,74 @@ my $SYM_RUNNING = "${DIM}\x{22EF}${RESET}";
 # CLI arguments
 # ---------------------------------------------------------------------------
 
-my $tiers      = '1';
-my $filter     = '';
-my $list_only  = 0;
-my $report     = '';
-my $serial     = 0;
-my $max_jobs   = 4;
-my $help       = 0;
-my $single     = '';
+my $tiers        = '1';
+my $filter       = '';
+my $list_only    = 0;
+my $report       = '';
+my $serial       = 0;
+my $max_jobs     = 4;
+my $help         = 0;
+my $single       = '';
+my $probe_judge  = 0;
 
 GetOptions(
-    'tier=s'   => \$tiers,
-    'filter=s' => \$filter,
-    'list'     => \$list_only,
-    'report=s' => \$report,
-    'serial'   => \$serial,
-    'jobs=i'   => \$max_jobs,
-    'help|h'   => \$help,
+    'tier=s'      => \$tiers,
+    'filter=s'    => \$filter,
+    'list'        => \$list_only,
+    'report=s'    => \$report,
+    'serial'      => \$serial,
+    'jobs=i'      => \$max_jobs,
+    'probe-judge' => \$probe_judge,
+    'help|h'      => \$help,
 ) or die "Bad options\n";
 
 if ($help) {
-    print "Usage: runner.pl [--tier 1,2] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [SCRIPT]\n";
+    print "Usage: runner.pl [--tier 1,2] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [--probe-judge] [SCRIPT]\n";
     exit 0;
 }
 
 $single = shift @ARGV if @ARGV;
 $serial = 1 if $single;
+
+# ---------------------------------------------------------------------------
+# Tier-2 LLM judge probe
+# ---------------------------------------------------------------------------
+# Tier 2 scripts drive an LLM visual judge (qa/lib/llm-judge.sh) that needs
+# provider config (env, ~/.config/zepto-qa/judge.json, or interactive
+# first-run setup). Rather than let each script silently SKIP its visual
+# assertions one at a time with no overall signal, probe ONCE up front and
+# either run tier2 for real or skip it loudly with one clear reason.
+use Cwd qw(abs_path);
+my $qa_dir = abs_path(dirname(__FILE__));
+
+sub judge_probe {
+    my $judge = "$qa_dir/lib/llm-judge.sh";
+    return (0, "llm-judge.sh not found at $judge") unless -f $judge;
+    my $out = `bash \Q$judge\E probe 2>&1`;
+    my $rc  = $? >> 8;
+    chomp $out;
+    (my $reason = $out) =~ s/^PROBE_(?:OK|FAIL):\s*//;
+    return ($rc == 0, $reason || $out || "probe failed (exit $rc)");
+}
+
+sub print_judge_banner {
+    my ($reason) = @_;
+    my $line = '=' x 70;
+    print "\n${YELLOW}${BOLD}${line}${RESET}\n";
+    print "${YELLOW}${BOLD}  tier 2 skipped: ${reason}${RESET}\n";
+    print "${YELLOW}${BOLD}${line}${RESET}\n\n";
+}
+
+if ($probe_judge) {
+    my ($ok, $reason) = judge_probe();
+    if ($ok) {
+        print "${GREEN}${BOLD}tier 2 judge probe OK${RESET} ${DIM}($reason)${RESET}\n";
+        exit 0;
+    } else {
+        print_judge_banner($reason);
+        exit 1;
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Discover scripts
@@ -85,8 +127,6 @@ $serial = 1 if $single;
 # relative-$0-derived path silently breaks (see QA-FILE-014/QA-FIF-015
 # history — instant set -e death when the runner was invoked as
 # `perl qa/runner.pl` from the repo root).
-use Cwd qw(abs_path);
-my $qa_dir = abs_path(dirname(__FILE__));
 
 sub discover_scripts {
     my @scripts;
@@ -300,6 +340,33 @@ sub finish_script {
     }
 
     print_result($name, $status, $duration);
+}
+
+# ---------------------------------------------------------------------------
+# Tier-2 judge probe: skip loudly (not silently) if unconfigured
+# ---------------------------------------------------------------------------
+# One probe for the whole run rather than one silent per-assertion SKIP per
+# script (the old behavior — see CLAUDE.md task history: tier 2 "has never
+# actually run" because a missing key made every assertion vanish quietly).
+# Scripts under tier2/ are pulled out of @scripts entirely and resolved as
+# SKIPPED right here, without spawning hangon/zepto at all, so an
+# unconfigured run stays fast AND visible.
+my $tier2_requested = grep { $_ eq '2' } split /,/, $tiers;
+if ($tier2_requested) {
+    my ($judge_ok, $judge_reason) = judge_probe();
+    unless ($judge_ok) {
+        print_judge_banner($judge_reason);
+        my @remaining;
+        for my $s (@scripts) {
+            if ($s =~ m{/tier2/}) {
+                $total_skip++;
+                print_result(basename($s, '.sh'), 'skip', 0);
+            } else {
+                push @remaining, $s;
+            }
+        }
+        @scripts = @remaining;
+    }
 }
 
 if ($serial) {

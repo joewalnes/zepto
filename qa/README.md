@@ -87,6 +87,102 @@ NOTES
   P2 (polish/edge), P3 (cosmetic).
 - **FEATURE** — short tag for cross-referencing related tests.
 
+## Test Tiers
+
+Executable coverage lives in two tiers under `qa/scripts/`:
+
+- **tier1** (`qa/scripts/tier1/*.sh`) — deterministic, `hangon`-driven
+  assertions against screen TEXT (`qa_assert_screen`), cursor position,
+  file contents, exit codes, etc. No LLM, no cost, always runs. This is
+  what `make qa` and `make test`-adjacent CI runs by default.
+- **tier2** (`qa/scripts/tier2/*.sh`) — visual assertions that can only be
+  judged by looking at a rendered screenshot (color, alignment, box-drawing
+  borders, hover highlights, icon glyphs, ...). Each tier2 script captures
+  a PNG via `hangon screenshot` and hands it to an LLM vision judge
+  (`qa/lib/llm-judge.sh`) along with a strict pass/fail prompt.
+
+### Tier 2: LLM Visual Judge
+
+`qa/lib/llm-judge.sh` sends a screenshot + criteria to a vision-capable
+LLM and expects back strict JSON: `{"pass": true|false, "reason": "..."}`.
+The judge is instructed to fail whenever the criteria are not *clearly*
+met — ambiguous screenshots are a FAIL, not a pass.
+
+**Screenshot rendering**: `hangon screenshot` needs `rsvg-convert`
+(`apt install librsvg2-bin` / `brew install librsvg`) or ImageMagick on
+PATH to produce a PNG; without one it silently falls back to SVG, which
+`qa_screenshot()` in `qa/lib/qa-helpers.sh` now detects and fails loudly
+about (instead of every subsequent visual assertion failing with an
+unhelpful "screenshot not found").
+
+**Config resolution** (`qa/lib/llm-judge.sh`), in order:
+
+1. **Environment** — `ZEPTO_JUDGE_PROVIDER`, `ZEPTO_JUDGE_MODEL`,
+   `ZEPTO_JUDGE_API_KEY`, `ZEPTO_JUDGE_BASE_URL`. Active whenever
+   `ZEPTO_JUDGE_API_KEY` is set (provider defaults to `anthropic` if
+   unset). This is what CI uses.
+2. **Config file** — `~/.config/zepto-qa/judge.json`:
+   ```json
+   {"provider": "anthropic", "model": "claude-haiku-4-5", "base_url": "https://api.anthropic.com", "api_key": "sk-..."}
+   ```
+   Written with mode `0600`.
+3. **Interactive first-run setup** — if stdin is a tty and neither of the
+   above resolved, `llm-judge.sh` prompts for a provider and key, probes
+   it, and on success saves it to the config file above. Run
+   `qa/lib/llm-judge.sh setup` any time to redo this.
+4. Otherwise: tier2 is unavailable. This is not silent — see "Local setup"
+   and "Skip behavior" below.
+
+**Supported providers**:
+
+| Provider     | Endpoint                                             | Default model              |
+|--------------|-------------------------------------------------------|-----------------------------|
+| `anthropic`  | `{base:-https://api.anthropic.com}/v1/messages`       | `claude-haiku-4-5`          |
+| `openai`     | `{base:-https://api.openai.com}/v1/chat/completions`  | `gpt-5-mini`                |
+| `openrouter` | `https://openrouter.ai/api/v1/chat/completions`       | `qwen/qwen3-vl-8b-instruct` |
+
+**Local setup**: run any tier2 script (or `qa/lib/llm-judge.sh setup`)
+interactively in a terminal — you'll be prompted for a provider and key
+once, and it's saved for future runs. To check config without running a
+full suite: `perl qa/runner.pl --probe-judge`.
+
+**Skip behavior**: `make qa` (tier1 only) never touches the judge. `make
+qa-visual` (tier1+tier2) probes the judge once up front — if unconfigured
+or unreachable, it prints ONE prominent banner
+(`tier 2 skipped: <reason>`) and marks every tier2 script `SKIPPED` with
+that reason, without even launching `hangon`/`zepto` for them. This is
+not a silent no-op: `perl qa/runner.pl --probe-judge` alone exits nonzero
+if the judge isn't usable, so CI can treat "unconfigured when it should
+be configured" as a hard failure while local dev without a key stays a
+clean, visible skip.
+
+**Key hygiene**: the API key is never placed on `curl`'s (or the
+transport's) argv — it travels via a private `0600` temp file read by
+`qa/lib/judge_request.py`, which hands it to `curl --config -` over
+stdin, mirroring the technique `lib/Zepto/AIHttp.pm` uses for the editor's
+own AI completion feature. Covered by
+`qa/scripts/tier1/judge_001_wiring.sh`, which asserts the key never
+appears in `ps` output during a call.
+
+**CI setup**: the `qa-visual` job in `.github/workflows/ci.yml` runs only
+on a push to `main` or the nightly `schedule` trigger (not on every PR —
+it costs real API budget), and only if the secret below is configured:
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `ZEPTO_JUDGE_API_KEY` | repository **secret** | the provider API key |
+| `ZEPTO_JUDGE_PROVIDER` | repository **variable** | provider name (default `anthropic` if unset) |
+| `ZEPTO_JUDGE_MODEL` | repository **variable** | model id (default `claude-haiku-4-5` if unset) |
+
+Configure these under repo Settings → Secrets and variables → Actions.
+Until `ZEPTO_JUDGE_API_KEY` is set, `qa-visual` doesn't run at all (no red
+job, no fake green — it's cleanly absent from the checks list).
+
+**Cost**: a full 46-script tier2 run on the default model (Claude Haiku
+4.5) costs roughly **$0.10–$0.30** — small images, short prompts, ~1-2
+judge calls per script. Fine to run nightly; not something to enable on
+every PR.
+
 ## Executing the Plan
 
 Test cases are written to be runnable by a human. When running

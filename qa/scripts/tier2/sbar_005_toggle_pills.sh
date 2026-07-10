@@ -25,8 +25,8 @@ shot_wrap="$QA_TMPDIR/sbar_wrap_on.png"
 qa_screenshot "$shot_wrap"
 
 qa_assert_visual "$shot_wrap" \
-    "Look at the status bar (bottom row). Find a 'Wrap' or 'Word Wrap' pill/button. Verify: (1) The pill is visible with readable text. (2) There is a keyboard shortcut indicator near it. The status bar should show multiple interactive pills. If you can see a Wrap-related pill at all, that is PASS." \
-    "Wrap pill visible in status bar"
+    "This shows a terminal text editor status bar (bottom row) immediately after word wrap was toggled ON. MUST be visible: (1) A 'Wrap' or 'Word Wrap' pill/button with readable text. (2) That pill has an ACTIVE/ON appearance — a bright, filled, or colored background (e.g. blue) that makes it visually stand out from plain status-bar text, not merely legible text on the default status-bar background. MUST NOT be true: the Wrap pill must NOT look identical in styling to a plain, unhighlighted status-bar label — dim/default-background text with no distinguishing color or fill is a FAIL even if the word 'Wrap' is readable. If you cannot clearly tell the pill is in a highlighted/active state from the screenshot, FAIL." \
+    "Wrap pill shows an active/highlighted appearance after being toggled on"
 
 # Toggle wrap OFF
 qa_keys "alt-z"

@@ -19,8 +19,8 @@ shot_hover="$QA_TMPDIR/hover.png"
 qa_screenshot "$shot_hover"
 
 qa_assert_visual "$shot_hover" \
-    "This shows a text editor. Look at the BOTTOM ROW (status bar). Verify: (1) Pill-shaped buttons are visible. (2) One pill may appear highlighted or brighter than the others due to mouse hover. If a pill shows any visual distinction (different shade, brighter text), that's a PASS." \
-    "status bar pill hover effect"
+    "This shows a text editor status bar (bottom row) with the mouse cursor currently positioned over one of the pills. MUST be visible: (1) Multiple pill-shaped buttons in the status bar. (2) EXACTLY the pill under the mouse position shows a distinct hover appearance — a brighter or different-colored background than the other, non-hovered pills next to it. MUST NOT be true: all pills must NOT look visually identical to each other — if every pill has the same background/brightness with no single pill standing out, FAIL. A hover effect that is not clearly distinguishable from the surrounding pills in the screenshot is a FAIL." \
+    "the hovered status bar pill is visually distinct from its non-hovered neighbors"
 
 qa_keys "ctrl-q"
 qa_summary
