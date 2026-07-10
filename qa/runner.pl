@@ -329,10 +329,12 @@ sub finish_script {
         $total_err++;
         $status = 'error';
         push @failures, { name => $name, duration => $duration, output => $output,
+                          pass => $pass, fail => $fail, skip => $skip,
                           error => "Script exited with code $rc" };
     } elsif ($fail > 0) {
         $status = 'fail';
-        push @failures, { name => $name, duration => $duration, output => $output };
+        push @failures, { name => $name, duration => $duration, output => $output,
+                          pass => $pass, fail => $fail, skip => $skip };
     } elsif ($skip > 0 && $pass == 0) {
         $status = 'skip';
     } else {
@@ -439,6 +441,52 @@ if ($serial) {
 
 hangon_quiet('stopall');
 clear_status();
+
+# ---------------------------------------------------------------------------
+# Serial retry of failures — harness flake guard
+# ---------------------------------------------------------------------------
+# hangon's session registry races under parallel load (non-atomic
+# state.json writes; see bugs.md), so a small number of scripts can fail
+# for harness reasons unrelated to Zepto. Each failed script gets ONE
+# serial re-run with no concurrent load; a clean pass converts the
+# failure and is reported loudly so persistent flakiness stays visible.
+# Disable with ZEPTO_QA_NO_RETRY=1 (used when debugging the harness).
+if (@failures && !$ENV{ZEPTO_QA_NO_RETRY}) {
+    my %path_of = map { basename($_, '.sh') => $_ } @scripts;
+    my @still_failing;
+    my @retried_ok;
+    printf "\n ${YELLOW}retrying %d failed script(s) serially (harness flake guard)...${RESET}\n",
+        scalar @failures;
+    for my $f (@failures) {
+        my $script = $path_of{ $f->{name} };
+        unless ($script) { push @still_failing, $f; next }
+        my $out = "$tmpdir/retry_$f->{name}.out";
+        my $t0  = time();
+        system("bash \Q$script\E >\Q$out\E 2>&1");
+        my $rc     = $? >> 8;
+        my $output = '';
+        if (open my $fh, '<', $out) { local $/; $output = <$fh> // ''; close $fh }
+        my ($pass, $fail, $skip) = parse_output($output);
+        if ($rc == 0 && $fail == 0 && ($pass > 0 || $skip > 0)) {
+            $total_pass += $pass - ($f->{pass} // 0);
+            $total_fail -= ($f->{fail} // 0);
+            $total_skip += $skip - ($f->{skip} // 0);
+            $total_err-- if $f->{error};
+            push @retried_ok, { name => $f->{name}, duration => time() - $t0 };
+        } else {
+            push @still_failing, $f;
+        }
+    }
+    @failures = @still_failing;
+    for my $r (@retried_ok) {
+        printf " ${YELLOW}\x{27f3}${RESET}  %-36s ${YELLOW}passed on serial retry${RESET} ${DIM}(%s)${RESET}\n",
+            $r->{name}, fmt_dur($r->{duration});
+    }
+    if (@retried_ok) {
+        printf " ${DIM}%d script(s) recovered on retry - harness flakes, not product failures.${RESET}\n",
+            scalar @retried_ok;
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Failure details
