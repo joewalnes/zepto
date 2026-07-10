@@ -26,12 +26,21 @@ qa_keys "end"
 # Paste
 qa_keys "ctrl-v"
 
-# Should see "hello worldhello" or "hello world" + pasted chars
+# Real assertion: "hello" was copied and appended after "world", so the only
+# way "worldhello" appears on screen is if paste actually inserted the
+# clipboard contents at the new cursor location. Merely having typed
+# "hello world" earlier does NOT produce this substring on its own, unlike
+# a bare `grep -q "hello"` check (which would pass even with paste broken).
+qa_assert_screen "worldhello" "paste inserted copied text after original content"
+
+# Belt-and-braces: "hello" must now appear twice (once in the original
+# text, once from the pasted duplicate).
 qa_screen
-if echo "$QA_SCREEN" | grep -q "hello"; then
-    qa_pass "paste produced output on screen"
+hello_count=$(echo "$QA_SCREEN" | grep -o "hello" | wc -l | tr -d ' ')
+if [[ "$hello_count" -ge 2 ]]; then
+    qa_pass "clipboard content duplicated on screen ($hello_count occurrences of 'hello')"
 else
-    qa_fail "paste result not visible"
+    qa_fail "clipboard content duplicated on screen" "expected >=2 occurrences of 'hello', got $hello_count"
 fi
 
 qa_keys "ctrl-q"

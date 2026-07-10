@@ -3,7 +3,6 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-FIF-015: Esc closes find-in-files"
 
-QA_ZEPTO="$(cd "$(dirname "$0")/../../.." && pwd)/zepto"
 file=$(qa_tmpfile_nl "fif015.txt" "hello world")
 qa_start "$file"
 

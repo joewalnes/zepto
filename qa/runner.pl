@@ -69,7 +69,7 @@ GetOptions(
 ) or die "Bad options\n";
 
 if ($help) {
-    print "Usage: runner.pl [--tier 1,2,3] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [SCRIPT]\n";
+    print "Usage: runner.pl [--tier 1,2] [--filter PAT] [--list] [--report FILE] [--serial] [--jobs N] [SCRIPT]\n";
     exit 0;
 }
 
@@ -80,7 +80,13 @@ $serial = 1 if $single;
 # Discover scripts
 # ---------------------------------------------------------------------------
 
-my $qa_dir = dirname(__FILE__);
+# Absolutized so every script receives an absolute $0: test scripts (and
+# qa-helpers.sh) may cd away from the invocation directory, after which any
+# relative-$0-derived path silently breaks (see QA-FILE-014/QA-FIF-015
+# history — instant set -e death when the runner was invoked as
+# `perl qa/runner.pl` from the repo root).
+use Cwd qw(abs_path);
+my $qa_dir = abs_path(dirname(__FILE__));
 
 sub discover_scripts {
     my @scripts;

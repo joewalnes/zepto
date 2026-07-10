@@ -4,7 +4,7 @@ source "$(dirname "$0")/../../lib/qa-helpers.sh"
 QA_TIER=2
 qa_header "QA-TREE-021: Tree hover (visual)"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 echo "aaa" > file1.txt
 echo "bbb" > file2.txt
 echo "ccc" > file3.txt

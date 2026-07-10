@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-RCN-010: Tree reveals file opened from recents"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 mkdir -p subdir
 echo "deep content" > subdir/deep.txt
 echo "root content" > root.txt

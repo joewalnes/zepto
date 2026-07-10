@@ -506,7 +506,13 @@ sub _column_paste {
 
     for my $i (reverse 0 .. $num_target_lines - 1) {
         my $target_line = $start_line + $i;
-        last if $target_line >= $doc->line_count();
+        # Skip (not abort) rows past the end of the document. This loop
+        # walks target lines bottom-to-top (reverse), so the highest $i is
+        # checked first — using `last` here would bail out of the whole
+        # paste the moment the bottom-most row didn't fit, silently
+        # discarding every valid row above it (e.g. pasting a 3-row column
+        # onto the last line of the document pasted nothing at all).
+        next if $target_line >= $doc->line_count();
 
         # Use corresponding paste line, or replicate single line
         my $paste_text = @paste_lines == 1 ? $paste_lines[0]

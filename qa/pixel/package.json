@@ -1,0 +1,12 @@
+{
+  "name": "zepto-qa-pixel",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pixel/browser-driven QA tier for Zepto: drives the editor through a real terminal (ttyd) rendered in a Playwright-controlled browser, for real mouse-pixel interactions and (opt-in) visual screenshot diffing.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

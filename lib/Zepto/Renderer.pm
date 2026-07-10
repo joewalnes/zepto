@@ -847,9 +847,10 @@ sub _render_tab_bar {
     my $hover_tab_idx = $ui->{hover_tab_index};
 
     # Build cache key from inputs that affect tab bar output
+    # (includes nerd-font state — tab edge glyphs now vary with it)
     my $cache_key = join("\0",
         $theme->name(), $cols, $tree_width, $active_idx, scalar(@$tabs),
-        ($hover_tab_idx // -1),
+        ($hover_tab_idx // -1), (Zepto::Chars->enabled() ? 1 : 0),
         map { ($_->{display_name} // '') . ($_->{is_dirty} ? 'D' : '') . ($_->{has_vcs_changes} ? 'V' : '') } @$tabs
     );
     my $cached = $class->_tab_bar_cache_get($cache_key);
@@ -862,8 +863,9 @@ sub _render_tab_bar {
     # Geometric triangle edges for tab shape:
     # ◢ (U+25E2) lower-right triangle: fg fills lower-right → left edge of tab
     # ◣ (U+25E3) lower-left triangle: fg fills lower-left → right edge of tab
-    my $TAB_LEFT  = "\x{25e2}";  # ◢
-    my $TAB_RIGHT = "\x{25e3}";  # ◣
+    # Both fall back to plain ASCII slashes when nerd font is disabled.
+    my $TAB_LEFT  = Zepto::Chars->get('tab_edge_left');   # ◢ or /
+    my $TAB_RIGHT = Zepto::Chars->get('tab_edge_right');  # ◣ or \
     my $close_char = "\x{00d7}";  # × (multiplication sign, reliable single-width)
     my $modified_char = "\x{25cf}";  # ● (filled circle)
 

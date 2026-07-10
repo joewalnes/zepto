@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-PICK-014: Mouse click in picker opens file"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 echo "alpha content" > alpha.txt
 echo "beta content" > beta.txt
 git add . && git commit -q -m "init"

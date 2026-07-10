@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-PICK-009: Cursor aligned in picker input"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 echo "test" > test.txt
 git add . && git commit -q -m "init"
 

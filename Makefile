@@ -87,12 +87,19 @@ qa-visual: build
 
 # All automated tiers
 qa-full: build
-	@perl qa/runner.pl --tier 1,2,3
+	@perl qa/runner.pl --tier 1,2
 
 # List available QA scripts without running
 qa-list:
-	@perl qa/runner.pl --list --tier 1,2,3
+	@perl qa/runner.pl --list --tier 1,2
 
 # Report documented-vs-scripted QA coverage (qa/CATALOG.md numbers)
 qa-coverage:
 	@perl qa/coverage.pl
+
+# Pixel QA tier — drives ./zepto through a real terminal (ttyd) rendered in
+# a real browser (Playwright), for real mouse-pixel interactions and (opt-in
+# via ZEPTO_PIXEL_SNAPSHOTS=1) visual screenshot diffing. See qa/pixel/README.md.
+# Requires: ttyd, Node.js/npm.
+qa-pixel: build
+	@cd qa/pixel && npm install --no-fund --no-audit && npx playwright test

@@ -404,7 +404,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-XFM-012 | tier1 | Preserves trailing newline behavior |
 | QA-XFM-013 | tier1 | Transform command is discoverable |
 
-### `17_auto_pair_and_completion.txt` (19/20 scripted)
+### `17_auto_pair_and_completion.txt` (20/21 scripted)
 
 | ID | Status | Description |
 |----|--------|-------------|
@@ -428,6 +428,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-CPLT-018 | no script | AI completion enabled |
 | QA-CPLT-019 | tier1 | Completion off by toggle |
 | QA-CPLT-020 | tier1 | Completion doesn't interfere with paste (REGRESSION) |
+| QA-CPLT-021 | tier1 | Ctrl+Space is context-sensitive (completion vs. palette) |
 
 ### `18_file_open_save.txt` (15/17 scripted)
 
@@ -696,7 +697,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-NF-007 | no script | Nerd font state persists across restart |
 | QA-NF-008 | no script | No duplicate icon codepoints (REGRESSION) |
 
-### `31_mouse_interactions.txt` (16/20 scripted)
+### `31_mouse_interactions.txt` (18/22 scripted)
 
 | ID | Status | Description |
 |----|--------|-------------|
@@ -720,6 +721,8 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-MS-018 | no script | Mouse hover uses ?1003 mode (REGRESSION) |
 | QA-MS-019 | tier1 | Scroll wheel in file tree |
 | QA-MS-020 | no script | Scroll wheel in command palette |
+| QA-MS-021 | tier1 | Drag selects text across multiple lines |
+| QA-MS-022 | tier1 | Drag above viewport in wrap mode (KNOWN BUG repro) |
 
 ### `32_syntax_highlighting.txt` (20/22 scripted)
 
@@ -867,7 +870,7 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-TERM-013 | no script | CSI u keyboard support |
 | QA-TERM-014 | no script | Kitty graphics protocol detection |
 
-### `40_regression_bugs.txt` (92/100 scripted)
+### `40_regression_bugs.txt` (93/105 scripted)
 
 | ID | Status | Description |
 |----|--------|-------------|
@@ -971,4 +974,9 @@ reference `ID:` lines in `qa/NN_*.txt` against `# QA-TAG-NNN:` headers in
 | QA-REG-098 | tier1 | _char_to_visual_col handles wide chars |
 | QA-REG-099 | tier1 | Render output uses array push (not concat) |
 | QA-REG-100 | tier1 | Status bar "Commands" label prominence |
+| QA-REG-101 | no script | Column paste onto last document line pastes all in-bounds rows (covered by QA-CLIP-007/QA-COL-004 scripts) |
+| QA-REG-102 | no script | --no-nerd-font eliminates tab bar corner triangles (covered by QA-CLI-007 script) |
+| QA-REG-103 | no script | QA git-repo scripts configure local git identity (covered by QA-FILE-014 script) |
+| QA-REG-104 | tier1 | QA state isolation survives hangon/tmux env laundering |
+| QA-REG-105 | no script | QA runs never write into the repository (verified by post-run `git status` — see 40_regression_bugs.txt) |
 

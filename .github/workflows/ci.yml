@@ -61,9 +61,45 @@ jobs:
       - name: Run QA tests
         run: make qa
 
+  qa-pixel:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.38'
+
+      - name: Install ttyd
+        run: sudo apt-get update && sudo apt-get install -y ttyd
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build zepto
+        run: make build
+
+      - name: Install pixel tier dependencies
+        run: cd qa/pixel && npm install --no-fund --no-audit
+
+      - name: Install Playwright Chromium
+        run: cd qa/pixel && npx playwright install chromium --with-deps
+
+      - name: Run pixel QA tests
+        # Screenshot-diff baselines are platform-specific (see
+        # qa/pixel/README.md) — deliberately NOT setting
+        # ZEPTO_PIXEL_SNAPSHOTS here so the opt-in visual-diff test stays
+        # skipped in CI rather than failing on a baseline nobody captured
+        # for this runner image.
+        run: make qa-pixel
+
   notify-failure:
     runs-on: ubuntu-latest
-    needs: [test, qa]
+    needs: [test, qa, qa-pixel]
     if: failure()
     steps:
       - name: Create failure issue

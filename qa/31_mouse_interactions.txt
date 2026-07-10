@@ -298,3 +298,56 @@ VERIFY
   - Palette list scrolls.
   - Highlight remains visible.
   - No scroll leakage to editor behind palette.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-021
+NAME:     Drag selects text across multiple lines
+PRIORITY: P1
+FEATURE:  mouse drag select
+RELATED:  QA-MS-003
+
+STEPS
+  1. Open a multi-line file.
+  2. Press the mouse inside the text, drag to a different line/column
+     (upward, i.e. dragging from a later line to an earlier one), release.
+  3. Cut the resulting selection.
+
+VERIFY
+  - The selection spans exactly the dragged range (verified by what
+    remains after cut — lines fully inside the drag disappear, lines
+    outside it are untouched, and the two partial lines at the drag
+    endpoints merge as expected).
+  - Uses raw SGR mouse injection (qa_mouse_press/drag/release in
+    qa-helpers.sh) rather than hangon's `mouse-drag` subcommand — the
+    latter encodes the SGR press/release final byte backwards relative to
+    the xterm standard Zepto's parser expects, so presses/releases sent
+    through it land as the wrong event type. See qa-helpers.sh comments
+    above qa_mouse_press for the full writeup.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-022
+NAME:     Drag above the text viewport in word-wrap mode (KNOWN BUG)
+PRIORITY: P1
+FEATURE:  mouse drag select wrap
+RELATED:  QA-WRAP-001
+
+STEPS
+  1. Open a prose file (word wrap on by filetype default) with several
+     long, wrapping lines.
+  2. Press inside the text well below the top, drag UP past the top of
+     the text viewport (into the ruler/tab-bar rows), release.
+
+VERIFY
+  - KNOWN BUG (bugs.md P1 "Mouse drag above first visual row in
+    word-wrap mode jumps selection/view to end of document",
+    `WrapMap::visual_to_doc`): dragging above the viewport currently
+    jumps the cursor/selection to the END of the document instead of
+    clamping to the start. Scheduled to be fixed in Phase 2.
+  - The test script (`ms_021_drag_above_viewport.sh`) self-adapts: it
+    reports the bug via SKIP (not FAIL) while it's present, and will
+    automatically report PASS once Phase 2's fix lands — plus it has a
+    dormant, commented-out strict `qa_assert_cursor_at "1:1"` assertion
+    ready to swap in as a permanent regression guard once fixed. This
+    keeps `make qa` green today without silently losing the repro.

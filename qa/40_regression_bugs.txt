@@ -932,3 +932,97 @@ PRIORITY: P2
 BUG:      P2 "More prominent ctrl-space hint"
 CROSS-REF: QA-PAL-019, QA-REG-045
 VERIFY    Rightmost pill shows `⌘ Commands ⌃␣` in distinctive color.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-101
+NAME:     Column paste onto last document line pastes all in-bounds rows
+PRIORITY: P1
+BUG:      P1 "Column paste silently does nothing when pasted rows extend
+          past end of document"
+CROSS-REF: QA-CLIP-007, QA-COL-004
+VERIFY    Column-copy 3 rows x N cols from the top of a short document,
+          paste at the document's last line: the target line's content is
+          mutated (pasted text visible in the saved file), not left
+          unchanged. Regresses if `_column_paste`'s bounds check in
+          `Editor/Commands.pm` reverts to `last` instead of `next` — that
+          aborts the whole paste the instant the bottom-most pasted row
+          falls past end-of-document, discarding every valid row above it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-102
+NAME:     --no-nerd-font eliminates tab bar corner triangle glyphs
+PRIORITY: P2
+BUG:      P2 "Tab bar corner triangles (◢/◣) ignored --no-nerd-font"
+CROSS-REF: QA-CLI-007
+VERIFY    With --no-nerd-font, no Private Use Area glyphs (U+E000-U+F8FF)
+          or the U+25E2/U+25E3 tab-pill corner triangles appear anywhere on
+          screen. Regresses if Renderer.pm's tab bar hardcodes
+          "\x{25e2}"/"\x{25e3}" again instead of going through
+          Zepto::Chars->get('tab_edge_left'/'tab_edge_right'), or if the
+          tab bar's render cache key stops including the nerd-font-enabled
+          state (stale cached glyphs would survive a runtime toggle).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-103
+NAME:     QA scripts that create git repos configure a local git identity
+PRIORITY: P1
+BUG:      P1 "QA scripts creating git repos must not depend on a global
+          git user being configured"
+CROSS-REF: QA-FILE-014
+VERIFY    On a machine/CI runner with NO global git user.name/user.email
+          configured (fresh HOME, no GIT_AUTHOR_*/GIT_COMMITTER_* env
+          vars), every QA script that runs `git init` + `git commit`
+          still passes — `git commit` must not fail with "Author identity
+          unknown". file_014_save_vcs_gutter.sh was the one script that
+          ran `git init`/`git commit` directly without setting local
+          `git config user.email`/`user.name` first (every other
+          git-repo-creating script either does this inline or goes
+          through the qa_git_repo() helper, which already sets it).
+          Regresses if a new script creates a git repo without local
+          identity config or without routing through qa_git_repo().
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-104
+NAME:     QA state isolation survives hangon/tmux environment laundering
+PRIORITY: P0
+BUG:      P0 "[Testing] hangon/tmux does not forward the caller's
+          environment — per-test ZEPTO_STATE_DIR isolation was silently
+          broken, cross-poisoning concurrent tests' preferences"
+CROSS-REF: QA-CLI-010, QA-CLI-011, QA-EDIT-020, QA-MS-012
+VERIFY    reg_104_state_isolation.sh: (1) a test with no ZEPTO_NERD_FONT
+          exported gets zepto's default (nerd font ON) — no stale env or
+          shared-state leak; (2) a ZEPTO_* var exported by the test
+          actually reaches zepto. Regresses if qa_start stops passing
+          --state-dir on the command line, stops clearing/forwarding
+          ZEPTO_* vars via its `env` wrapper, or if scripts start zepto
+          via `hangon start process` directly instead of qa_start.
+          Mechanism: hangon's tmux backend runs `tmux new-session` with
+          no env forwarding, so panes get the tmux SERVER's environment
+          (from whichever long-dead test started the server), not the
+          caller's; combined with StateStore's cross-instance mtime sync,
+          one test toggling a persisted pref (auto-pairs, nerd font)
+          live-poisoned every concurrently-running test's zepto.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-105
+NAME:     QA runs never write into the repository (project-dir subshell bug)
+PRIORITY: P0
+BUG:      P0 "[Testing] qa_project/qa_git_repo's documented
+          command-substitution API subshelled the cd — tests wrote into
+          (and COMMITTED into) the zepto repo itself"
+CROSS-REF: QA-WRAP-009, QA-VCS-007, QA-PICK-009
+VERIFY    After a full `make qa` run, `git status` in the repo is clean:
+          no stray commits (reflog shows no test-authored "init"/"initial"
+          commits), no junk files in the repo root (test.txt, root.txt,
+          alpha.txt, subdir/, ...), and `git config --local user.email`
+          is not the test identity (test@test.com). Regresses if
+          qa_project/qa_git_repo are ever called via command substitution
+          (`dir=$(qa_project)` — the subshell swallows the cd), if
+          qa_setup stops cd-ing into $QA_TMPDIR, or if the functions
+          start echoing their path again (which invites the $() pattern
+          back).

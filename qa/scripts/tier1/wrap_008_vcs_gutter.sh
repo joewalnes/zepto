@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-WRAP-008: VCS gutter on wrapped lines"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 echo "short line" > test.txt
 git add . && git commit -q -m "init"
 

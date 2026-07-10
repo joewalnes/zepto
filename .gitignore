@@ -15,3 +15,11 @@ foo.txt
 /*.tmp
 /node_modules/
 /.venv/
+
+# Pixel QA tier (qa/pixel) — npm deps, Playwright run artifacts, and
+# screenshot baselines are all machine/platform-specific and regenerated
+# on demand (see qa/pixel/README.md); nothing here is meant to be committed.
+qa/pixel/node_modules/
+qa/pixel/test-results/
+qa/pixel/playwright-report/
+qa/pixel/tests/__screenshots__/

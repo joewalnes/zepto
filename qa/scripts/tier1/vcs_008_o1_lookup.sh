@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-VCS-008: VCS O(1) lookup"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 content=""
 for i in $(seq 1 200); do content+="line $i"$'\n'; done
 printf '%s' "$content" > test.txt

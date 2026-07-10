@@ -255,6 +255,10 @@ my %CHARS = (
     # Directory expand/collapse arrows (Nerd Font carets)
     tree_arrow_right    => [ NF_CARET_RIGHT,      '>' ],  #  (collapsed)
     tree_arrow_down     => [ NF_CARET_DOWN,        'v' ],  #  (expanded)
+
+    # Tab bar pill edges (slanted "parallelogram" tab shape)
+    tab_edge_left       => [ "\x{25e2}",          '/'  ],  # ◢
+    tab_edge_right      => [ "\x{25e3}",          '\\' ],  # ◣
 );
 
 # Module state

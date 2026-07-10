@@ -15,9 +15,10 @@ QA_ZEPTO="$(cd "$(dirname "$QA_ZEPTO")" && pwd)/$(basename "$QA_ZEPTO")"
 
 cd "$projdir"
 
-# Start with tree visible
-hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" .
-sleep "$QA_RENDER_WAIT"
+# Start with tree visible (via qa_start for state-dir isolation + env
+# forwarding — see qa-helpers.sh qa_start comments on hangon/tmux env
+# laundering)
+qa_start .
 
 cd "$OLDPWD"
 

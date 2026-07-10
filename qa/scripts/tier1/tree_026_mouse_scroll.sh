@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-026: Mouse scroll in tree area"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 for i in $(seq 1 30); do
     echo "content $i" > "item_$(printf '%03d' $i).txt"
 done

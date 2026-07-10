@@ -21,12 +21,22 @@ qa_send "sort" 0.2
 qa_keys "enter"
 sleep 0.5
 
-# Text should be sorted
+# Text should be sorted. NOTE: "apple" is one of the original three input
+# words and is visible on screen even BEFORE the sort runs — grepping for it
+# alone (as this test used to) is a tautology that can't detect a broken
+# transform. Assert the actual reordering instead: alphabetically, apple
+# must now appear before banana, which must appear before cherry.
 qa_screen
-if echo "$QA_SCREEN" | grep -q "apple"; then
-    qa_pass "sort command executed — apple visible"
+apple_line=$(echo "$QA_SCREEN" | grep -n "apple" | head -1 | cut -d: -f1 || true)
+banana_line=$(echo "$QA_SCREEN" | grep -n "banana" | head -1 | cut -d: -f1 || true)
+cherry_line=$(echo "$QA_SCREEN" | grep -n "cherry" | head -1 | cut -d: -f1 || true)
+
+if [[ -n "$apple_line" && -n "$banana_line" && -n "$cherry_line" \
+      && "$apple_line" -lt "$banana_line" && "$banana_line" -lt "$cherry_line" ]]; then
+    qa_pass "sort command executed — lines reordered alphabetically"
 else
-    qa_fail "sort command executed — apple visible"
+    qa_fail "sort command executed — lines reordered alphabetically" \
+        "apple=$apple_line banana=$banana_line cherry=$cherry_line"
 fi
 
 qa_keys "ctrl-q"
