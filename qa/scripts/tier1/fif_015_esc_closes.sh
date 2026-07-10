@@ -37,3 +37,29 @@ qa_assert_screen "hello world" "editor visible after closing FIF"
 
 qa_keys "ctrl-q"
 qa_summary
+
+# ---------------------------------------------------------------------------
+# TEMP-DEBUG (remove after CI diagnosis of the ^[-in-query failure).
+# Runs only when the assertion above failed AND we're on CI.
+# ---------------------------------------------------------------------------
+if [ "${CI:-}" = "true" ] && ! qa_screen | grep -qF "hello world"; then
+    echo "=== TEMP-DEBUG fif_015 ==="
+    echo "--- versions ---"
+    tmux -V; command -v hangon; hangon version 2>/dev/null || hangon --version 2>/dev/null || echo "no version cmd"
+    echo "--- tmux escape-time / assume-paste-time ---"
+    tmux show-options -g -s escape-time 2>/dev/null; tmux show-options -g assume-paste-time 2>/dev/null
+    echo "--- screen (plain) ---"; qa_screen
+    echo "--- input row hexdump ---"
+    qa_screen | grep -n "hello" | head -2 | od -c | head -6
+    echo "--- probe 1: hangon keys escape again after 1s ---"
+    sleep 1; hangon keys "$QA_SESSION" escape; sleep 1
+    qa_screen | head -6
+    echo "--- probe 2: raw ESC byte via tmux send-keys -H 1b ---"
+    pid=$(hangon info "$QA_SESSION" 2>/dev/null | grep -oE 'PID=[0-9]+' | cut -d= -f2)
+    [ -z "$pid" ] && pid=$(hangon list 2>/dev/null | grep -oE '[0-9]+' | head -1)
+    for t in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep hangon); do
+        tmux send-keys -t "$t" -H 1b 2>/dev/null && echo "sent raw 1b to $t"
+    done
+    sleep 1; qa_screen | head -6
+    echo "=== END TEMP-DEBUG ==="
+fi
