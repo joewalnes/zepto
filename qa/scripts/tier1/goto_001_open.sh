@@ -8,7 +8,7 @@ line two")
 qa_start "$file"
 
 qa_keys "ctrl-g"
-qa_assert_screen "line.*col|:col|Go to|Go To" "goto input visible with hint"
+qa_assert_expect "line.*col|:col|Go to|Go To" "goto input visible with hint"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

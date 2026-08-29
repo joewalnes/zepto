@@ -11,7 +11,7 @@ qa_keys "ctrl-g"
 qa_send ":10" 0.2
 qa_keys "enter"
 
-qa_assert_screen "1:10" "cursor at col 10"
+qa_assert_expect "1:10" "cursor at col 10"
 
 qa_keys "ctrl-q"
 qa_summary

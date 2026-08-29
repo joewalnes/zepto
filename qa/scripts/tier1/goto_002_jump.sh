@@ -13,7 +13,7 @@ file=$(qa_tmpfile "goto002.txt" "$content")
 qa_start "$file"
 
 # Should start at line 1
-qa_assert_screen "1:1|1,1" "starts at line 1"
+qa_assert_expect "1:1|1,1" "starts at line 1"
 
 # Open goto
 qa_keys "ctrl-g"
@@ -26,8 +26,8 @@ qa_send "10"
 qa_keys "enter"
 
 # Should now be at line 10
-qa_assert_screen "10:" "cursor at line 10"
-qa_assert_screen "line number 10" "line 10 content visible"
+qa_assert_expect "10:" "cursor at line 10"
+qa_assert_expect "line number 10" "line 10 content visible"
 
 # Test line:col format
 qa_keys "ctrl-g"
@@ -36,7 +36,7 @@ qa_keys "ctrl-a" 0.1
 qa_send "15:5"
 qa_keys "enter"
 
-qa_assert_screen "15:" "cursor at line 15"
+qa_assert_expect "15:" "cursor at line 15"
 
 qa_keys "ctrl-q"
 

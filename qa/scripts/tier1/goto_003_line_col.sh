@@ -15,7 +15,7 @@ qa_keys "ctrl-g"
 qa_send "5:3" 0.2
 qa_keys "enter"
 
-qa_assert_screen "5:3" "cursor at line 5 col 3"
+qa_assert_expect "5:3" "cursor at line 5 col 3"
 
 qa_keys "ctrl-q"
 qa_summary

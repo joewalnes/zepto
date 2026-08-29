@@ -19,12 +19,7 @@ qa_keys "enter" 0.3
 
 qa_send "UNIQUE_FINDME_123" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "one|three|2|match"; then
-    qa_pass "find in files shows results"
-else
-    qa_fail "find in files shows results"
-fi
+qa_assert_expect "one|three|2|match" "find in files shows results"
 
 # Navigate to a result
 qa_keys "down" 0.2

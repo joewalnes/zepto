@@ -15,13 +15,8 @@ qa_send "hello"
 # Type closing quote — should skip over
 qa_send "\""
 
-qa_screen
 # Should see "hello" not "hello""
-if echo "$QA_SCREEN" | grep -qF '"hello"'; then
-    qa_pass "closing quote skipped over, result is \"hello\""
-else
-    qa_fail "closing quote skipped over" "expected \"hello\""
-fi
+qa_assert_expect '"hello"' "closing quote skipped over, result is \"hello\""
 
 qa_keys "ctrl-q"
 sleep 0.2

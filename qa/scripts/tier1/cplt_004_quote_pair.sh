@@ -9,12 +9,7 @@ qa_start "$file"
 # Type a double-quote
 qa_send "\""
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qF '""'; then
-    qa_pass "double-quote auto-paired to \"\""
-else
-    qa_fail "double-quote auto-paired to \"\""
-fi
+qa_assert_expect '""' "double-quote auto-paired to \"\""
 
 qa_keys "ctrl-q"
 sleep 0.2
