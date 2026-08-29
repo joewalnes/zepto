@@ -2,6 +2,7 @@
 
 ## 2026-08-29
 
+- Status bar reworked: shortcuts are now grouped into a ⌃ (Ctrl) column and an ⌥ (Alt) column, each showing its modifier once instead of on every pill — the most useful action in each column (Save, Word Wrap) now stays visible even in a narrow terminal
 - Markdown emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) now render in a dimmed color so bold/italic/strikethrough/highlighted text pops out visually
 - Added session restore: relaunching zepto with no file arguments now reopens the tabs, cursor positions, and scroll positions you left in that directory. Explicit file/directory args always bypass it. Toggle via "Restore Session on Startup" in the command palette (on by default)
 - Added automatic dark/light theme mode: pick "Theme: Auto" from the command palette to follow the system appearance (macOS/GNOME), with a periodic check while running. Manual dark/light selection ("Theme: Dark", "Theme: Light", or ⌃T) always still works and takes an explicit choice out of auto

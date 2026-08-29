@@ -1135,3 +1135,47 @@ VERIFY    The "Theme" row's icon region (everything before the "Theme"
           text" comparison also false-passed pre-fix due to "[dark]" vs
           "[light]" padding-width differences — cutting at the fixed
           "Theme" label instead isolates the icon itself).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-110
+NAME:     Status bar pills are modifier-grouped, not one flat repeating-modifier list
+PRIORITY: P1
+BUG:      P1 "Status bar rework — always-visible keys grouped by modifier"
+          (2026-08-29, fixed 2026-08-29)
+CROSS-REF: QA-SBAR-016, QA-SBAR-017
+VERIFY    DOCUMENT-context status bar shows a `⌃` label once followed by
+          Ctrl-shortcut pills with bare keys (no repeated `⌃`), then a `⌥`
+          label once followed by Alt-shortcut pills with bare keys, with
+          the `⌃` group entirely left of the `⌥` group. Open File is an
+          ordinary `⌃` column pill (`Open File O/P`), not a second
+          hardcoded pill pinned next to the palette trigger — only `⌃␣
+          Commands` is unconditionally pinned rightmost.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-111
+NAME:     Priority-1 pill in each status bar column survives narrow widths
+PRIORITY: P1
+BUG:      P1 "Status bar rework — always-visible keys grouped by modifier"
+          (2026-08-29, fixed 2026-08-29)
+CROSS-REF: QA-SBAR-018
+VERIFY    At the default 80-column terminal (where several lower-priority
+          pills already drop, see QA-SBAR-006), Save (`⌃` priority 1) and
+          Word Wrap (`⌥` priority 1) both still render — full or compact
+          form. Cursor-position pill and `⌃␣ Commands` are the only two
+          truly unconditional elements at any width.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-112
+NAME:     Tutorial (F1) removed from status bar pills, still in palette
+PRIORITY: P3
+BUG:      P1 "Status bar rework — always-visible keys grouped by modifier"
+          (2026-08-29, fixed 2026-08-29) — F1 has no ⌃/⌥ modifier so it
+          doesn't fit either grouped column; previously it was priority 5
+          and could appear as a bare "Tutorial F1" pill.
+CROSS-REF: QA-SBAR-019
+VERIFY    No status bar pill reads "Tutorial" at any width. Tutorial still
+          appears in the command palette with its F1 shortcut, and F1
+          still opens the Tutorial doc directly.

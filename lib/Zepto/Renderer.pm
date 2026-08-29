@@ -3781,6 +3781,98 @@ sub _render_pill {
     return (join('', @_out), $width);
 }
 
+# =============================================================================
+# Modifier-Grouped Pill Columns (⌃ left / ⌥ right — see UI_GUIDELINES.md)
+# =============================================================================
+#
+# Greedily fit as many candidate pills (sorted ascending by priority, i.e.
+# highest-importance first) into $budget columns. Tries the full pill form
+# (icon + label + key) first; if even the highest-priority candidate can't
+# fit in full form, the whole group falls back to a compact form (icon +
+# key, no label) and retries. This guarantees the top-priority pill in a
+# group renders in *some* form whenever the group has any budget at all,
+# instead of just vanishing once the label makes it too wide.
+#
+# Returns (\@fit_pills, $used_width) where each fit pill is a shallow copy
+# of the candidate with `text` and `width` set to whichever form was used.
+sub _fit_pill_group {
+    my ($candidates, $budget, $nerd_font) = @_;
+    return ([], 0) if $budget <= 0 || !@$candidates;
+
+    my $try_mode = sub {
+        my ($mode) = @_;
+        my @fit;
+        my $used = 0;
+        for my $c (@$candidates) {
+            my $w  = $mode eq 'full' ? $c->{full_width} : $c->{compact_width};
+            my $pw = $w + ($nerd_font ? 3 : 1);  # caps (2) + gap (1), or just gap
+            last if $used + $pw > $budget;
+            push @fit, { %$c, text => ($mode eq 'full' ? $c->{full_text} : $c->{compact_text}), width => $w };
+            $used += $pw;
+        }
+        return (\@fit, $used);
+    };
+
+    my ($full_fit, $full_used) = $try_mode->('full');
+    return ($full_fit, $full_used) if @$full_fit;
+
+    return $try_mode->('compact');
+}
+
+# Render a non-interactive modifier group label (e.g. " ⌃ ") — a Separator,
+# not a pill: no rounded caps, dim text, not clickable. Mutates $center_col_ref.
+sub _render_group_label {
+    my ($class, $theme, $sym, $out_ref, $center_col_ref) = @_;
+    push @$out_ref, $theme->color('status_bg') . $theme->color('gutter_fg');
+    push @$out_ref, " $sym ";
+    $$center_col_ref += 3;
+}
+
+# Render a list of already-fit pills (from _fit_pill_group) with rounded
+# caps, hover highlighting, and click button registration. Mutates
+# $out_ref, $buttons_ref, $center_col_ref, and $btn_offset_ref (so the
+# caller can chain multiple groups and keep hover indices contiguous with
+# render order — see Editor::_handle_mouse_hover / get_status_buttons).
+sub _render_pill_list {
+    my ($class, $theme, $nerd_font, $round_l, $round_r, $fit_list,
+        $hover_pill_index, $btn_offset_ref, $out_ref, $buttons_ref, $center_col_ref) = @_;
+
+    for my $i (0 .. $#$fit_list) {
+        my $pill = $fit_list->[$i];
+        my $btn_idx  = $$btn_offset_ref + $i;
+        my $is_hover = defined $hover_pill_index && $hover_pill_index == $btn_idx;
+        my $eff_fg   = $is_hover ? 'pill_hover_fg'   : $pill->{fg};
+        my $eff_bg   = $is_hover ? 'pill_hover_bg'   : $pill->{bg};
+        my $eff_edge = $is_hover ? 'pill_hover_edge' : $pill->{edge};
+
+        if ($nerd_font) {
+            push @$out_ref, $theme->color('status_bg') . $theme->color($eff_edge);
+            push @$out_ref, $round_l;
+            $$center_col_ref += 1;
+        }
+
+        push @$out_ref, $theme->color($eff_bg) . $theme->color($eff_fg);
+        push @$out_ref, " $pill->{text} ";
+        push @$buttons_ref, {
+            x_start    => $$center_col_ref,
+            x_end      => $$center_col_ref + $pill->{width} - 1,
+            command_id => $pill->{cmd}{id},
+        };
+        $$center_col_ref += $pill->{width};
+
+        if ($nerd_font) {
+            push @$out_ref, $theme->color('status_bg') . $theme->color($eff_edge);
+            push @$out_ref, $round_r;
+            $$center_col_ref += 1;
+        }
+
+        push @$out_ref, $theme->color('status_bg') . ' ';
+        $$center_col_ref += 1;
+    }
+
+    $$btn_offset_ref += scalar @$fit_list;
+}
+
 sub _render_context_status_bar {
     my ($class, $doc, $view, $theme, $cols, $message, $message_is_error, $ui, $word_wrap_active) = @_;
 
@@ -3977,31 +4069,45 @@ sub _render_context_status_bar {
         $left_width += 1;
     }
 
-    # 2. RIGHT: Open File + Palette trigger pills (always visible, rightmost)
-    my $open_icon = Zepto::Chars->get('folder_open');
-    my $open_text = " $open_icon Open \x{2303}O ";
-    my $open_total_width = length($open_text) + ($nerd_font ? 2 : 0);
-
+    # 2. RIGHT: Palette trigger pill only (always visible, rightmost — see
+    # UI_GUIDELINES.md "Context-Aware Status Bar"). Open File used to be a
+    # second hardcoded pill here; it's now an ordinary ⌃ group candidate
+    # (⌃O/⌃P) like every other Ctrl shortcut, so it can drop at very narrow
+    # widths just like the rest of that column.
     my $palette_icon = Zepto::Chars->get('palette');
     my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
     my $palette_text_width = length($palette_text);
     # Total palette width includes the round caps (left + right)
     my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
 
-    my $right_total_width = $open_total_width + 1 + $palette_total_width;  # +1 for gap
-
-    # 3. CENTER: Priority-based pills
+    # 3. CENTER: two modifier-grouped pill columns — ⌃ (Ctrl) on the left,
+    # ⌥ (Alt) on the right — each showing its modifier glyph once instead
+    # of repeating it on every pill. See docs/UI_GUIDELINES.md.
     my $editor = $ui->{editor};
-    # No trailing transition cost — each pill is self-contained with its own caps
-    # -2 accounts for gap before first pill and after cursor pill
-    my $available = $cols - $left_width - $right_total_width - 2;
+    # -2 accounts for the gap after the cursor pill and the gap before the palette pill
+    my $available = $cols - $left_width - $palette_total_width - 2;
     $available = 0 if $available < 0;
 
-    # Collect pills sorted by priority
-    my @candidates;
+    my $ctrl_sym = Zepto::CommandRegistry::SYM_CTRL();
+    my $alt_sym  = Zepto::CommandRegistry::SYM_ALT();
+
+    # Collect candidates, sorted by priority (ascending = most important first),
+    # split into the ⌃ and ⌥ columns by which modifier their shortcut starts with.
+    # Commands with no shortcut, a bare function key, or a multi-modifier chord
+    # (e.g. ⌃⇧F) don't belong to either column and are never a status bar pill —
+    # they remain reachable from the command palette.
+    my (@ctrl_candidates, @alt_candidates);
     if ($editor) {
         my @cmds = Zepto::CommandRegistry->commands_for_status_bar('document', $cols, $editor);
         for my $cmd (@cmds) {
+            my $shortcut = $cmd->{shortcut} // '';
+            my $group = index($shortcut, $ctrl_sym) == 0 ? 'ctrl'
+                      : index($shortcut, $alt_sym)  == 0 ? 'alt'
+                      : undef;
+            next unless $group;
+            my $sym = $group eq 'ctrl' ? $ctrl_sym : $alt_sym;
+            (my $stripped = $shortcut) =~ s/\Q$sym\E//g;
+
             my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
             # Theme pill: icon reflects the actual current mode (auto/dark/
             # light), not a static moon regardless of state.
@@ -4009,15 +4115,14 @@ sub _render_context_status_bar {
                 my $theme_state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor) // 'dark';
                 $icon = Zepto::Chars->get("theme_$theme_state");
             }
-            my $shortcut = $cmd->{shortcut} // '';
-            my ($fg, $bg, $edge);
+            my ($fg, $bg, $edge, $label, $is_on);
 
             if ($cmd->{type} eq 'toggle') {
                 my $state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor);
                 my $state_display = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
 
                 # Determine effective on/off (handle theme specially)
-                my $is_on = $state ? 1 : 0;
+                $is_on = $state ? 1 : 0;
                 if ($cmd->{pref} && $cmd->{pref} eq 'theme') {
                     $is_on = 1;  # Theme is always "active"
                 }
@@ -4053,128 +4158,94 @@ sub _render_context_status_bar {
                     # else: keep default on/off colors (grey = no change)
                 }
 
-                my $label = $cmd->{label};
+                $label = $cmd->{label};
                 if ($state_display ne '' && $state_display ne 'on' && $state_display ne 'off') {
                     $label .= ":$state_display";
                 }
-
-                my $text = "$icon $label $shortcut";
-                my $pill_width = length($text) + 2;
-
-                push @candidates, {
-                    cmd      => $cmd,
-                    text     => $text,
-                    icon     => $icon,
-                    label    => $label,
-                    shortcut => $shortcut,
-                    fg       => $fg,
-                    bg       => $bg,
-                    edge     => $edge,
-                    width    => $pill_width,
-                    priority => $cmd->{priority},
-                    is_on    => $is_on,
-                };
             }
-            elsif ($cmd->{type} eq 'action') {
-                my $label = $cmd->{label};
-                my $text = "$icon $label $shortcut";
-                my $pill_width = length($text) + 2;
-
-                push @candidates, {
-                    cmd      => $cmd,
-                    text     => $text,
-                    icon     => $icon,
-                    label    => $label,
-                    shortcut => $shortcut,
-                    fg       => 'pill_action_fg',
-                    bg       => 'pill_action_bg',
-                    edge     => 'pill_action_edge',
-                    width    => $pill_width,
-                    priority => $cmd->{priority},
-                };
+            else {
+                $label = $cmd->{label};
+                $fg = 'pill_action_fg';
+                $bg = 'pill_action_bg';
+                $edge = 'pill_action_edge';
             }
+
+            my $full_text = $stripped ne '' ? "$icon $label $stripped" : "$icon $label";
+            my $compact_text = $stripped ne '' ? "$icon $stripped" : $icon;
+
+            my $entry = {
+                cmd           => $cmd,
+                fg            => $fg,
+                bg            => $bg,
+                edge          => $edge,
+                priority      => $cmd->{priority},
+                is_on         => $is_on,
+                full_text     => $full_text,
+                full_width    => length($full_text) + 2,
+                compact_text  => $compact_text,
+                compact_width => length($compact_text) + 2,
+            };
+            push @{ $group eq 'ctrl' ? \@ctrl_candidates : \@alt_candidates }, $entry;
         }
     }
 
-    # Greedily fit pills into available space
-    my @pills_to_render;
-    my $used = 0;
-    for my $pill (@candidates) {
-        # Each pill costs: content + caps (2 if nerd font) + 1 space gap
-        my $pw = $pill->{width} + ($nerd_font ? 3 : 1);
-        last if $used + $pw > $available;
-        push @pills_to_render, $pill;
-        $used += $pw;
-    }
+    # Budget negotiation: figure out the minimum width each column needs to
+    # show just its priority-1 pill (label + compact form of the top item).
+    # Whenever both minimums fit in the available width, reserve alt's
+    # minimum up front so ctrl can never greedily starve it, then hand
+    # back whatever ctrl didn't use. This guarantees the priority-1 pill in
+    # *each* column renders (full or compact) as long as the terminal has
+    # room for both. Under genuine extreme-narrow scarcity (not even both
+    # minimums fit), ctrl — rendered first, holds Save — wins the
+    # remaining space and alt may drop entirely; see docs/UI_GUIDELINES.md.
+    my $ctrl_label_w = @ctrl_candidates ? 3 : 0;  # " ⌃ "
+    my $alt_label_w  = @alt_candidates  ? 3 : 0;  # " ⌥ "
 
-    # Render center pills with rounded caps
-    # Add gap between cursor pill and first center pill (matching between-pill gaps)
+    my $ctrl_min = @ctrl_candidates
+        ? $ctrl_label_w + $ctrl_candidates[0]{compact_width} + ($nerd_font ? 3 : 1)
+        : 0;
+    my $alt_min = @alt_candidates
+        ? $alt_label_w + $alt_candidates[0]{compact_width} + ($nerd_font ? 3 : 1)
+        : 0;
+
+    my $alt_reserve = ($ctrl_min + $alt_min <= $available) ? $alt_min : 0;
+
+    my $ctrl_pill_budget = $available - $alt_reserve - $ctrl_label_w;
+    $ctrl_pill_budget = 0 if $ctrl_pill_budget < 0;
+    my ($ctrl_fit, $ctrl_pills_used) = _fit_pill_group(\@ctrl_candidates, $ctrl_pill_budget, $nerd_font);
+    my $ctrl_total_used = @$ctrl_fit ? ($ctrl_label_w + $ctrl_pills_used) : 0;
+
+    my $alt_pill_budget = $available - $ctrl_total_used - $alt_label_w;
+    $alt_pill_budget = 0 if $alt_pill_budget < 0;
+    my ($alt_fit, $alt_pills_used) = _fit_pill_group(\@alt_candidates, $alt_pill_budget, $nerd_font);
+    my $alt_total_used = @$alt_fit ? ($alt_label_w + $alt_pills_used) : 0;
+
+    # Render: [cursor pill][gap][⌃ group][fill][⌥ group][gap][palette pill]
     my $center_col = $left_width + 1;
-    if (@pills_to_render) {
-        push @_out, $theme->color('status_bg') . ' ';
-        $center_col += 1;
-    }
     my $hover_pill_index = $ui->{hover_pill_index};
-    # Button index offset: pills rendered so far in @buttons
     my $pill_btn_offset = scalar @buttons;
 
-    for my $i (0 .. $#pills_to_render) {
-        my $pill = $pills_to_render[$i];
-        my $is_hover = defined $hover_pill_index && $hover_pill_index == ($pill_btn_offset + $i);
-        my $eff_fg   = $is_hover ? 'pill_hover_fg'   : $pill->{fg};
-        my $eff_bg   = $is_hover ? 'pill_hover_bg'   : $pill->{bg};
-        my $eff_edge = $is_hover ? 'pill_hover_edge'  : $pill->{edge};
-
-        if ($nerd_font) {
-            # Left round cap
-            push @_out, $theme->color('status_bg') . $theme->color($eff_edge);
-            push @_out, $round_l;
-            $center_col += 1;
-        }
-
-        push @_out, $theme->color($eff_bg) . $theme->color($eff_fg);
-        push @_out, " $pill->{text} ";
-        push @buttons, {
-            x_start    => $center_col,
-            x_end      => $center_col + $pill->{width} - 1,
-            command_id => $pill->{cmd}{id},
-        };
-        $center_col += $pill->{width};
-
-        if ($nerd_font) {
-            # Right round cap
-            push @_out, $theme->color('status_bg') . $theme->color($eff_edge);
-            push @_out, $round_r;
-            $center_col += 1;
-        }
-
-        # Gap between pills
+    if (@$ctrl_fit) {
         push @_out, $theme->color('status_bg') . ' ';
         $center_col += 1;
+        $class->_render_group_label($theme, $ctrl_sym, \@_out, \$center_col);
+        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $ctrl_fit,
+            $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }
 
-    # Middle fill
-    my $remaining = $cols - $center_col - $right_total_width + 1;
+    # Middle fill — right-aligns the ⌥ column against the palette pill
+    my $tail_width = (@$alt_fit ? $alt_label_w + $alt_pills_used : 0) + $palette_total_width;
+    my $remaining = $cols - $center_col - $tail_width - 1;  # -1 for gap before palette pill
     $remaining = 0 if $remaining < 0;
     push @_out, $theme->color('status_bg');
     push @_out, ' ' x $remaining if $remaining > 0;
+    $center_col += $remaining;
 
-    # Open File pill
-    if ($nerd_font) {
-        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        push @_out, $round_l;
+    if (@$alt_fit) {
+        $class->_render_group_label($theme, $alt_sym, \@_out, \$center_col);
+        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $alt_fit,
+            $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }
-    push @_out, $theme->color('pill_palette_bg') . $theme->color('pill_palette_fg');
-    push @_out, $open_text;
-    if ($nerd_font) {
-        push @_out, $theme->color('status_bg') . $theme->color('pill_palette_edge');
-        push @_out, $round_r;
-    }
-    push @buttons, {
-        x_start    => $cols - $right_total_width + 1,
-        x_end      => $cols - $right_total_width + $open_total_width,
-        command_id => 'open_file',
-    };
 
     push @_out, $theme->color('status_bg') . ' ';  # gap between pills
 

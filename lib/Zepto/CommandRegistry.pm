@@ -9,7 +9,18 @@ package Zepto::CommandRegistry;
 #
 # Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW
 # Types: action (one-shot), toggle (binary on/off), setting (multi-value)
-# Priority: 1 = always on status bar, 5 = only if wide terminal
+#
+# Status bar priority: commands with priority > 0 are candidates for the
+# status bar's two modifier-grouped columns (see Renderer::_render_context_status_bar).
+# A command joins the ⌃ (Ctrl) column if its shortcut starts with the Ctrl
+# glyph, or the ⌥ (Alt) column if it starts with the Alt glyph; anything else
+# (no shortcut, a bare function key, or a multi-modifier chord) is never a
+# status bar pill — it's still reachable from the command palette.
+# Lower priority number = higher importance = fits at narrower widths and is
+# the last to degrade to a compact (icon+key, no label) form. Priority 1 in
+# each column is guaranteed a minimum width reservation so it always renders
+# (in full or compact form) whenever the terminal is wide enough for any
+# pills at all.
 # =============================================================================
 
 use strict;
@@ -46,7 +57,7 @@ my @COMMANDS = (
         shortcut => SYM_CTRL . 'O/' . SYM_CTRL . 'P',
         section  => 'FILE',
         type     => 'action',
-        priority => 0,
+        priority => 2,   # status bar: ⌃ group (was a hardcoded fixed-right pill)
         method   => 'cmd_open_file',
     },
     {
@@ -56,7 +67,7 @@ my @COMMANDS = (
         shortcut => SYM_CTRL . 'S',
         section  => 'FILE',
         type     => 'action',
-        priority => 0,
+        priority => 1,   # status bar: ⌃ group, most useful action
         method   => 'cmd_save',
     },
     {
@@ -117,7 +128,7 @@ my @COMMANDS = (
         section  => 'FILE',
         type     => 'toggle',
         pref     => 'show_tree',
-        priority => 0,
+        priority => 3,   # status bar: ⌃ group
         method   => 'cmd_toggle_tree',
     },
 
@@ -261,7 +272,7 @@ my @COMMANDS = (
         shortcut => SYM_CTRL . 'F',
         section  => 'NAVIGATE',
         type     => 'action',
-        priority => 3,
+        priority => 2,   # status bar: ⌃ group
         method   => 'cmd_find',
     },
     {
@@ -364,7 +375,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => 'word_wrap',
-        priority => 2,
+        priority => 1,   # status bar: ⌥ group, most useful toggle
         method   => 'cmd_toggle_word_wrap',
     },
     {
@@ -375,7 +386,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => undef,          # managed by view, not prefs
-        priority => 2,
+        priority => 2,   # status bar: ⌥ group
         method   => 'cmd_toggle_column_mode',
     },
     {
@@ -386,7 +397,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => undef,          # managed per-view
-        priority => 2,
+        priority => 2,   # status bar: ⌥ group
         method   => 'cmd_toggle_diff',
     },
     {
@@ -397,7 +408,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => 'show_minimap',
-        priority => 0,
+        priority => 3,   # status bar: ⌥ group
         method   => 'cmd_toggle_minimap',
     },
     {
@@ -408,7 +419,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => 'nerd_font',
-        priority => 0,
+        priority => 5,   # status bar: ⌥ group, rarely toggled
         method   => 'cmd_toggle_nerd_font',
     },
     {
@@ -419,7 +430,7 @@ my @COMMANDS = (
         section  => 'VIEW',
         type     => 'toggle',
         pref     => 'theme',
-        priority => 4,
+        priority => 4,   # status bar: ⌃ group
         method   => 'cmd_toggle_theme',
     },
     # Explicit theme-mode picks. The 'toggle_theme' row above (⌃T) shows the
@@ -531,7 +542,10 @@ my @COMMANDS = (
         shortcut => 'F1',
         section  => 'DOCUMENTATION',
         type     => 'action',
-        priority => 5,
+        # Not shown as a status bar pill: F1 has no ⌃/⌥ modifier so it
+        # doesn't belong in either grouped column (see status bar rework,
+        # bugs.md). Still discoverable via palette and the F1 key itself.
+        priority => 0,
         method   => 'cmd_doc_tutorial',
     },
     {

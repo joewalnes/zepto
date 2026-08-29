@@ -42,15 +42,49 @@ These guidelines define the user interface standards for Zepto. They are used to
 - The `⌃␣` palette trigger pill is always visible as the rightmost element.
 - The status bar adapts per context: DOCUMENT shows editing toggles and actions, FILE_TREE shows tree-specific hints, FIND/PROMPT/FOOTER_INPUT use dedicated specialized renderers.
 
+## Modifier-Grouped Pill Columns (⌃ left / ⌥ right)
+
+In the DOCUMENT context, status bar pills are organized Zellij-style into
+two columns by the modifier their shortcut uses, instead of one flat
+category-ordered list with the modifier repeated on every pill:
+
+- The `⌃` (Ctrl) column renders immediately after the cursor-position pill,
+  left-aligned. The `⌥` (Alt) column renders immediately before the `⌃␣`
+  palette trigger, right-aligned. A middle fill gap separates them, so the
+  Ctrl/Alt split is visually obvious even before reading any labels.
+- Each column shows its modifier glyph exactly once, as a small dim
+  non-clickable label (a `Separator`, not a pill — no rounded caps, no
+  background fill) — never repeated inside the pills that follow it.
+- A command belongs to a column only if its shortcut starts with exactly
+  that modifier (`⌃X` or `⌥X`). Commands with no shortcut, a bare function
+  key (e.g. `F1`), or a multi-modifier chord (e.g. `⌃⇧F`) never appear as a
+  status bar pill — they're still reachable from the command palette, which
+  always shows the full, un-stripped shortcut.
+- Within a column, pills are ordered by priority (see below) and can render
+  in two forms: **full** (`icon label key`, e.g. `Save S`) when there's
+  room, or **compact** (`icon key`, e.g. `S`) when there isn't. A pill's
+  on/off color still conveys toggle state in compact form even though the
+  label text is gone.
+- Open File (`⌃O/⌃P`) is an ordinary `⌃` column pill, not a hardcoded
+  fixed-position pill — only the `⌃␣` palette trigger is unconditionally
+  pinned to the rightmost position.
+
 ## Priority-Based Progressive Disclosure
 
-- Status bar pills have priority tiers (1 = essential, 5 = nice-to-have).
-- As terminal width narrows, lower-priority pills drop off first.
-  - P1 (always, any width): cursor position + `⌃␣` palette trigger.
-  - P2 (~35+ cols): active toggles (ON state only).
-  - P3 (~50+ cols): action pills (Find, Go to Line).
-  - P4 (~65+ cols): settings and theme toggle.
-  - P5 (~80+ cols): inactive toggles (dim OFF indicators).
+- Status bar pills have priority tiers (1 = essential, 5 = nice-to-have),
+  assigned per-column: priority 1 is the single most useful command in that
+  modifier column (`⌃S` Save on the left, `⌥Z` Word Wrap on the right).
+- As terminal width narrows, lower-priority pills drop first — within each
+  column independently, not globally — and full-form pills degrade to
+  compact form before they disappear.
+- Two unconditional elements never drop, at any width: the cursor-position
+  pill and the `⌃␣` palette trigger.
+- Budget negotiation guarantees the priority-1 pill in *both* columns
+  renders (full or compact) whenever the terminal is wide enough for both —
+  neither column can starve the other by greedily consuming the whole
+  width. Under genuine extreme-narrow scarcity (not even room for both
+  columns' priority-1 pill), the `⌃` column wins the remaining space
+  because it's rendered first and holds Save.
 - The command palette (`⌃Space`) always provides access to everything regardless of terminal width.
 
 ## Command Registry
