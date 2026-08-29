@@ -7,17 +7,17 @@ file=$(qa_tmpfile "edit005.txt" "")
 qa_start "$file"
 
 # Should start at 1:1
-qa_assert_screen "1:1" "cursor at 1:1 on empty file"
+qa_assert_expect "1:1" "cursor at 1:1 on empty file"
 
 # Type in empty file
 qa_send "hello"
-qa_assert_screen "hello" "can type in empty file"
+qa_assert_expect "hello" "can type in empty file"
 
 # Undo
 qa_keys "ctrl-z"
-sleep 0.2
 
 # Should be back to empty
+qa_wait_screen "^$|1:1" || true
 qa_screen
 if ! echo "$QA_SCREEN" | grep -q "hello"; then
     qa_pass "undo removed text in empty file"

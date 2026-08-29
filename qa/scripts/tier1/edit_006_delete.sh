@@ -14,7 +14,7 @@ qa_keys "right" 0.1
 qa_keys "delete" 0.1
 qa_keys "delete" 0.1
 
-qa_assert_screen "abef" "delete removed chars at cursor"
+qa_assert_expect "abef" "delete removed chars at cursor"
 
 qa_keys "ctrl-q"
 sleep 0.2

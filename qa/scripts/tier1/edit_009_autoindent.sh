@@ -16,10 +16,10 @@ qa_keys "enter"
 qa_send "return 1"
 
 # Line 3 should have indented "return 1"
-qa_assert_screen "return 1" "return 1 appears"
+qa_assert_expect "return 1" "return 1 appears"
 
 # Check we're on line 3
-qa_assert_screen "3:" "cursor on line 3"
+qa_assert_expect "3:" "cursor on line 3"
 
 qa_keys "ctrl-q"
 sleep 0.2

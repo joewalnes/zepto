@@ -19,7 +19,7 @@ qa_keys "ctrl-v"
 sleep 0.5
 
 # Paste should go through cleanly
-qa_assert_screen "some pasted text here" "paste completed without interference"
+qa_assert_expect "some pasted text here" "paste completed without interference"
 
 qa_keys "ctrl-q"
 sleep 0.2

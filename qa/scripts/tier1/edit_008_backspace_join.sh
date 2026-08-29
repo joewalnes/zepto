@@ -13,7 +13,7 @@ qa_keys "down" 0.1
 # Backspace at col 1 of line 2 should join with line 1
 qa_keys "backspace"
 
-qa_assert_screen "helloworld" "lines joined"
+qa_assert_expect "helloworld" "lines joined"
 
 qa_keys "ctrl-q"
 sleep 0.2

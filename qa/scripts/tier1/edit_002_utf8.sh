@@ -7,7 +7,7 @@ file=$(qa_tmpfile "edit002.txt" "")
 qa_start "$file"
 
 qa_send "café"
-qa_assert_screen "café" "UTF-8 text displayed correctly"
+qa_assert_expect "café" "UTF-8 text displayed correctly"
 
 qa_keys "ctrl-q"
 sleep 0.2

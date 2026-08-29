@@ -13,7 +13,7 @@ qa_keys "end"
 qa_keys "backspace" 0.1
 qa_keys "backspace" 0.1
 
-qa_assert_screen "abcd" "backspace removed trailing chars"
+qa_assert_expect "abcd" "backspace removed trailing chars"
 
 qa_keys "ctrl-q"
 sleep 0.2
