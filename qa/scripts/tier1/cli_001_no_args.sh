@@ -6,7 +6,7 @@ qa_header "QA-CLI-001: Binary runs with no args"
 qa_start
 
 qa_assert_expect "1:1" "cursor position pill shows 1:1"
-qa_assert_screen "Commands" "Commands pill visible"
+qa_assert_expect "Commands" "Commands pill visible"
 
 qa_keys "ctrl-q"
 qa_summary

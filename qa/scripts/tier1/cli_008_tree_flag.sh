@@ -8,7 +8,7 @@ qa_start --tree "$file"
 
 # Tree should be visible — look for directory entries (dots, names)
 qa_assert_expect "lib|docs|src|\\.github" "tree panel shows directory entries"
-qa_assert_screen "hello" "editor content still visible"
+qa_assert_expect "hello" "editor content still visible"
 
 qa_keys "ctrl-q"
 qa_summary

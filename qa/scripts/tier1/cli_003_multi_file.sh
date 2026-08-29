@@ -8,8 +8,8 @@ file2=$(qa_tmpfile_nl "cli003_b.txt" "content B")
 qa_start "$file1" "$file2"
 
 qa_assert_expect "cli003_a" "tab A visible"
-qa_assert_screen "cli003_b" "tab B visible"
-qa_assert_screen "content A" "first file content shown"
+qa_assert_expect "cli003_b" "tab B visible"
+qa_assert_expect "content A" "first file content shown"
 
 qa_keys "alt-."
 qa_assert_expect "content B" "second file content after tab switch"

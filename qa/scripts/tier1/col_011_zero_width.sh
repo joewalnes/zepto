@@ -10,7 +10,7 @@ qa_start "$file"
 
 # Enter column mode
 qa_keys "alt-c"
-qa_assert_screen "COL" "COL indicator visible"
+qa_assert_expect "COL" "COL indicator visible"
 
 # No text should be highlighted yet (zero-width)
 # Extend right to create actual selection
@@ -18,7 +18,7 @@ qa_keys "right" 0.1
 qa_keys "right" 0.1
 
 # Should still be in COL mode
-qa_assert_screen "COL" "still in column mode after extending"
+qa_assert_expect "COL" "still in column mode after extending"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

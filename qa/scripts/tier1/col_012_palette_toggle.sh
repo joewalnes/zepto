@@ -10,9 +10,8 @@ qa_start "$file"
 qa_keys "ctrl-space"
 qa_send "column" 0.3
 qa_keys "enter"
-sleep 0.3
 
-qa_assert_screen "COL" "column mode toggled on via palette"
+qa_assert_expect "COL" "column mode toggled on via palette"
 
 # Toggle off via palette
 qa_keys "ctrl-space"

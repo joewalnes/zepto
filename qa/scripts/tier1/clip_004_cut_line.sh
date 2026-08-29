@@ -11,7 +11,7 @@ qa_start "$file"
 qa_keys "ctrl-x"
 
 qa_assert_not_screen "delete me" "line removed"
-qa_assert_screen "keep me" "other line still present"
+qa_assert_expect "keep me" "other line still present"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -15,9 +15,10 @@ qa_keys "ctrl-a"
 qa_raw $'\x1f'
 
 qa_assert_expect "# x = 1" "first line commented"
-qa_assert_screen "# y = 2" "third line commented"
+qa_assert_expect "# y = 2" "third line commented"
 
 # Check blank line is still blank (not "# ")
+qa_wait_screen "# " || true
 qa_screen
 blank_line_count=$(echo "$QA_SCREEN" | grep -c "^$" || true)
 if [[ "$blank_line_count" -ge 1 ]] || ! echo "$QA_SCREEN" | grep -qE "^# $"; then

@@ -16,7 +16,7 @@ qa_raw $'\x1f'
 
 # All # should be at minimum indent (col 1 = def foo line)
 qa_assert_expect "# def foo" "comment at minimum indent"
-qa_assert_screen "#     x = 1" "indented line has comment at min indent"
+qa_assert_expect "#     x = 1" "indented line has comment at min indent"
 
 qa_keys "ctrl-q"
 sleep 0.2

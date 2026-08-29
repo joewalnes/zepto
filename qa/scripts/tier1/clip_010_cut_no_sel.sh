@@ -15,8 +15,8 @@ qa_keys "down"
 qa_keys "ctrl-x"
 
 qa_assert_not_screen "line two" "line two was cut"
-qa_assert_screen "line one" "line one still present"
-qa_assert_screen "line three" "line three still present"
+qa_assert_expect "line one" "line one still present"
+qa_assert_expect "line three" "line three still present"
 
 # Paste it back to verify it was copied
 qa_keys "ctrl-v"

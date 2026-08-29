@@ -33,7 +33,7 @@ if [[ "$after_toggle" != "$initial" ]]; then
     qa_keys "ctrl-b" 0.3
 fi
 
-qa_assert_screen "tree test" "editor content still visible after toggle"
+qa_assert_expect "tree test" "editor content still visible after toggle"
 
 qa_keys "ctrl-q"
 qa_summary

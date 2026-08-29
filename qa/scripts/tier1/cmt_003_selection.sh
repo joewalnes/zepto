@@ -15,8 +15,8 @@ qa_keys "ctrl-a"
 qa_raw $'\x1f'
 
 qa_assert_expect "# x = 1" "line 1 commented"
-qa_assert_screen "# y = 2" "line 2 commented"
-qa_assert_screen "# z = 3" "line 3 commented"
+qa_assert_expect "# y = 2" "line 2 commented"
+qa_assert_expect "# z = 3" "line 3 commented"
 
 qa_keys "ctrl-q"
 sleep 0.2

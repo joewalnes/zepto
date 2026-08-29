@@ -13,7 +13,7 @@ qa_assert_not_screen "COL" "column mode initially off"
 
 # Toggle column mode via Alt+C to verify the indicator location
 qa_keys "alt-c"
-qa_assert_screen "COL" "column mode on via alt-c"
+qa_assert_expect "COL" "column mode on via alt-c"
 
 # Toggle off
 qa_keys "alt-c"

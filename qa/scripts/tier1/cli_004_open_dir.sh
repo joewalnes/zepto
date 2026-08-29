@@ -12,7 +12,7 @@ qa_start "$QA_TMPDIR/testdir"
 
 # Tree should be visible showing directory contents
 qa_assert_expect "alpha" "alpha.txt visible in tree"
-qa_assert_screen "beta" "beta.txt visible in tree"
+qa_assert_expect "beta" "beta.txt visible in tree"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -21,7 +21,7 @@ sleep 0.3
 qa_keys "ctrl-v"
 sleep 0.3
 
-qa_assert_screen "test query" "paste restored query in find bar"
+qa_assert_expect "test query" "paste restored query in find bar"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
