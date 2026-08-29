@@ -8,7 +8,7 @@ qa_start "$file"
 
 qa_keys "end"
 qa_send " world"
-qa_assert_screen "hello world" "text added"
+qa_assert_expect "hello world" "text added"
 
 qa_keys "ctrl-z"
 # Should undo the " world"
@@ -18,7 +18,7 @@ if echo "$QA_SCREEN" | grep -qv "hello world"; then
 fi
 
 qa_keys "ctrl-y"
-qa_assert_screen "hello world" "redo restored text"
+qa_assert_expect "hello world" "redo restored text"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -7,7 +7,7 @@ file=$(qa_tmpfile_nl "undo005.txt" "clean file")
 qa_start "$file"
 
 qa_keys "ctrl-z"
-qa_assert_screen "Nothing to undo|Nothing|undo" "nothing to undo message"
+qa_assert_expect "Nothing to undo|Nothing|undo" "nothing to undo message"
 
 qa_keys "ctrl-q"
 qa_summary

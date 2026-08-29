@@ -14,7 +14,7 @@ sleep 0.3
 
 # Type more after save
 qa_send " second"
-qa_assert_screen "base first second" "both edits visible"
+qa_assert_expect "base first second" "both edits visible"
 
 # Undo — should undo post-save changes first
 qa_keys "ctrl-z" 0.2
