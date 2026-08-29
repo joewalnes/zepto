@@ -19,12 +19,7 @@ qa_keys "enter" 0.3
 # Search for uppercase "Hello"
 qa_send "Hello" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "upper|1|match"; then
-    qa_pass "case-sensitive search found match"
-else
-    qa_fail "case-sensitive search found match"
-fi
+qa_assert_expect "upper|1|match" "case-sensitive search found match"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

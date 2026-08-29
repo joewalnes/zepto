@@ -19,12 +19,7 @@ qa_keys "enter" 0.3
 # Search with a pattern
 qa_send "foo123" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "match|1|foo123"; then
-    qa_pass "find in files regex search works"
-else
-    qa_fail "find in files regex search works"
-fi
+qa_assert_expect "match|1|foo123" "find in files regex search works"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
