@@ -10,7 +10,8 @@ date")
 qa_start "$file"
 
 qa_keys "ctrl-f"
-# Regex should be on by default
+# Enable regex mode (find defaults to literal — QA-REG-105)
+qa_keys "ctrl-r" 0.2
 qa_send 'apple|cherry' 0.3
 
 qa_screen

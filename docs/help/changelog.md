@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-28 (later)
+
+- Find now defaults to literal search — press ⌃R to enable regex matching
+- Hovering a status bar pill now always brightens it (bright pills used to dim on hover)
+- New `--no-system-clipboard` flag: copy/paste use only the editor's internal clipboard
+
 ## 2026-08-28
 
 - Fixed editor appearing frozen after mouse movement — typed text and cursor moves now render immediately instead of waiting for the next click

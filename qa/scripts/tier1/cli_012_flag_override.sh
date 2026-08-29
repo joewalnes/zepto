@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# QA-CLI-012: CLI flag overrides env var
+# QA-CLI-012: CLI flag overrides env var (--tree beats ZEPTO_TREE=0)
+# NOTE: hangon sessions do NOT inherit the client env — inject via `env`
+# wrapper inside the session command.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-CLI-012: Flag overrides env var"
 
-QA_ZEPTO="$(cd "$(dirname "$QA_ZEPTO")" && pwd)/$(basename "$QA_ZEPTO")"
 proj_dir=$(mktemp -d /tmp/zepto_qa_cli012_XXXXXX)
-echo "content" > "$proj_dir/a.txt"
-echo "other" > "$proj_dir/b.txt"
-cd "$proj_dir"
+echo "content" > "$proj_dir/marker_cli012.txt"
 
-# ZEPTO_TREE=0 should hide tree, but --tree flag should override
-export ZEPTO_TREE=0
-hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" --tree a.txt
+# ZEPTO_TREE=0 hides the tree, but the --tree flag must win
+hangon start process --name "$QA_SESSION" -- \
+    env ZEPTO_TREE=0 \
+    "$QA_ZEPTO" --state-dir "$QA_STATE_DIR" --no-system-clipboard --tree "$proj_dir"
 sleep "$QA_RENDER_WAIT"
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "b\.txt|a\.txt.*a\.txt"; then
-    qa_pass "--tree flag overrides ZEPTO_TREE=0"
+if qa_wait_screen "marker_cli012"; then
+    qa_pass "--tree flag overrides ZEPTO_TREE=0 (tree visible)"
 else
-    # Even if tree not visible, the flag was accepted
-    qa_pass "flag accepted (tree visibility depends on context)"
+    qa_fail "--tree flag overrides ZEPTO_TREE=0" "tree entry not visible"
 fi
 
 qa_keys "ctrl-q"
-cd "$OLDPWD"
 rm -rf "$proj_dir"
 qa_summary

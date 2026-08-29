@@ -320,3 +320,21 @@ VERIFY
   - The status bar cursor pill reflects the arrow-key move immediately.
   - Idle hover motion alone still does NOT trigger a render per event
     (the ?1003h motion-flood optimization is preserved).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-022
+NAME:     Pill hover brightens, never dims (REGRESSION)
+PRIORITY: P2
+FEATURE:  mouse hover
+RELATED:  QA-MS-014, QA-REG-104
+SCRIPT:   tier2/ms_022_pill_hover_bright.sh
+
+STEPS
+  1. Open a file; note the Word Wrap pill (toggle ON → bright blue).
+  2. Hover the mouse over it without clicking.
+
+VERIFY
+  - The pill becomes BRIGHTER (light vivid blue), not dimmer/grayer.
+  - Moving the mouse off returns it to its normal color.
+  - Same holds for the Commands (palette) pill and diff pills.

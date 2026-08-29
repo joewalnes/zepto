@@ -77,7 +77,9 @@ sub new {
     my $self = bless {
         # Core components
         tab_manager  => Zepto::Editor::TabManager->new(),
-        terminal     => $opts{terminal} // Zepto::Terminal->new(),
+        terminal     => $opts{terminal} // Zepto::Terminal->new(
+            $opts{no_system_clipboard} ? (no_system_clipboard => 1) : ()
+        ),
         parser       => Zepto::InputParser->new(),
         state_store  => $opts{state_store} // Zepto::StateStore->new(),
         prefs        => undef,  # initialized below (needs state_store)
@@ -99,7 +101,7 @@ sub new {
         # Incremental find state
         find_widget       => undef,   # InputWidget for search field
         find_current      => 0,       # Index of current match (0-based)
-        find_regex        => 1,       # Regex mode enabled (on by default)
+        find_regex        => 0,       # Literal search by default (⌃R toggles regex)
         find_case         => 0,       # Case-sensitive enabled
 
         # Replace state (extension of find)

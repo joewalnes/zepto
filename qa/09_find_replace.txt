@@ -441,3 +441,22 @@ STEPS
 
 VERIFY
   - Cursor jumps by word within the input field.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-027
+NAME:     Literal search is the default (REGRESSION)
+PRIORITY: P2
+FEATURE:  find literal default
+RELATED:  QA-FIND-008, QA-REG-105
+SCRIPT:   tier1/reg_105_find_literal_default.sh
+
+STEPS
+  1. File contains `fooXbar`, `foo.bar`, `fooYbar`.
+  2. ⌃F, type `foo.bar`.
+
+VERIFY
+  - Matches exactly the literal `foo.bar` line ("1 of 1") — the `.` is
+    NOT treated as a regex wildcard by default.
+  - The regex pill (`.* ⌃R`) shows OFF state.
+  - Pressing ⌃R switches to regex matching (all 3 lines match).

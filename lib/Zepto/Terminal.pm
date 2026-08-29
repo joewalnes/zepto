@@ -83,6 +83,11 @@ sub new {
         _output_buf => '',
         _clipboard_copy_cmd  => undef,
         _clipboard_paste_cmd => undef,
+        # When set, never touch the system clipboard (no OSC 52, no
+        # pbcopy/xclip/...) — copy/paste use only the editor's internal
+        # buffer. Used by the QA suite so parallel test sessions cannot
+        # clobber each other (or the user's real clipboard).
+        _no_system_clipboard => $opts{no_system_clipboard} ? 1 : 0,
     }, $class;
 
     # Ensure output handle is in raw/bytes mode — Terminal encodes
@@ -90,7 +95,7 @@ sub new {
     binmode($self->{out_fh}, ':raw');
 
     # Detect platform clipboard commands
-    $self->_detect_clipboard_commands();
+    $self->_detect_clipboard_commands() unless $self->{_no_system_clipboard};
 
     return $self;
 }
@@ -567,6 +572,7 @@ sub _safe_backtick {
 sub copy_to_clipboard {
     my ($self, $text) = @_;
     return unless defined $text && length $text;
+    return if $self->{_no_system_clipboard};
 
     # Encode to UTF-8 bytes — encode_base64 and pipe write expect bytes,
     # not Perl's internal wide character strings

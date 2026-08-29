@@ -22,10 +22,10 @@ qa_keys "shift-left" 0.1
 qa_keys "shift-left" 0.1
 qa_keys "shift-left" 0.1
 
-# Paste — should replace "world" with "hello"
-qa_keys "ctrl-v"
-
-qa_assert_screen "hello hello" "paste replaced selection"
+# Paste — should replace "world" with "hello".
+# Expect-based wait: a fixed post-keys sleep flaked under full-suite load.
+qa_keys "ctrl-v" 0.1
+qa_assert_expect "hello hello" "paste replaced selection"
 
 qa_keys "ctrl-q"
 sleep 0.2

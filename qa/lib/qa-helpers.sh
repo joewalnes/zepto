@@ -81,8 +81,14 @@ trap qa_cleanup EXIT
 
 # Start zepto in a hangon session
 #   qa_start [args...]
+# Isolation is passed as CLI flags, NOT env vars: hangon sessions do NOT
+# inherit the client's environment, so the exported ZEPTO_STATE_DIR never
+# reached zepto — every test silently shared the user's real state dir
+# (and the system clipboard), causing cross-test interference under
+# parallel runs. See bugs.md 2026-08-28.
 qa_start() {
-    hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" "$@"
+    hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" \
+        --state-dir "$QA_STATE_DIR" --no-system-clipboard "$@"
     sleep "$QA_RENDER_WAIT"
 }
 
@@ -225,6 +231,44 @@ qa_screenshot() {
 # ---------------------------------------------------------------------------
 # Assertions
 # ---------------------------------------------------------------------------
+
+# Wait (up to TIMEOUT s) for a regex to appear on the RENDERED screen,
+# then assert. Prefer this over sleep+qa_assert_screen — fixed sleeps
+# flake when the suite runs many sessions in parallel and renders are
+# starved. Polls `hangon screen` (the rendered text grid); do NOT use
+# `hangon expect` for screen content — it matches the raw output stream,
+# where escape sequences interleave between characters, so patterns like
+# `\(\)` rarely appear as adjacent bytes.
+#   qa_assert_expect PATTERN [DESC] [TIMEOUT]
+qa_assert_expect() {
+    local pattern="$1"
+    local desc="${2:-screen shows '$pattern'}"
+    local timeout="${3:-8}"
+    if qa_wait_screen "$pattern" "$timeout"; then
+        qa_pass "$desc"
+    else
+        qa_fail "$desc" "Pattern did not appear within ${timeout}s: $pattern"
+    fi
+}
+
+# Poll the rendered screen until PATTERN appears (or TIMEOUT s elapse).
+# Returns 0 if it appeared; QA_SCREEN holds the last capture either way.
+#   qa_wait_screen PATTERN [TIMEOUT]
+qa_wait_screen() {
+    local pattern="$1"
+    local timeout="${2:-8}"
+    local tries=$((timeout * 4))
+    local i=0
+    while (( i < tries )); do
+        qa_screen
+        if echo "$QA_SCREEN" | grep -qE "$pattern"; then
+            return 0
+        fi
+        sleep 0.25
+        i=$((i + 1))
+    done
+    return 1
+}
 
 qa_assert_screen() {
     local pattern="$1"

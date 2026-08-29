@@ -267,8 +267,8 @@ subtest 'Toggle cycles through options' => sub {
     my $editor = create_editor_with_content("Hello World\n");
     $editor->enter_find_mode();
 
-    # Initial state (regex on by default)
-    is($editor->{find_regex}, 1, 'Regex on initially');
+    # Initial state (literal search by default — QA-REG-105)
+    is($editor->{find_regex}, 0, 'Regex off initially (literal default)');
     is($editor->{find_case}, 0, 'Case off initially');
 
     # Toggle: regex off

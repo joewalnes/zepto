@@ -128,4 +128,38 @@ subtest 'Constants' => sub {
     is(Zepto::Theme::REVERSE, "\x1b[7m", 'REVERSE constant');
 };
 
+# ============================================================================
+# Pill hover contrast (QA-REG-104)
+# ============================================================================
+# Regression: pill_hover_bg was dimmer than the bright pill categories
+# (toggle-on, palette), so hovering those pills DE-highlighted them — the
+# inverted affordance read as a stale-render bug. Hover must be visibly
+# brighter (dark theme) than every pill category it can be applied to.
+sub _bg_luminance {
+    my ($theme, $name) = @_;
+    my $ansi = $theme->color($name);
+    my ($r, $g, $b) = $ansi =~ /48;2;(\d+);(\d+);(\d+)m/
+        or die "not an RGB background: $name => " . unpack('H*', $ansi);
+    return 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
+}
+
+subtest 'Pill hover is brighter than every pill category (dark)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $hover = _bg_luminance($theme, 'pill_hover_bg');
+    for my $cat (qw(pill_toggle_on_bg pill_toggle_off_bg pill_action_bg pill_palette_bg)) {
+        my $lum = _bg_luminance($theme, $cat);
+        ok($hover > $lum, "pill_hover_bg brighter than $cat ($hover > $lum)");
+    }
+};
+
+subtest 'Pill hover is distinct from every pill category (light)' => sub {
+    my $theme = Zepto::Theme->light_theme();
+    my $hover = _bg_luminance($theme, 'pill_hover_bg');
+    for my $cat (qw(pill_toggle_on_bg pill_toggle_off_bg pill_action_bg pill_palette_bg)) {
+        my $lum = _bg_luminance($theme, $cat);
+        ok(abs($hover - $lum) > 10,
+           "pill_hover_bg visibly distinct from $cat (|$hover - $lum| > 10)");
+    }
+};
+
 done_testing();

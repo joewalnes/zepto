@@ -7,7 +7,7 @@ file=$(qa_tmpfile_nl "cli017.txt" "hello")
 
 # Run zepto and capture stderr for any "Can't locate" or "require" errors
 stderr_file="$QA_TMPDIR/stderr.txt"
-hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" "$file" 2>"$stderr_file"
+hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" --state-dir "$QA_STATE_DIR" --no-system-clipboard "$file" 2>"$stderr_file"
 sleep "$QA_RENDER_WAIT"
 
 # Check no module-not-found errors in stderr

@@ -158,9 +158,12 @@ sub dark_theme {
         pill_toggle_off_fg  => fg_rgb(148, 155, 185),   # Readable but subdued
         pill_toggle_off_bg  => bg_rgb(52, 59, 86),      # Slightly lighter for contrast
         pill_toggle_off_edge => fg_rgb(52, 59, 86),
-        pill_hover_fg       => fg_rgb(220, 228, 255),
-        pill_hover_bg       => bg_rgb(62, 69, 100),
-        pill_hover_edge     => fg_rgb(62, 69, 100),
+        # Hover must be brighter than EVERY pill category (incl. toggle-on
+        # 52,79,138 and palette 86,119,252), or hovering a bright pill dims
+        # it and the highlight reads as a de-highlight.
+        pill_hover_fg       => fg_rgb(255, 255, 255),
+        pill_hover_bg       => bg_rgb(110, 140, 255),
+        pill_hover_edge     => fg_rgb(110, 140, 255),
         pill_action_fg      => fg_rgb(192, 202, 245),
         pill_action_bg      => bg_rgb(52, 59, 86),      # Neutral
         pill_action_edge    => fg_rgb(52, 59, 86),
@@ -430,9 +433,12 @@ sub light_theme {
         pill_toggle_off_fg  => fg_rgb(108, 112, 134),   # Darker text for contrast
         pill_toggle_off_bg  => bg_rgb(213, 217, 227),    # Slightly different bg
         pill_toggle_off_edge => fg_rgb(213, 217, 227),
-        pill_hover_fg       => fg_rgb(40, 44, 60),
-        pill_hover_bg       => bg_rgb(190, 195, 210),
-        pill_hover_edge     => fg_rgb(190, 195, 210),
+        # Hover must read as emphasis against every pill category (incl.
+        # lavender toggle-on/palette 114,135,253): a deeper saturated
+        # lavender, not a washed-out gray.
+        pill_hover_fg       => fg_rgb(255, 255, 255),
+        pill_hover_bg       => bg_rgb(90, 110, 240),
+        pill_hover_edge     => fg_rgb(90, 110, 240),
         pill_action_fg      => fg_rgb(76, 79, 105),
         pill_action_bg      => bg_rgb(206, 210, 218),    # Neutral
         pill_action_edge    => fg_rgb(206, 210, 218),

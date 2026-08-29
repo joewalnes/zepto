@@ -970,3 +970,46 @@ VERIFY    qa_project/qa_git_repo cd into a temp dir in the CALLING shell;
           git init/add/commit from QA scripts land in that temp repo, never
           in the caller's repo; invoking them via $(...) aborts loudly; a
           victim repo's HEAD, worktree, and config stay untouched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-104
+NAME:     Pill hover color brighter than all pill categories
+PRIORITY: P2
+BUG:      P2 "Hover highlight paints one event late" — misdiagnosis; real
+          cause was pill_hover_bg dimmer than toggle-on/palette pill colors
+          (2026-08-28)
+CROSS-REF: QA-MS-022, QA-MS-014
+VERIFY    tests/theme.t: pill_hover_bg luminance exceeds toggle-on,
+          toggle-off, action, and palette pill backgrounds (dark theme) and
+          is visibly distinct in the light theme. Hovering a bright pill
+          must brighten it, never dim it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-105
+NAME:     Find bar defaults to literal search
+PRIORITY: P3
+BUG:      P3 "Regex mode defaults to ON in find bar" (2026-05-03, fixed
+          2026-08-28)
+CROSS-REF: QA-FIND-027, QA-FIND-008
+VERIFY    Fresh find bar: searching `foo.bar` matches only the literal
+          line ("1 of 1"), not `fooXbar` via regex dot. Pressing ⌃R then
+          matches all regex candidates. Also update any script that types
+          a regex pattern without pressing ⌃R first.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-106
+NAME:     QA session isolation — state dir and clipboard
+PRIORITY: P2
+BUG:      P2 "QA scripts flaky under full-suite parallel load" — root cause
+          was broken isolation: hangon strips client env, so ZEPTO_STATE_DIR
+          never reached zepto; system clipboard shared across sessions
+          (2026-08-28)
+CROSS-REF: QA-EDIT-020, QA-CLIP-009, QA-GUT-012, QA-COL-005
+VERIFY    Pref toggles land in the per-test QA_STATE_DIR (never the real
+          ~/.config/zepto); a copy in one session is NOT pastable in a
+          parallel session (--no-system-clipboard); helpers poll the
+          rendered screen (qa_wait_screen), never `hangon expect`, for
+          screen content.

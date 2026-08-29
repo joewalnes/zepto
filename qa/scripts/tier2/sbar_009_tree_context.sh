@@ -16,7 +16,7 @@ QA_ZEPTO="$(cd "$(dirname "$QA_ZEPTO")" && pwd)/$(basename "$QA_ZEPTO")"
 cd "$projdir"
 
 # Start with tree visible
-hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" .
+hangon start process --name "$QA_SESSION" -- "$QA_ZEPTO" --state-dir "$QA_STATE_DIR" --no-system-clipboard .
 sleep "$QA_RENDER_WAIT"
 
 cd "$OLDPWD"

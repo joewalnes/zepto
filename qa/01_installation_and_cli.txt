@@ -329,3 +329,23 @@ VERIFY
   - Either: opens as a new empty file with that filename (future save
     will create it), or shows a clear status message. Current behavior
     should be documented and consistent — verify no crash.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CLI-019
+NAME:     --no-system-clipboard uses internal clipboard only
+PRIORITY: P3
+FEATURE:  cli flags clipboard
+RELATED:  QA-REG-106
+SCRIPT:   tier1/reg_106_session_isolation.sh
+
+STEPS
+  1. Launch two zepto instances with `--no-system-clipboard`.
+  2. Copy text in one; paste in the other.
+
+VERIFY
+  - The paste does NOT receive the other instance's text (each process
+    uses only its internal clipboard).
+  - No OSC 52 or pbcopy/xclip invocation occurs; the user's system
+    clipboard is untouched.
+  - `--help` documents the flag.

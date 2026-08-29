@@ -6,45 +6,22 @@ qa_header "QA-EDIT-020: Bracket auto-close"
 file=$(qa_tmpfile_nl "edit020.js" "")
 qa_start "$file"
 
-# Auto-pairs is ON by default (each test gets fresh state dir)
-sleep 0.3
+# Auto-pairs is ON by default (each test gets fresh state dir).
+# Use expect-based waits, not fixed sleeps — this script flaked under
+# full-suite parallel load when 0.2s wasn't enough for a render.
 
-# Type opening bracket — should auto-insert closing bracket
-qa_send "("
-sleep 0.2
+qa_send "(" 0.1
+qa_assert_expect '\(\)' "( auto-closed with )"
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "()"; then
-    qa_pass "( auto-closed with )"
-else
-    qa_fail "( auto-closed with )"
-fi
+qa_keys "end" 0.1
+qa_keys "enter" 0.1
+qa_send "{" 0.1
+qa_assert_expect '\{\}' "{ auto-closed with }"
 
-# Type opening brace
-qa_keys "end"
-qa_keys "enter"
-qa_send "{"
-sleep 0.2
-
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "{}"; then
-    qa_pass "{ auto-closed with }"
-else
-    qa_fail "{ auto-closed with }"
-fi
-
-# Type opening square bracket
-qa_keys "end"
-qa_keys "enter"
-qa_send "["
-sleep 0.2
-
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "[]"; then
-    qa_pass "[ auto-closed with ]"
-else
-    qa_fail "[ auto-closed with ]"
-fi
+qa_keys "end" 0.1
+qa_keys "enter" 0.1
+qa_send "[" 0.1
+qa_assert_expect '\[\]' "[ auto-closed with ]"
 
 qa_keys "ctrl-q"
 sleep 0.2

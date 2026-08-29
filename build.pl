@@ -357,6 +357,7 @@ my @files;
 my $no_nerd_font = 0;
 my $no_tree = 0;
 my $force_tree = 0;
+my $no_system_clipboard = 0;
 my $state_dir = $ENV{ZEPTO_STATE_DIR} || '';
 
 {
@@ -374,6 +375,8 @@ my $state_dir = $ENV{ZEPTO_STATE_DIR} || '';
             $state_dir = $raw_args[++$i];
         } elsif ($arg =~ /^--state-dir=(.+)/) {
             $state_dir = $1;
+        } elsif ($arg eq '--no-system-clipboard') {
+            $no_system_clipboard = 1;
         } elsif ($arg eq '--help' || $arg eq '-h') {
             print "Usage: zepto [options] [file ...]\n";
             print "Options:\n";
@@ -383,6 +386,7 @@ my $state_dir = $ENV{ZEPTO_STATE_DIR} || '';
             print "  --tree              Show file tree on startup\n";
             print "  --no-tree           Hide file tree on startup\n";
             print "  --state-dir DIR     State/prefs directory (default: ~/.config/zepto)\n";
+            print "  --no-system-clipboard  Use internal clipboard only (for tests)\n";
             print "  --help, -h          Show this help\n";
             print "\nEnvironment:\n";
             print "  ZEPTO_NERD_FONT=0   Disable Nerd Font glyphs by default\n";
@@ -429,6 +433,7 @@ my $editor = Zepto::Editor->new(
     files => \@files, prefs => $prefs,
     state_store => $state_store, focus_tree => $focus_tree,
     ($hide_tree ? (show_tree => 0) : ()),
+    ($no_system_clipboard ? (no_system_clipboard => 1) : ()),
 );
 $editor->run();
 MAIN
