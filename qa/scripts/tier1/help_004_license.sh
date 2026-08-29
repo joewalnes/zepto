@@ -14,7 +14,7 @@ if echo "$QA_SCREEN" | grep -qiE "license|License"; then
     qa_pass "license command found in palette"
     qa_keys "enter"
     sleep 0.5
-    qa_assert_screen "MIT|License|license|Copyright|copyright" "license content displayed"
+    qa_assert_expect "MIT|License|license|Copyright|copyright" "license content displayed"
     qa_keys "ctrl-w"
 else
     qa_fail "license command found in palette"

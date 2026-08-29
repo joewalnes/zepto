@@ -9,12 +9,12 @@ qa_start
 qa_keys "ctrl-space"
 qa_send "about" 0.3
 
-qa_assert_screen "About" "about command visible in palette"
+qa_assert_expect "About" "about command visible in palette"
 
 qa_keys "enter" 0.3
 
 # Should show about content with version info or project name
-qa_assert_screen "Zepto|zepto|version|Version" "about document shows editor info"
+qa_assert_expect "Zepto|zepto|version|Version" "about document shows editor info"
 
 qa_keys "ctrl-q"
 qa_summary
