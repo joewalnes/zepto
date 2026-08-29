@@ -199,6 +199,22 @@ subtest 'Theme accessor' => sub {
     is($prefs->theme(), 'light', 'Theme setter');
 };
 
+# Theme is three-valued: 'auto' | 'dark' | 'light'. Preferences itself is
+# value-agnostic (resolution of 'auto' to a concrete theme happens in
+# Zepto::Editor via Zepto::ThemeDetect) — this just locks in that 'auto'
+# is stored/round-tripped like any other value, and the default stays
+# 'dark' so auto mode remains opt-in.
+subtest 'Theme accepts auto as a valid three-valued setting' => sub {
+    my $prefs = Zepto::Preferences->new();
+    is($prefs->theme(), 'dark', 'Default is dark, not auto (auto is opt-in)');
+
+    $prefs->set_theme('auto');
+    is($prefs->theme(), 'auto', 'auto value round-trips');
+
+    $prefs->set_theme('dark');
+    is($prefs->theme(), 'dark', 'dark value round-trips after auto');
+};
+
 subtest 'Tab width accessor' => sub {
     my $prefs = Zepto::Preferences->new();
     is($prefs->tab_width(), 4, 'Tab width getter');

@@ -85,6 +85,7 @@ use constant {
     NF_GOTO             => "\x{f0dc}",  #  sort/goto
     NF_SUN              => "\x{f185}",  #  sun (light theme)
     NF_MOON             => "\x{f186}",  #  moon (dark theme)
+    NF_ADJUST           => "\x{f042}",  #  half-filled circle (auto theme)
     NF_PLUS             => "\x{f067}",  #  plus (new file)
     NF_MAP              => "\x{f279}",  #  map (minimap)
     NF_INDENT           => "\x{f03c}",  #  indent
@@ -199,6 +200,7 @@ my %CHARS = (
     comment             => [ NF_COMMENT,        '#'         ],
     theme_light         => [ NF_SUN,            '*'         ],
     theme_dark          => [ NF_MOON,           '*'         ],
+    theme_auto          => [ NF_ADJUST,         'A'         ],
     new_file            => [ NF_PLUS,           '+'         ],
     minimap             => [ NF_MAP,            'M'         ],
     indent              => [ NF_INDENT,         '>'         ],

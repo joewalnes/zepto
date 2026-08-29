@@ -19,6 +19,9 @@ use warnings;
 # Default preference values
 my %DEFAULTS = (
     # Display
+    # Three-valued: 'auto' | 'dark' | 'light'. 'auto' follows the system
+    # appearance (see Zepto::ThemeDetect) and is opt-in — the default stays
+    # 'dark' so existing behavior is unchanged unless a user picks Auto.
     theme            => 'dark',
     show_line_numbers => 1,
     show_status_bar  => 1,

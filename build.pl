@@ -40,6 +40,7 @@ my %priority = (
     'lib/Zepto/View.pm'         => 15,
     'lib/Zepto/InputParser.pm'  => 16,
     'lib/Zepto/Theme.pm'        => 17,
+    'lib/Zepto/ThemeDetect.pm'  => 17.1, # System theme detection for "auto" mode; used by Editor
     'lib/Zepto/StateStore.pm'   => 17.5, # Before Preferences (which will depend on it)
     'lib/Zepto/AIComplete.pm'   => 17.6, # Before Editor (async AI completion)
     'lib/Zepto/Preferences.pm'  => 18,

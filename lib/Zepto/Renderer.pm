@@ -4003,6 +4003,12 @@ sub _render_context_status_bar {
         my @cmds = Zepto::CommandRegistry->commands_for_status_bar('document', $cols, $editor);
         for my $cmd (@cmds) {
             my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
+            # Theme pill: icon reflects the actual current mode (auto/dark/
+            # light), not a static moon regardless of state.
+            if (($cmd->{pref} // '') eq 'theme') {
+                my $theme_state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor) // 'dark';
+                $icon = Zepto::Chars->get("theme_$theme_state");
+            }
             my $shortcut = $cmd->{shortcut} // '';
             my ($fg, $bg, $edge);
 
@@ -5250,6 +5256,11 @@ sub _render_command_palette {
                 my $icon;
                 if ($cmd->{_is_file}) {
                     $icon = Zepto::Chars->file_icon($cmd->{_filename});
+                } elsif (($cmd->{pref} // '') eq 'theme') {
+                    # Theme row: icon reflects the actual current mode
+                    # (auto/dark/light), not a static moon regardless of state.
+                    my $theme_state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor) // 'dark';
+                    $icon = Zepto::Chars->get("theme_$theme_state");
                 } else {
                     $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
                 }

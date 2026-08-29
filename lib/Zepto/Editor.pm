@@ -35,6 +35,7 @@ use Zepto::InputParser;
 use Zepto::Preferences;
 use Zepto::StateStore;
 use Zepto::Theme;
+use Zepto::ThemeDetect;
 use Zepto::Highlighter;
 use Zepto::FindEngine;
 use Zepto::LineMap;
@@ -70,6 +71,7 @@ use constant {
     INPUT_TIMEOUT_SEC           => 0.5,   # Seconds to wait for input
     RESERVED_ROWS               => 3,     # Rows for tab bar + ruler bar + status bar
     EXTERNAL_CHECK_INTERVAL_SEC => 1.0,   # How often to stat() for external file changes
+    THEME_POLL_INTERVAL_SEC     => 5.0,   # Minimum gap between "auto" theme re-checks
 };
 
 sub new {
@@ -85,6 +87,12 @@ sub new {
         state_store  => $opts{state_store} // Zepto::StateStore->new(),
         prefs        => undef,  # initialized below (needs state_store)
         theme        => undef,
+
+        # Injectable system-theme-detection collaborators (tests only —
+        # production code always leaves these undef and falls back to the
+        # real Zepto::ThemeDetect functions). Never shell out in unit tests.
+        _theme_detect_fn         => $opts{theme_detect_fn},
+        _theme_poll_supported_fn => $opts{theme_poll_supported_fn},
 
         # UI state
         state        => STATE_EDITING,
@@ -192,8 +200,13 @@ sub new {
     # Per-window state, initialized from global default (or explicit override)
     $self->{_show_tree} = defined $opts{show_tree} ? $opts{show_tree} : $self->{prefs}->show_tree();
 
-    # Initialize theme
-    $self->{theme} = Zepto::Theme->get_theme($self->{prefs}->theme());
+    # Initialize theme. The 'theme' preference is three-valued:
+    # 'auto' | 'dark' | 'light'. 'auto' is resolved to a concrete theme
+    # via system detection; $self->{theme} always ends up a concrete
+    # dark/light Theme object (never an 'auto' one).
+    $self->{_theme_effective} = $self->_resolve_theme_name($self->{prefs}->theme());
+    $self->{theme} = Zepto::Theme->get_theme($self->{_theme_effective});
+    $self->{_theme_poll_last} = time();
 
     # Initialize completion controller with providers
     {
@@ -247,6 +260,69 @@ sub _effective_word_wrap {
 
     # Global preference
     return $self->{prefs}->word_wrap();
+}
+
+# =============================================================================
+# Theme (auto/dark/light) resolution and runtime detection
+# =============================================================================
+
+# Resolve a 'theme' preference value ('auto'|'dark'|'light') to a concrete
+# theme name ('dark'|'light'). 'auto' triggers system appearance
+# detection; anything unrecognized falls back to 'dark' (the long-standing
+# default), matching ThemeDetect's own "inconclusive -> dark" behavior.
+# Detection failures (e.g. no subprocess support in a sandboxed
+# environment) are swallowed defensively — a theme lookup must never crash
+# the editor.
+sub _resolve_theme_name {
+    my ($self, $pref_value) = @_;
+
+    if (defined $pref_value && $pref_value eq 'auto') {
+        my $fn = $self->{_theme_detect_fn} // \&Zepto::ThemeDetect::detect;
+        my $detected = eval { $fn->() };
+        return ($detected && $detected eq 'light') ? 'light' : 'dark';
+    }
+
+    return 'light' if defined $pref_value && $pref_value eq 'light';
+    return 'dark';
+}
+
+# Whether it's cheap enough to re-check the system theme periodically at
+# idle (single subprocess, no terminal round-trip). False on platforms/
+# desktops with no dependable detection source (e.g. Linux without
+# gsettings) — polling there would just burn CPU for no benefit.
+sub _theme_polling_supported {
+    my ($self) = @_;
+    my $fn = $self->{_theme_poll_supported_fn} // \&Zepto::ThemeDetect::platform_supports_polling;
+    return eval { $fn->() } ? 1 : 0;
+}
+
+# Called from the idle branch of run(). Only does anything when the theme
+# preference is 'auto': re-detects at most once per THEME_POLL_INTERVAL_SEC
+# and, if the system appearance changed, swaps the active theme live.
+# Returns true if the theme changed (caller should trigger a render).
+sub _maybe_poll_system_theme {
+    my ($self) = @_;
+
+    return 0 unless ($self->{prefs}->theme() // '') eq 'auto';
+    return 0 unless $self->_theme_polling_supported();
+
+    my $now = time();
+    $self->{_theme_poll_last} //= 0;
+    return 0 if ($now - $self->{_theme_poll_last}) < THEME_POLL_INTERVAL_SEC;
+    $self->{_theme_poll_last} = $now;
+
+    my $detected = $self->_resolve_theme_name('auto');
+    return 0 if !$self->{theme} || $detected eq $self->{theme}->name();
+
+    $self->{_theme_effective} = $detected;
+    $self->{theme} = Zepto::Theme->get_theme($detected);
+    my $cursor_color = $self->{theme}->color('cursor_color');
+    if ($cursor_color) {
+        print STDOUT "\x1b]12;${cursor_color}\x1b\\";
+        STDOUT->flush();
+    }
+    $self->{_prev_frame} = undef;  # Force full redraw
+    return 1;
 }
 
 # =============================================================================
@@ -808,7 +884,8 @@ sub init {
     $self->{prefs}->on_change(sub {
         my ($key, $new_value, $old_value) = @_;
         if ($key eq 'theme') {
-            $self->{theme} = Zepto::Theme->get_theme($new_value);
+            $self->{_theme_effective} = $self->_resolve_theme_name($new_value);
+            $self->{theme} = Zepto::Theme->get_theme($self->{_theme_effective});
             my $cursor_color = $self->{theme}->color('cursor_color');
             if ($cursor_color) {
                 print STDOUT "\x1b]12;${cursor_color}\x1b\\";
@@ -916,6 +993,13 @@ sub run {
                 if ($self->{_tree_vcs_deferred}) {
                     $self->{_tree_vcs_deferred} = 0;
                     $self->{_tree_vcs_ready} = 1;
+                    $needs_render = 1;
+                }
+
+                # Auto theme: occasionally re-check the system appearance
+                # (only on cheap-to-poll platforms; no-op unless the theme
+                # preference is 'auto' — see _maybe_poll_system_theme).
+                if ($self->_maybe_poll_system_theme()) {
                     $needs_render = 1;
                 }
             }

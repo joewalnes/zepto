@@ -414,13 +414,48 @@ my @COMMANDS = (
     {
         id       => 'toggle_theme',
         label    => 'Theme',
-        icon     => 'theme_dark',    # dynamic: theme_dark or theme_light
+        icon     => 'theme_dark',    # dynamic: theme_auto/theme_dark/theme_light
         shortcut => SYM_CTRL . 'T',
         section  => 'VIEW',
         type     => 'toggle',
         pref     => 'theme',
         priority => 4,
         method   => 'cmd_toggle_theme',
+    },
+    # Explicit theme-mode picks. The 'toggle_theme' row above (⌃T) shows the
+    # current mode ([auto]/[dark]/[light]) and toggles between explicit
+    # dark/light; these three jump directly to a specific mode, including
+    # back into 'auto' — which ⌃T deliberately never does on its own (see
+    # cmd_toggle_theme in Editor/Commands.pm).
+    {
+        id       => 'theme_set_auto',
+        label    => 'Theme: Auto',
+        icon     => 'theme_auto',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_set_theme_auto',
+    },
+    {
+        id       => 'theme_set_dark',
+        label    => 'Theme: Dark',
+        icon     => 'theme_dark',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_set_theme_dark',
+    },
+    {
+        id       => 'theme_set_light',
+        label    => 'Theme: Light',
+        icon     => 'theme_light',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_set_theme_light',
     },
     {
         id       => 'toggle_autocomplete',

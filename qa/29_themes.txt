@@ -179,3 +179,84 @@ STEPS
 VERIFY
   - Theme row shows current value ("dark" or "light") with sun/moon icon.
   - Enter toggles between them.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-012
+NAME:     Theme: Auto / Dark / Light palette entries
+PRIORITY: P2
+FEATURE:  theme auto
+SCRIPT:   tier1/thm_012_auto_dark_light_palette.sh
+
+SETUP
+  Fresh state (no persisted prefs) — theme defaults to explicit dark.
+
+STEPS
+  1. Open palette, search "theme".
+  2. Observe "Theme: Auto", "Theme: Dark", "Theme: Light" rows below the
+     main "Theme" toggle row.
+  3. Select "Theme: Light" directly (without going via ^T).
+  4. Reopen palette, search "theme"; select "Theme: Dark" directly.
+
+VERIFY
+  - All three explicit-mode entries are visible and searchable — this is
+    the three-valued theme preference's discoverability path (Rule 2):
+    users can jump straight to any mode without needing to know ^T's
+    toggle behavior.
+  - The main "Theme" row's state indicator (`[dark]`/`[light]`/`[auto]`)
+    updates immediately to match whichever mode was just selected.
+  - Selecting "Theme: Dark"/"Theme: Light" works from any starting state,
+    not just as a toggle from the current value.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-013
+NAME:     Theme: Auto resolves to a concrete system-matched theme
+PRIORITY: P2
+FEATURE:  theme auto
+SCRIPT:   tier1/thm_013_auto_mode_resolves.sh
+RELATED:  bugs.md P3 "Automatic dark/light mode"
+
+STEPS
+  1. Open palette, search "theme", select "Theme: Auto".
+  2. Reopen palette, search "theme".
+
+VERIFY
+  - Theme row shows `[auto]`.
+  - The editor renders normally afterward (document content still
+    visible, still accepts input) — detection did not error out or leave
+    the editor in a broken state.
+  - On a real machine: the resolved look (background/foreground colors)
+    matches the OS appearance setting at the time — verify manually via
+    `defaults read -g AppleInterfaceStyle` (macOS) or the GNOME appearance
+    setting (Linux) against what's on screen. The automated script does
+    NOT assert which concrete theme it resolves to (host-dependent); see
+    tests/theme_detect.t and tests/editor.t for deterministic, mocked
+    coverage of the detection matrix itself (macOS `defaults read -g
+    AppleInterfaceStyle`, Linux `gsettings get
+    org.gnome.desktop.interface color-scheme`, inconclusive → dark).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-THM-014
+NAME:     ^T from auto mode sets an explicit theme and leaves auto
+PRIORITY: P1
+FEATURE:  theme auto toggle
+SCRIPT:   tier1/thm_014_ctrl_t_leaves_auto.sh
+RELATED:  bugs.md P3 "Automatic dark/light mode"
+
+STEPS
+  1. Select "Theme: Auto" from the palette.
+  2. Press ^T.
+  3. Press ^T again.
+
+VERIFY
+  - After step 2: theme indicator reads `[dark]` or `[light]` (whichever
+    is the explicit opposite of what auto had just resolved to) — never
+    `[auto]` again. This is the documented design: ^T always means "give
+    me the other look right now," and setting an explicit preference
+    necessarily leaves auto mode.
+  - After step 3: indicator toggles normally between the two explicit
+    values (dark<->light), confirming ^T does not silently hop back into
+    auto on its own — re-entering auto requires the dedicated
+    "Theme: Auto" palette command.
