@@ -6,7 +6,7 @@ qa_header "QA-REG-045: Commands label on status bar"
 file=$(qa_tmpfile_nl "reg045.txt" "hello")
 qa_start "$file"
 
-qa_assert_screen "Commands" "Commands pill visible in status bar"
+qa_assert_expect "Commands" "Commands pill visible in status bar"
 
 qa_keys "ctrl-q"
 qa_summary

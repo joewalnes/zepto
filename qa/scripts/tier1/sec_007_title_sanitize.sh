@@ -13,7 +13,7 @@ qa_start "$sanitize_dir/$safe_name"
 sleep 0.3
 
 # Editor should open normally
-qa_assert_screen "safe content" "file with normal name opens fine"
+qa_assert_expect "safe content" "file with normal name opens fine"
 
 # Verify the editor is functional
 qa_keys "ctrl-q"

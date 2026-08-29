@@ -11,7 +11,7 @@ qa_start "$file"
 # Move to line 2, end of line
 qa_keys "down"
 qa_keys "end"
-qa_assert_screen "2:" "on line 2"
+qa_assert_expect "2:" "on line 2"
 
 # First Home - go to first non-whitespace (col 5)
 qa_keys "home"

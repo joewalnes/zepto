@@ -8,13 +8,13 @@ qa_start "$file"
 
 # Open find bar
 qa_keys "ctrl-f"
-qa_assert_screen "Find|find|Search" "find bar open"
+qa_assert_expect "Find|find|Search" "find bar open"
 
 # Ctrl+N should open new tab even from find bar
 qa_keys "ctrl-n"
 sleep 0.5
 
-qa_assert_screen "untitled|Untitled" "Ctrl+N opened new tab from find bar"
+qa_assert_expect "untitled|Untitled" "Ctrl+N opened new tab from find bar"
 
 qa_keys "ctrl-q"
 qa_summary

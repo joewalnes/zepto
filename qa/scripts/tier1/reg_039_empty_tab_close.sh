@@ -7,7 +7,7 @@ file=$(qa_tmpfile_nl "reg039.txt" "content here")
 # Start with no file (untitled tab)
 qa_start
 
-qa_assert_screen "untitled|Untitled" "starts with untitled tab"
+qa_assert_expect "untitled|Untitled" "starts with untitled tab"
 
 # Open a file
 qa_keys "ctrl-o"
@@ -19,7 +19,7 @@ qa_keys "enter"
 sleep 0.5
 
 # The untitled tab should be gone - only the opened file tab
-qa_screen
+qa_wait_screen "reg039" || true
 # If untitled is gone, that's good
 if echo "$QA_SCREEN" | grep -qiE "reg039"; then
     qa_pass "opened file visible"

@@ -11,7 +11,7 @@ echo "also safe" > "$QA_TMPDIR/sec004/file;echo pwned.txt" 2>/dev/null || true
 qa_start "$QA_TMPDIR/sec004/normal.txt"
 
 # Verify editor opened safely
-qa_assert_screen "safe content" "file opened safely"
+qa_assert_expect "safe content" "file opened safely"
 
 # Verify no command execution occurred
 if [[ ! -f "$QA_TMPDIR/sec004/pwned" ]]; then

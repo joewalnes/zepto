@@ -17,7 +17,7 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # The tree should show files in natural sort order: file2, file7, file10
-qa_screen
+qa_wait_screen 'file[0-9]' || true
 # Check that file2 appears before file10 in screen output
 file2_line=$(echo "$QA_SCREEN" | grep -n "file2" | head -1 | cut -d: -f1 || true)
 file10_line=$(echo "$QA_SCREEN" | grep -n "file10" | head -1 | cut -d: -f1 || true)

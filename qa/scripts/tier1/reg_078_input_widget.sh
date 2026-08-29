@@ -16,7 +16,7 @@ sleep 0.1
 # Select all and replace
 qa_keys "ctrl-a"
 qa_send "world" 0.3
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 if [[ -n "$count" ]]; then
     qa_pass "find input: select-all + retype works ($count)"

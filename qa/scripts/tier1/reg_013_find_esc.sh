@@ -14,7 +14,7 @@ qa_keys "escape" 0.2
 qa_keys "escape" 0.3
 
 # Editor should still be alive with content visible
-qa_assert_screen "hello world" "editor still showing content after Esc"
+qa_assert_expect "hello world" "editor still showing content after Esc"
 
 # Find bar should be gone (no "Find:" visible)
 qa_screen

@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "ctrl-e"
 sleep 0.5
 
-qa_assert_screen "Recent|recent|reg032" "recent files list visible"
+qa_assert_expect "Recent|recent|reg032" "recent files list visible"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

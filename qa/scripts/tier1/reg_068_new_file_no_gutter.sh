@@ -15,7 +15,7 @@ sleep 0.3
 
 # The gutter should not show VCS markers (green/amber/red)
 # since this file has no git baseline
-qa_screen
+qa_wait_screen 'hello|second' || true
 
 # Check there are no diff markers (the gutter area is clean)
 # This is an untitled/new file so no VCS markers expected

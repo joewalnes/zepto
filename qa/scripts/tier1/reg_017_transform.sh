@@ -13,7 +13,7 @@ qa_keys "ctrl-a"
 
 # Open transform
 qa_keys "alt-t"
-qa_assert_screen "Shell|sort|command|pipe|Transform" "transform prompt visible"
+qa_assert_expect "Shell|sort|command|pipe|Transform" "transform prompt visible"
 
 # Type sort command and execute
 qa_keys "ctrl-a" 0.1
@@ -21,7 +21,7 @@ qa_send "sort" 0.2
 qa_keys "enter"
 sleep 0.5
 
-qa_assert_screen "apple" "sort result: apple present"
+qa_assert_expect "apple" "sort result: apple present"
 
 qa_keys "ctrl-q"
 sleep 0.2

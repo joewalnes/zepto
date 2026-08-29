@@ -9,9 +9,9 @@ qa_start "$file"
 
 # The identifiers with underscores should NOT be styled as emphasis
 # Just verify the editor doesn't crash and content is visible
-qa_assert_screen "NF_CLOSE" "NF_CLOSE visible"
-qa_assert_screen "MY_CONSTANT" "MY_CONSTANT visible"
-qa_assert_screen "_italic" "italic markup visible"
+qa_assert_expect "NF_CLOSE" "NF_CLOSE visible"
+qa_assert_expect "MY_CONSTANT" "MY_CONSTANT visible"
+qa_assert_expect "_italic" "italic markup visible"
 
 qa_keys "ctrl-q"
 qa_summary

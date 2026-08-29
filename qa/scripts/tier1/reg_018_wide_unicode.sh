@@ -18,7 +18,7 @@ fi
 
 # Type after wide chars
 qa_send "X"
-qa_assert_screen "X" "can type after wide chars"
+qa_assert_expect "X" "can type after wide chars"
 
 qa_keys "ctrl-q"
 sleep 0.2

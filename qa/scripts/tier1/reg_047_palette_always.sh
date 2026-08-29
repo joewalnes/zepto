@@ -11,7 +11,7 @@ qa_keys "ctrl-f"
 sleep 0.2
 qa_keys "ctrl-space"
 sleep 0.3
-qa_assert_screen "Commands" "palette opens from find bar"
+qa_assert_expect "Commands" "palette opens from find bar"
 qa_keys "escape" 0.2
 qa_keys "escape" 0.2
 qa_keys "escape" 0.2
@@ -21,7 +21,7 @@ qa_keys "ctrl-g"
 sleep 0.2
 qa_keys "ctrl-space"
 sleep 0.3
-qa_assert_screen "Commands" "palette opens from goto"
+qa_assert_expect "Commands" "palette opens from goto"
 qa_keys "escape" 0.2
 qa_keys "escape" 0.2
 qa_keys "escape" 0.2

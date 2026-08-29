@@ -14,7 +14,7 @@ qa_keys "ctrl-f"
 qa_keys "ctrl-r" 0.2
 qa_send 'apple|cherry' 0.3
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 if [[ "$count" == *"of 2"* ]]; then
     qa_pass "regex pipe found 2 matches ($count)"

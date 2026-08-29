@@ -15,7 +15,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should see save/discard/cancel options
-qa_screen
+qa_wait_screen 'Save|Discard|Cancel' || true
 has_save=$(echo "$QA_SCREEN" | grep -ciE "save|Save" || true)
 has_discard=$(echo "$QA_SCREEN" | grep -ciE "discard|Discard|Don't Save" || true)
 has_cancel=$(echo "$QA_SCREEN" | grep -ciE "cancel|Cancel" || true)

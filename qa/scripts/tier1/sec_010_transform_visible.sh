@@ -15,7 +15,7 @@ qa_keys "alt-t"
 sleep 0.3
 
 # The transform input should be visible — user must type the command
-qa_assert_screen "Transform|transform|Shell|shell|\|" "transform input prompt visible"
+qa_assert_expect "Transform|transform|Shell|shell|\\|" "transform input prompt visible"
 
 # Cancel without executing
 qa_keys "escape"

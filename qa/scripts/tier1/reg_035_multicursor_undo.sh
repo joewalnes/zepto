@@ -21,7 +21,7 @@ qa_keys "ctrl-z"
 sleep 0.3
 
 # foo should be back
-qa_screen
+qa_wait_screen 'foo|bar' || true
 foo_count=$(echo "$QA_SCREEN" | grep -o "foo" | wc -l | tr -d ' ' || true)
 if [[ "$foo_count" -ge 2 ]]; then
     qa_pass "undo restored multi-cursor edit ($foo_count foo found)"

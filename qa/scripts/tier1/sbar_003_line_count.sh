@@ -9,7 +9,7 @@ file=$(qa_tmpfile_nl "sbar003.txt" "$content")
 qa_start "$file"
 
 # Status bar should show cursor position pill
-qa_assert_screen "1:1" "cursor position 1:1 shown"
+qa_assert_expect "1:1" "cursor position 1:1 shown"
 
 # Navigate to line 10
 qa_keys "ctrl-g"
@@ -17,7 +17,7 @@ qa_send "10" 0.2
 qa_keys "enter"
 
 # Status bar should update to show 10:1
-qa_assert_screen "10:1" "cursor position updated to 10:1"
+qa_assert_expect "10:1" "cursor position updated to 10:1"
 
 qa_keys "ctrl-q"
 qa_summary

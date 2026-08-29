@@ -9,18 +9,13 @@ line 3")
 qa_start "$file"
 
 # Status bar should show cursor position pill
-qa_assert_screen "1:1" "cursor position visible in status bar"
+qa_assert_expect "1:1" "cursor position visible in status bar"
 
 # Open goto with Ctrl+G
 qa_keys "ctrl-g"
 sleep 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "Go to|Line|:"; then
-    qa_pass "Ctrl+G opens goto input"
-else
-    qa_fail "Ctrl+G opens goto input" "no goto prompt visible"
-fi
+qa_assert_expect "Go to|Line|:" "Ctrl+G opens goto input"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

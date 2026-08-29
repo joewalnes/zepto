@@ -10,7 +10,7 @@ qa_keys "ctrl-space"
 sleep 0.5
 
 # Check for section headers
-qa_screen
+qa_wait_screen 'FILE|EDIT|NAVIGATE|VIEW|File|Edit|Navigate|View' || true
 headers_found=0
 for header in "FILE" "EDIT" "NAVIGATE" "VIEW" "File" "Edit" "Navigate" "View"; do
     if echo "$QA_SCREEN" | grep -q "$header"; then

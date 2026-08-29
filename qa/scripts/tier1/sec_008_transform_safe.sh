@@ -8,7 +8,7 @@ qa_keys "ctrl-a"
 qa_keys "alt-t"
 sleep 0.3
 # Verify the transform prompt is waiting for user input
-qa_screen
+qa_wait_screen 'Shell|sort|command' || true
 if echo "$QA_SCREEN" | grep -qiE "Shell:|sort|command"; then
     qa_pass "transform waits for user command input"
 else

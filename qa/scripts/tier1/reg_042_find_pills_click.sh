@@ -11,7 +11,7 @@ qa_keys "ctrl-f"
 qa_send "hello" 0.3
 
 # Find the status bar with pills (last 2 lines)
-qa_screen
+qa_wait_screen 'Esc|Enter' || true
 total_lines=$(echo "$QA_SCREEN" | wc -l | tr -d ' ')
 status_row=$total_lines
 

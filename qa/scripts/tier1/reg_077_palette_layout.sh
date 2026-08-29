@@ -9,7 +9,7 @@ qa_start "$file"
 # Open palette
 qa_keys "ctrl-space" 0.3
 
-qa_screen
+qa_wait_screen 'command|file|edit' || true
 # Palette should render with appropriate width for terminal
 # Verify commands are visible and shortcuts are aligned
 if echo "$QA_SCREEN" | grep -qE "[⌃⌥]"; then

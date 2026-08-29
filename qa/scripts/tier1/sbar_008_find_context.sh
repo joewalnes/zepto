@@ -16,7 +16,7 @@ qa_keys "ctrl-f"
 qa_send "hello" 0.3
 
 # Status bar / find bar should show find-related info
-qa_screen
+qa_wait_screen 'Esc|Find|match' || true
 find_screen=$(echo "$QA_SCREEN" | tail -5)
 
 if echo "$find_screen" | grep -qE "Esc|Find|Aa|match|1 of"; then

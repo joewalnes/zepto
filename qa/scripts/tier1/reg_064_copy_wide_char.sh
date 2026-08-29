@@ -6,7 +6,7 @@ qa_header "QA-REG-064: Copy wide chars no crash (P0 regression)"
 file=$(qa_tmpfile_nl "reg064.txt" "Hello 你好世界 emoji")
 qa_start "$file"
 
-qa_assert_screen "Hello" "file content visible"
+qa_assert_expect "Hello" "file content visible"
 
 # Select all and copy
 qa_keys "ctrl-a"

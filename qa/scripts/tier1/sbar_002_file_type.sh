@@ -8,12 +8,7 @@ file=$(qa_tmpfile_nl "sbar002.py" "def hello():
 qa_start "$file"
 
 # Status bar should show Python file type
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "python|py"; then
-    qa_pass "status bar shows Python file type"
-else
-    qa_fail "status bar shows Python file type"
-fi
+qa_assert_expect "python|py" "status bar shows Python file type"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -12,7 +12,7 @@ qa_start "$file"
 qa_keys "ctrl-f"
 qa_send "apple" 0.3
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 if [[ "$count" == *"of 3"* ]]; then
     qa_pass "find shows correct count: $count"
