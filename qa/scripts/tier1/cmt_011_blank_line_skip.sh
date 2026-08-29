@@ -14,7 +14,7 @@ qa_keys "ctrl-a"
 # Toggle comment
 qa_raw $'\x1f'
 
-qa_assert_screen "# x = 1" "first line commented"
+qa_assert_expect "# x = 1" "first line commented"
 qa_assert_screen "# y = 2" "third line commented"
 
 # Check blank line is still blank (not "# ")

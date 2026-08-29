@@ -6,7 +6,7 @@ qa_header "QA-CLI-002: Open single file shows content"
 file=$(qa_tmpfile_nl "cli002.txt" "hello world")
 qa_start "$file"
 
-qa_assert_screen "hello world" "file content displayed"
+qa_assert_expect "hello world" "file content displayed"
 qa_assert_screen "cli002" "filename in tab bar"
 qa_assert_screen "1:1" "cursor at 1:1"
 

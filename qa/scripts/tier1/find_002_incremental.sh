@@ -11,7 +11,7 @@ qa_start "$file"
 qa_keys "ctrl-f"
 qa_send "apple" 0.3
 
-qa_assert_screen "2" "match count shows 2 matches for 'apple'"
+qa_assert_expect "2" "match count shows 2 matches for 'apple'"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

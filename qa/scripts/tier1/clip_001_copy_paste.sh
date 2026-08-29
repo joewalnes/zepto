@@ -27,12 +27,7 @@ qa_keys "end"
 qa_keys "ctrl-v"
 
 # Should see "hello worldhello" or "hello world" + pasted chars
-qa_screen
-if echo "$QA_SCREEN" | grep -q "hello"; then
-    qa_pass "paste produced output on screen"
-else
-    qa_fail "paste result not visible"
-fi
+qa_assert_expect "hello" "paste produced output on screen"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -12,14 +12,9 @@ qa_start "$file"
 qa_keys "down"
 
 qa_raw $'\x1f'
-qa_screen
 
 # Comment should preserve the indentation (e.g. "    # x = 1")
-if echo "$QA_SCREEN" | grep -qE "    #|	#"; then
-    qa_pass "comment preserves indentation"
-else
-    qa_fail "comment preserves indentation"
-fi
+qa_assert_expect "    #|	#" "comment preserves indentation"
 
 qa_keys "ctrl-q"
 sleep 0.2

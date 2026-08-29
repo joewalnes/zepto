@@ -16,7 +16,7 @@ qa_keys "end" 0.1
 qa_keys "enter"
 qa_keys "ctrl-v"
 
-qa_assert_screen "first line" "pasted line contains first line content"
+qa_assert_expect "first line" "pasted line contains first line content"
 
 qa_keys "ctrl-q"
 sleep 0.2

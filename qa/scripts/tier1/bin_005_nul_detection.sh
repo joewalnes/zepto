@@ -8,9 +8,8 @@ binfile="$QA_TMPDIR/bin005_early.dat"
 printf 'text\x00more text\n' > "$binfile"
 
 qa_start "$binfile"
-sleep 0.3
 
-qa_assert_screen "Binary file|binary file|READ ONLY" "NUL byte detected as binary"
+qa_assert_expect "Binary file|binary file|READ ONLY" "NUL byte detected as binary"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -12,7 +12,7 @@ qa_keys "ctrl-c"
 
 # Editor should still be alive and responsive
 qa_alive && qa_pass "editor alive after copy" || qa_fail "editor crashed after copy"
-qa_assert_screen "hello" "buffer content intact"
+qa_assert_expect "hello" "buffer content intact"
 
 qa_keys "ctrl-q"
 sleep 0.2

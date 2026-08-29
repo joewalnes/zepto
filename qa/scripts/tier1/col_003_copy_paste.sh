@@ -32,12 +32,7 @@ qa_keys "home" 0.1
 qa_keys "ctrl-v"
 
 # Should see pasted rectangle content
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "bcd|hij|nop"; then
-    qa_pass "column paste produced rectangular content"
-else
-    qa_fail "column paste produced rectangular content"
-fi
+qa_assert_expect "bcd|hij|nop" "column paste produced rectangular content"
 
 qa_keys "ctrl-q"
 sleep 0.2

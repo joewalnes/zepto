@@ -900,7 +900,17 @@ Originally logged as "the render paints the previous hover state, one event late
 Note: months of QA runs may have already drifted the user's real `~/.config/zepto/preferences.json` (auto-pair/minimap/theme toggles) — worth a manual review.
 
 ### P3: Remaining sleep-based QA scripts occasionally flake under full-suite load
-The 2026-08-28 isolation fixes eliminated the systematic cross-test failures, but a long tail of scripts still use fixed `sleep` + `qa_assert_screen` instead of the deadline-polling `qa_wait_screen`/`qa_assert_expect` helpers, and one occasionally blinks when the parallel suite starves its renders (observed: `sbar_001_cursor_pos` fast-fail on the startup assertion — now migrated; `wrap_009_diff_wrap` one transient session-start error, passes standalone). Migrate scripts to the polling helpers opportunistically whenever one flakes; there is no need for a big-bang rewrite.
+The 2026-08-28 isolation fixes eliminated the systematic cross-test failures, but a long tail of scripts still use fixed `sleep` + `qa_assert_screen` instead of the deadline-polling `qa_wait_screen`/`qa_assert_expect` helpers, and one occasionally blinks when the parallel suite starves its renders (observed: `sbar_001_cursor_pos` fast-fail on the startup assertion — now migrated; `wrap_009_diff_wrap` one transient session-start error, passes standalone). 
+
+**Batch 1 (2026-08-29):** Migrated 15 scripts: `bin_001_placeholder`, `bin_005_nul_detection`, `cli_001_no_args`, `cli_002_open_file`, `cli_003_multi_file`, `cli_004_open_dir`, `cli_007_no_nerd_font`, `cli_008_tree_flag`, `cli_018_invalid_file`, `clip_001_copy_paste`, `clip_002_cut`, `clip_003_copy_line`, `clip_006_copy_unicode`, `clip_007_column_paste`, `clip_010_cut_no_sel`. All tested passing.
+
+**Batch 2 (2026-08-29):** Migrated 15 scripts: `cmt_001_toggle`, `cmt_003_selection`, `cmt_004_multi_lang`, `cmt_005_javascript`, `cmt_006_html`, `cmt_007_css`, `cmt_008_no_lang`, `cmt_009_indented`, `cmt_010_min_indent`, `cmt_011_blank_line_skip`, `cmt_014_undo`, `col_001_toggle`, `col_003_copy_paste`, `col_004_copy_paste_rect`, `col_007_esc_exit`. All tested passing.
+
+**Batch 3 (partial, 2026-08-29):** Migrated 3 scripts: `edit_001_insert_ascii`, `find_001_open_bar`, `find_002_incremental`. All tested passing.
+
+**Total: 33 scripts migrated, 0 failures.**
+
+**Skipped (not migrated):** Scripts with complex patterns that don't fit rules 1-3 cleanly — nested conditionals, file-based checks, data extraction without simple polling. Examples: `cli_009_no_tree` (screen state comparisons), `cplt_001_auto_pair` (complex regex escaping), `bin_003_save_blocked` (nested error handling), file-based checks instead of screen assertions. Continue migration opportunistically on future flakes.
 
 ### ~~P2: QA runner killed all hangon sessions on the machine~~ FIXED (2026-08-29)
 `qa/runner.pl` ran `hangon stopall` before and after every suite run and deleted `~/.hangon/state.json` — fatal when multiple runners or concurrent agents share the machine's hangon server (each run killed everyone else's live sessions). Replaced with `cleanup_stale_qa_sessions()`: stops only `zqa_<pid>*` sessions whose owning script PID is dead. Test: `reg_108_runner_concurrent.sh` (QA-REG-108) — a live foreign session and a live zqa session survive a runner invocation; a stale one is reaped.

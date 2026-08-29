@@ -9,7 +9,7 @@ qa_start "$file"
 
 # Enter column mode
 qa_keys "alt-c"
-qa_assert_screen "COL" "COL indicator visible"
+qa_assert_expect "COL" "COL indicator visible"
 
 # Esc should exit column mode
 qa_keys "escape"

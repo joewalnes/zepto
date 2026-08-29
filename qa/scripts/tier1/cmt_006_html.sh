@@ -7,10 +7,10 @@ file=$(qa_tmpfile_nl "cmt006.html" "<p>hello</p>")
 qa_start "$file"
 
 qa_raw $'\x1f'
-qa_assert_screen "<!--" "HTML comment opening visible"
+qa_assert_expect "<!--" "HTML comment opening visible"
 
 qa_raw $'\x1f'
-qa_assert_screen "<p>hello</p>" "uncommented back"
+qa_assert_expect "<p>hello</p>" "uncommented back"
 
 qa_keys "ctrl-q"
 qa_summary

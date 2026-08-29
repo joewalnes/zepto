@@ -32,12 +32,7 @@ qa_keys "enter"
 # Paste
 qa_keys "ctrl-v"
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "aaaa|bbbb|cccc"; then
-    qa_pass "column paste inserted rectangle"
-else
-    qa_fail "column paste did not insert rectangle"
-fi
+qa_assert_expect "aaaa|bbbb|cccc" "column paste inserted rectangle"
 
 qa_keys "ctrl-q"
 sleep 0.2

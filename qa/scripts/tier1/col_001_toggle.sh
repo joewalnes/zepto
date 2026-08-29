@@ -9,7 +9,7 @@ mnopqr")
 qa_start "$file"
 
 qa_keys "alt-c"
-qa_assert_screen "COL" "COL indicator visible in status bar"
+qa_assert_expect "COL" "COL indicator visible in status bar"
 
 qa_keys "alt-c"
 qa_assert_not_screen "COL" "COL indicator gone after second toggle"

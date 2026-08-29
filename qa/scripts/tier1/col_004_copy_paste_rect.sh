@@ -34,13 +34,8 @@ qa_keys "enter"
 # Paste
 qa_keys "ctrl-v"
 
-qa_screen
 # Line 4 should have the pasted column data
-if echo "$QA_SCREEN" | grep -qE "abcd|klmn|uvwx"; then
-    qa_pass "column paste visible"
-else
-    qa_fail "column paste not visible"
-fi
+qa_assert_expect "abcd|klmn|uvwx" "column paste visible"
 
 qa_keys "ctrl-q"
 sleep 0.2
