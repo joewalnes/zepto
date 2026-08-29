@@ -11,13 +11,13 @@ qa_send "dirty edit"
 # Trigger save prompt
 qa_keys "ctrl-q"
 sleep 0.3
-qa_assert_screen "Save|Discard|Cancel" "prompt visible"
+qa_assert_expect "Save|Discard|Cancel" "prompt visible"
 
 # Wait 3 seconds
 sleep 3
 
 # Prompt should still be visible
-qa_assert_screen "Save|Discard|Cancel" "prompt persists after 3 seconds"
+qa_assert_expect "Save|Discard|Cancel" "prompt persists after 3 seconds"
 
 # Cancel
 qa_send "c" 0.3

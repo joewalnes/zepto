@@ -16,12 +16,7 @@ qa_keys "ctrl-p" 0.5
 qa_keys "pagedown" 0.3
 
 # Should still show picker with files
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "file_"; then
-    qa_pass "page down in picker shows files"
-else
-    qa_fail "page down in picker"
-fi
+qa_assert_expect "file_" "page down in picker shows files"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

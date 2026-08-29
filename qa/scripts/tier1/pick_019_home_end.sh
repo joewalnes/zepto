@@ -19,12 +19,7 @@ qa_keys "end" 0.3
 qa_keys "home" 0.3
 
 # Still in picker, files visible
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "file_"; then
-    qa_pass "home/end navigation in picker works"
-else
-    qa_fail "home/end in picker"
-fi
+qa_assert_expect "file_" "home/end navigation in picker works"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
