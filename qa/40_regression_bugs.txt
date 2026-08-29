@@ -1056,3 +1056,40 @@ VERIFY    ⌥U duplicates the current line downward and moves the cursor
           ever sets modifier ['ctrl'] for control-code bytes 1-26 — the
           shift bit is never recoverable there), so a binding on it
           could never actually be received.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-126
+NAME:     Long status messages don't corrupt the screen (line-wrap scroll)
+PRIORITY: P1
+BUG:      P3 "No Save As command in palette" — found while testing the
+          new command with a long absolute save path (2026-08-29)
+CROSS-REF: QA-FILE-018, QA-FILE-019, QA-FILE-020
+VERIFY    A status/error message longer than the terminal width (e.g.
+          "Saved: /very/long/absolute/path/to/file.py") is truncated
+          with a leading "…" (tail — e.g. filename — stays visible),
+          not printed raw. Before the fix, an untruncated long message
+          wrapped onto the next real terminal row in both
+          `_render_status_bar` and `_render_context_status_bar`
+          (Renderer.pm), causing a genuine terminal scroll that the
+          app's fixed-position redraw didn't account for: the tab bar
+          disappeared and the ruler/gutter row showed stale, misaligned
+          content on the next redraw. Reproduce by saving (or Save As)
+          to a path longer than the terminal width and confirming the
+          tab bar and ruler render correctly afterward, including after
+          further cursor movement.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-127
+NAME:     "Save As" command exists in the palette
+PRIORITY: P3
+BUG:      P3 "No Save As command in palette" (2026-08-29)
+CROSS-REF: QA-FILE-018, QA-FILE-019, QA-FILE-020
+VERIFY    Command palette FILE section shows "Save As", distinct from
+          "Save" (⌃S). Unlike ⌃S, which only prompts for a path when
+          the document is untitled, "Save As" always opens the footer
+          prompt (prefilled with the current path) regardless of
+          whether the document already has one. Writes via plain file
+          I/O (Document::save(), atomic temp-file-then-rename) — no
+          shell exec.

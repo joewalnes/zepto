@@ -309,3 +309,85 @@ STEPS
 
 VERIFY
   - Trailing whitespace removed on save.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FILE-018
+NAME:     "Save As" command in palette re-saves an already-titled file
+PRIORITY: P3
+FEATURE:  save-as command
+RELATED:  bugs.md P3 "No Save As command in palette"
+
+SETUP
+  Open an existing, already-named file (not untitled).
+
+STEPS
+  1. ⌃Space, search "Save As", Enter.
+  2. Footer input opens, prefilled with the current file's path
+     (pre-selected so typing replaces it).
+  3. Type a new path, Enter.
+
+VERIFY
+  - File is written at the new path (original file untouched).
+  - Tab title updates to the new filename.
+  - Status message confirms "Saved: <new path>".
+  - Unlike ⌃S (which only prompts when the document has no path yet),
+    "Save As" always prompts, even though the file already had a path.
+
+NOTES
+  Distinct from QA-FILE-002, which covers the ⌃S-on-untitled inline
+  flow. This exercises the standalone command added for File → Save As
+  discoverability (bugs.md P3, was palette-only-missing before).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FILE-019
+NAME:     "Save As" command prompts before overwriting a different file
+PRIORITY: P2
+FEATURE:  save-as command overwrite
+RELATED:  bugs.md P3 "No Save As command in palette"
+
+SETUP
+  Two existing files: current.txt (open) and other.txt (exists on disk,
+  different content).
+
+STEPS
+  1. ⌃Space → "Save As" → Enter.
+  2. Type the path of other.txt, Enter.
+  3. VERIFY confirmation prompt appears; choose "No".
+  4. Repeat, this time choose "Yes".
+
+VERIFY
+  - Step 3: prompt reads "'<path>' already exists. Overwrite?" with
+    Yes/No options; choosing No cancels — other.txt on disk is
+    unchanged, current.txt's tab is untouched.
+  - Step 4: choosing Yes overwrites other.txt with current.txt's
+    content; tab title updates to other.txt.
+  - Re-saving to the document's OWN current path (no path change) does
+    NOT prompt — only prompts when writing to a different, existing
+    file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FILE-020
+NAME:     "Save As" command activates syntax highlighting for new extension
+PRIORITY: P2
+FEATURE:  save-as command syntax
+RELATED:  bugs.md P2 "Syntax highlighting doesn't activate after Save As"
+
+SETUP
+  Open an untitled or .txt file with Python-like content, e.g.
+  `def foo():\n    return 1`.
+
+STEPS
+  1. ⌃Space → "Save As" → Enter.
+  2. Type a path ending in `.py`, Enter.
+
+VERIFY
+  - After save, Python syntax highlighting activates (keywords/strings
+    colored).
+
+NOTES
+  Same plumbing as QA-FILE-003 (`active_highlighter()->set_file()`),
+  reached through the new explicit "Save As" command instead of the
+  ⌃S-on-untitled inline flow.

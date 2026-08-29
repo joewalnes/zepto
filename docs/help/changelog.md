@@ -3,6 +3,8 @@
 ## 2026-08-29
 
 - Added a direct keyboard shortcut for Duplicate Down: ⌥U (pairs with ⌃U for Duplicate Up)
+- Added a "Save As" command to the palette (FILE section) — prompts for a path even when the document already has one, confirms before overwriting a different existing file, and activates syntax highlighting for the new extension
+- Fixed long status messages (e.g. "Saved: /very/long/path...") overflowing past the terminal width and scrolling/corrupting the screen — long messages are now truncated with a leading "…"
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

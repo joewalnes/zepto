@@ -60,6 +60,16 @@ my @COMMANDS = (
         method   => 'cmd_save',
     },
     {
+        id       => 'save_as',
+        label    => 'Save As',
+        icon     => 'save',
+        shortcut => '',
+        section  => 'FILE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_save_as',
+    },
+    {
         id       => 'close_tab',
         label    => 'Save and Close Tab',
         icon     => 'times',

@@ -50,26 +50,7 @@ sub cmd_save {
             prompt => 'Save As:',
             on_submit => sub {
                 my ($filename) = @_;
-                if ($filename) {
-                    $doc->set_path($filename);
-                    eval { $doc->save(); };
-                    if ($@) {
-                        $self->show_error_message(_user_error("Save failed", $@));
-                    }
-                    else {
-                        # Update tab's file_path and clear untitled name
-                        my $tab = $self->active_tab();
-                        $tab->{file_path} = $filename;
-                        $tab->{untitled_name} = undef;
-                        # Re-detect syntax highlighting for the new filename
-                        $self->active_highlighter()->set_file($filename);
-                        $self->show_message("Saved: $filename");
-                        # Refresh file tree to show newly saved file
-                        if ($self->{file_tree}) {
-                            $self->{file_tree}->refresh();
-                        }
-                    }
-                }
+                $self->_finish_save_as($doc, $filename) if $filename;
             },
             on_cancel => sub {
                 $self->show_message("Save cancelled");
@@ -84,6 +65,82 @@ sub cmd_save {
     }
     else {
         $self->show_message("Saved: " . $doc->filename());
+    }
+}
+
+# Save As: always prompts for a path (unlike cmd_save, which only
+# prompts when the document has no path yet). Prefills the current
+# path so re-saving under a tweaked name is a quick edit. Confirms
+# before overwriting an existing file that isn't the document's own
+# current path.
+sub cmd_save_as {
+    my ($self) = @_;
+
+    my $doc = $self->active_doc();
+    my $current_path = $doc->path();
+
+    $self->open_footer_input(
+        prompt => 'Save As:',
+        value  => defined $current_path ? $current_path : '',
+        select_all => defined $current_path ? 1 : 0,
+        on_submit => sub {
+            my ($filename) = @_;
+            return unless defined $filename && length $filename;
+
+            # Confirm before silently overwriting a different existing file.
+            # Saving to the document's own current path is not an "overwrite"
+            # in the user-surprise sense, so it's exempt from the prompt.
+            my $is_different_file = !defined($current_path) || $filename ne $current_path;
+            if ($is_different_file && -e $filename) {
+                $self->open_prompt(
+                    text    => "'$filename' already exists. Overwrite?",
+                    options => [
+                        { key => 'y', label => 'Yes' },
+                        { key => 'n', label => 'No' },
+                    ],
+                    on_select => sub {
+                        my ($choice) = @_;
+                        $self->_finish_save_as($doc, $filename) if $choice eq 'y';
+                    },
+                );
+                return;
+            }
+
+            $self->_finish_save_as($doc, $filename);
+        },
+        on_cancel => sub {
+            $self->show_message("Save As cancelled");
+        },
+    );
+}
+
+# Shared tail of the Save As flow: write the file at $filename, then
+# update the tab path/title and re-detect syntax highlighting for the
+# new extension. Used by both cmd_save (untitled-document path) and
+# cmd_save_as (explicit command).
+sub _finish_save_as {
+    my ($self, $doc, $filename) = @_;
+
+    $doc->set_path($filename);
+    eval { $doc->save(); };
+    if ($@) {
+        $self->show_error_message(_user_error("Save failed", $@));
+        return;
+    }
+
+    # Update tab's file_path and clear untitled name
+    my $tab = $self->active_tab();
+    $tab->{file_path} = $filename;
+    $tab->{untitled_name} = undef;
+
+    # Re-detect syntax highlighting for the new filename
+    $self->active_highlighter()->set_file($filename);
+
+    $self->show_message("Saved: $filename");
+
+    # Refresh file tree to show newly saved file
+    if ($self->{file_tree}) {
+        $self->{file_tree}->refresh();
     }
 }
 

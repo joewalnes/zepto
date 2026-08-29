@@ -2245,6 +2245,121 @@ subtest 'Save As activates syntax highlighting for new filename' => sub {
 };
 
 # ============================================================================
+# cmd_save_as (bugs.md P3 "No Save As command in palette")
+# ============================================================================
+subtest 'cmd_save_as opens footer input prefilled with current path' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+
+    is($editor->{state}, 'footer_input', 'cmd_save_as opens footer input');
+    is($editor->{footer_input}{prompt}, 'Save As:', 'Prompt is "Save As:"');
+    is($editor->{footer_input}{widget}->value(), $filename,
+       'Prefilled with the document\'s current path');
+};
+
+subtest 'cmd_save_as writes the file, updates the tab, and activates syntax highlighting' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("def foo():\n    return 1\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $hl = $editor->active_highlighter();
+    ok(!$hl->{grammar}, 'Plain temp file has no grammar before Save As');
+
+    $editor->cmd_save_as();
+    is($editor->{state}, 'footer_input', 'Footer input open');
+
+    my $py_file = $filename . '.py';
+    # Replace the pre-selected prefilled value with the new path
+    $editor->handle_input($py_file);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'editing', 'Back to editing after submit');
+    ok(-e $py_file, 'New file exists on disk');
+
+    my $tab = $editor->active_tab();
+    is($tab->{file_path}, $py_file, 'Tab file_path updated to the new path');
+    is($tab->{untitled_name}, undef, 'Tab untitled_name cleared');
+
+    ok($hl->{grammar}, 'Grammar activated for the new .py extension');
+    like($hl->{grammar_class}, qr/Python/, 'Python grammar detected');
+
+    unlink $py_file;
+};
+
+subtest 'cmd_save_as prompts before overwriting a different existing file' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("current content\n");
+    my $other = create_temp_file("other content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    $editor->handle_input($other);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'prompt', 'Overwrite confirmation prompt opens');
+    like($editor->{prompt}{text}, qr/already exists/, 'Prompt warns the file already exists');
+
+    # Decline: file on disk must be untouched
+    $editor->handle_input('n');
+    is($editor->{state}, 'editing', 'Back to editing after declining');
+
+    open(my $fh, '<', $other) or die $!;
+    my $content = do { local $/; <$fh> };
+    close $fh;
+    is($content, "other content\n", 'Declining overwrite leaves the other file untouched');
+
+    unlink $filename, $other;
+};
+
+subtest 'cmd_save_as overwrites when confirmed' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("current content\n");
+    my $other = create_temp_file("other content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    $editor->handle_input($other);
+    $editor->handle_input("\r");
+    is($editor->{state}, 'prompt', 'Overwrite confirmation prompt opens');
+
+    $editor->handle_input('y');
+    is($editor->{state}, 'editing', 'Back to editing after confirming');
+
+    open(my $fh, '<', $other) or die $!;
+    my $content = do { local $/; <$fh> };
+    close $fh;
+    is($content, "current content\n", 'Confirming overwrite writes this document\'s content');
+
+    my $tab = $editor->active_tab();
+    is($tab->{file_path}, $other, 'Tab now points at the overwritten file');
+
+    unlink $filename, $other;
+};
+
+subtest 'cmd_save_as does not prompt when re-saving to the document\'s own path' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    # Submit without changing the prefilled (== current) path
+    $editor->handle_input($filename);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'editing', 'No overwrite prompt — straight back to editing');
+
+    unlink $filename;
+};
+
+# ============================================================================
 # Render decision after input batches (QA-REG-101)
 # ============================================================================
 # Regression: after a mouse hover-motion event, the main loop skipped
