@@ -31,8 +31,23 @@ When viewing `.md` files, render tables with continuous Unicode box-drawing line
 ### P3: Dim Markdown formatting delimiters
 In Markdown files, emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) are rendered as `TOKEN_PUNCTUATION` in `Syntax/Markdown.pm`, giving them the same visual weight as the styled text they surround. The delimiters should be rendered much fainter (dimmed/low-opacity) so the bold, italic, strikethrough, and highlighted text pops out visually. This is how many modern Markdown editors handle it — the formatting chars become near-invisible while the styled content stands out. Currently all delimiter tokens share the generic punctuation color in `Theme.pm`.
 
-### P2: Buffer word completion
+### ~~P2: Buffer word completion~~ ALREADY IMPLEMENTED
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
+
+**Verified 2026-08-29:** Fully implemented, and the shipped design exceeds this entry's ask — `lib/Zepto/Completion/CrossBufferWordProvider.pm` scans **every open tab's document**, not just the active buffer (cached per-document by `content_version`, rebuilt only when something changed; words from the active document get a proximity score bonus). Confirmed interactively via hangon: typed a distinctive identifier in tab A, switched to tab B, typed a 2-char prefix — ghost text suggested the tab-A-only word, and Tab accepted it into tab B.
+
+Shipped trigger model (`lib/Zepto/Completion/Controller.pm`, orchestrated from `Editor.pm`):
+- **Auto-trigger**: ghost text appears automatically after typing 2+ word characters — no dedicated key needed for the common case (this entry's suggested `Ctrl+N`/`Tab` triggers were never implemented as such; auto-trigger plus the existing `⌃Space` below covers the same need without demanding a key to memorize).
+- **`⌃Space`**: dual-purpose — if the cursor sits immediately after a word character, it explicitly opens the dropdown menu (multiple candidates) instead of the command palette; otherwise it opens the palette. This is intentional, pre-existing behavior, not new.
+- **`Tab`**: accepts the full ghost-text completion.
+- **`→` (Right arrow)**: accepts one character at a time, keeping the rest as ghost text.
+- **`↑`/`↓`**: navigate the dropdown menu; `Enter` accepts the highlighted item.
+- **`Esc`**: dismisses.
+- **`⌥[` / `⌥]`**: cycle ghost-text alternatives.
+
+Other providers already merged into the same ranked result set: `KeywordProvider` (language keywords), `SnippetProvider` (multi-line templates, e.g. Python `def`), `PathProvider`, `RecentProvider` (recently-accepted completions get a score boost), and AI completion (separate opt-in provider, rate-limited).
+
+No gap found — nothing to implement. Added `QA-CPLT-021` (cross-buffer path specifically; existing `QA-CPLT-001`–`020` covered same-buffer, dropdown, accept/dismiss/navigate, undo/redo, snippets, recent-pick, AI, the off-toggle, and paste-doesn't-trigger, but none exercised a SECOND open tab as the completion source).
 
 ### P2: Session restore
 Reopen the editor and get back exactly where you were: same tabs, cursor positions, scroll positions. The recent files infrastructure already exists (`~/.config/zepto/recent_files`). Extending to full session state eliminates the re-navigation tax every time the editor is restarted. Especially important for a terminal editor that gets opened/closed frequently.

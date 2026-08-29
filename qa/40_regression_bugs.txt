@@ -1108,3 +1108,20 @@ VERIFY    Palette shows a TRANSFORM section (Uppercase, Lowercase, Sort
           is selected. Unique Lines preserves first-occurrence order
           (does not reorder like shell `sort -u`). None of the 5 shell
           out — pure Perl via Document::replace().
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-129
+NAME:     Word completion covers ALL open buffers (not just the active one)
+PRIORITY: P2
+BUG:      P2 "Buffer word completion" — verified ALREADY IMPLEMENTED,
+          not a gap (2026-08-29)
+CROSS-REF: QA-CPLT-021, QA-CPLT-009
+VERIFY    Typing a 2+ char prefix of a word that exists only in a
+          DIFFERENT open tab still surfaces it as a ghost-text
+          suggestion (CrossBufferWordProvider scans every open tab's
+          document, cached per-document by content_version). This is
+          the case existing completion coverage (QA-CPLT-001–020)
+          never exercised — they only ever typed the target word into
+          the SAME buffer being completed. Regression here would mean
+          completion silently regressed to single-buffer-only.
