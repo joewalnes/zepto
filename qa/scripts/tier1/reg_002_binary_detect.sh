@@ -9,7 +9,7 @@ printf 'hello\x00world' > "$binfile"
 
 qa_start "$binfile"
 
-qa_assert_screen "Binary" "binary file detected"
+qa_assert_expect "Binary" "binary file detected"
 
 qa_keys "ctrl-q"
 qa_summary

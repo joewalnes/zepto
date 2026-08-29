@@ -11,13 +11,7 @@ qa_keys "alt-." 0.2
 
 qa_keys "ctrl-e" 0.5
 
-qa_screen
-# Recent picker should be visible
-if echo "$QA_SCREEN" | grep -qiE "recent|rcn011"; then
-    qa_pass "recent picker rendered"
-else
-    qa_pass "recent picker opened (content may vary)"
-fi
+qa_assert_expect 'recent|rcn011' "recent picker rendered"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

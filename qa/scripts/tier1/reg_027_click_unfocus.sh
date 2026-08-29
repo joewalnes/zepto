@@ -20,7 +20,7 @@ sleep 0.3
 
 # Should be able to type (editor focused, not tree)
 qa_send "X"
-qa_assert_screen "X" "typing works after click — editor focused"
+qa_assert_expect "X" "typing works after click — editor focused"
 
 qa_keys "ctrl-q"
 sleep 0.2

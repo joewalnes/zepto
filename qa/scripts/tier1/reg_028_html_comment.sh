@@ -10,11 +10,11 @@ qa_start "$file"
 # Toggle comment on line 1 (Ctrl+/ = 0x1f)
 qa_raw $'\x1f'
 
-qa_assert_screen "<!--" "HTML comment opening tag added"
+qa_assert_expect "<!--" "HTML comment opening tag added"
 
 # Uncomment
 qa_raw $'\x1f'
-qa_assert_screen "<div>" "HTML comment removed, div restored"
+qa_assert_expect "<div>" "HTML comment removed, div restored"
 
 qa_keys "ctrl-q"
 qa_summary

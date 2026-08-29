@@ -17,7 +17,7 @@ qa_keys "ctrl-f"
 qa_send "TARGETWORD"
 sleep 0.5
 
-qa_assert_screen "TARGETWORD" "viewport scrolled to show match"
+qa_assert_expect "TARGETWORD" "viewport scrolled to show match"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

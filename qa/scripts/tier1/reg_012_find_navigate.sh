@@ -11,12 +11,12 @@ qa_start "$file"
 qa_keys "ctrl-f"
 qa_send "word" 0.3
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 first=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 
 qa_keys "down" 0.2
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 second=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 
 if [[ -n "$first" && -n "$second" && "$first" != "$second" ]]; then
