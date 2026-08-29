@@ -5,10 +5,20 @@ use utf8;
 use Test::More;
 use lib 'lib';
 use Zepto::CommandRegistry;
+use Zepto::Editor;
+use Zepto::Terminal;
+use Zepto::StateStore;
+use File::Temp qw(tempfile tempdir);
 
 # =============================================================================
 # CommandRegistry unit tests
 # =============================================================================
+
+sub mock_terminal {
+    my ($in_fh, $in_name) = tempfile(UNLINK => 1);
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    return Zepto::Terminal->new(in => $in_fh, out => $out_fh);
+}
 
 subtest 'All commands have unique IDs' => sub {
     my @cmds = Zepto::CommandRegistry->all_commands();
@@ -147,6 +157,53 @@ subtest 'section order is consistent' => sub {
     is($order[1], 'EDIT', 'Second section is EDIT');
     is($order[2], 'NAVIGATE', 'Third section is NAVIGATE');
     is($order[3], 'VIEW', 'Fourth section is VIEW');
+};
+
+subtest 'Every command method resolves on Zepto::Editor' => sub {
+    # Catches typos in the 'method' field that would otherwise only
+    # surface at runtime when a user actually invokes that command.
+    my @cmds = Zepto::CommandRegistry->all_commands();
+    for my $cmd (@cmds) {
+        ok(Zepto::Editor->can($cmd->{method}),
+           "cmd '$cmd->{id}': Zepto::Editor->can('$cmd->{method}')");
+    }
+};
+
+# ============================================================================
+# Auto/Dark/Light theme commands (P3 "Automatic dark/light mode")
+# ============================================================================
+subtest 'Theme: Auto/Dark/Light palette commands are registered' => sub {
+    for my $id (qw(theme_set_auto theme_set_dark theme_set_light)) {
+        my $cmd = Zepto::CommandRegistry->find_command($id);
+        ok($cmd, "'$id' is a registered command");
+        next unless $cmd;
+        is($cmd->{type}, 'action', "'$id' is an action command");
+        is($cmd->{section}, 'VIEW', "'$id' is in the VIEW section");
+        like($cmd->{label}, qr/^Theme:/, "'$id' label starts with 'Theme:'");
+    }
+};
+
+subtest 'toggle_theme reflects auto/dark/light in get_toggle_display' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    my $cmd = Zepto::CommandRegistry->find_command('toggle_theme');
+    ok($cmd, 'toggle_theme command found');
+
+    $editor->{prefs}->set_theme('dark');
+    is(Zepto::CommandRegistry->get_toggle_display($cmd, $editor), 'dark',
+        'Displays dark');
+
+    $editor->{prefs}->set_theme('light');
+    is(Zepto::CommandRegistry->get_toggle_display($cmd, $editor), 'light',
+        'Displays light');
+
+    $editor->{prefs}->set_theme('auto');
+    is(Zepto::CommandRegistry->get_toggle_display($cmd, $editor), 'auto',
+        'Displays auto (not coerced to on/off or to dark/light)');
 };
 
 done_testing();

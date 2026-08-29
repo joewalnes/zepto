@@ -1038,3 +1038,44 @@ VERIFY    A runner invocation never stops live foreign hangon sessions or
           live zqa_* sessions whose owning script PID is alive, and never
           deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
           are cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-138
+NAME:     OSC escape sequences don't corrupt the document
+PRIORITY: P1
+BUG:      P1 "InputParser mis-parses OSC escape sequences as Alt+']' +
+          garbage keystrokes" (found + fixed 2026-08-29, while building P3
+          "Automatic dark/light mode" — Linux auto-theme detection can
+          receive an OSC 11 background-color reply on stdin)
+CROSS-REF: QA-THM-013, QA-REG-102
+SCRIPT:   tier1/reg_138_osc_no_corruption.sh
+VERIFY    A raw OSC sequence (BEL-terminated: `ESC ] 11 ; rgb:.../.../...
+          BEL`, or ST-terminated: `ESC ] 11 ; rgb:.../.../... ESC \`)
+          arriving on stdin — as a real terminal's reply to a color query
+          would — produces no visible text in the document: no literal
+          "rgb", no fragment of the payload, and a real keystroke typed
+          immediately after lands cleanly with nothing extra before it
+          (previously: "]" became Alt+']' and every following payload
+          byte was typed in one character at a time). Verified failing
+          against the pre-fix InputParser.pm.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-139
+NAME:     Theme palette icon reflects actual mode
+PRIORITY: P3
+BUG:      P3 "Theme palette icon didn't reflect actual dark/light state"
+          (found + fixed 2026-08-29, while building P3 "Automatic
+          dark/light mode" — adding the third 'auto' state exposed that
+          the icon was static)
+CROSS-REF: QA-THM-011, QA-THM-012
+SCRIPT:   tier1/reg_139_theme_icon_reflects_state.sh
+VERIFY    The "Theme" row's icon region (everything before the "Theme"
+          label — border + glyph, a fixed-width prefix regardless of
+          which state text follows) differs between dark mode and light
+          mode. Verified failing against the pre-fix Renderer.pm/Chars.pm
+          (identical icon in both modes; a naive "cut before the bracket
+          text" comparison also false-passed pre-fix due to "[dark]" vs
+          "[light]" padding-width differences — cutting at the fixed
+          "Theme" label instead isolates the icon itself).

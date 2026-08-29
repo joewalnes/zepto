@@ -511,4 +511,90 @@ subtest 'Incomplete sequences still wait for more bytes' => sub {
     is($events[0]->{action}, 'move', 'Motion decoded');
 };
 
+# ============================================================================
+# OSC sequences (QA-REG-138 / QA-THM auto-theme detection support)
+# ============================================================================
+# Regression: "ESC ]" previously fell into the generic Alt+key branch,
+# producing an Alt+']' char event immediately followed by every byte of
+# the OSC payload as further bogus char events — a terminal OSC response
+# (e.g. a background-color query reply used for Linux theme auto-detect)
+# would have spammed garbage keystrokes into whatever was focused.
+subtest 'OSC sequence (BEL-terminated) is consumed, not misparsed' => sub {
+    my $parser = Zepto::InputParser->new();
+    # OSC 11 background-color response, BEL-terminated, followed by a real
+    # keystroke that must survive intact.
+    my @events = $parser->parse("\x1b]11;rgb:1a1a/1a1a/2626\x07" . "x");
+    is(scalar @events, 1, 'Only the real keystroke produced an event');
+    is($events[0]->{type}, 'char', 'Char event');
+    is($events[0]->{char}, 'x', 'Char survived the OSC sequence intact');
+    is(length($parser->{buffer}), 0, 'No bytes left stuck in buffer');
+};
+
+subtest 'OSC sequence (ST-terminated) is consumed, not misparsed' => sub {
+    my $parser = Zepto::InputParser->new();
+    # ST = ESC \
+    my @events = $parser->parse("\x1b]11;rgb:ffff/ffff/ffff\x1b\\" . "y");
+    is(scalar @events, 1, 'Only the real keystroke produced an event');
+    is($events[0]->{char}, 'y', 'Char survived the ST-terminated OSC sequence');
+};
+
+subtest 'OSC sequence does not corrupt following keystrokes character-by-character' => sub {
+    # This is the actual failure mode of the pre-fix bug: without OSC
+    # recognition, "]" is consumed as Alt+']', and then "1", "1", ";", etc.
+    # are each parsed as their own regular char events.
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b]11;rgb:0000/0000/0000\x07" . "ab");
+    is(scalar @events, 2, 'Exactly the two real keystrokes, nothing from the OSC body');
+    is($events[0]->{char}, 'a', 'First real char');
+    is($events[1]->{char}, 'b', 'Second real char');
+};
+
+subtest 'Incomplete OSC sequence waits for its terminator' => sub {
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b]11;rgb:1a1a");
+    is(scalar @events, 0, 'No event yet, terminator not seen');
+    ok(length($parser->{buffer}) > 0, 'Bytes retained, waiting for terminator');
+
+    @events = $parser->parse("/1a1a/2626\x07" . "z");
+    is(scalar @events, 1, 'Completes once the terminator arrives');
+    is($events[0]->{char}, 'z', 'Real char after the split OSC sequence');
+};
+
+subtest 'Runaway (unterminated) OSC body is eventually discarded' => sub {
+    my $parser = Zepto::InputParser->new();
+    # Well past OSC_MAX_LEN with no BEL/ST anywhere in this read — must be
+    # discarded rather than wedging the parser (or the whole buffer)
+    # forever. A byte string this size with no terminator can't be
+    # distinguished from real keystrokes concatenated into the same read,
+    # so the whole blob is dropped — the important guarantee is that the
+    # parser recovers cleanly afterward.
+    my @events = $parser->parse("\x1b]" . ('9' x 600));
+    is(scalar @events, 0, 'Runaway OSC body produces no garbage char events');
+    is(length($parser->{buffer}), 0, 'Buffer fully drained, not wedged');
+
+    # A real keystroke arriving in a SEPARATE read afterward (the
+    # realistic case — the terminal never sent a terminator, and the user
+    # then typed something) must parse normally.
+    @events = $parser->parse("z");
+    is(scalar @events, 1, 'Parser recovered for the next real read');
+    is($events[0]->{char}, 'z', 'Real char after runaway OSC body recovers cleanly');
+};
+
+subtest 'Lone "ESC ]" with nothing following is Alt+\']\' on flush' => sub {
+    # A human pressing Alt+] produces exactly "ESC ]" and then nothing
+    # else — indistinguishable from the start of an OSC sequence until a
+    # read timeout proves no terminator is coming. This must still work
+    # as Alt+']', matching the existing bare-ESC flush behavior.
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b]");
+    is(scalar @events, 0, 'No event yet, could still be an OSC sequence starting');
+
+    my $event = $parser->flush_pending();
+    ok($event, 'Flush returns an event');
+    is($event->{type}, 'char', 'Alt+] is a char event');
+    is($event->{char}, ']', 'Char is ]');
+    ok(Zepto::InputParser::has_modifier($event, 'alt'), 'Has alt modifier');
+    is(length($parser->{buffer}), 0, 'Buffer cleared after flush');
+};
+
 done_testing();

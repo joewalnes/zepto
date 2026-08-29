@@ -624,7 +624,10 @@ sub light_theme {
     });
 }
 
-# Get theme by name
+# Get theme by name. Only understands the two concrete built-in themes —
+# the three-valued 'theme' preference ('auto'|'dark'|'light') is resolved
+# to a concrete 'dark'/'light' name by Zepto::Editor::_resolve_theme_name
+# (via Zepto::ThemeDetect for 'auto') before ever reaching here.
 sub get_theme {
     my ($class, $name) = @_;
     $name //= 'dark';

@@ -2,6 +2,9 @@
 
 ## 2026-08-29
 
+- Added automatic dark/light theme mode: pick "Theme: Auto" from the command palette to follow the system appearance (macOS/GNOME), with a periodic check while running. Manual dark/light selection ("Theme: Dark", "Theme: Light", or ⌃T) always still works and takes an explicit choice out of auto
+- Fixed a terminal response (used internally by auto theme detection) potentially typing garbage characters into the document
+- Fixed the theme icon in the command palette staying a moon regardless of the current mode
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

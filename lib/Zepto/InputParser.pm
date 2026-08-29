@@ -15,6 +15,11 @@ use constant {
     EVT_NONE   => 'none',      # No event / incomplete sequence
 };
 
+# Sanity cap on OSC sequence body length (bytes between "ESC ]" and its
+# terminator) — guards against a runaway/unterminated OSC body stalling
+# the parser forever if a terminal never sends BEL/ST.
+use constant OSC_MAX_LEN => 512;
+
 # Key constants
 use constant {
     KEY_UP        => 'up',
@@ -102,6 +107,16 @@ sub flush_pending {
         $self->{buffer} = '';
         return { type => EVT_KEY, key => KEY_ESCAPE, modifiers => [] };
     }
+
+    # A lone "ESC ]" that never got a following byte within the timeout is
+    # Alt+']' (a real keystroke), not the start of an OSC response — a
+    # genuine terminal OSC reply arrives as one fast burst together with
+    # its terminator, not trickling in across a read timeout.
+    if ($self->{buffer} eq "\x1b]") {
+        $self->{buffer} = '';
+        return $self->_make_char_event(']', ['alt']);
+    }
+
     return undef;
 }
 
@@ -156,6 +171,16 @@ sub _parse_escape {
     # SS3 sequence: ESC O (some function keys)
     if ($second eq 'O') {
         return $self->_parse_ss3();
+    }
+
+    # OSC sequence: ESC ] ... (terminated by BEL or ST/ESC-backslash)
+    # e.g. terminal responses to color queries (OSC 10/11), title queries.
+    # Must be recognized here — otherwise it falls into the generic
+    # "Alt+key" branch below, which treats ']' as Alt+']' and then feeds
+    # the rest of the OSC payload byte-by-byte through as garbage
+    # keystrokes (a QA-REG-102-class stall/corruption bug).
+    if ($second eq ']') {
+        return $self->_parse_osc();
     }
 
     # Alt+key: ESC followed by regular key
@@ -309,6 +334,63 @@ sub _parse_ss3 {
     if ($final eq 'R') { return $self->_make_key_event(KEY_F3, []); }
     if ($final eq 'S') { return $self->_make_key_event(KEY_F4, []); }
 
+    return { type => EVT_NONE };
+}
+
+# Parse OSC sequence (ESC ] ... terminated by BEL or ST)
+# We don't currently act on any OSC response content — the goal is purely
+# to consume the sequence's exact bytes so it can never be misparsed as
+# Alt+']' followed by a stream of garbage character events, and so real
+# input queued behind it isn't stalled (see call site comment).
+sub _parse_osc {
+    my ($self) = @_;
+
+    my $buf = $self->{buffer};
+    my $len = length($buf);
+
+    my $i = 2;
+    while ($i < $len) {
+        my $c = substr($buf, $i, 1);
+
+        if ($c eq "\x07") {
+            # BEL-terminated
+            substr($self->{buffer}, 0, $i + 1, '');
+            return { type => EVT_NONE };
+        }
+
+        if ($c eq "\x1b") {
+            if ($i + 1 >= $len) {
+                return { type => EVT_NONE };  # need one more byte to see if it's ST
+            }
+            if (substr($buf, $i + 1, 1) eq '\\') {
+                # ST-terminated (ESC \)
+                substr($self->{buffer}, 0, $i + 2, '');
+                return { type => EVT_NONE };
+            }
+            # A bare ESC that isn't ST means this wasn't (or isn't only) an
+            # OSC body. Discard just the unterminated OSC prefix so the
+            # ESC that follows starts a fresh sequence on the next parse.
+            substr($self->{buffer}, 0, $i, '');
+            return { type => EVT_NONE };
+        }
+
+        $i++;
+    }
+
+    # Exhausted everything currently buffered with no terminator found.
+    if ($len - 2 > OSC_MAX_LEN) {
+        # Runaway OSC body with no terminator anywhere in sight — discard
+        # all of it so input isn't stalled forever waiting for a
+        # terminator that may never arrive (QA-REG-102 class of bug).
+        # Any real keystrokes concatenated into this same read (rather
+        # than arriving as a separate read) are indistinguishable from the
+        # OSC body without a terminator and are discarded along with it —
+        # an acceptable tradeoff for a pathological/non-terminating stream.
+        $self->{buffer} = '';
+        return { type => EVT_NONE };
+    }
+
+    # No terminator yet, still under the sanity cap — wait for more bytes
     return { type => EVT_NONE };
 }
 

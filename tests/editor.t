@@ -213,6 +213,166 @@ subtest 'Theme change' => sub {
 };
 
 # ============================================================================
+# Auto theme (P3 "Automatic dark/light mode")
+# ============================================================================
+# theme_detect_fn / theme_poll_supported_fn are test-only injection points
+# on Zepto::Editor->new — production code always leaves them undef and
+# calls the real Zepto::ThemeDetect functions. These tests must never
+# shell out.
+subtest 'Auto theme resolves via injected detector at construction' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { return 'light'; },
+    );
+
+    is($editor->{prefs}->theme(), 'auto', 'Pref stays auto');
+    is($editor->{theme}->name(), 'light', 'Effective theme resolved from injected detector');
+};
+
+subtest 'Auto theme falls back to dark when detector says dark' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { return 'dark'; },
+    );
+
+    is($editor->{theme}->name(), 'dark', 'Effective theme resolved as dark');
+};
+
+subtest 'cmd_set_theme_auto / dark / light jump directly to a mode' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        theme_detect_fn => sub { return 'light'; },
+    );
+
+    is($editor->{prefs}->theme(), 'dark', 'Starts explicit dark');
+
+    $editor->cmd_set_theme_auto();
+    is($editor->{prefs}->theme(), 'auto', 'Pref is now auto');
+    is($editor->{theme}->name(), 'light', 'Resolved immediately via injected detector');
+
+    $editor->cmd_set_theme_dark();
+    is($editor->{prefs}->theme(), 'dark', 'Pref is explicit dark');
+    is($editor->{theme}->name(), 'dark', 'Theme is dark');
+
+    $editor->cmd_set_theme_light();
+    is($editor->{prefs}->theme(), 'light', 'Pref is explicit light');
+    is($editor->{theme}->name(), 'light', 'Theme is light');
+};
+
+subtest 'ctrl-T in auto mode switches to the explicit opposite and leaves auto' => sub {
+    # Documented design: ^T always means "give me the other look right
+    # now". Since that sets an explicit dark/light preference, it
+    # necessarily leaves 'auto' mode — re-entering auto requires the
+    # dedicated "Theme: Auto" palette command (cmd_set_theme_auto).
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { return 'dark'; },  # system is dark
+    );
+
+    is($editor->{prefs}->theme(), 'auto', 'Starts in auto');
+    is($editor->{theme}->name(), 'dark', 'Auto resolved to dark (system is dark)');
+
+    $editor->cmd_toggle_theme();
+    is($editor->{prefs}->theme(), 'light', 'ctrl-T set explicit light (opposite of effective)');
+    is($editor->{theme}->name(), 'light', 'Theme is now light');
+
+    $editor->cmd_toggle_theme();
+    is($editor->{prefs}->theme(), 'dark', 'Second ctrl-T set explicit dark');
+    is($editor->{theme}->name(), 'dark', 'Theme is dark');
+};
+
+subtest '_maybe_poll_system_theme is a no-op unless pref is auto' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $detect_calls = 0;
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        theme_detect_fn => sub { $detect_calls++; return 'light'; },
+        theme_poll_supported_fn => sub { return 1; },
+    );
+    $editor->{_theme_poll_last} = 0;  # bypass debounce
+
+    is($editor->_maybe_poll_system_theme(), 0, 'No-op: pref is explicit dark, not auto');
+    is($detect_calls, 0, 'Detector never invoked');
+};
+
+subtest '_maybe_poll_system_theme is a no-op when polling is unsupported' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $detect_calls = 0;
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { $detect_calls++; return 'light'; },
+        theme_poll_supported_fn => sub { return 0; },  # e.g. Linux without gsettings
+    );
+    $editor->{_theme_poll_last} = 0;  # bypass debounce
+    $detect_calls = 0;  # constructor's own startup resolution doesn't count
+
+    is($editor->_maybe_poll_system_theme(), 0, 'No-op: platform does not support cheap polling');
+    is($detect_calls, 0, 'Detector not invoked by the poll itself');
+};
+
+subtest '_maybe_poll_system_theme respects the debounce interval' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $detect_calls = 0;
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { $detect_calls++; return 'light'; },
+        theme_poll_supported_fn => sub { return 1; },
+    );
+    # Constructor already ran one resolution; _theme_poll_last was just
+    # set to "now" — a poll attempted immediately after must be skipped.
+    $detect_calls = 0;  # constructor's own startup resolution doesn't count
+    is($editor->_maybe_poll_system_theme(), 0, 'Skipped: debounce interval has not elapsed');
+    is($detect_calls, 0, 'Detector not invoked again within the interval');
+};
+
+subtest '_maybe_poll_system_theme swaps the theme when the system changed' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+        prefs => Zepto::Preferences->new(theme => 'auto'),
+        theme_detect_fn => sub { return 'dark'; },  # matches construction-time result
+        theme_poll_supported_fn => sub { return 1; },
+    );
+    is($editor->{theme}->name(), 'dark', 'Starts dark');
+
+    # Simulate the system flipping to light and enough time passing
+    $editor->{_theme_detect_fn} = sub { return 'light'; };
+    $editor->{_theme_poll_last} = 0;
+
+    is($editor->_maybe_poll_system_theme(), 1, 'Poll detected a change and reports it');
+    is($editor->{theme}->name(), 'light', 'Theme swapped live to light');
+
+    # A second immediate poll (still light) reports no change
+    $editor->{_theme_poll_last} = 0;
+    is($editor->_maybe_poll_system_theme(), 0, 'No change reported when system theme is unchanged');
+};
+
+# ============================================================================
 # Search state
 # ============================================================================
 subtest 'Search state' => sub {

@@ -1068,13 +1068,16 @@ sub cmd_toggle_column_mode {
     }
 }
 
-sub cmd_toggle_theme {
-    my ($self) = @_;
-    my $current = $self->{theme}->name();
-    my $new_theme = ($current eq 'dark') ? 'light' : 'dark';
+# Set the theme preference to an explicit value ('auto'|'dark'|'light')
+# and immediately resolve/apply the concrete theme it maps to. Shared by
+# cmd_toggle_theme and the palette's explicit Theme: Auto/Dark/Light
+# commands.
+sub _apply_theme_pref {
+    my ($self, $pref_value) = @_;
 
-    $self->{prefs}->set_theme($new_theme);
-    $self->{theme} = Zepto::Theme->get_theme($new_theme);
+    $self->{prefs}->set_theme($pref_value);
+    $self->{_theme_effective} = $self->_resolve_theme_name($pref_value);
+    $self->{theme} = Zepto::Theme->get_theme($self->{_theme_effective});
 
     # Re-apply cursor color for new theme
     my $cursor_color = $self->{theme}->color('cursor_color');
@@ -1083,6 +1086,24 @@ sub cmd_toggle_theme {
         STDOUT->flush();
     }
 }
+
+# ⌃T: toggle between the explicit opposite of whatever theme is currently
+# effective — including while in 'auto' mode. This is a deliberate design
+# choice: ⌃T always means "I want the OTHER look, right now", and setting
+# an explicit dark/light preference naturally LEAVES auto mode (the pref
+# is no longer 'auto'). To re-enable auto mode, use the "Theme: Auto"
+# palette command — ⌃T itself never re-enters auto.
+sub cmd_toggle_theme {
+    my ($self) = @_;
+    my $current = $self->{theme}->name();  # effective theme, even under auto
+    my $new_theme = ($current eq 'dark') ? 'light' : 'dark';
+    $self->_apply_theme_pref($new_theme);
+}
+
+# Palette commands: jump directly to a specific theme mode.
+sub cmd_set_theme_auto  { $_[0]->_apply_theme_pref('auto'); }
+sub cmd_set_theme_dark  { $_[0]->_apply_theme_pref('dark'); }
+sub cmd_set_theme_light { $_[0]->_apply_theme_pref('light'); }
 
 sub cmd_toggle_nerd_font {
     my ($self) = @_;
