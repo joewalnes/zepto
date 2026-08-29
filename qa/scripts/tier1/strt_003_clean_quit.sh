@@ -7,7 +7,7 @@ file=$(qa_tmpfile_nl "strt003.txt" "hello world")
 qa_start "$file"
 
 # Verify editor is alive
-qa_assert_screen "hello world" "editor showing content"
+qa_assert_expect "hello world" "editor showing content"
 
 # Quit without making changes
 qa_keys "ctrl-q"

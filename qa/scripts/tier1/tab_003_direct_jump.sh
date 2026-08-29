@@ -10,15 +10,15 @@ qa_start "$file1" "$file2" "$file3"
 
 # Jump to tab 3 (Alt+3 = ESC 3)
 qa_raw $'\x1b3' 0.3
-qa_assert_screen "content C" "alt-3 shows tab 3"
+qa_assert_expect "content C" "alt-3 shows tab 3"
 
 # Jump to tab 1
 qa_raw $'\x1b1' 0.3
-qa_assert_screen "content A" "alt-1 shows tab 1"
+qa_assert_expect "content A" "alt-1 shows tab 1"
 
 # Jump to tab 2
 qa_raw $'\x1b2' 0.3
-qa_assert_screen "content B" "alt-2 shows tab 2"
+qa_assert_expect "content B" "alt-2 shows tab 2"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -7,7 +7,7 @@ qa_project; dir="$QA_PROJECT_DIR"
 
 # Fresh state dir, fresh project dir — no prior session could exist.
 qa_start
-qa_assert_screen "\[untitled\]" "bare launch with no saved session opens a single empty tab"
+qa_assert_expect "\[untitled\]" "bare launch with no saved session opens a single empty tab"
 qa_assert_not_screen "⌥2" "exactly one tab is open, not multiple"
 
 qa_keys "ctrl-q"

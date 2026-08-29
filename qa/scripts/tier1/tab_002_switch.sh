@@ -8,15 +8,15 @@ file2=$(qa_tmpfile_nl "tab002_b.txt" "BETA_CONTENT")
 qa_start "$file1" "$file2"
 
 # Should start on tab 1
-qa_assert_screen "ALPHA_CONTENT" "starts on tab 1"
+qa_assert_expect "ALPHA_CONTENT" "starts on tab 1"
 
 # Alt+. to next tab
 qa_keys "alt-."
-qa_assert_screen "BETA_CONTENT" "alt-. switched to tab 2"
+qa_assert_expect "BETA_CONTENT" "alt-. switched to tab 2"
 
 # Alt+, back
 qa_keys "alt-,"
-qa_assert_screen "ALPHA_CONTENT" "alt-, switched back to tab 1"
+qa_assert_expect "ALPHA_CONTENT" "alt-, switched back to tab 1"
 
 qa_keys "ctrl-q"
 qa_summary
