@@ -17,7 +17,7 @@ sleep 0.3
 
 # Should be focused on editor, not tree — type and check
 qa_send "X"
-qa_assert_screen "X" "typing works after clicking tab (editor focused)"
+qa_assert_expect "X" "typing works after clicking tab (editor focused)"
 
 qa_keys "ctrl-q"
 sleep 0.2

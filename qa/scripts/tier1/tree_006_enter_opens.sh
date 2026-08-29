@@ -13,7 +13,7 @@ qa_start --tree "$QA_TMPDIR/treedir/alpha.txt"
 
 # Tree should be visible
 sleep 0.3
-qa_assert_screen "alpha" "alpha visible in tree or tab"
+qa_assert_expect "alpha" "alpha visible in tree or tab"
 
 # Toggle to tree focus with Ctrl+B then navigate
 qa_keys "ctrl-b" 0.3

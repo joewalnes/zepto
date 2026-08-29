@@ -23,7 +23,7 @@ qa_keys "enter" 0.4
 
 qa_keys "ctrl-space"
 qa_send "theme" 0.3
-qa_assert_screen '\[auto\]' "Theme preference shows auto"
+qa_assert_expect '\[auto\]' "Theme preference shows auto"
 qa_keys "escape"
 qa_keys "escape"
 
@@ -31,7 +31,7 @@ qa_keys "escape"
 # crash or leave the editor in a broken state) — content is visible and
 # the editor still responds to navigation (non-destructive, so the buffer
 # stays clean and ^Q won't trip the unsaved-changes prompt).
-qa_assert_screen "hello" "Document content still renders after auto-resolve"
+qa_assert_expect "hello" "Document content still renders after auto-resolve"
 qa_keys "end" 0.2
 if qa_alive; then
     qa_pass "Editor still alive and responsive after auto-resolve"

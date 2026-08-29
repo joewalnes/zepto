@@ -22,7 +22,7 @@ qa_keys "down" 0.2
 qa_keys "enter" 0.3
 
 # Should now have bbb.txt content in editor
-qa_assert_screen "content_bbb" "tree enter opened bbb.txt"
+qa_assert_expect "content_bbb" "tree enter opened bbb.txt"
 
 qa_keys "ctrl-q"
 

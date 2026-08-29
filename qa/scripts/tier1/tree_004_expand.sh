@@ -18,7 +18,7 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # Verify mysubdir is in tree
-qa_assert_screen "mysubdir" "mysubdir visible in tree"
+qa_assert_expect "mysubdir" "mysubdir visible in tree"
 
 # Before expand — nested file should not be visible
 qa_assert_not_screen "deep_nested" "nested file hidden before expand"
@@ -31,7 +31,7 @@ qa_keys "up" 0.2
 qa_keys "right" 0.3
 
 # After expand — nested file should be visible
-qa_assert_screen "deep_nested" "nested file visible after expand"
+qa_assert_expect "deep_nested" "nested file visible after expand"
 
 # Collapse with Left
 qa_keys "left" 0.3

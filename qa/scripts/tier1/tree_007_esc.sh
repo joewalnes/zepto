@@ -20,7 +20,7 @@ sleep 0.2
 
 # Type — should go to editor, not tree
 qa_send "x"
-qa_assert_screen "editor content" "editor has focus after Esc"
+qa_assert_expect "editor content" "editor has focus after Esc"
 
 qa_keys "ctrl-q"
 sleep 0.2
