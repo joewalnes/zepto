@@ -21,7 +21,7 @@ fi
 
 # Should still be responsive
 qa_send "hello"
-qa_assert_screen "hello" "can still type after Ctrl+D on empty"
+qa_assert_expect "hello" "can still type after Ctrl+D on empty"
 
 qa_keys "ctrl-q"
 sleep 0.2

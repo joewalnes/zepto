@@ -13,7 +13,7 @@ hangon mouse-drag "$QA_SESSION" --from 10,3 --to 14,5 --alt --steps 5
 sleep 0.3
 
 # COL indicator should appear in status bar
-qa_assert_screen "COL" "alt+drag activated column mode"
+qa_assert_expect "COL" "alt+drag activated column mode"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
