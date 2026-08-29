@@ -17,8 +17,8 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # Should show files
-qa_assert_screen "aaa" "tree shows aaa.txt"
-qa_assert_screen "bbb" "tree shows bbb.txt"
+qa_assert_expect "aaa" "tree shows aaa.txt"
+qa_assert_expect "bbb" "tree shows bbb.txt"
 
 # Navigate down
 qa_keys "down" 0.2

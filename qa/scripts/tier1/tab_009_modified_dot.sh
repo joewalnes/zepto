@@ -9,7 +9,7 @@ qa_start "$file"
 qa_assert_not_screen "●" "no dot initially"
 
 qa_send "x"
-qa_assert_screen "●" "dot appears after edit"
+qa_assert_expect "●" "dot appears after edit"
 
 qa_keys "ctrl-z"
 qa_assert_not_screen "●" "dot gone after undo"

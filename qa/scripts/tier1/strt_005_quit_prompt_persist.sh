@@ -14,12 +14,12 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Prompt should appear
-qa_assert_screen "Save|Discard|Cancel" "save prompt visible initially"
+qa_assert_expect "Save|Discard|Cancel" "save prompt visible initially"
 
 # Wait 2 seconds — prompt should persist
 sleep 2
 
-qa_assert_screen "Save|Discard|Cancel" "save prompt still visible after 2s"
+qa_assert_expect "Save|Discard|Cancel" "save prompt still visible after 2s"
 
 # Dismiss
 qa_send "n" 0.3

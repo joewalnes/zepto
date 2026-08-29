@@ -9,8 +9,8 @@ qa_start "$file"
 qa_keys "ctrl-space"
 qa_send "transform" 0.3
 
-qa_assert_screen "Transform" "Transform command found in palette"
-qa_assert_screen "T" "shortcut indicator visible"
+qa_assert_expect "Transform" "Transform command found in palette"
+qa_assert_expect "T" "shortcut indicator visible"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

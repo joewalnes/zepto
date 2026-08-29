@@ -9,7 +9,7 @@ file3=$(qa_tmpfile_nl "tab018_c.txt" "content C")
 qa_start "$file1" "$file2" "$file3"
 
 # Verify initial order — tab018_a should be first/active
-qa_assert_screen "tab018_a" "tab A visible"
+qa_assert_expect "tab018_a" "tab A visible"
 
 # Try reorder via palette
 qa_keys "ctrl-space"

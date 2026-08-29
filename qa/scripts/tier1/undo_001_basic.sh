@@ -9,7 +9,7 @@ qa_start "$file"
 # Type " world" at end of line
 qa_keys "end"
 qa_send " world"
-qa_assert_screen "hello world" "text modified to 'hello world'"
+qa_assert_expect "hello world" "text modified to 'hello world'"
 
 # Undo
 qa_keys "ctrl-z"
@@ -35,7 +35,7 @@ fi
 # Redo
 qa_keys "ctrl-y"
 sleep 0.3
-qa_assert_screen "hello" "after redo, text is present"
+qa_assert_expect "hello" "after redo, text is present"
 
 qa_keys "ctrl-q"
 sleep 0.2

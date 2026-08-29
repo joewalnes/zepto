@@ -22,7 +22,7 @@ qa_keys "enter" 0.4
 
 qa_keys "ctrl-space"
 qa_send "theme" 0.3
-qa_assert_screen '\[auto\]' "Starts in auto mode"
+qa_assert_expect '\[auto\]' "Starts in auto mode"
 qa_keys "escape"
 qa_keys "escape"
 

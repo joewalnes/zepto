@@ -9,7 +9,7 @@ echo "no git here" > "$nogit_dir/test.txt"
 
 qa_start "$nogit_dir/test.txt"
 
-qa_assert_screen "no git here" "file content displayed"
+qa_assert_expect "no git here" "file content displayed"
 qa_assert_not_screen "fatal|error|Error|FATAL" "no git errors"
 
 qa_keys "ctrl-q"

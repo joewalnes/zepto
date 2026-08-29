@@ -15,7 +15,7 @@ qa_send "rev" 0.2
 qa_keys "enter"
 sleep 0.5
 
-qa_assert_screen "olleh" "rev reversed the text"
+qa_assert_expect "olleh" "rev reversed the text"
 
 qa_keys "ctrl-q"
 sleep 0.2

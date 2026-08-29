@@ -28,7 +28,7 @@ else
     qa_fail "theme toggle during find session crashed"
 fi
 
-qa_assert_screen "hello" "find still works after theme toggle"
+qa_assert_expect "hello" "find still works after theme toggle"
 
 qa_keys "escape"
 qa_keys "escape"

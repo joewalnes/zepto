@@ -17,7 +17,7 @@ sleep 0.3
 
 # Enter column mode
 qa_keys "alt-c"
-qa_assert_screen "COL" "column mode active"
+qa_assert_expect "COL" "column mode active"
 
 # Extend column selection
 qa_keys "down" 0.1

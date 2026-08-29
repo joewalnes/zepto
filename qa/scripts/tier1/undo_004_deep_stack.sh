@@ -11,7 +11,7 @@ for i in $(seq 1 20); do
     qa_send "x" 0.15
 done
 
-qa_assert_screen "xxxxxxxxxxxxxxxxxxxx" "typed 20 x's"
+qa_assert_expect "xxxxxxxxxxxxxxxxxxxx" "typed 20 x's"
 
 # Undo many times
 for i in $(seq 1 15); do

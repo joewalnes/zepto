@@ -16,7 +16,7 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # The file being edited should be visible/highlighted in tree
-qa_assert_screen "deep" "current file visible in tree"
+qa_assert_expect "deep" "current file visible in tree"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

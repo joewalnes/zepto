@@ -17,12 +17,12 @@ qa_send "edit" 0.5
 qa_keys "ctrl-w"
 sleep 0.5
 
-qa_assert_screen "Save|Discard|Cancel" "save prompt appears"
+qa_assert_expect "Save|Discard|Cancel" "save prompt appears"
 
 # Discard with N — should close tab 2 and switch to tab 1
 qa_send "n" 0.3
 
-qa_assert_screen "file A" "tab 1 active after closing tab 2"
+qa_assert_expect "file A" "tab 1 active after closing tab 2"
 qa_assert_not_screen "tab005b" "tab 2 no longer in tab bar"
 
 qa_keys "ctrl-q"

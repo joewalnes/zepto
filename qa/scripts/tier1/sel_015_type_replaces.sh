@@ -17,7 +17,7 @@ qa_keys "shift-right" 0.1
 # Type replacement
 qa_send "goodbye"
 
-qa_assert_screen "goodbye world" "typing replaced selection"
+qa_assert_expect "goodbye world" "typing replaced selection"
 
 qa_keys "ctrl-q"
 sleep 0.2

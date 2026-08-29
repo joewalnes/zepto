@@ -9,7 +9,7 @@ qa_start "$file"
 qa_assert_not_screen "●" "clean initially"
 
 qa_send "x"
-qa_assert_screen "●" "dirty after edit"
+qa_assert_expect "●" "dirty after edit"
 
 qa_keys "ctrl-z"
 qa_assert_not_screen "●" "clean after undo"

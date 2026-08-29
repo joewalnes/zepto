@@ -21,13 +21,7 @@ sleep 0.3
 # Type to replace selection
 qa_send "X"
 
-qa_screen
-# Everything before cursor should be replaced with X, leaving the rest of line 3
-if echo "$QA_SCREEN" | grep -q "X"; then
-    qa_pass "shift+ctrl+home selected from cursor to doc start"
-else
-    qa_fail "shift+ctrl+home selected from cursor to doc start"
-fi
+qa_assert_expect "X" "shift+ctrl+home selected from cursor to doc start"
 
 qa_keys "ctrl-q"
 sleep 0.2

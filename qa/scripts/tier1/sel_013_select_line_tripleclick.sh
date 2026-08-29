@@ -15,9 +15,9 @@ sleep 0.3
 # Type to replace entire line
 qa_send "REPLACED"
 
-qa_assert_screen "first line" "first line intact"
-qa_assert_screen "REPLACED" "second line replaced"
-qa_assert_screen "third line" "third line intact"
+qa_assert_expect "first line" "first line intact"
+qa_assert_expect "REPLACED" "second line replaced"
+qa_assert_expect "third line" "third line intact"
 
 qa_keys "ctrl-q"
 sleep 0.2

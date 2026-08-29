@@ -15,7 +15,7 @@ qa_raw $'\x1b[1;6F'
 qa_send "X"
 
 # All content should be replaced
-qa_assert_screen "X" "replacement visible"
+qa_assert_expect "X" "replacement visible"
 qa_assert_not_screen "line one" "line one gone"
 qa_assert_not_screen "line three" "line three gone"
 

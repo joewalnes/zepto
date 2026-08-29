@@ -21,7 +21,7 @@ sleep 0.3
 
 # Type should go to editor
 qa_send "Z"
-qa_assert_screen "Z" "typing goes to editor after click"
+qa_assert_expect "Z" "typing goes to editor after click"
 
 qa_keys "ctrl-q"
 sleep 0.2

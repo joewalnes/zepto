@@ -16,7 +16,7 @@ qa_keys "enter"
 sleep 0.5
 
 # Verify sort happened
-qa_assert_screen "apple" "sorted content visible"
+qa_assert_expect "apple" "sorted content visible"
 
 # Undo
 qa_keys "ctrl-z"

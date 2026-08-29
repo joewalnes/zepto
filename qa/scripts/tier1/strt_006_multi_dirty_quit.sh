@@ -20,7 +20,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should see save prompt for one of the files
-qa_assert_screen "Save|Discard|Cancel" "first save prompt visible"
+qa_assert_expect "Save|Discard|Cancel" "first save prompt visible"
 
 # Discard first
 qa_send "n" 0.5

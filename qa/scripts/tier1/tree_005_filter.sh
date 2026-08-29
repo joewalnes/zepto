@@ -18,8 +18,8 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # All files should be visible
-qa_assert_screen "alpha" "alpha visible before filter"
-qa_assert_screen "delta" "delta visible before filter"
+qa_assert_expect "alpha" "alpha visible before filter"
+qa_assert_expect "delta" "delta visible before filter"
 
 # Type to filter
 qa_send "bet" 0.3

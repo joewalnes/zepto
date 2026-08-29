@@ -17,7 +17,7 @@ else
     qa_fail "started in ${elapsed}s (expected <= 3s)"
 fi
 
-qa_assert_screen "hello" "content visible after startup"
+qa_assert_expect "hello" "content visible after startup"
 
 qa_keys "ctrl-q"
 qa_summary

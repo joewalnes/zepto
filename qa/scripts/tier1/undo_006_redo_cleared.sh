@@ -19,7 +19,7 @@ qa_send "X"
 
 # Redo should do nothing (stack cleared)
 qa_keys "ctrl-y"
-qa_assert_screen "abcX" "redo does nothing after new edit"
+qa_assert_expect "abcX" "redo does nothing after new edit"
 
 qa_keys "ctrl-q"
 sleep 0.2

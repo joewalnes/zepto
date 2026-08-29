@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "ctrl-space"
 qa_send "theme" 0.3
 
-qa_assert_screen "[Tt]heme" "theme command visible in palette"
+qa_assert_expect "[Tt]heme" "theme command visible in palette"
 
 qa_keys "escape"
 qa_keys "escape"

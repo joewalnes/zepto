@@ -11,12 +11,12 @@ printf 'content\n' > a.txt
 qa_start
 qa_keys "ctrl-space"
 qa_send "restore session" 0.3
-qa_assert_screen "Restore Session on Startup" "command found via fuzzy palette search"
-qa_assert_screen "\[on\]" "toggle shows default ON state"
+qa_assert_expect "Restore Session on Startup" "command found via fuzzy palette search"
+qa_assert_expect "\[on\]" "toggle shows default ON state"
 
 # Turn it off.
 qa_keys "enter" 0.3
-qa_assert_screen "\[off\]" "toggle reflects OFF state immediately"
+qa_assert_expect "\[off\]" "toggle reflects OFF state immediately"
 qa_keys "escape" 0.2
 
 # Open a file, quit — session save is a no-op with the pref off.
@@ -30,7 +30,7 @@ sleep 0.4
 # sidebar, which lists a.txt as a directory entry regardless of whether
 # it's open as a tab.
 qa_restart
-qa_assert_screen "◢ \[untitled\] ⌥1" "with the pref off, bare relaunch does not restore a.txt"
+qa_assert_expect "◢ \[untitled\] ⌥1" "with the pref off, bare relaunch does not restore a.txt"
 qa_assert_not_screen "◢ a\.txt ⌥" "a.txt tab is not reopened while restore_session is off"
 
 qa_keys "ctrl-q"

@@ -12,14 +12,7 @@ qa_keys "shift-alt-right" 0.2 2>/dev/null || qa_raw $'\x1b[1;4C' 0.3
 # Type to replace
 qa_send "X"
 
-qa_screen
-if ! echo "$QA_SCREEN" | grep -q "alpha"; then
-    qa_pass "shift-alt-right selected first word"
-elif echo "$QA_SCREEN" | grep -q "X"; then
-    qa_pass "shift-alt-right selected text"
-else
-    qa_fail "shift-alt-right word select"
-fi
+qa_assert_expect "X" "shift-alt-right selected text and was replaced"
 
 qa_keys "ctrl-q"
 sleep 0.2
