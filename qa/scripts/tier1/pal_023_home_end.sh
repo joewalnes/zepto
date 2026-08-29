@@ -22,7 +22,7 @@ sleep 0.3
 qa_keys "home"
 sleep 0.3
 
-qa_assert_screen "Commands" "palette responsive after Home/End"
+qa_assert_expect "Commands" "palette responsive after Home/End"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

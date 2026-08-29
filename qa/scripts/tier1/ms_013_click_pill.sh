@@ -15,7 +15,7 @@ hangon mouse-click "$QA_SESSION" --x 70 --y "$last_row"
 sleep 0.5
 
 # Command palette should open
-qa_assert_screen "FILE|EDIT|NAVIGATE|VIEW|Save|Quit" "clicking Commands pill opens palette"
+qa_assert_expect "FILE|EDIT|NAVIGATE|VIEW|Save|Quit" "clicking Commands pill opens palette"
 
 qa_keys "escape"
 qa_keys "escape"

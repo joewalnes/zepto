@@ -8,21 +8,21 @@ ghijkl
 mnopqr")
 qa_start "$file"
 
-qa_assert_screen "1:1" "starts at 1:1"
+qa_assert_expect "1:1" "starts at 1:1"
 
 qa_keys "right" 0.1
 qa_keys "right" 0.1
 qa_keys "right" 0.1
-qa_assert_screen "1:4" "right x3 = col 4"
+qa_assert_expect "1:4" "right x3 = col 4"
 
 qa_keys "down" 0.1
-qa_assert_screen "2:4" "down = line 2"
+qa_assert_expect "2:4" "down = line 2"
 
 qa_keys "left" 0.1
-qa_assert_screen "2:3" "left = col 3"
+qa_assert_expect "2:3" "left = col 3"
 
 qa_keys "up" 0.1
-qa_assert_screen "1:3" "up = line 1"
+qa_assert_expect "1:3" "up = line 1"
 
 qa_keys "ctrl-q"
 qa_summary

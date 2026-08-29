@@ -13,7 +13,7 @@ sleep 0.3
 # Type to replace the selected word
 qa_send "REPLACED"
 
-qa_assert_screen "hello REPLACED foo" "double-click selected and replaced word"
+qa_assert_expect "hello REPLACED foo" "double-click selected and replaced word"
 
 qa_keys "ctrl-q"
 sleep 0.2

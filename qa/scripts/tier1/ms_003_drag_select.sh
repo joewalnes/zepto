@@ -14,12 +14,7 @@ sleep 0.3
 # Type to replace selection
 qa_send "X"
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "X"; then
-    qa_pass "drag created selection that was replaced"
-else
-    qa_fail "drag created selection that was replaced"
-fi
+qa_assert_expect "X" "drag created selection that was replaced"
 
 qa_keys "ctrl-q"
 sleep 0.2

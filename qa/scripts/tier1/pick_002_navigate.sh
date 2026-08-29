@@ -16,19 +16,14 @@ qa_start aaa.txt
 qa_keys "ctrl-p" 0.3
 
 # Should show file list
-qa_assert_screen "bbb|ccc" "picker shows other files"
+qa_assert_expect "bbb|ccc" "picker shows other files"
 
 # Navigate down and select
 qa_keys "down" 0.2
 qa_keys "enter" 0.3
 
 # Should have opened a different file
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "content_bbb|content_ccc"; then
-    qa_pass "picker opened selected file"
-else
-    qa_fail "picker opened selected file"
-fi
+qa_assert_expect "content_bbb|content_ccc" "picker opened selected file"
 
 qa_keys "ctrl-q"
 

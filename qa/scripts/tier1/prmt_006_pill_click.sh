@@ -12,7 +12,7 @@ qa_send "dirty edit"
 qa_keys "ctrl-q"
 sleep 0.3
 
-qa_assert_screen "Save|Discard|Cancel" "prompt visible"
+qa_assert_expect "Save|Discard|Cancel" "prompt visible"
 
 # Click Cancel pill (approximate position — rightmost pill)
 # The prompt pills are on the status bar area at bottom

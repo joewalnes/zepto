@@ -20,12 +20,7 @@ sleep 0.3
 qa_send "X"
 
 # "hello" should be partially replaced
-qa_screen
-if echo "$QA_SCREEN" | grep -q "X"; then
-    qa_pass "shift+click created selection that was replaced"
-else
-    qa_fail "shift+click created selection that was replaced"
-fi
+qa_assert_expect "X" "shift+click created selection that was replaced"
 
 qa_keys "ctrl-q"
 sleep 0.2

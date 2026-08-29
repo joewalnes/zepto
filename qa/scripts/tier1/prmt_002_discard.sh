@@ -15,12 +15,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should show save/discard prompt
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "save|discard|unsaved|modified"; then
-    qa_pass "quit shows save/discard prompt"
-else
-    qa_fail "quit shows save/discard prompt"
-fi
+qa_assert_expect "save|discard|unsaved|modified" "quit shows save/discard prompt"
 
 # Discard (N)
 qa_send "n" 0.3

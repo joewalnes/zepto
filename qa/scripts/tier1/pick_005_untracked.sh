@@ -25,12 +25,7 @@ qa_keys "ctrl-p" 0.5
 # Type to filter
 qa_send "untracked" 0.3
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "untracked"; then
-    qa_pass "untracked file visible in picker"
-else
-    qa_fail "untracked file visible in picker"
-fi
+qa_assert_expect "untracked" "untracked file visible in picker"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

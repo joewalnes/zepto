@@ -10,12 +10,7 @@ qa_keys "ctrl-o"
 sleep 0.3
 
 # Picker should show file list or "Open File" prompt
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "\.sh|\.txt|\.py|\.pm|Makefile|Open|pick001"; then
-    qa_pass "file picker visible with file entries"
-else
-    qa_fail "file picker visible with file entries"
-fi
+qa_assert_expect "\.sh|\.txt|\.py|\.pm|Makefile|Open|pick001" "file picker visible with file entries"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

@@ -23,7 +23,7 @@ qa_keys "escape"
 sleep 0.3
 
 # Editor content should be visible again
-qa_assert_screen "hello" "editor content visible after Esc"
+qa_assert_expect "hello" "editor content visible after Esc"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -10,10 +10,10 @@ qa_start "$file"
 qa_keys "ctrl-space"
 
 # Palette should show section headers or commands
-qa_assert_screen "FILE|EDIT|NAVIGATE|VIEW|Commands" "palette visible with sections or title"
+qa_assert_expect "FILE|EDIT|NAVIGATE|VIEW|Commands" "palette visible with sections or title"
 
 # Should see some commands
-qa_assert_screen "Save|Quit|Find|Theme|Undo" "at least one known command visible"
+qa_assert_expect "Save|Quit|Find|Theme|Undo" "at least one known command visible"
 
 # Close with Esc
 qa_keys "escape"
@@ -21,7 +21,7 @@ sleep 0.2
 qa_keys "escape" 0.2  # second esc in case first cleared filter
 
 # Palette should be gone — main editor visible
-qa_assert_screen "hello" "editor content visible after palette close"
+qa_assert_expect "hello" "editor content visible after palette close"
 
 qa_keys "ctrl-q"
 

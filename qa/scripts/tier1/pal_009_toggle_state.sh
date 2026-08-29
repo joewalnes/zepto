@@ -9,12 +9,7 @@ qa_keys "ctrl-space"
 qa_send "wrap" 0.3
 
 # Should show [on] or [off] next to word wrap toggle
-qa_screen
-if echo "$QA_SCREEN" | grep -qE '\[(on|off)\]'; then
-    qa_pass "toggle state indicator visible"
-else
-    qa_fail "toggle state indicator visible"
-fi
+qa_assert_expect '\[(on|off)\]' "toggle state indicator visible"
 
 qa_keys "escape"
 qa_keys "escape"
