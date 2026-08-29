@@ -15,12 +15,7 @@ qa_keys "ctrl-a"
 qa_keys "tab"
 
 # All lines should have leading spaces
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "    alpha|   alpha"; then
-    qa_pass "selection indented with spaces"
-else
-    qa_fail "selection indented with spaces"
-fi
+qa_assert_expect "    alpha|   alpha" "selection indented with spaces"
 
 qa_keys "ctrl-q"
 sleep 0.2

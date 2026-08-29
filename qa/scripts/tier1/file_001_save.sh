@@ -17,7 +17,7 @@ qa_keys "ctrl-s"
 qa_assert_file_contains "$file" "original content modified" "file on disk updated"
 
 # Dirty indicator should be gone
-qa_assert_screen "Saved" "saved message visible"
+qa_assert_expect "Saved" "saved message visible"
 
 qa_keys "ctrl-q"
 qa_summary

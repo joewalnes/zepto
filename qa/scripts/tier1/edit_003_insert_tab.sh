@@ -11,12 +11,7 @@ qa_keys "home"
 qa_keys "tab"
 
 # Line should now be indented
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "^  +hello| +hello"; then
-    qa_pass "tab indented the line"
-else
-    qa_fail "tab indented the line"
-fi
+qa_assert_expect "  +hello| +hello" "tab indented the line"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -25,7 +25,7 @@ fi
 
 # Type something to verify it's editable
 qa_send "hello new file"
-qa_assert_screen "hello new file" "can type in new tab"
+qa_assert_expect "hello new file" "can type in new tab"
 
 qa_keys "ctrl-q"
 sleep 0.2

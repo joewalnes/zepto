@@ -7,12 +7,7 @@ file=$(qa_tmpfile "cplt003.js" "")
 qa_start "$file"
 
 qa_send "["
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "[]"; then
-    qa_pass "[ auto-paired to []"
-else
-    qa_fail "[ auto-paired to []"
-fi
+qa_assert_expect "\\[\\]" "[ auto-paired to []"
 
 qa_keys "ctrl-q"
 sleep 0.2

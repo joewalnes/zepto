@@ -16,7 +16,7 @@ qa_keys "ctrl-w"
 sleep 0.5
 
 # Should now be on tab 2
-qa_assert_screen "content B" "switched to remaining tab"
+qa_assert_expect "content B" "switched to remaining tab"
 
 # Check that first file was saved
 qa_assert_file_contains "$file1" "modified" "file was saved before closing"
