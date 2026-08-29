@@ -87,15 +87,17 @@ This means:
 - **Behavioral discovery**: when you learn something non-obvious about
   how Zepto behaves (from code reading, user report, or interactive
   testing), add a test script and test case so it can't regress silently.
-- **Always update `qa/CATALOG.md`**: add the new test ID under the right
-  file's section. IDs are stable — never renumber. To retire a test,
-  mark it `[RETIRED]` in place rather than deleting.
+- **IDs are stable — never renumber.** To retire a test, mark it
+  `[RETIRED]` in place in its `qa/NN_*.txt` file rather than deleting.
+  (There is no separate catalog file — it was removed because a manual
+  index drifts; `grep -r 'QA-<TAG>-' qa/*.txt` is the index.)
 - **Run `make qa`** to verify the new test passes along with all existing tests.
 
 Work is not done until the QA script exists and passes. "I'll add the test later" is not acceptable.
 
 Test IDs are `QA-<TAG>-<NNN>` where `<TAG>` is the 3-6 char feature tag
-listed in `qa/CATALOG.md`. Use the next unused number within that tag.
+used in the corresponding `qa/NN_*.txt` file. Find the next unused number
+with `grep -rho 'QA-<TAG>-[0-9]*' qa/ | sort -V | tail -1`.
 
 Full plan: `qa/README.md`.
 
@@ -247,7 +249,7 @@ Before every commit, verify each rule in order:
 | 5 | Test before, fix, test after | Confirm a failing test or broken behavior was captured *before* the fix, not just after |
 | 6 | Bug tracking | Any bugs found (even incidentally) are recorded in `bugs.md` |
 | 7 | Code quality | Changes follow existing conventions; no new patterns introduced without reason |
-| 8 | QA plan current | New feature or bug fix → new executable test script in `qa/scripts/tier1/` + test case in the right `qa/NN_*.txt` + `qa/CATALOG.md` updated. Bug fix also gets `QA-REG-###` in `qa/40_regression_bugs.txt`. Run `make qa` to verify. No exceptions. |
+| 8 | QA plan current | New feature or bug fix → new executable test script in `qa/scripts/tier1/` + test case in the right `qa/NN_*.txt`. Bug fix also gets `QA-REG-###` in `qa/40_regression_bugs.txt`. Run `make qa` to verify. No exceptions. |
 
 If any rule is not satisfied:
 - **Do not commit.**
@@ -263,7 +265,6 @@ If any rule is not satisfied:
 | `CLAUDE.md` | Rules change, workflow improves, new communication preferences |
 | `bugs.md` | Bug found or fixed |
 | `qa/*.txt` | **Every new feature, fix, or behavioral discovery** — see Rule 8 |
-| `qa/CATALOG.md` | Any new or retired QA test ID |
 | `docs/CODE_QUALITY.md` | New patterns, pitfalls, testing lessons |
 | `docs/SECURITY.md` | New security concerns or mitigations |
 | `docs/UI_GUIDELINES.md` | New UI standards or design decisions |

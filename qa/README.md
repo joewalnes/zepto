@@ -12,7 +12,6 @@ fixed should have at least one test case that would catch a regression.
 
 | File | Area |
 |------|------|
-| `CATALOG.md` | Master index of every test case ID |
 | `01_installation_and_cli.txt` | Installer, `--install`, `--version`, CLI flags, env vars |
 | `02_startup_and_quit.txt` | First launch, opening files/dirs, quit flow, unsaved prompt |
 | `03_editing_core.txt` | Insert/delete/enter/tab, auto-indent, bracketed paste |
@@ -80,9 +79,10 @@ NOTES
   Optional: edge cases, related bugs, refs
 ```
 
-- **ID** — stable, referenced from `CATALOG.md` and CLAUDE.md. Once
-  assigned, do not renumber. If a test is obsolete, mark it `[RETIRED]`
-  rather than deleting.
+- **ID** — stable, referenced from CLAUDE.md and cross-refs in other
+  test entries. Once assigned, do not renumber. If a test is obsolete,
+  mark it `[RETIRED]` rather than deleting. There is no separate catalog
+  file — `grep -r 'QA-' qa/*.txt` is the index.
 - **PRIORITY** — P0 (must pass every release), P1 (core feature),
   P2 (polish/edge), P3 (cosmetic).
 - **FEATURE** — short tag for cross-referencing related tests.
