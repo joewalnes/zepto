@@ -9,7 +9,7 @@ file=$(qa_tmpfile_nl "edit015.txt" "$long_line")
 qa_start "$file"
 
 # Should open at 1:1
-qa_assert_screen "1:1" "opens at 1:1"
+qa_assert_expect "1:1" "opens at 1:1"
 
 # Navigate right many times
 for i in $(seq 1 10); do qa_keys "right" 0.05; done

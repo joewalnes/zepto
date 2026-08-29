@@ -6,7 +6,7 @@ qa_header "QA-EXT-001: Clean buffer external reload"
 file=$(qa_tmpfile_nl "ext001.txt" "original content")
 qa_start "$file"
 
-qa_assert_screen "original content" "initial content"
+qa_assert_expect "original content" "initial content"
 
 # Modify file externally
 echo "modified externally" > "$file"

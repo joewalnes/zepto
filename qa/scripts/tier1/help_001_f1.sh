@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "f1"
 sleep 0.5
 
-qa_assert_screen "Zepto|Tutorial|Getting Started|Welcome" "tutorial content visible"
+qa_assert_expect "Zepto|Tutorial|Getting Started|Welcome" "tutorial content visible"
 
 qa_keys "ctrl-w"
 qa_keys "ctrl-q"

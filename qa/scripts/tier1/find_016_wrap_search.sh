@@ -19,7 +19,7 @@ qa_keys "ctrl-f"
 qa_send "MARKER_TOP" 0.3
 
 # Should find it (wrapping from bottom to top)
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 match=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 if [[ -n "$match" ]]; then
     qa_pass "find wraps around to match ($match)"

@@ -15,12 +15,7 @@ qa_keys "escape"
 sleep 0.3
 
 # Goto bar should be closed — verify editor is responsive
-qa_screen
-if echo "$QA_SCREEN" | grep -q "line 1"; then
-    qa_pass "goto cancelled, still showing original content"
-else
-    qa_pass "goto dismissed"
-fi
+qa_assert_expect "line 1" "goto cancelled, still showing original content"
 
 qa_keys "ctrl-q"
 qa_summary

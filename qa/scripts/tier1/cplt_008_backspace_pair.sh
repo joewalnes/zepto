@@ -9,12 +9,7 @@ qa_start "$file"
 # Type opening paren — auto-pairs to ()
 qa_send "("
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "()"; then
-    qa_pass "auto-pair created ()"
-else
-    qa_fail "auto-pair created ()" "() not found"
-fi
+qa_assert_expect "\\(\\)" "auto-pair created ()"
 
 # Backspace should remove both ( and )
 qa_keys "backspace"

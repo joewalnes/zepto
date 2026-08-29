@@ -11,7 +11,7 @@ qa_keys "f1"
 sleep 0.5
 
 # Tutorial content should render (embedded in binary)
-qa_assert_screen "Zepto|Tutorial|Getting Started|Welcome|shortcut" "tutorial content embedded and rendered"
+qa_assert_expect "Zepto|Tutorial|Getting Started|Welcome|shortcut" "tutorial content embedded and rendered"
 
 # Close tutorial tab
 qa_keys "ctrl-w"
@@ -22,7 +22,7 @@ qa_send "changelog" 0.3
 qa_keys "enter"
 sleep 0.5
 
-qa_assert_screen "Changelog|changelog|Changes|Fixed|Added" "changelog content embedded and rendered"
+qa_assert_expect "Changelog|changelog|Changes|Fixed|Added" "changelog content embedded and rendered"
 
 qa_keys "ctrl-w"
 qa_keys "ctrl-q"

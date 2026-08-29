@@ -15,7 +15,7 @@ qa_start "$proj_dir/alpha.txt"
 qa_keys "ctrl-space"
 qa_send "find in" 0.3
 
-qa_assert_screen "Find in Files|Find in files|find.in.files" "find-in-files command visible in palette"
+qa_assert_expect "Find in Files|Find in files|find.in.files" "find-in-files command visible in palette"
 
 qa_keys "escape"
 qa_keys "escape"

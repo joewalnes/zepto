@@ -13,12 +13,7 @@ qa_keys "ctrl-space"
 qa_send "find in" 0.3
 qa_keys "enter" 0.3
 qa_send "FINDME" 0.3
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "2|match|FINDME"; then
-    qa_pass "find-in-files backend found results"
-else
-    qa_fail "find-in-files backend"
-fi
+qa_assert_expect "2|match|FINDME" "find-in-files backend found results"
 qa_keys "escape"
 qa_keys "ctrl-q"
 cd "$OLDPWD"

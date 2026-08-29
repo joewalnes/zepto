@@ -9,9 +9,9 @@ printf "line1\r\nline2\r\nline3\r\n" > "$file"
 qa_start "$file"
 
 # Should display correctly
-qa_assert_screen "line1" "line1 visible"
-qa_assert_screen "line2" "line2 visible"
-qa_assert_screen "line3" "line3 visible"
+qa_assert_expect "line1" "line1 visible"
+qa_assert_expect "line2" "line2 visible"
+qa_assert_expect "line3" "line3 visible"
 
 # Status bar should indicate CRLF
 qa_screen

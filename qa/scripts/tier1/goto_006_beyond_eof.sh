@@ -13,12 +13,7 @@ qa_send "9999" 0.2
 qa_keys "enter"
 
 # Should be clamped to last line
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "3:[0-9]"; then
-    qa_pass "cursor clamped to last line"
-else
-    qa_fail "cursor clamped to last line"
-fi
+qa_assert_expect "3:[0-9]" "cursor clamped to last line"
 
 qa_keys "ctrl-q"
 qa_summary

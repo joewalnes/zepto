@@ -15,14 +15,14 @@ qa_keys "ctrl-space"
 qa_send "find in" 0.3
 qa_keys "enter" 0.3
 
-qa_assert_screen "Find|Search|find" "find-in-files opened"
+qa_assert_expect "Find|Search|find" "find-in-files opened"
 
 # Close with Esc
 qa_keys "escape"
 sleep 0.3
 
 # Should be back to normal editor
-qa_assert_screen "content" "back to editor after Esc"
+qa_assert_expect "content" "back to editor after Esc"
 
 qa_keys "ctrl-q"
 

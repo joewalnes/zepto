@@ -22,12 +22,7 @@ qa_keys "enter" 0.3
 qa_send "unique_marker_alpha" 0.3
 
 # Should show results mentioning the matching files
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "alpha|gamma|2|matches"; then
-    qa_pass "find in files shows matching results"
-else
-    qa_fail "find in files shows matching results"
-fi
+qa_assert_expect "alpha|gamma|2|matches" "find in files shows matching results"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

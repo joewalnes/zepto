@@ -8,12 +8,12 @@ qa_start
 qa_keys "ctrl-space"
 qa_send "changelog" 0.3
 
-qa_assert_screen "Changelog|changelog" "changelog command visible in palette"
+qa_assert_expect "Changelog|changelog" "changelog command visible in palette"
 
 qa_keys "enter" 0.3
 
 # Should show changelog content
-qa_assert_screen "202[0-9]" "changelog shows dated entries"
+qa_assert_expect "202[0-9]" "changelog shows dated entries"
 
 qa_keys "ctrl-q"
 qa_summary

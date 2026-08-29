@@ -13,7 +13,7 @@ qa_keys "ctrl-s"
 sleep 0.3
 
 # Should see Save As prompt or footer input
-qa_assert_screen "Save|save|name|path" "save-as prompt visible"
+qa_assert_expect "Save|save|name|path" "save-as prompt visible"
 
 # Type a filename
 savepath="$QA_TMPDIR/saved_file.txt"
@@ -26,7 +26,7 @@ qa_assert_file_exists "$savepath" "file created on disk"
 qa_assert_file_contains "$savepath" "test content 123" "file contains typed content"
 
 # Tab should show filename now
-qa_assert_screen "saved_file" "tab title shows filename"
+qa_assert_expect "saved_file" "tab title shows filename"
 
 qa_keys "ctrl-q"
 

@@ -10,12 +10,7 @@ qa_keys "tab"
 qa_send "x"
 
 # Cursor should be past the indent
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "    x|   x"; then
-    qa_pass "tab inserted leading spaces before x"
-else
-    qa_fail "tab inserted leading spaces before x"
-fi
+qa_assert_expect "    x|   x" "tab inserted leading spaces before x"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -15,7 +15,7 @@ qa_keys "ctrl-a"
 qa_raw $'\x1b[Z'
 
 # Lines should lose indent
-qa_assert_screen "alpha" "alpha visible (unindented)"
+qa_assert_expect "alpha" "alpha visible (unindented)"
 
 qa_keys "ctrl-q"
 sleep 0.2

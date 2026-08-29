@@ -17,12 +17,7 @@ qa_send "(unbalanced" 0.3
 qa_keys "escape"
 sleep 0.2
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "hello world"; then
-    qa_pass "editor still alive after invalid regex"
-else
-    qa_fail "editor still alive after invalid regex"
-fi
+qa_assert_expect "hello world" "editor still alive after invalid regex"
 
 qa_keys "ctrl-q"
 qa_summary
