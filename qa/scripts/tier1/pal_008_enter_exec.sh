@@ -13,7 +13,7 @@ qa_keys "enter"
 sleep 0.3
 
 # Should have created a new untitled tab
-qa_assert_screen "untitled" "new file command executed"
+qa_assert_expect "untitled" "new file command executed"
 
 qa_keys "ctrl-q"
 qa_summary

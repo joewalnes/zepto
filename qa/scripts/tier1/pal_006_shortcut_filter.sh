@@ -10,13 +10,8 @@ qa_keys "ctrl-space"
 # Type a shortcut key string to filter
 qa_send "ctrl" 0.3
 
-qa_screen
 # Should show commands with Ctrl shortcuts
-if echo "$QA_SCREEN" | grep -qiE "ctrl|⌃"; then
-    qa_pass "palette filters by shortcut string"
-else
-    qa_pass "palette filter executed"
-fi
+qa_assert_expect "ctrl|⌃" "palette filters by shortcut string"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

@@ -19,8 +19,8 @@ qa_send "ABC"
 qa_keys "backspace"
 
 # All should show "AB"
-qa_assert_screen "AB bar AB" "first line: AB after backspace"
-qa_assert_screen "baz AB end" "second line: AB after backspace"
+qa_assert_expect "AB bar AB" "first line: AB after backspace"
+qa_assert_expect "baz AB end" "second line: AB after backspace"
 
 qa_keys "ctrl-q"
 sleep 0.2

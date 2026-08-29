@@ -16,8 +16,8 @@ qa_keys "ctrl-d"
 qa_send "X"
 
 # All "foo" should be replaced with "X"
-qa_assert_screen "X bar X" "first line: foo replaced with X"
-qa_assert_screen "baz X end" "second line: foo replaced with X"
+qa_assert_expect "X bar X" "first line: foo replaced with X"
+qa_assert_expect "baz X end" "second line: foo replaced with X"
 
 qa_keys "ctrl-q"
 sleep 0.2
