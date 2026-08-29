@@ -2,8 +2,7 @@
 14 — Line Operations
 ================================================================================
 
-Covers: Move Line Up/Down (⌥↑/⌥↓), Duplicate Up (⌃U), Duplicate Down
-(palette-only after multi-cursor reassignment).
+Covers: Move Line Up/Down (⌥↑/⌥↓), Duplicate Up (⌃U), Duplicate Down (⌥U).
 
 --------------------------------------------------------------------------------
 
@@ -130,8 +129,9 @@ VERIFY
 
 NOTES
   ⌃D is bound to Select Next Occurrence (multi-cursor), NOT Duplicate
-  Down. Historical users may expect ⌃D for duplicate; palette is the
-  only shortcut path. See bugs.md P2 "Shortcut key for Duplicate Down".
+  Down — Duplicate Down has its own direct shortcut, ⌥U (see
+  QA-LINE-010). Historical users may expect ⌃D for duplicate; it isn't
+  bound to it. See bugs.md P2 "Shortcut key for Duplicate Down" (FIXED).
 
 --------------------------------------------------------------------------------
 
@@ -164,3 +164,31 @@ STEPS
 VERIFY
   - Line order reverts.
   - Cursor returns to original position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-LINE-010
+NAME:     ⌥U duplicates current line down (direct shortcut)
+PRIORITY: P2
+FEATURE:  duplicate shortcut
+RELATED:  bugs.md P2 "Shortcut key for Duplicate Down"
+
+SETUP
+  Line `hello`.
+
+STEPS
+  1. Press ⌥U.
+
+VERIFY
+  - A second `hello` line is inserted below the original.
+  - Cursor moves to the lower (new) `hello` line.
+  - Palette entry "Duplicate Down" shows shortcut "⌥U".
+
+NOTES
+  ⌥U was chosen over ⌃⇧D: classic terminals deliver Ctrl+letter via a
+  single control byte (0x01-0x1a) with no way to distinguish Shift —
+  Ctrl+D and Ctrl+Shift+D are indistinguishable on the wire in most
+  terminals (see InputParser.pm _parse_control). Alt+letter (ESC+char)
+  reliably survives, so ⌥U was picked to pair mnemonically with the
+  existing ⌃U (Duplicate Up) — same letter, "up" modifier vs "down"
+  modifier — without colliding with any other bound Alt+letter.

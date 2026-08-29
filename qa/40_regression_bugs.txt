@@ -1038,3 +1038,21 @@ VERIFY    A runner invocation never stops live foreign hangon sessions or
           live zqa_* sessions whose owning script PID is alive, and never
           deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
           are cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-125
+NAME:     Duplicate Down has a working direct shortcut (⌥U)
+PRIORITY: P2
+BUG:      P2 "Shortcut key for Duplicate Down" — Duplicate Down was
+          palette-only; ⌃⇧D was the suggested candidate but is not
+          reliably deliverable (fixed 2026-08-29)
+CROSS-REF: QA-LINE-010, QA-LINE-006, QA-LINE-007
+VERIFY    ⌥U duplicates the current line downward and moves the cursor
+          to the new copy, mirroring ⌃U (Duplicate Up). The palette
+          entry for "Duplicate Down" displays "⌥U". ⌃⇧D was rejected:
+          classic terminals send the same single control byte for
+          Ctrl+D and Ctrl+Shift+D (InputParser.pm _parse_control only
+          ever sets modifier ['ctrl'] for control-code bytes 1-26 — the
+          shift bit is never recoverable there), so a binding on it
+          could never actually be received.

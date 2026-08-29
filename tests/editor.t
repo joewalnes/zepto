@@ -498,6 +498,27 @@ subtest 'Duplicate line up' => sub {
     is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
 };
 
+subtest 'Alt+U keybinding dispatches to Duplicate Down' => sub {
+    # bugs.md P2 "Shortcut key for Duplicate Down": Ctrl+Shift+D was
+    # considered but rejected because classic terminals deliver
+    # Ctrl+letter as a single control byte (no way to carry Shift), so
+    # Alt+U was bound instead — verify the raw ESC+'u' sequence a
+    # terminal actually sends for Alt+U reaches do_duplicate_line_down.
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    setup_editor_doc($editor, $filename);
+
+    $editor->handle_input("\x1bu");  # ESC + 'u' = Alt+U
+
+    is($editor->active_doc()->text(), "aaa\naaa\nbbb", 'Alt+U duplicated line below');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
+};
+
 # ============================================================================
 # Copy/paste
 # ============================================================================

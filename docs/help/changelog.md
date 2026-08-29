@@ -2,6 +2,7 @@
 
 ## 2026-08-29
 
+- Added a direct keyboard shortcut for Duplicate Down: ⌥U (pairs with ⌃U for Duplicate Up)
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

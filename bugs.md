@@ -40,8 +40,10 @@ Reopen the editor and get back exactly where you were: same tabs, cursor positio
 ### P2: Persistent config file
 Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
 
-### P2: Shortcut key for Duplicate Down
+### ~~P2: Shortcut key for Duplicate Down~~ FIXED
 Duplicate Down currently has no keyboard shortcut — it's palette-only. Should have a direct keybinding for quick access. `⌃D` is taken (Select Next Occurrence). Candidates: `⌃⇧D` (Shift=reverse already used for Duplicate Up as `⌃U`, but `⌃⇧D` is intuitive as "duplicate" with Shift for the pair), or find another mnemonic. Also consider giving Duplicate Up a matching shortcut if it doesn't have one.
+
+**Fix:** `⌃⇧D` was rejected after checking `InputParser.pm`: classic terminals deliver Ctrl+letter as a single control byte (0x01-0x1a, `_parse_control`), which can only ever set `modifiers => ['ctrl']` — there is no wire representation of Shift for it, so Ctrl+D and Ctrl+Shift+D are indistinguishable in most terminals (confirmed interactively — `hangon`'s own key vocabulary has no `ctrl-shift-*` combos for exactly this reason). Bound `⌥U` instead (Alt+letter survives reliably as ESC+char). `⌥U` pairs mnemonically with the existing `⌃U` (Duplicate Up) — same letter, "up" vs "down" modifier — and doesn't collide with any other Alt+letter binding. Duplicate Up already had `⌃U` from the original multi-cursor work, so no change was needed there. Added to `CommandRegistry.pm` (`dup_line_down` shortcut) and `Editor.pm::handle_alt_char`. QA: `QA-LINE-010`, `QA-REG-125`.
 
 ### P3: Automatic dark/light mode
 Detect the system theme (dark/light) on startup and choose the matching editor theme. Detect when the system theme changes at runtime and automatically switch. Auto mode is optional — users can still manually set dark or light via `Ctrl+T` or config.
