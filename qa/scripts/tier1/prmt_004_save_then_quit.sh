@@ -13,7 +13,7 @@ qa_send " modified"
 qa_keys "ctrl-q"
 sleep 0.3
 
-qa_assert_screen "Save|Discard|Cancel" "save prompt visible"
+qa_assert_expect "Save|Discard|Cancel" "save prompt visible"
 
 # Choose save (Y)
 qa_send "y" 0.5

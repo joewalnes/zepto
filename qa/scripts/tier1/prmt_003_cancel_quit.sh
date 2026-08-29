@@ -18,7 +18,7 @@ sleep 0.3
 qa_keys "escape" 0.3
 
 # Editor should still be running with content visible
-qa_assert_screen "original" "editor still showing content after cancel"
+qa_assert_expect "original" "editor still showing content after cancel"
 
 # Clean quit
 qa_keys "ctrl-q"

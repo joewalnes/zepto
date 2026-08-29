@@ -15,12 +15,7 @@ sleep 0.2
 qa_keys "ctrl-e" 0.3
 
 # Should show recent files list
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "rcn002"; then
-    qa_pass "recent files shows opened files"
-else
-    qa_fail "recent files shows opened files"
-fi
+qa_assert_expect "rcn002" "recent files shows opened files"
 
 # Navigate and select
 qa_keys "down" 0.2

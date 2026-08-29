@@ -7,7 +7,7 @@ file1=$(qa_tmpfile_nl "ms009_a.txt" "content A")
 file2=$(qa_tmpfile_nl "ms009_b.txt" "content B")
 qa_start "$file1" "$file2"
 
-qa_assert_screen "content A" "starts on tab A"
+qa_assert_expect "content A" "starts on tab A"
 
 # Tab B should be visible in tab bar (row 1). Find its position.
 # Tab A starts ~col 2, tab B follows after tab A label.
@@ -16,13 +16,13 @@ qa_assert_screen "content A" "starts on tab A"
 hangon mouse-click "$QA_SESSION" --x 28 --y 1
 sleep 0.3
 
-qa_assert_screen "content B" "clicking tab B shows content B"
+qa_assert_expect "content B" "clicking tab B shows content B"
 
 # Click back on tab A (col ~8, row 1)
 hangon mouse-click "$QA_SESSION" --x 8 --y 1
 sleep 0.3
 
-qa_assert_screen "content A" "clicking tab A shows content A"
+qa_assert_expect "content A" "clicking tab A shows content A"
 
 qa_keys "ctrl-q"
 qa_summary

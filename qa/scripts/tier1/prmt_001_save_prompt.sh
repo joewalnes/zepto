@@ -10,11 +10,11 @@ qa_send "edit"
 # Use ctrl-q to trigger save prompt
 qa_keys "ctrl-q"
 sleep 0.3
-qa_assert_screen "Save|Discard|Cancel" "prompt shows options"
+qa_assert_expect "Save|Discard|Cancel" "prompt shows options"
 
 # Press C = cancel
 qa_send "c" 0.3
-qa_assert_screen "edit" "C cancels prompt, buffer stays"
+qa_assert_expect "edit" "C cancels prompt, buffer stays"
 
 # Quit again and discard with N
 qa_keys "ctrl-q"
