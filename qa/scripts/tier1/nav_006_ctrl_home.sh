@@ -12,11 +12,11 @@ qa_start "$file"
 
 # Go to end (Ctrl+End = CSI 1;5F)
 qa_raw $'\x1b[1;5F'
-qa_assert_screen "50" "at doc end, line 50 visible"
+qa_assert_expect "50" "at doc end, line 50 visible"
 
 # Go to start (Ctrl+Home = CSI 1;5H)
 qa_raw $'\x1b[1;5H'
-qa_assert_screen "1:1" "ctrl+home returns to 1:1"
+qa_assert_expect "1:1" "ctrl+home returns to 1:1"
 
 qa_keys "ctrl-q"
 qa_summary

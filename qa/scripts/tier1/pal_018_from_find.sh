@@ -8,13 +8,13 @@ qa_start "$file"
 
 # Open find bar
 qa_keys "ctrl-f"
-qa_assert_screen "Find" "find bar open"
+qa_assert_expect "Find" "find bar open"
 
 # Open palette from find bar
 qa_keys "ctrl-space"
 sleep 0.3
 
-qa_assert_screen "Commands" "palette opened from find bar state"
+qa_assert_expect "Commands" "palette opened from find bar state"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
