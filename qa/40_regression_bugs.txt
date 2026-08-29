@@ -1038,3 +1038,24 @@ VERIFY    A runner invocation never stops live foreign hangon sessions or
           live zqa_* sessions whose owning script PID is alive, and never
           deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
           are cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-120
+NAME:     Tab Width invalid input shows a visible error
+PRIORITY: P3
+BUG:      P3 "New Tab Width prompt swallowed validation errors" — first
+          draft of cmd_set_tab_width wrote to $self->{status_msg}, a field
+          the renderer never reads. Non-numeric or out-of-range input was
+          silently rejected with no feedback. Fixed by using
+          show_error_message(), the same API every other validated prompt
+          uses. (found + fixed 2026-08-29, during QA-PREF-015 work)
+CROSS-REF: QA-PREF-015
+NOTES     cmd_goto_line (lib/Zepto/Editor/Commands.pm) has the identical
+          latent bug for its "Invalid format" case — not fixed here
+          (out of scope for the preferences-persistence task), tracked in
+          bugs.md.
+VERIFY    Palette → "Tab Width" → non-numeric input (e.g. "abc") shows
+          "Invalid tab width..." on screen; same for out-of-range input
+          (0 or 17). The stored tab_width is unchanged by any rejected
+          attempt.

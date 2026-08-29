@@ -120,10 +120,11 @@ ID:       QA-MD-007
 NAME:     Table render toggleable
 PRIORITY: P3
 FEATURE:  md pref
+RELATED:  QA-PREF-020
 
 STEPS
-  1. Palette → search "render markdown tables" (if exposed).
-  2. Or set preference directly.
+  1. Palette → "Markdown Table Rendering" (exposed as of QA-PREF-020;
+     also persists across restarts — see qa/36_preferences.txt).
 
 VERIFY
   - Can toggle `render_markdown_tables` OFF.

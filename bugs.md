@@ -37,8 +37,42 @@ Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N
 ### P2: Session restore
 Reopen the editor and get back exactly where you were: same tabs, cursor positions, scroll positions. The recent files infrastructure already exists (`~/.config/zepto/recent_files`). Extending to full session state eliminates the re-navigation tax every time the editor is restarted. Especially important for a terminal editor that gets opened/closed frequently.
 
-### P2: Persistent config file
-Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
+### ~~P2: Persistent config file~~ FIXED (was already mostly true)
+Original text: "Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts... Without this, users can't persist their theme choice, tab width, minimap preference, etc."
+
+**Audit finding: this was stale.** `StateStore` + `preferences.json` under `~/.config/zepto/` (honoring `--state-dir` / `$ZEPTO_STATE_DIR`, see `build.pl`) has persisted global preferences all along — theme, nerd font, minimap, auto-complete, auto-pairs, AI URL/model already round-tripped across restarts with a working palette command, verified interactively. The file is pretty-printed JSON, so it's already hand-editable — a second config system (e.g. `config.toml`) would have been needless duplication and was deliberately **not** added. `preferences.json` *is* the persistent config file; QA-PREF-014 now documents this instead of the stale "no config file yet" claim.
+
+**What was actually missing** (verified with `hangon`: toggle → quit → relaunch with the same `--state-dir`):
+
+| Preference | Persist-eligible before | UI before | Fix |
+|---|---|---|---|
+| `tab_width` | yes (in `GLOBAL_PREFS`) | **none** | Added "Tab Width" palette action (footer-input prompt, validates 1-16) |
+| `soft_tabs` | yes | **none** | Added "Soft Tabs (Spaces)" palette toggle |
+| `auto_indent` | yes | **none** | Added "Auto Indent" palette toggle |
+| `mouse_enabled` | yes | **none** (only set at startup) | Added "Mouse" palette toggle; also enables/disables mouse mode on the live terminal |
+| `search_wrap` | no (real effect, used by find-next/prev) | **none** | Added "Search Wrap Around" palette toggle; added to `GLOBAL_PREFS` |
+| `render_markdown_tables` | no (real effect, used by table rendering) | **none** | Added "Markdown Table Rendering" palette toggle; added to `GLOBAL_PREFS` |
+
+**Fix:** `lib/Zepto/Preferences.pm` (`search_wrap`, `render_markdown_tables` added to `%GLOBAL_PREFS`), `lib/Zepto/CommandRegistry.pm` (6 new commands: `set_tab_width`, `toggle_soft_tabs`, `toggle_auto_indent`, `toggle_mouse`, `toggle_search_wrap`, `toggle_markdown_tables`), `lib/Zepto/Editor/Commands.pm` (handlers). QA: `qa/scripts/tier1/pref_015..020_*.sh`, `qa/36_preferences.txt` (QA-PREF-015 through 020, rewrote QA-PREF-014). Also fixed `qa/scripts/tier1/pref_001_defaults.sh`, `wrap_001_toggle.sh`, `wrap_012_per_window.sh` — they searched the palette for the bare word "wrap", which now also fuzzy-matches "Search Wrap Around" and could grab the wrong toggle's on/off state; narrowed to the exact label "Word Wrap".
+
+**Deliberately left alone (documented, not fixed — out of scope):** `theme`, `nerd_font`, `show_minimap`, `auto_complete`, `auto_pairs`, `ai_api_url`/`ai_model` already had working UI + persistence. `word_wrap` and `show_tree` are intentionally per-window/session state (see `Preferences.pm` header comment and `_effective_word_wrap`'s override-precedence design, confirmed by existing QA-PREF-012) — their palette toggles change the current window only, by design, and should not be made to overwrite the global default. See also the new vestigial-preference bug below.
+
+### P3: Several defined preferences have no effect (dead/vestigial)
+Audit of every key in `Preferences.pm` (2026-08-29, alongside the Persistent config file fix above) found preferences that are defined with defaults, covered by unit tests asserting their default value, but never actually read by any behavior:
+
+- `show_line_numbers` — gutter is rendered unconditionally; the renderer never checks this pref.
+- `show_status_bar` — status bar is rendered unconditionally; never checked.
+- `confirm_quit_unsaved` — `cmd_quit`/`_prompt_close_dirty_tabs` always prompt on dirty tabs regardless of this pref's value; it's never read.
+- `scroll_margin` — not referenced anywhere outside `Preferences.pm`; scrolling logic doesn't use it.
+- `backup_on_save` — no `.bak`-file-writing code exists anywhere.
+- `trim_trailing_whitespace` — `Document::save()` never trims trailing whitespace.
+- `ensure_final_newline` — `Document::save()` unconditionally appends a trailing newline; the pref's value is never consulted (so today, "off" is actually impossible to achieve).
+- `search_case_sensitive`, `search_regex` — these top-level defaults are never read; the live find/file-search state is tracked separately per session (`find_case` in Editor.pm, `_file_search_regex`, `_file_search_case`) and always initializes to a hardcoded `0`, not from these prefs.
+
+These weren't added to the palette or `GLOBAL_PREFS` in the config-file fix above because there's no working behavior to expose or persist yet — doing so would be misleading (a toggle that visibly does nothing). Each one is either a genuinely unimplemented feature (implement the behavior, then add UI + persistence) or dead code that should be deleted. Needs a product decision on which.
+
+### P3: Tab Width's validation-error pattern exposed a pre-existing dead-code bug in Go to Line
+While adding the new "Tab Width" palette command, invalid input was (in the first draft) reported via `$self->{status_msg}`, which turned out to be a field the renderer never displays — errors vanished silently. Fixed in Tab Width by switching to `show_error_message()` (see QA-REG-120). `cmd_goto_line` (`lib/Zepto/Editor/Commands.pm`) has the exact same bug for its "Invalid format. Use: line, line:col, or :col" message — typing a malformed Go to Line input fails silently today. Not fixed here (out of scope for this task) — it's the only other `status_msg` writer in the codebase (`grep -rn status_msg lib/`), so this is the complete list.
 
 ### P2: Shortcut key for Duplicate Down
 Duplicate Down currently has no keyboard shortcut — it's palette-only. Should have a direct keybinding for quick access. `⌃D` is taken (Select Next Occurrence). Candidates: `⌃⇧D` (Shift=reverse already used for Duplicate Up as `⌃U`, but `⌃⇧D` is intuitive as "duplicate" with Shift for the pair), or find another mnemonic. Also consider giving Duplicate Up a matching shortcut if it doesn't have one.

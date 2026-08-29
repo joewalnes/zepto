@@ -1117,6 +1117,71 @@ sub cmd_toggle_auto_pairs {
     $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
 }
 
+sub cmd_toggle_mouse {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->mouse_enabled();
+    $self->{prefs}->set_mouse_enabled($new);
+
+    my $term = $self->{terminal};
+    if ($term) {
+        $new ? $term->enable_mouse() : $term->disable_mouse();
+    }
+    $self->{message} = "Mouse: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_toggle_search_wrap {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->search_wrap();
+    $self->{prefs}->set_search_wrap($new);
+    $self->{message} = "Search Wrap Around: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_toggle_markdown_tables {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->render_markdown_tables();
+    $self->{prefs}->set_render_markdown_tables($new);
+    $self->{message} = "Markdown Table Rendering: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_toggle_soft_tabs {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->soft_tabs();
+    $self->{prefs}->set_soft_tabs($new);
+    $self->{message} = "Soft Tabs: " . ($new ? "ON (spaces)" : "OFF (tabs)");
+}
+
+sub cmd_toggle_auto_indent {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->auto_indent();
+    $self->{prefs}->set_auto_indent($new);
+    $self->{message} = "Auto Indent: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_set_tab_width {
+    my ($self) = @_;
+    my $prefs = $self->{prefs};
+
+    $self->open_footer_input(
+        prompt => 'Tab Width:',
+        value  => $prefs->tab_width(),
+        select_all => 1,
+        hint   => '1-16',
+        id     => 'set_tab_width',
+        on_submit => sub {
+            my ($input) = @_;
+            return unless defined $input && $input =~ /\S/;
+
+            unless ($input =~ /^\d+$/ && $input >= 1 && $input <= 16) {
+                $self->show_error_message("Invalid tab width. Use a number 1-16.");
+                return;
+            }
+
+            $prefs->set_tab_width($input + 0);
+            $self->{message} = "Tab Width: $input";
+        },
+    );
+}
+
 sub cmd_toggle_ai {
     my ($self) = @_;
     my $ai = $self->{_ai_complete};

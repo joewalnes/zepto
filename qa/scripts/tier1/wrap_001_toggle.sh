@@ -8,9 +8,11 @@ long_line=$(python3 -c "print('word ' * 80)")
 file=$(qa_tmpfile_nl "wrap001.txt" "$long_line")
 qa_start "$file"
 
-# Check wrap state via palette
+# Check wrap state via palette. Query the full label ("Word Wrap"), not the
+# bare substring "wrap" — that now also fuzzy-matches "Search Wrap Around"
+# (QA-PREF-019) and would grab the wrong toggle's on/off state.
 qa_keys "ctrl-space"
-qa_send "wrap" 0.3
+qa_send "Word Wrap" 0.3
 qa_screen
 initial_state=$(echo "$QA_SCREEN" | grep -oE '\[(on|off)\]' | head -1)
 qa_keys "escape" 0.2
@@ -22,7 +24,7 @@ sleep 0.3
 
 # Check new state
 qa_keys "ctrl-space"
-qa_send "wrap" 0.3
+qa_send "Word Wrap" 0.3
 qa_screen
 new_state=$(echo "$QA_SCREEN" | grep -oE '\[(on|off)\]' | head -1)
 qa_keys "escape" 0.2

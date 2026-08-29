@@ -292,6 +292,37 @@ subtest 'Persistence: prefs load from StateStore on init' => sub {
     is($prefs->get('scroll_margin'), 3, 'Non-persisted pref is default');
 };
 
+subtest 'Persistence: soft_tabs, auto_indent, mouse_enabled are global prefs' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs1 = Zepto::Preferences->new(state_store => $store);
+
+    $prefs1->set_soft_tabs(0);
+    $prefs1->set_auto_indent(0);
+    $prefs1->set_mouse_enabled(0);
+
+    my $prefs2 = Zepto::Preferences->new(state_store => $store);
+    is($prefs2->get('soft_tabs'), 0, 'soft_tabs persisted');
+    is($prefs2->get('auto_indent'), 0, 'auto_indent persisted');
+    is($prefs2->get('mouse_enabled'), 0, 'mouse_enabled persisted');
+};
+
+subtest 'Persistence: search_wrap and render_markdown_tables are global prefs' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $prefs1 = Zepto::Preferences->new(state_store => $store);
+
+    is($prefs1->get('search_wrap'), 1, 'search_wrap defaults to on');
+    is($prefs1->get('render_markdown_tables'), 1, 'render_markdown_tables defaults to on');
+
+    $prefs1->set('search_wrap', 0);
+    $prefs1->set_render_markdown_tables(0);
+
+    my $prefs2 = Zepto::Preferences->new(state_store => $store);
+    is($prefs2->get('search_wrap'), 0, 'search_wrap persisted');
+    is($prefs2->get('render_markdown_tables'), 0, 'render_markdown_tables persisted');
+};
+
 subtest 'Persistence: round-trip via StateStore' => sub {
     my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
     my $store = Zepto::StateStore->new(base_dir => $tmpdir);

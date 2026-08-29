@@ -2,6 +2,8 @@
 
 ## 2026-08-29
 
+- New palette commands to set/toggle preferences that had no UI before: "Tab Width" (footer prompt, 1-16), "Soft Tabs (Spaces)", "Auto Indent", "Mouse", "Search Wrap Around", "Markdown Table Rendering" — all now persist across restarts like the other preferences
+- Fixed "Tab Width" (and any similarly invalid preference input) failing silently instead of showing an error message
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

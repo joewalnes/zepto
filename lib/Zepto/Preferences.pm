@@ -76,6 +76,8 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     mouse_enabled
     ai_api_url
     ai_model
+    search_wrap
+    render_markdown_tables
 );
 
 sub new {
