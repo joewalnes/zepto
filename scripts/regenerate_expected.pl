@@ -56,6 +56,7 @@ my %type_names = (
     'strikethrough' => 'STRIKETHROUGH',
     'highlight'   => 'HIGHLIGHT',
     'bold_italic' => 'BOLD_ITALIC',
+    'formatting_delim' => 'FORMATTING_DELIM',
 );
 
 # Get list of sample files to process

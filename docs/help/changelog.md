@@ -2,6 +2,7 @@
 
 ## 2026-08-29
 
+- Markdown emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) now render in a dimmed color so bold/italic/strikethrough/highlighted text pops out visually
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

@@ -8,7 +8,7 @@ This document demonstrates various Markdown syntax elements.
 
 Word wrap is especially useful for prose files like this one, where paragraphs can be quite long and extend well beyond the visible width of a typical terminal window. When word wrap is enabled, lines break at word boundaries so you can read the full content without scrolling horizontally, which makes editing markdown documents, README files, and other text-heavy content much more pleasant and efficient.
 
-This second paragraph tests <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><LINK>https://github.com/example/zepto-editor</LINK><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
+This second paragraph tests <FORMATTING_DELIM>**</FORMATTING_DELIM><BOLD>bold text</BOLD><FORMATTING_DELIM>**</FORMATTING_DELIM> that appears inside a very long line to make sure syntax highlighting is preserved correctly when the editor wraps the text across multiple visual rows. It also includes <FORMATTING_DELIM>*</FORMATTING_DELIM><ITALIC>italic text</ITALIC><FORMATTING_DELIM>*</FORMATTING_DELIM>, some <FUNCTION>`inline code`</FUNCTION>, and a <PUNCTUATION>[</PUNCTUATION><STRING>link to the project</STRING><PUNCTUATION>](</PUNCTUATION><LINK>https://github.com/example/zepto-editor</LINK><PUNCTUATION>)</PUNCTUATION> to exercise various inline markdown elements within wrapped content. The paragraph keeps going to ensure it wraps at least three or four times at the default terminal width of eighty columns, which is important for testing continuation indicators and hanging indent behavior.
 
 <PUNCTUATION>&gt;</PUNCTUATION> This is a long blockquote that should also demonstrate word wrap behavior. Blockquotes in markdown are prefixed with the greater-than sign, and when the quoted text is long enough it will wrap across multiple visual rows. The wrap indicator and indentation should still look correct even inside quoted blocks.
 
@@ -41,15 +41,15 @@ Alternative H2
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING2>Emphasis</HEADING2>
 
-This is <PUNCTUATION>**</PUNCTUATION><BOLD>bold text</BOLD><PUNCTUATION>**</PUNCTUATION> and this is also <PUNCTUATION>__</PUNCTUATION><BOLD>bold</BOLD><PUNCTUATION>__</PUNCTUATION>.
+This is <FORMATTING_DELIM>**</FORMATTING_DELIM><BOLD>bold text</BOLD><FORMATTING_DELIM>**</FORMATTING_DELIM> and this is also <FORMATTING_DELIM>__</FORMATTING_DELIM><BOLD>bold</BOLD><FORMATTING_DELIM>__</FORMATTING_DELIM>.
 
-This is <PUNCTUATION>*</PUNCTUATION><ITALIC>italic text</ITALIC><PUNCTUATION>*</PUNCTUATION> and this is also <PUNCTUATION>_</PUNCTUATION><ITALIC>italic</ITALIC><PUNCTUATION>_</PUNCTUATION>.
+This is <FORMATTING_DELIM>*</FORMATTING_DELIM><ITALIC>italic text</ITALIC><FORMATTING_DELIM>*</FORMATTING_DELIM> and this is also <FORMATTING_DELIM>_</FORMATTING_DELIM><ITALIC>italic</ITALIC><FORMATTING_DELIM>_</FORMATTING_DELIM>.
 
-This is <PUNCTUATION>***</PUNCTUATION><BOLD_ITALIC>bold and italic</BOLD_ITALIC><PUNCTUATION>***</PUNCTUATION> and also <PUNCTUATION>___</PUNCTUATION><BOLD_ITALIC>bold italic</BOLD_ITALIC><PUNCTUATION>___</PUNCTUATION>.
+This is <FORMATTING_DELIM>***</FORMATTING_DELIM><BOLD_ITALIC>bold and italic</BOLD_ITALIC><FORMATTING_DELIM>***</FORMATTING_DELIM> and also <FORMATTING_DELIM>___</FORMATTING_DELIM><BOLD_ITALIC>bold italic</BOLD_ITALIC><FORMATTING_DELIM>___</FORMATTING_DELIM>.
 
-This is <PUNCTUATION>~~</PUNCTUATION><STRIKETHROUGH>strikethrough</STRIKETHROUGH><PUNCTUATION>~~</PUNCTUATION> text.
+This is <FORMATTING_DELIM>~~</FORMATTING_DELIM><STRIKETHROUGH>strikethrough</STRIKETHROUGH><FORMATTING_DELIM>~~</FORMATTING_DELIM> text.
 
-This is <PUNCTUATION>==</PUNCTUATION><HIGHLIGHT>highlighted</HIGHLIGHT><PUNCTUATION>==</PUNCTUATION> text (some flavors).
+This is <FORMATTING_DELIM>==</FORMATTING_DELIM><HIGHLIGHT>highlighted</HIGHLIGHT><FORMATTING_DELIM>==</FORMATTING_DELIM> text (some flavors).
 
 <PUNCTUATION>##</PUNCTUATION> <HEADING2>Lists</HEADING2>
 
@@ -270,7 +270,7 @@ $$
 
 Hidden content that can be expanded.
 
-<KEYWORD>-</KEYWORD> Can contain <PUNCTUATION>**</PUNCTUATION><BOLD>Markdown</BOLD><PUNCTUATION>**</PUNCTUATION>
+<KEYWORD>-</KEYWORD> Can contain <FORMATTING_DELIM>**</FORMATTING_DELIM><BOLD>Markdown</BOLD><FORMATTING_DELIM>**</FORMATTING_DELIM>
 <KEYWORD>-</KEYWORD> With <FUNCTION>`code`</FUNCTION> and other elements
 
 &lt;/details&gt;
@@ -327,4 +327,4 @@ HTML is a markup language.
 
 <HEADING2>---</HEADING2>
 
-<PUNCTUATION>*</PUNCTUATION><ITALIC>Document end</ITALIC><PUNCTUATION>*</PUNCTUATION>
+<FORMATTING_DELIM>*</FORMATTING_DELIM><ITALIC>Document end</ITALIC><FORMATTING_DELIM>*</FORMATTING_DELIM>

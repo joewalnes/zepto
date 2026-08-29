@@ -146,16 +146,46 @@ VERIFY
 --------------------------------------------------------------------------------
 
 ID:       QA-MD-009
-NAME:     Dim emphasis delimiters (FEATURE REQUEST TRACK)
+NAME:     Dim emphasis delimiters
 PRIORITY: P3
 FEATURE:  md emphasis
-RELATED:  bugs.md P3 "Dim Markdown formatting delimiters"
+RELATED:  bugs.md P3 "Dim Markdown formatting delimiters" (FIXED),
+          QA-REG-135, QA-SYN-015
+
+SETUP
+  Markdown file with:
+    This is **bold text** and this is *italic text*.
+    This is ***bold and italic*** combined.
+    This is ~~strikethrough text~~ here.
+    This is ==highlighted text== here.
+
+STEPS
+  1. Observe the line in both dark and light themes (⌃T toggles).
+
+VERIFY
+  - The `**`, `*`, `***`, `~~`, `==` delimiter characters render in a
+    faint/low-contrast color, distinctly dimmer than both the plain
+    body text and the styled content they surround.
+  - The styled content itself (bold/italic/bold-italic/strikethrough/
+    highlighted text) keeps its normal, prominent styling — the
+    delimiters are dim, not the content.
+  - No characters are hidden — the `**`/`*`/`~~`/`==` marks are still
+    visible on screen, just visually de-emphasized (color only, not
+    concealment).
+  - Other punctuation (heading `#`, list `-`/`1.`, blockquote `>`,
+    code fences, link `[]()` brackets, `---`/`***` thematic breaks) is
+    UNCHANGED — still the normal punctuation color, not dimmed.
+  - Non-Markdown files are unaffected (e.g. Perl `2 ** 3` keeps the
+    normal operator color).
 
 NOTES
-  This is currently an open P3 feature request. When implemented:
-    - `**bold**` — the `**` delimiters should render in a dimmed color.
-    - Same for `*italic*`, `_..._`, `~~..~~`, `==..==`.
-  Add a test case here once implemented.
+  Deterministic coverage (token type + exact theme RGB, both themes):
+  tests/syntax_rendering.t subtests "Markdown emphasis delimiters use a
+  dedicated dim token type", "Theme defines faint colors for
+  formatting_delim in both themes", "Rendered markdown shows dimmed
+  delimiter distinct from bold content", "Non-Markdown languages are
+  unaffected by formatting_delim". Sample fixture:
+  tests/samples/markdown_complete.{md,expected}.
 
 --------------------------------------------------------------------------------
 

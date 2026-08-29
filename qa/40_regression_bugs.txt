@@ -1038,3 +1038,25 @@ VERIFY    A runner invocation never stops live foreign hangon sessions or
           live zqa_* sessions whose owning script PID is alive, and never
           deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
           are cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-135
+NAME:     Markdown emphasis delimiters dimmed, not full punctuation weight
+PRIORITY: P3
+BUG:      P3 "Dim Markdown formatting delimiters" (fixed 2026-08-29)
+CROSS-REF: QA-MD-009, QA-SYN-015
+VERIFY    `**`, `__`, `*`, `_`, `***`, `___`, `~~`, `==` emphasis
+          delimiters tokenize as TOKEN_FORMATTING_DELIM (not
+          TOKEN_PUNCTUATION) in Syntax/Markdown.pm, and both themes
+          define a syntax_formatting_delim color measurably closer to
+          that theme's background than syntax_punctuation is (dark:
+          fg_rgb(70,75,100) vs bg(26,27,38); light: fg_rgb(200,203,212)
+          vs bg(255,255,255)). Delimited content keeps its normal
+          bold/italic/bold_italic/strikethrough/highlight token type
+          and color. Character count covered by tokens is unchanged
+          (no concealment). Other Markdown punctuation (headings, list
+          markers, blockquotes, code fences, link brackets, thematic
+          breaks) still uses TOKEN_PUNCTUATION. Non-Markdown grammars
+          are unaffected (Perl `**` stays TOKEN_OPERATOR).
+          tests/syntax_rendering.t covers this deterministically.

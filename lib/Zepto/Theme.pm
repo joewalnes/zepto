@@ -337,6 +337,7 @@ sub dark_theme {
         syntax_underline   => UNDERLINE . fg_rgb(192, 202, 245),  # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(130, 140, 170),  # Strikethrough dimmed
         syntax_highlight   => bg_rgb(120, 100, 30) . fg_rgb(255, 255, 220),  # Yellow highlighter pen
+        syntax_formatting_delim => fg_rgb(70, 75, 100),  # Faint blue-gray, close to bg(26,27,38) - emphasis delimiters (**, *, _, ~~, ==)
 
         # Completion (ghost text + dropdown menu)
         completion_ghost_fg     => DIM . fg_rgb(100, 110, 150),   # DIM + muted blue-gray
@@ -612,6 +613,7 @@ sub light_theme {
         syntax_underline   => UNDERLINE . fg_rgb(76, 79, 105),   # Underlined fg - prose underline
         syntax_strikethrough => STRIKETHROUGH . fg_rgb(120, 125, 140),  # Strikethrough dimmed
         syntax_highlight   => bg_rgb(255, 235, 120) . fg_rgb(50, 40, 10),   # Yellow highlighter pen
+        syntax_formatting_delim => fg_rgb(200, 203, 212),  # Faint light gray, close to bg(255,255,255) - emphasis delimiters (**, *, _, ~~, ==)
 
         # Completion (ghost text + dropdown menu)
         completion_ghost_fg     => DIM . fg_rgb(160, 165, 180),   # DIM + muted gray
