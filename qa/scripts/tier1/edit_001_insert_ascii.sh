@@ -7,19 +7,13 @@ file=$(qa_tmpfile "edit001.txt" "")
 qa_start "$file"
 
 qa_send "hello world"
-qa_assert_screen "hello world" "text appears on screen"
+qa_assert_expect "hello world" "text appears on screen"
 
 # Check cursor position — should be at col 12 (after 11 chars)
-qa_assert_screen "1:12|1,12|1: 12" "cursor at col 12 (approx)"
+qa_assert_expect "1:12|1,12|1: 12" "cursor at col 12 (approx)"
 
 # Check dirty indicator
-qa_screen
-if echo "$QA_SCREEN" | head -1 | grep -q "●"; then
-    qa_pass "modified indicator visible in tab bar"
-else
-    # Some renderings use different dirty indicators
-    qa_pass "tab bar rendered (dirty indicator check is visual)"
-fi
+qa_assert_expect "●" "modified indicator visible in tab bar"
 
 qa_keys "ctrl-q"
 sleep 0.2
