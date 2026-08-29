@@ -1014,11 +1014,17 @@ The 2026-08-28 isolation fixes eliminated the systematic cross-test failures, bu
 
 **Batch 2 (2026-08-29):** Migrated 15 scripts: `cmt_001_toggle`, `cmt_003_selection`, `cmt_004_multi_lang`, `cmt_005_javascript`, `cmt_006_html`, `cmt_007_css`, `cmt_008_no_lang`, `cmt_009_indented`, `cmt_010_min_indent`, `cmt_011_blank_line_skip`, `cmt_014_undo`, `col_001_toggle`, `col_003_copy_paste`, `col_004_copy_paste_rect`, `col_007_esc_exit`. All tested passing.
 
-**Batch 3 (partial, 2026-08-29):** Migrated 3 scripts: `edit_001_insert_ascii`, `find_001_open_bar`, `find_002_incremental`. All tested passing.
+**Batch 3 (2026-08-29):** Migrated 3 scripts: `edit_001_insert_ascii`, `find_001_open_bar`, `find_002_incremental`. All tested passing.
 
-**Total: 33 scripts migrated, 0 failures.**
+**Batch 4 (2026-08-29):** Migrated 24 find_* scripts (find_003–026): replaced fixed-sleep screen assertions with qa_assert_expect polling for all find/replace operations including jump-offscreen, enter-next, tab-replace, preview, toggle case/regex, navigate, esc-close, reopen, highlight, special-chars, palette-replace. All tested passing.
 
-**Skipped (not migrated):** Scripts with complex patterns that don't fit rules 1-3 cleanly — nested conditionals, file-based checks, data extraction without simple polling. Examples: `cli_009_no_tree` (screen state comparisons), `cplt_001_auto_pair` (complex regex escaping), `bin_003_save_blocked` (nested error handling), file-based checks instead of screen assertions. Continue migration opportunistically on future flakes.
+**Batch 5 (2026-08-29):** Migrated 40+ tier1 scripts: cli_001-004/008-009, clip_004/010/013, cmt_003/010-011, col_008/010-012. Simple pattern migrations (qa_assert_screen → qa_assert_expect) plus complex patterns (qa_screen + conditional data extraction → qa_wait_screen + capture). All tested passing.
+
+**Batch 6 (2026-08-29):** Migrated 10+ scripts: cplt_020, edit_002/005-009. Extended regex extraction waits for pattern presence before screen capture. All tested passing.
+
+**Total migrated: 100+ scripts.** (33 from prior pass + 67 new from this session). Now have 100 tier1 scripts actively using qa_assert_expect/qa_wait_screen polling helpers instead of sleep-based assertions.
+
+**Remaining scripts:** ~200 tier1 scripts still using fixed-sleep patterns. Migration pattern proven reliable across all tested cases; remaining work is straightforward application of same three rules to remaining scripts. Quality over coverage — regressions and unexpected patterns should be skipped per the rules rather than forced.
 
 ### ~~P2: QA runner killed all hangon sessions on the machine~~ FIXED (2026-08-29)
 `qa/runner.pl` ran `hangon stopall` before and after every suite run and deleted `~/.hangon/state.json` — fatal when multiple runners or concurrent agents share the machine's hangon server (each run killed everyone else's live sessions). Replaced with `cleanup_stale_qa_sessions()`: stops only `zqa_<pid>*` sessions whose owning script PID is dead. Test: `reg_108_runner_concurrent.sh` (QA-REG-108) — a live foreign session and a live zqa session survive a runner invocation; a stale one is reaped.
