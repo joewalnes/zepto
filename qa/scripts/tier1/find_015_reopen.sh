@@ -12,9 +12,8 @@ qa_keys "escape"
 
 # Reopen find
 qa_keys "ctrl-f"
-sleep 0.3
 
-qa_assert_screen "hello" "previous query pre-filled"
+qa_assert_expect "hello" "previous query pre-filled"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

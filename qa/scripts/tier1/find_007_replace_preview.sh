@@ -13,25 +13,15 @@ qa_send "foo" 0.3
 
 # Tab to replace field
 qa_keys "tab"
-qa_send "ZZZ" 0.3
+qa_send "ZZZ"
 
 # Should see preview of replacement in editor area
-qa_screen
-if echo "$QA_SCREEN" | grep -q "ZZZ"; then
-    qa_pass "replace preview shows ZZZ"
-else
-    qa_fail "replace preview shows ZZZ"
-fi
+qa_assert_expect "ZZZ" "replace preview shows ZZZ"
 
 # Escape should revert the preview (no changes saved)
-qa_keys "escape" 0.3
+qa_keys "escape"
 
-qa_screen
-if echo "$QA_SCREEN" | grep -q "foo"; then
-    qa_pass "escape reverted replace preview"
-else
-    qa_fail "escape reverted replace preview"
-fi
+qa_assert_expect "foo" "escape reverted replace preview"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -12,10 +12,10 @@ qa_start "$file"
 
 # Open find and search for MARKER
 qa_keys "ctrl-f"
-qa_send "MARKER" 0.3
+qa_send "MARKER"
 
 # Should find it
-qa_assert_screen "1 of 1" "found 1 match"
+qa_assert_expect "1 of 1" "found 1 match"
 
 # Press Enter to jump to it and close find bar
 qa_keys "enter" 0.3

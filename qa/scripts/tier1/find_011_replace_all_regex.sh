@@ -9,14 +9,14 @@ qa_start "$file"
 
 # Open find — regex is ON by default
 qa_keys "ctrl-f"
-qa_send 'foo[0-9]+' 0.3
+qa_send 'foo[0-9]+'
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+|No matches' || true
 count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 
 # If no matches, regex might be off — toggle it on
 if [[ -z "$count" ]] || echo "$QA_SCREEN" | grep -q "No matches"; then
-    qa_keys "ctrl-r" 0.3
+    qa_keys "ctrl-r"
 fi
 
 # Tab to replace field

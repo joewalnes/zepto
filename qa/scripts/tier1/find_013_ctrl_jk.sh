@@ -12,11 +12,11 @@ qa_start "$file"
 
 # Find MARKER and close
 qa_keys "ctrl-f"
-qa_send "MARKER" 0.3
+qa_send "MARKER"
 qa_keys "escape"
 
 # Should have jumped to MARKER
-qa_assert_screen "MARKER" "found and jumped to MARKER"
+qa_assert_expect "MARKER" "found and jumped to MARKER"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -9,19 +9,19 @@ date apple fig")
 qa_start "$file"
 
 qa_keys "ctrl-f"
-qa_send "apple" 0.3
+qa_send "apple"
 
 # Should show match count
-qa_assert_screen "3" "match count visible"
+qa_assert_expect "3" "match count visible"
 
 # Find bar shows "N of M" — check initial match index
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 initial_match=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
 
 # Navigate to next match with Down
-qa_keys "down" 0.2
+qa_keys "down"
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 next_match=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
 
 if [[ -n "$initial_match" && -n "$next_match" && "$initial_match" != "$next_match" ]]; then

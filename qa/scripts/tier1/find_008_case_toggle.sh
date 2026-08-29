@@ -9,16 +9,16 @@ qa_start "$file"
 
 # Open find
 qa_keys "ctrl-f"
-qa_send "hello" 0.3
+qa_send "hello"
 
 # Default is case-insensitive — should find all 3
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 match_count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
 
 # Toggle case sensitivity with Ctrl+C (shown as Aa ⌃C in find bar)
-qa_keys "ctrl-c" 0.3
+qa_keys "ctrl-c"
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 new_count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1)
 
 # Case-sensitive "hello" should match only 1 (lowercase)

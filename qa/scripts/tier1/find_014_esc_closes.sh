@@ -7,14 +7,14 @@ file=$(qa_tmpfile_nl "find014.txt" "hello world")
 qa_start "$file"
 
 qa_keys "ctrl-f"
-qa_send "hello" 0.3
+qa_send "hello"
 
 # Find bar should be open
-qa_screen
+qa_wait_screen "Find:" || true
 has_find_bar="$QA_SCREEN"
 
 qa_keys "escape"
-qa_screen
+qa_wait_screen "1:[0-9].*Commands|hello world" || true
 
 # After close, the status bar should show cursor position, not find controls
 if echo "$QA_SCREEN" | grep -qE "1:[0-9].*Commands"; then
@@ -23,7 +23,7 @@ else
     qa_pass "Esc dismissed find mode"
 fi
 
-qa_assert_screen "hello world" "editor content visible"
+qa_assert_expect "hello world" "editor content visible"
 
 qa_keys "ctrl-q"
 qa_summary

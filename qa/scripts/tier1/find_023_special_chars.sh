@@ -9,14 +9,18 @@ normal text")
 qa_start "$file"
 
 qa_keys "ctrl-f"
-qa_send "file.txt" 0.3
+qa_send "file.txt"
 
 # Should find "file.txt"
-qa_screen
+qa_wait_screen "1 of 1|1.*match|file.txt" || true
 if echo "$QA_SCREEN" | grep -qE "1 of 1|1.*match"; then
     qa_pass "literal dot search works"
 else
-    qa_assert_screen "file.txt" "find shows file.txt"
+    if echo "$QA_SCREEN" | grep -q "file.txt"; then
+        qa_pass "find shows file.txt"
+    else
+        qa_fail "find shows file.txt"
+    fi
 fi
 
 qa_keys "escape"

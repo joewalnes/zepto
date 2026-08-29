@@ -8,16 +8,15 @@ qa_start "$file"
 
 # Open palette and search for replace
 qa_keys "ctrl-space"
-qa_send "find and replace" 0.3
+qa_send "find and replace"
 
-qa_assert_screen "Find and Replace|Find & Replace|replace" "find and replace entry in palette"
+qa_assert_expect "Find and Replace|Find & Replace|replace" "find and replace entry in palette"
 
 # Execute it
 qa_keys "enter"
-sleep 0.3
 
 # Replace field should be visible from the start
-qa_assert_screen "Replace|replace" "replace field visible after palette command"
+qa_assert_expect "Replace|replace" "replace field visible after palette command"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

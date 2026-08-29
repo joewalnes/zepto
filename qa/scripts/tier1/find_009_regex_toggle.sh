@@ -11,15 +11,15 @@ qa_start "$file"
 
 # Open find, type a regex pattern
 qa_keys "ctrl-f"
-qa_send 'foo|bar' 0.3
+qa_send 'foo|bar'
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 first_count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 
 # Toggle regex with Ctrl+R
-qa_keys "ctrl-r" 0.3
+qa_keys "ctrl-r"
 
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 toggled_count=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 
 # One state should match 3 (regex: foo OR bar), the other 0 (literal "foo|bar")

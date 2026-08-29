@@ -9,15 +9,19 @@ foo end")
 qa_start "$file"
 
 qa_keys "ctrl-f"
-qa_send "foo" 0.3
+qa_send "foo"
 
 # Should show match count indicating all occurrences found
-qa_screen
+qa_wait_screen "foo" || true
 if echo "$QA_SCREEN" | grep -qE "[34] of [34]|[34].*match"; then
     qa_pass "match count shows all occurrences"
 else
     # At minimum the find bar is open with results
-    qa_assert_screen "foo" "find bar showing matches"
+    if echo "$QA_SCREEN" | grep -q "foo"; then
+        qa_pass "find bar showing matches"
+    else
+        qa_fail "find bar showing matches"
+    fi
 fi
 
 qa_keys "escape"

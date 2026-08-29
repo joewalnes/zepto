@@ -22,11 +22,10 @@ qa_start "$file"
 # We're at line 1 — FINDME is at line 50 (off-screen)
 qa_keys "ctrl-f"
 qa_send "FINDME"
-sleep 0.5
 
 # Viewport should have jumped to show "FINDME"
-qa_assert_screen "FINDME" "viewport scrolled to show match"
-qa_assert_screen "50" "line 50 visible in gutter or content"
+qa_assert_expect "FINDME" "viewport scrolled to show match"
+qa_assert_expect "50" "line 50 visible in gutter or content"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
