@@ -81,6 +81,8 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     ai_api_url
     ai_model
     restore_session
+    search_wrap
+    render_markdown_tables
 );
 
 sub new {

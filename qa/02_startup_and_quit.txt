@@ -375,7 +375,7 @@ ID:       QA-SESS-009
 NAME:     Restore Session on Startup toggle is discoverable
 PRIORITY: P2
 FEATURE:  session restore preferences
-RELATED:  QA-PREF-015
+RELATED:  QA-PREF-021
 
 STEPS
   1. ⌃Space, type "restore session".

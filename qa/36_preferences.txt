@@ -99,9 +99,12 @@ ID:       QA-PREF-007
 NAME:     Tab width preference respected
 PRIORITY: P2
 FEATURE:  pref tab
+RELATED:  QA-PREF-015
 
 SETUP
-  Set tab_width = 2 via config (or test fixture).
+  Set tab_width = 2 via config (or test fixture). As of QA-PREF-015, tab
+  width can also be set from the command palette ("Tab Width") — no config
+  editing or test fixture required.
 
 STEPS
   1. Open empty file, press Tab.
@@ -133,7 +136,8 @@ PRIORITY: P2
 FEATURE:  pref indent
 
 SETUP
-  auto_indent = 0.
+  auto_indent = 0. As of QA-PREF-017, this can be set from the command
+  palette ("Auto Indent") — no config editing or test fixture required.
 
 STEPS
   1. Line with 4 leading spaces. Cursor at end. Press Enter.
@@ -202,26 +206,152 @@ STEPS
 
 VERIFY
   - Defaults match Preferences.pm (e.g. openrouter.ai, anthropic/claude-haiku).
-  - Can override via config (when persistent config file implemented).
+  - Overridable via Palette → "AI Completion: Setup" (cmd_ai_setup), and the
+    override persists to preferences.json like any other global pref.
 
 --------------------------------------------------------------------------------
 
 ID:       QA-PREF-014
-NAME:     No persistent config file yet (DOC CHECK)
+NAME:     Persistent config file IS preferences.json (DOC CHECK)
 PRIORITY: P3
 FEATURE:  pref persistence
+RELATED:  QA-PREF-015
+RELATED:  QA-PREF-016
+RELATED:  QA-PREF-017
+RELATED:  QA-PREF-018
+RELATED:  QA-PREF-019
+RELATED:  QA-PREF-020
 
 NOTES
-  bugs.md P2 "Persistent config file" is an open feature request. Until
-  implemented, preferences persist via StateStore (sqlite-like
-  $HOME/.local/share/zepto/state.store), NOT via ~/.config/zepto/config.toml.
+  Resolved 2026-08-29 (see bugs.md P2 "Persistent config file"). This entry
+  previously claimed no persistent config file existed and described the
+  store as a sqlite-like $HOME/.local/share/zepto/state.store — both were
+  stale/incorrect even at the time. The truth, confirmed by audit:
 
-  Once config.toml support is added, add new tests here for loading,
-  saving, and priority order (CLI > env > config > defaults).
+  - StateStore (lib/Zepto/StateStore.pm) has ALWAYS persisted preferences
+    as human-editable, pretty-printed JSON at
+    $XDG_CONFIG_HOME/zepto/preferences.json (default ~/.config/zepto/),
+    honoring --state-dir / $ZEPTO_STATE_DIR (see build.pl). This IS the
+    persistent config file — no second config system (e.g. config.toml)
+    was introduced; that would have been needless duplication.
+  - What was genuinely missing: several persist-eligible preferences had
+    NO UI to change them at all (tab_width, soft_tabs, auto_indent,
+    mouse_enabled), and two working preferences (search_wrap,
+    render_markdown_tables) had a UI gap AND were not yet in the
+    persisted set. All six were closed — see QA-PREF-015 through
+    QA-PREF-020, each with a palette command and StateStore persistence.
+  - A number of other defined preferences (show_line_numbers,
+    show_status_bar, confirm_quit_unsaved, scroll_margin, backup_on_save,
+    trim_trailing_whitespace, ensure_final_newline, search_case_sensitive,
+    search_regex) are vestigial: the renderer/behavior never reads them,
+    so persisting them would be misleading (nothing to persist). These are
+    tracked as separate P3 bugs.md items — implement-or-remove, not a
+    persistence problem. Deliberately out of scope here.
+
+VERIFY
+  - $ZEPTO_STATE_DIR/preferences.json (or --state-dir DIR/preferences.json)
+    exists after any preference change, is valid pretty-printed JSON, and
+    a hand-edit of it is picked up on next launch (or via cross-instance
+    sync, QA-PREF-010).
 
 --------------------------------------------------------------------------------
 
 ID:       QA-PREF-015
+NAME:     Tab width settable from palette, persists across restart
+PRIORITY: P2
+FEATURE:  pref tab ui
+RELATED:  QA-PREF-007
+RELATED:  QA-REG-120
+
+STEPS
+  1. Palette → "Tab Width" — footer input opens prefilled with the
+     current value (default 4).
+  2. Type a new value (1-16), Enter.
+  3. Quit, relaunch.
+  4. Palette → "Tab Width" again.
+
+VERIFY
+  - New value takes effect immediately (message + Tab key behavior).
+  - Prefilled value on relaunch matches what was set (persisted).
+  - Out-of-range or non-numeric input is rejected with a visible error
+    message and does not change the stored value (QA-REG-120).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-016
+NAME:     Soft Tabs toggle persists
+PRIORITY: P3
+FEATURE:  pref tab ui
+
+STEPS
+  1. Palette → "Soft Tabs (Spaces)" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Soft Tabs remains off (Tab key inserts a literal \t — QA-PREF-008).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-017
+NAME:     Auto Indent toggle persists
+PRIORITY: P3
+FEATURE:  pref indent ui
+RELATED:  QA-PREF-009
+
+STEPS
+  1. Palette → "Auto Indent" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Auto Indent remains off.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-018
+NAME:     Mouse toggle persists
+PRIORITY: P3
+FEATURE:  pref mouse ui
+
+STEPS
+  1. Palette → "Mouse" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Mouse remains off (mouse mode is not enabled in the new session).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-019
+NAME:     Search Wrap Around toggle persists
+PRIORITY: P3
+FEATURE:  pref search ui
+
+STEPS
+  1. Palette → "Search Wrap Around" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Search Wrap Around remains off (Find no longer wraps past the last
+    match to the top of the document).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-020
+NAME:     Markdown Table Rendering toggle persists
+PRIORITY: P3
+FEATURE:  pref markdown ui
+
+STEPS
+  1. Palette → "Markdown Table Rendering" off.
+  2. Quit, relaunch.
+
+VERIFY
+  - Markdown Table Rendering remains off (pretty-printed tables in .md
+    files render as plain pipe-delimited text instead).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-021
 NAME:     Restore Session on Startup persists across sessions
 PRIORITY: P2
 FEATURE:  pref persistence

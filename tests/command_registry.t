@@ -183,6 +183,36 @@ subtest 'All command sections are in SECTION_ORDER' => sub {
     }
 };
 
+subtest 'New preference commands are registered and reflect toggle state' => sub {
+    require Zepto::Preferences;
+
+    for my $case (
+        { id => 'toggle_soft_tabs',       pref => 'soft_tabs' },
+        { id => 'toggle_auto_indent',     pref => 'auto_indent' },
+        { id => 'toggle_mouse',           pref => 'mouse_enabled' },
+        { id => 'toggle_search_wrap',     pref => 'search_wrap' },
+        { id => 'toggle_markdown_tables', pref => 'render_markdown_tables' },
+    ) {
+        my $cmd = Zepto::CommandRegistry->find_command($case->{id});
+        ok(defined $cmd, "Command '$case->{id}' is registered");
+        is($cmd->{type}, 'toggle', "Command '$case->{id}' is a toggle");
+        is($cmd->{pref}, $case->{pref}, "Command '$case->{id}' is wired to pref '$case->{pref}'");
+
+        my $fake_editor = { prefs => Zepto::Preferences->new() };
+        is(Zepto::CommandRegistry->get_toggle_state($cmd, $fake_editor), 1,
+            "'$case->{id}' reports ON by default");
+
+        $fake_editor->{prefs}->set($case->{pref}, 0);
+        is(Zepto::CommandRegistry->get_toggle_state($cmd, $fake_editor), 0,
+            "'$case->{id}' reports OFF after pref flips");
+    }
+
+    my $cmd = Zepto::CommandRegistry->find_command('set_tab_width');
+    ok(defined $cmd, "Command 'set_tab_width' is registered");
+    is($cmd->{type}, 'action', "'set_tab_width' is an action (numeric value, not boolean)");
+    is($cmd->{method}, 'cmd_set_tab_width', "'set_tab_width' method name");
+};
+
 subtest 'section order is consistent' => sub {
     my @order = Zepto::CommandRegistry->section_order();
     is($order[0], 'FILE', 'First section is FILE');

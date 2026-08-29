@@ -373,6 +373,148 @@ subtest '_maybe_poll_system_theme swaps the theme when the system changed' => su
 };
 
 # ============================================================================
+# Preference toggles/settings added for persistent-config-file audit
+# (tab_width, soft_tabs, auto_indent, mouse, search_wrap, markdown_tables)
+# ============================================================================
+subtest 'Tab width setting via footer input' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->tab_width(), 4, 'Default tab width');
+
+    $editor->cmd_set_tab_width();
+    ok($editor->{footer_input}, 'Footer input opened');
+    is($editor->{footer_input}->{widget}->value(), '4', 'Prefilled with current value');
+
+    $editor->{footer_input}->{on_submit}->('2');
+    is($editor->{prefs}->tab_width(), 2, 'Tab width updated to 2');
+
+    # Invalid input is rejected and does not change the preference
+    $editor->cmd_set_tab_width();
+    $editor->{footer_input}->{on_submit}->('abc');
+    is($editor->{prefs}->tab_width(), 2, 'Non-numeric input rejected');
+    ok($editor->{message_is_error}, 'Error message flagged');
+
+    $editor->cmd_set_tab_width();
+    $editor->{footer_input}->{on_submit}->('0');
+    is($editor->{prefs}->tab_width(), 2, 'Out-of-range (0) input rejected');
+
+    $editor->cmd_set_tab_width();
+    $editor->{footer_input}->{on_submit}->('17');
+    is($editor->{prefs}->tab_width(), 2, 'Out-of-range (17) input rejected');
+
+    $editor->cmd_set_tab_width();
+    $editor->{footer_input}->{on_submit}->('8');
+    is($editor->{prefs}->tab_width(), 8, 'Valid input (8) accepted');
+};
+
+subtest 'Soft tabs toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->soft_tabs(), 1, 'Default soft_tabs is on');
+    $editor->cmd_toggle_soft_tabs();
+    ok(!$editor->{prefs}->soft_tabs(), 'Soft tabs toggled off');
+    $editor->cmd_toggle_soft_tabs();
+    is($editor->{prefs}->soft_tabs(), 1, 'Soft tabs toggled back on');
+};
+
+subtest 'Auto indent toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->auto_indent(), 1, 'Default auto_indent is on');
+    $editor->cmd_toggle_auto_indent();
+    ok(!$editor->{prefs}->auto_indent(), 'Auto indent toggled off');
+    $editor->cmd_toggle_auto_indent();
+    is($editor->{prefs}->auto_indent(), 1, 'Auto indent toggled back on');
+};
+
+subtest 'Mouse toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->mouse_enabled(), 1, 'Default mouse_enabled is on');
+    $editor->cmd_toggle_mouse();
+    ok(!$editor->{prefs}->mouse_enabled(), 'Mouse toggled off');
+    ok(!$term->is_mouse_enabled(), 'Terminal mouse mode disabled');
+
+    $editor->cmd_toggle_mouse();
+    is($editor->{prefs}->mouse_enabled(), 1, 'Mouse toggled back on');
+    ok($term->is_mouse_enabled(), 'Terminal mouse mode re-enabled');
+};
+
+subtest 'Search wrap toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->search_wrap(), 1, 'Default search_wrap is on');
+    $editor->cmd_toggle_search_wrap();
+    ok(!$editor->{prefs}->search_wrap(), 'Search wrap toggled off');
+    $editor->cmd_toggle_search_wrap();
+    is($editor->{prefs}->search_wrap(), 1, 'Search wrap toggled back on');
+};
+
+subtest 'Markdown table rendering toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->render_markdown_tables(), 1, 'Default render_markdown_tables is on');
+    $editor->cmd_toggle_markdown_tables();
+    ok(!$editor->{prefs}->render_markdown_tables(), 'Markdown tables toggled off');
+    $editor->cmd_toggle_markdown_tables();
+    is($editor->{prefs}->render_markdown_tables(), 1, 'Markdown tables toggled back on');
+};
+
+subtest 'New preference toggles persist across StateStore-backed instances' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store1 = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $editor1 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store1);
+
+    $editor1->cmd_set_tab_width();
+    $editor1->{footer_input}->{on_submit}->('2');
+    $editor1->cmd_toggle_soft_tabs();
+    $editor1->cmd_toggle_auto_indent();
+    $editor1->cmd_toggle_mouse();
+    $editor1->cmd_toggle_search_wrap();
+    $editor1->cmd_toggle_markdown_tables();
+
+    my $store2 = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $editor2 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store2);
+
+    is($editor2->{prefs}->tab_width(), 2, 'Tab width persisted');
+    ok(!$editor2->{prefs}->soft_tabs(), 'Soft tabs persisted');
+    ok(!$editor2->{prefs}->auto_indent(), 'Auto indent persisted');
+    ok(!$editor2->{prefs}->mouse_enabled(), 'Mouse enabled persisted');
+    ok(!$editor2->{prefs}->search_wrap(), 'Search wrap persisted');
+    ok(!$editor2->{prefs}->render_markdown_tables(), 'Markdown tables persisted');
+};
+
+# ============================================================================
 # Search state
 # ============================================================================
 subtest 'Search state' => sub {
