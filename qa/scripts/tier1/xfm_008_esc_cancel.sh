@@ -11,7 +11,7 @@ qa_keys "alt-t"
 qa_send "sort" 0.2
 qa_keys "escape"
 
-qa_assert_screen "original text" "buffer unchanged after Esc"
+qa_assert_expect "original text" "buffer unchanged after Esc"
 
 qa_keys "ctrl-q"
 qa_summary

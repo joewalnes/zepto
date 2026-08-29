@@ -16,7 +16,7 @@ qa_send "cat" 0.2
 qa_keys "enter"
 sleep 0.5
 
-qa_assert_screen "hello world" "text preserved through cat transform"
+qa_assert_expect "hello world" "text preserved through cat transform"
 
 qa_keys "ctrl-q"
 sleep 0.2

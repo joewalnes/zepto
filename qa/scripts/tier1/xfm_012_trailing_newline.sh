@@ -17,8 +17,8 @@ qa_send "tee" 0.2
 qa_keys "enter"
 sleep 0.5
 
-qa_assert_screen "line one" "first line preserved"
-qa_assert_screen "line two" "second line preserved"
+qa_assert_expect "line one" "first line preserved"
+qa_assert_expect "line two" "second line preserved"
 
 qa_keys "ctrl-q"
 sleep 0.2

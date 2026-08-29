@@ -13,7 +13,7 @@ qa_keys "ctrl-a"
 
 # Open transform
 qa_keys "alt-t"
-qa_assert_screen "Shell|sort|command|pipe|Transform" "transform input visible"
+qa_assert_expect "Shell|sort|command|pipe|Transform" "transform input visible"
 
 # The Shell: prompt pre-fills with "sort" — clear and type fresh
 qa_keys "ctrl-a" 0.1
