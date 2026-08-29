@@ -7,7 +7,7 @@ file=$(qa_tmpfile_nl "cli008.txt" "hello")
 qa_start --tree "$file"
 
 # Tree should be visible — look for directory entries (dots, names)
-qa_assert_screen "lib|docs|src|\\.github" "tree panel shows directory entries"
+qa_assert_expect "lib|docs|src|\\.github" "tree panel shows directory entries"
 qa_assert_screen "hello" "editor content still visible"
 
 qa_keys "ctrl-q"

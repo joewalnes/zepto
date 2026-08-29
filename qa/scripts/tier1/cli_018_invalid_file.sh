@@ -7,16 +7,11 @@ nonexistent="$QA_TMPDIR/does_not_exist.txt"
 qa_start "$nonexistent"
 
 # Editor should open with empty buffer for new file
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "does_not_exist|1:1"; then
-    qa_pass "editor opened with nonexistent file path"
-else
-    qa_fail "editor opened with nonexistent file path"
-fi
+qa_assert_expect "does_not_exist|1:1" "editor opened with nonexistent file path"
 
 # Should be able to type
 qa_send "hello new file"
-qa_assert_screen "hello new file" "can type in new file buffer"
+qa_assert_expect "hello new file" "can type in new file buffer"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -9,7 +9,7 @@ printf '\x00\x01\x02\x89PNG\r\n' > "$binfile"
 
 qa_start "$binfile"
 
-qa_assert_screen "Binary|binary|bytes" "binary file indicator shown"
+qa_assert_expect "Binary|binary|bytes" "binary file indicator shown"
 
 qa_keys "ctrl-q"
 qa_summary

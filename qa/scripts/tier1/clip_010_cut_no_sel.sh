@@ -20,7 +20,7 @@ qa_assert_screen "line three" "line three still present"
 
 # Paste it back to verify it was copied
 qa_keys "ctrl-v"
-qa_assert_screen "line two" "cut line pasted back"
+qa_assert_expect "line two" "cut line pasted back"
 
 qa_keys "ctrl-q"
 sleep 0.2

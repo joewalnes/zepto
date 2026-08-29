@@ -21,13 +21,13 @@ qa_keys "shift-right" 0.1
 
 # Cut
 qa_keys "ctrl-x"
-qa_assert_screen " world" "cut removed 'hello'"
+qa_assert_expect " world" "cut removed 'hello'"
 
 # Move to end and paste
 qa_keys "end"
 qa_keys "ctrl-v"
 
-qa_assert_screen "worldhello" "paste restored cut text"
+qa_assert_expect "worldhello" "paste restored cut text"
 
 qa_keys "ctrl-q"
 sleep 0.2
