@@ -24,7 +24,7 @@ qa_keys "end" 0.2
 qa_send "Y" 0.3
 
 # Query is now "XabcdefghijY" - no match expected
-qa_screen
+qa_wait_screen '[0-9]+ of [0-9]+' || true
 match_info=$(echo "$QA_SCREEN" | grep -oE '[0-9]+ of [0-9]+' | head -1 || true)
 if [[ -z "$match_info" || "$match_info" == "0 of 0" ]]; then
     qa_pass "End moved cursor to end of input"

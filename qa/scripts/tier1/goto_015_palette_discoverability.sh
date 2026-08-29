@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "ctrl-space"
 qa_send "go back" 0.3
 
-qa_assert_screen "Go Back" "Go Back command found in palette"
+qa_assert_expect "Go Back" "Go Back command found in palette"
 
 qa_keys "escape"
 sleep 0.2
@@ -17,7 +17,7 @@ sleep 0.2
 qa_keys "ctrl-space"
 qa_send "go forward" 0.3
 
-qa_assert_screen "Go Forward" "Go Forward command found in palette"
+qa_assert_expect "Go Forward" "Go Forward command found in palette"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

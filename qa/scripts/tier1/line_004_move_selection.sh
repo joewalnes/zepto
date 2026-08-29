@@ -18,7 +18,7 @@ qa_keys "shift-down" 0.1
 qa_keys "alt-up"
 
 # beta should now be on line 1
-qa_screen
+qa_wait_screen "beta" || true
 line1=$(echo "$QA_SCREEN" | head -5 | grep "beta" || true)
 if [[ -n "$line1" ]]; then
     qa_pass "alt-up moved selected block up"
