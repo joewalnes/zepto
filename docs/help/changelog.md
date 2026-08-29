@@ -2,6 +2,7 @@
 
 ## 2026-08-29
 
+- Added session restore: relaunching zepto with no file arguments now reopens the tabs, cursor positions, and scroll positions you left in that directory. Explicit file/directory args always bypass it. Toggle via "Restore Session on Startup" in the command palette (on by default)
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

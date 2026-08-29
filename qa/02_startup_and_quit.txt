@@ -214,3 +214,177 @@ STEPS
 VERIFY
   - First-launch behavior is predictable (no crash).
   - Pressing F1 opens the tutorial.
+
+--------------------------------------------------------------------------------
+Session Restore (bugs.md P2 "Session restore")
+--------------------------------------------------------------------------------
+
+Design: session state (open tabs, cursor, scroll) is saved per working
+directory (keyed by cwd, not global) at quit time, and restored only when
+zepto is launched with NO file/directory arguments. Explicit file args, or
+a bare directory arg (tree-focus mode), always win over the saved session
+and — critically — never overwrite or clear it, so a one-off `zepto
+file.txt` or a `zepto .` tree-browse doesn't destroy a real saved session
+for that directory. Only tabs with a real file path are saved; unsaved
+`[untitled]` buffers are never persisted. Files that vanished since the
+session was saved are skipped individually at restore. Gated by the
+`restore_session` preference (default on), toggleable from the command
+palette (⌃Space -> "Restore Session on Startup").
+
+ID:       QA-SESS-001
+NAME:     Basic session restore — tabs, active tab, cursor
+PRIORITY: P1
+FEATURE:  session restore
+
+STEPS
+  1. In a fresh project dir, `./zepto a.txt b.txt`.
+  2. Move the cursor to a distinctive position in a.txt.
+  3. ⌥. to switch to b.txt, move the cursor there too.
+  4. ⌃Q to quit.
+  5. Relaunch with NO arguments from the same directory: `./zepto`.
+
+VERIFY
+  - Both a.txt and b.txt tabs reappear.
+  - b.txt (the tab that was active at quit) is the active tab.
+  - Cursor position in both tabs matches where it was left.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-002
+NAME:     Scroll position restored exactly
+PRIORITY: P2
+FEATURE:  session restore
+
+STEPS
+  1. Open a file with 100+ lines. Page Down several times so the
+     viewport is scrolled well past the top.
+  2. ⌃Q to quit.
+  3. Relaunch with no arguments from the same directory.
+
+VERIFY
+  - The viewport opens scrolled to the same line range — no snap back to
+    the top of the file, no re-scroll needed to see where you were.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-003
+NAME:     Explicit file args bypass and never clobber a saved session
+PRIORITY: P1
+FEATURE:  session restore
+RELATED:  QA-REG-115
+
+STEPS
+  1. Bare-launch `./zepto`, open a.txt and b.txt (⌃O), quit (⌃Q) —
+     this saves a session for the directory.
+  2. Launch `./zepto c.txt` (a file NOT in the saved session). Quit.
+  3. Relaunch with no arguments.
+
+VERIFY
+  - Step 2 shows only c.txt — the saved a.txt/b.txt session is not
+    opened alongside it.
+  - Step 3 still restores a.txt and b.txt — the one-off c.txt launch in
+    step 2 did not overwrite or clear the saved session.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-004
+NAME:     Directory-arg launch does not restore or clobber the session
+PRIORITY: P2
+FEATURE:  session restore
+RELATED:  QA-REG-115
+
+STEPS
+  1. Bare-launch, open a.txt and b.txt, quit (saves a session).
+  2. Launch `./zepto .` (directory arg — tree-focus mode). Quit
+     immediately without opening any file.
+  3. Relaunch with no arguments.
+
+VERIFY
+  - Step 2 shows a single empty `[untitled]` tab with the tree focused —
+    it does NOT restore a.txt/b.txt.
+  - Step 3 still restores a.txt and b.txt — browsing the tree in step 2
+    did not wipe the saved session.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-005
+NAME:     Missing files are skipped individually at restore
+PRIORITY: P2
+FEATURE:  session restore
+RELATED:  QA-REG-116
+
+STEPS
+  1. Bare-launch, open a.txt and b.txt, quit.
+  2. Delete b.txt from disk (outside the editor).
+  3. Relaunch with no arguments.
+
+VERIFY
+  - Only the a.txt tab reappears — no crash, no error dialog, no empty
+    tab for the missing file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-006
+NAME:     Unsaved [untitled] buffers are never persisted
+PRIORITY: P2
+FEATURE:  session restore
+
+STEPS
+  1. Bare-launch, open a.txt, then ⌃N for a new untitled tab (don't
+     save it). Quit.
+  2. Relaunch with no arguments.
+
+VERIFY
+  - Only a.txt reappears — the untitled buffer is not restored (its
+    content was never persisted).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-007
+NAME:     Sessions are isolated per working directory
+PRIORITY: P1
+FEATURE:  session restore
+
+STEPS
+  1. In project dir A, bare-launch, open a.txt, quit.
+  2. In project dir B, bare-launch, open b.txt, quit.
+  3. Relaunch bare from dir A, then separately from dir B.
+
+VERIFY
+  - Dir A restores a.txt only; dir B restores b.txt only — the two
+    directories' sessions never mix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-008
+NAME:     No saved session falls back to a single empty tab
+PRIORITY: P3
+FEATURE:  session restore
+
+STEPS
+  1. In a directory with no prior zepto session (fresh state dir),
+     bare-launch `./zepto`.
+
+VERIFY
+  - Editor opens with one empty `[untitled]` tab (the pre-existing
+    no-args behavior) — no crash, no error.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SESS-009
+NAME:     Restore Session on Startup toggle is discoverable
+PRIORITY: P2
+FEATURE:  session restore preferences
+RELATED:  QA-PREF-015
+
+STEPS
+  1. ⌃Space, type "restore session".
+  2. Confirm "Restore Session on Startup" appears with an [on]/[off]
+     state indicator, then press Enter to toggle it off.
+  3. Bare-launch, open a.txt, quit. Relaunch bare.
+
+VERIFY
+  - The command is found by fuzzy search in the palette (no docs/source
+    reading required to discover it).
+  - With the preference off, step 3 opens a fresh empty tab instead of
+    restoring a.txt.

@@ -118,6 +118,7 @@ sub _do_close_tab {
 
     # If this is the last tab, quit
     if ($tm->tab_count() <= 1) {
+        $self->_save_session();
         $self->{state} = 'quit';
         return;
     }
@@ -159,12 +160,14 @@ sub cmd_quit {
 
     # If no dirty tabs, quit immediately
     unless (@dirty) {
+        $self->_save_session();
         $self->{state} = 'quit';
         return;
     }
 
     # Walk through dirty tabs one at a time
     $self->_prompt_close_dirty_tabs(\@dirty, sub {
+        $self->_save_session();
         $self->{state} = 'quit';
     });
 }
@@ -1115,6 +1118,13 @@ sub cmd_toggle_auto_pairs {
     my $new = !$self->{prefs}->auto_pairs();
     $self->{prefs}->set_auto_pairs($new);
     $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
+}
+
+sub cmd_toggle_restore_session {
+    my ($self) = @_;
+    my $new = !$self->{prefs}->restore_session();
+    $self->{prefs}->set_restore_session($new);
+    $self->{message} = "Restore Session on Startup: " . ($new ? "ON" : "OFF");
 }
 
 sub cmd_toggle_ai {

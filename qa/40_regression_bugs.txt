@@ -1038,3 +1038,37 @@ VERIFY    A runner invocation never stops live foreign hangon sessions or
           live zqa_* sessions whose owning script PID is alive, and never
           deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
           are cleaned up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-115
+NAME:     One-off explicit-file launch does not clobber a saved session
+PRIORITY: P1
+BUG:      P2 "Session restore" — caught during implementation, before
+          release (2026-08-29)
+CROSS-REF: QA-SESS-003
+VERIFY    Session save at quit is gated by the same "bare launch, no
+          file/dir args" eligibility as restore (`_session_eligible` in
+          Editor.pm, set once in init()). Launching `zepto some_file.txt`
+          against a directory that already has a saved multi-tab session,
+          then quitting, must leave that saved session untouched — a
+          naive "always save whatever tabs are open at quit" would
+          silently overwrite it with just the one-off file.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-116
+NAME:     Directory-arg (tree-focus) launch does not wipe a saved session
+PRIORITY: P1
+BUG:      P2 "Session restore" — caught during implementation, before
+          release (2026-08-29)
+CROSS-REF: QA-SESS-004
+VERIFY    `zepto .` (or any bare directory arg) opens tree-focus mode
+          with a single empty tab and never restores a saved session —
+          but critically must also never DELETE it. Because saving
+          "nothing to restore" (all tabs untitled) clears the stored
+          session for that cwd, a directory-browse launch that isn't
+          save-eligible must skip the save step entirely, not just skip
+          the restore step. Quitting out of `zepto .` immediately, then
+          relaunching bare, must still restore the previously saved
+          tabs.
