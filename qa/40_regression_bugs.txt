@@ -1200,3 +1200,90 @@ VERIFY    Palette → "Tab Width" → non-numeric input (e.g. "abc") shows
           "Invalid tab width..." on screen; same for out-of-range input
           (0 or 17). The stored tab_width is unchanged by any rejected
           attempt.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-125
+NAME:     Duplicate Down has a working direct shortcut (⌥U)
+PRIORITY: P2
+BUG:      P2 "Shortcut key for Duplicate Down" — Duplicate Down was
+          palette-only; ⌃⇧D was the suggested candidate but is not
+          reliably deliverable (fixed 2026-08-29)
+CROSS-REF: QA-LINE-010, QA-LINE-006, QA-LINE-007
+VERIFY    ⌥U duplicates the current line downward and moves the cursor
+          to the new copy, mirroring ⌃U (Duplicate Up). The palette
+          entry for "Duplicate Down" displays "⌥U". ⌃⇧D was rejected:
+          classic terminals send the same single control byte for
+          Ctrl+D and Ctrl+Shift+D (InputParser.pm _parse_control only
+          ever sets modifier ['ctrl'] for control-code bytes 1-26 — the
+          shift bit is never recoverable there), so a binding on it
+          could never actually be received.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-126
+NAME:     Long status messages don't corrupt the screen (line-wrap scroll)
+PRIORITY: P1
+BUG:      P3 "No Save As command in palette" — found while testing the
+          new command with a long absolute save path (2026-08-29)
+CROSS-REF: QA-FILE-018, QA-FILE-019, QA-FILE-020
+VERIFY    A status/error message longer than the terminal width (e.g.
+          "Saved: /very/long/absolute/path/to/file.py") is truncated
+          with a leading "…" (tail — e.g. filename — stays visible),
+          not printed raw. Before the fix, an untruncated long message
+          wrapped onto the next real terminal row in both
+          `_render_status_bar` and `_render_context_status_bar`
+          (Renderer.pm), causing a genuine terminal scroll that the
+          app's fixed-position redraw didn't account for: the tab bar
+          disappeared and the ruler/gutter row showed stale, misaligned
+          content on the next redraw. Reproduce by saving (or Save As)
+          to a path longer than the terminal width and confirming the
+          tab bar and ruler render correctly afterward, including after
+          further cursor movement.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-127
+NAME:     "Save As" command exists in the palette
+PRIORITY: P3
+BUG:      P3 "No Save As command in palette" (2026-08-29)
+CROSS-REF: QA-FILE-018, QA-FILE-019, QA-FILE-020
+VERIFY    Command palette FILE section shows "Save As", distinct from
+          "Save" (⌃S). Unlike ⌃S, which only prompts for a path when
+          the document is untitled, "Save As" always opens the footer
+          prompt (prefilled with the current path) regardless of
+          whether the document already has one. Writes via plain file
+          I/O (Document::save(), atomic temp-file-then-rename) — no
+          shell exec.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-128
+NAME:     Built-in transforms exist in a TRANSFORM palette section
+PRIORITY: P3
+BUG:      P3 "Transform (Alt+T) is shell-pipe only" (2026-08-29)
+CROSS-REF: QA-XFM-014, QA-XFM-015, QA-XFM-016, QA-XFM-017
+VERIFY    Palette shows a TRANSFORM section (Uppercase, Lowercase, Sort
+          Lines, Reverse Lines, Unique Lines) alongside the unchanged
+          "Transform via Shell" (⌥T, EDIT section). All 5 built-ins
+          operate on the selection, or the whole document if nothing
+          is selected. Unique Lines preserves first-occurrence order
+          (does not reorder like shell `sort -u`). None of the 5 shell
+          out — pure Perl via Document::replace().
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-129
+NAME:     Word completion covers ALL open buffers (not just the active one)
+PRIORITY: P2
+BUG:      P2 "Buffer word completion" — verified ALREADY IMPLEMENTED,
+          not a gap (2026-08-29)
+CROSS-REF: QA-CPLT-021, QA-CPLT-009
+VERIFY    Typing a 2+ char prefix of a word that exists only in a
+          DIFFERENT open tab still surfaces it as a ghost-text
+          suggestion (CrossBufferWordProvider scans every open tab's
+          document, cached per-document by content_version). This is
+          the case existing completion coverage (QA-CPLT-001–020)
+          never exercised — they only ever typed the target word into
+          the SAME buffer being completed. Regression here would mean
+          completion silently regressed to single-buffer-only.

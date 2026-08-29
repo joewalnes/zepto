@@ -320,3 +320,39 @@ STEPS
 VERIFY
   - Paste goes through cleanly.
   - Completion does NOT trigger mid-paste with cascading suggestions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-021
+NAME:     Word completion scans ALL open buffers, not just the active one
+PRIORITY: P1
+FEATURE:  completion cross-buffer
+RELATED:  bugs.md P2 "Buffer word completion" (ALREADY IMPLEMENTED)
+
+SETUP
+  Two tabs open: tab A contains a long, distinctive identifier that
+  appears nowhere else (e.g. `longUniqueVariableNameXYZ`); tab B is
+  empty/unrelated.
+
+STEPS
+  1. Switch to tab B (⌥. or ⌥,).
+  2. Type a 2+ char prefix of the identifier from tab A (e.g.
+     `longUnique`).
+  3. Press Tab to accept.
+
+VERIFY
+  - Ghost text suggests the completion even though the full word has
+    never been typed in tab B — it comes from CrossBufferWordProvider
+    scanning tab A.
+  - Accepting inserts the full identifier from tab A into tab B.
+
+NOTES
+  `lib/Zepto/Completion/CrossBufferWordProvider.pm` is a superset of a
+  same-buffer word provider: it scans every open tab's document (cached
+  per-document by content_version, rebuilt only when something
+  changed), with a proximity score bonus for words from the currently
+  active document. This is what makes the "Buffer word completion"
+  bugs.md entry ALREADY IMPLEMENTED rather than a gap to fill — it
+  covers cross-buffer, which the original ask didn't even require.
+  QA-CPLT-009 already covers same-buffer triggering; this test is the
+  one that actually exercises the cross-tab path.

@@ -92,7 +92,7 @@ category-ordered list with the modifier repeated on every pill:
 - All commands are defined in a single registry (`lib/Zepto/CommandRegistry.pm`).
 - The registry is the source of truth for: command palette display, status bar pills, and shortcut dispatch.
 - Every command has: id, label, icon, shortcut, section, type, priority, and method.
-- Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, DIAGNOSTICS.
+- Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, TRANSFORM, AI, DOCUMENTATION, DIAGNOSTICS.
 
 ## Mouse And Keyboard Behavior
 

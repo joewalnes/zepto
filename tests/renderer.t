@@ -1263,6 +1263,49 @@ subtest 'Status bar shows READ ONLY for binary files' => sub {
     (my $plain = $bar) =~ s/\x1b\[[^m]*m//g;
     like($plain, qr/READ ONLY/, 'Status bar contains READ ONLY for binary files');
 };
+
+# ============================================================================
+# QA-REG-126: long status messages must be truncated, not left to overflow
+# and wrap onto the next terminal row (which scrolls the whole screen and
+# corrupts everything rendered above the status bar).
+# ============================================================================
+subtest 'Long status message is truncated to fit the terminal width' => sub {
+    my $doc = Zepto::Document->new();
+    my $theme = Zepto::Theme->new('dark');
+    my $cols = 80;
+    my $tail = 'reg126_target_file.py';
+    my $long_msg = 'Saved: /' . ('x' x 150) . '/' . $tail;
+
+    my $bar = Zepto::Renderer->_render_status_bar($doc, undef, $theme, $cols, $long_msg, undef, undef);
+    (my $plain = $bar) =~ s/\x1b\[[^m]*m//g;
+    $plain =~ s/\x1b\[K//g;
+
+    ok(length($plain) <= $cols + 1, '_render_status_bar output fits within terminal width')
+        or diag("length=" . length($plain) . " cols=$cols");
+    like($plain, qr/\x{2026}/, 'truncated message contains an ellipsis');
+    like($plain, qr/\Q$tail\E/, 'truncated message preserves the tail (filename)');
+    unlike($plain, qr/x{150}/, 'the full untruncated 150-char run is not printed verbatim');
+};
+
+subtest 'Long status message is truncated in context status bar too' => sub {
+    my $doc = Zepto::Document->new();
+    my $theme = Zepto::Theme->new('dark');
+    my $cols = 80;
+    my $tail = 'reg126_other.txt';
+    my $long_msg = 'Saved: /' . ('y' x 150) . '/' . $tail;
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(
+        $doc, undef, $theme, $cols, $long_msg, 0, {}, 0
+    );
+    (my $plain = $bar) =~ s/\x1b\[[^m]*m//g;
+    $plain =~ s/\x1b\[K//g;
+
+    ok(length($plain) <= $cols + 1, '_render_context_status_bar output fits within terminal width')
+        or diag("length=" . length($plain) . " cols=$cols");
+    like($plain, qr/\x{2026}/, 'truncated message contains an ellipsis');
+    like($plain, qr/\Q$tail\E/, 'truncated message preserves the tail (filename)');
+    unlike($plain, qr/y{150}/, 'the full untruncated 150-char run is not printed verbatim');
+};
 # ============================================================================
 # Inline Markdown image detection
 # ============================================================================

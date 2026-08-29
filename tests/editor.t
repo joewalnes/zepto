@@ -800,6 +800,172 @@ subtest 'Duplicate line up' => sub {
     is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
 };
 
+subtest 'Alt+U keybinding dispatches to Duplicate Down' => sub {
+    # bugs.md P2 "Shortcut key for Duplicate Down": Ctrl+Shift+D was
+    # considered but rejected because classic terminals deliver
+    # Ctrl+letter as a single control byte (no way to carry Shift), so
+    # Alt+U was bound instead — verify the raw ESC+'u' sequence a
+    # terminal actually sends for Alt+U reaches do_duplicate_line_down.
+    my $term = mock_terminal();
+    my $filename = create_temp_file("aaa\nbbb\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
+
+    setup_editor_doc($editor, $filename);
+
+    $editor->handle_input("\x1bu");  # ESC + 'u' = Alt+U
+
+    is($editor->active_doc()->text(), "aaa\naaa\nbbb", 'Alt+U duplicated line below');
+    is($editor->active_view()->cursor_line(), 1, 'Cursor on new duplicate');
+};
+
+# ============================================================================
+# Built-in Text Transforms (bugs.md P3 "Transform (Alt+T) is shell-pipe only")
+#
+# Note: Document->load() strips the file's trailing newline for in-memory
+# editing (Document->save() adds it back per POSIX convention — see
+# Document.pm "Strip trailing newline for editing"). So text() on a
+# create_temp_file()-loaded document never ends with "\n" regardless of
+# what was on disk. Tests that need a real embedded "\n" inside the text
+# under test build the Document directly via Zepto::Document->new(text
+# => ...), which stores content as-is with no stripping.
+# ============================================================================
+subtest 'cmd_transform_uppercase on selection' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world\nother line\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $view = $editor->active_view();
+    $view->set_cursor(0, 0, 0);
+    $view->set_cursor(0, 5, 1);  # select "hello"
+
+    $editor->cmd_transform_uppercase();
+
+    is($editor->active_doc()->text(), "HELLO world\nother line", 'Only selection uppercased');
+};
+
+subtest 'cmd_transform_lowercase on whole document when nothing selected' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("HELLO WORLD\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    ok(!$editor->active_view()->has_selection(), 'No selection to start');
+    $editor->cmd_transform_lowercase();
+
+    is($editor->active_doc()->text(), 'hello world', 'Whole document lowercased (auto-select-all)');
+};
+
+subtest 'cmd_transform_uppercase is a no-op (no undo entry) when already uppercase' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("ALREADY UPPER\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $doc = $editor->active_doc();
+    my $version_before = $doc->content_version();
+    $editor->cmd_transform_uppercase();
+
+    is($doc->text(), 'ALREADY UPPER', 'Text unchanged');
+    is($doc->content_version(), $version_before, 'No-op transform does not bump content_version (no undo entry)');
+};
+
+subtest 'cmd_transform_sort_lines sorts alphabetically' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_sort_lines();
+
+    is($editor->active_doc()->text(), "apple\nbanana\ncherry", 'Lines sorted');
+};
+
+subtest 'cmd_transform_sort_lines preserves trailing newline on a partial selection' => sub {
+    my $term = mock_terminal();
+    # Built directly (not via create_temp_file/load), so the embedded "\n"
+    # characters are real — this is what a partial, mid-document selection
+    # actually looks like in memory.
+    my $doc = Zepto::Document->new(text => "banana\napple\ncherry\n");
+    my $view = Zepto::View->new(document => $doc);
+    my $term2 = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term2);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document => $doc, view => $view, find_engine => $find_engine,
+        highlighter => $highlighter, file_path => undef,
+    );
+
+    # Select "banana\napple\n" (first two lines, including their trailing
+    # newlines) — leaves "cherry\n" out of the selection entirely.
+    $view->set_cursor(0, 0, 0);
+    $view->set_cursor(2, 0, 1);
+
+    $editor->cmd_transform_sort_lines();
+
+    is($doc->text(), "apple\nbanana\ncherry\n",
+       'Selected lines sorted with trailing newline preserved; unselected "cherry" untouched');
+};
+
+subtest 'cmd_transform_reverse_lines reverses line order' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("one\ntwo\nthree\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_reverse_lines();
+
+    is($editor->active_doc()->text(), "three\ntwo\none", 'Line order reversed');
+};
+
+subtest 'cmd_transform_unique_lines keeps first occurrence, preserves order' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\napple\nbanana\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_unique_lines();
+
+    is($editor->active_doc()->text(), "banana\napple\ncherry",
+       'Duplicates removed, first-occurrence order preserved (not re-sorted)');
+};
+
+subtest 'Built-in transforms are undoable in one step' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $doc = $editor->active_doc();
+    my $original = $doc->text();
+
+    $editor->cmd_transform_sort_lines();
+    isnt($doc->text(), $original, 'Text changed after sort');
+
+    $doc->undo();
+    is($doc->text(), $original, 'Single undo restores original order');
+};
+
+subtest 'Built-in transforms never shell out (pure Perl, no injection risk)' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $marker = "$tmpdir/should_never_run";
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("foo; touch $marker; echo hi\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_uppercase();
+
+    is($editor->active_doc()->text(), 'FOO; TOUCH ' . uc($marker) . '; ECHO HI',
+       'Shell-metacharacter line treated as literal text, uppercased in place');
+    ok(!-e $marker, 'No command was ever executed');
+};
+
 # ============================================================================
 # Copy/paste
 # ============================================================================
@@ -2675,6 +2841,121 @@ subtest 'Save As activates syntax highlighting for new filename' => sub {
     like($hl->{grammar_class}, qr/Python/, 'Python grammar detected for .py file');
 
     unlink $py_file;
+};
+
+# ============================================================================
+# cmd_save_as (bugs.md P3 "No Save As command in palette")
+# ============================================================================
+subtest 'cmd_save_as opens footer input prefilled with current path' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("Content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+
+    is($editor->{state}, 'footer_input', 'cmd_save_as opens footer input');
+    is($editor->{footer_input}{prompt}, 'Save As:', 'Prompt is "Save As:"');
+    is($editor->{footer_input}{widget}->value(), $filename,
+       'Prefilled with the document\'s current path');
+};
+
+subtest 'cmd_save_as writes the file, updates the tab, and activates syntax highlighting' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("def foo():\n    return 1\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $hl = $editor->active_highlighter();
+    ok(!$hl->{grammar}, 'Plain temp file has no grammar before Save As');
+
+    $editor->cmd_save_as();
+    is($editor->{state}, 'footer_input', 'Footer input open');
+
+    my $py_file = $filename . '.py';
+    # Replace the pre-selected prefilled value with the new path
+    $editor->handle_input($py_file);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'editing', 'Back to editing after submit');
+    ok(-e $py_file, 'New file exists on disk');
+
+    my $tab = $editor->active_tab();
+    is($tab->{file_path}, $py_file, 'Tab file_path updated to the new path');
+    is($tab->{untitled_name}, undef, 'Tab untitled_name cleared');
+
+    ok($hl->{grammar}, 'Grammar activated for the new .py extension');
+    like($hl->{grammar_class}, qr/Python/, 'Python grammar detected');
+
+    unlink $py_file;
+};
+
+subtest 'cmd_save_as prompts before overwriting a different existing file' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("current content\n");
+    my $other = create_temp_file("other content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    $editor->handle_input($other);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'prompt', 'Overwrite confirmation prompt opens');
+    like($editor->{prompt}{text}, qr/already exists/, 'Prompt warns the file already exists');
+
+    # Decline: file on disk must be untouched
+    $editor->handle_input('n');
+    is($editor->{state}, 'editing', 'Back to editing after declining');
+
+    open(my $fh, '<', $other) or die $!;
+    my $content = do { local $/; <$fh> };
+    close $fh;
+    is($content, "other content\n", 'Declining overwrite leaves the other file untouched');
+
+    unlink $filename, $other;
+};
+
+subtest 'cmd_save_as overwrites when confirmed' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("current content\n");
+    my $other = create_temp_file("other content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    $editor->handle_input($other);
+    $editor->handle_input("\r");
+    is($editor->{state}, 'prompt', 'Overwrite confirmation prompt opens');
+
+    $editor->handle_input('y');
+    is($editor->{state}, 'editing', 'Back to editing after confirming');
+
+    open(my $fh, '<', $other) or die $!;
+    my $content = do { local $/; <$fh> };
+    close $fh;
+    is($content, "current content\n", 'Confirming overwrite writes this document\'s content');
+
+    my $tab = $editor->active_tab();
+    is($tab->{file_path}, $other, 'Tab now points at the overwritten file');
+
+    unlink $filename, $other;
+};
+
+subtest 'cmd_save_as does not prompt when re-saving to the document\'s own path' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("content\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_save_as();
+    # Submit without changing the prefilled (== current) path
+    $editor->handle_input($filename);
+    $editor->handle_input("\r");
+
+    is($editor->{state}, 'editing', 'No overwrite prompt — straight back to editing');
+
+    unlink $filename;
 };
 
 # ============================================================================

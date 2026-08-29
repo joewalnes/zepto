@@ -71,6 +71,16 @@ my @COMMANDS = (
         method   => 'cmd_save',
     },
     {
+        id       => 'save_as',
+        label    => 'Save As',
+        icon     => 'save',
+        shortcut => '',
+        section  => 'FILE',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_save_as',
+    },
+    {
         id       => 'close_tab',
         label    => 'Save and Close Tab',
         icon     => 'times',
@@ -237,7 +247,7 @@ my @COMMANDS = (
         id       => 'dup_line_down',
         label    => 'Duplicate Down',
         icon     => 'dup_down',
-        shortcut => '',
+        shortcut => SYM_ALT . 'U',
         section  => 'EDIT',
         type     => 'action',
         priority => 0,
@@ -567,6 +577,62 @@ my @COMMANDS = (
         method   => 'cmd_toggle_markdown_tables',
     },
 
+    # === TRANSFORM section ===
+    # Built-in, pure-Perl text transforms — no shell exec, unlike
+    # "Transform via Shell" (⌥T, EDIT section, unchanged). Operate on
+    # the current selection, or the whole document if nothing is
+    # selected — same scoping ⌥T already uses.
+    {
+        id       => 'transform_uppercase',
+        label    => 'Uppercase',
+        icon     => 'terminal',
+        shortcut => '',
+        section  => 'TRANSFORM',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform_uppercase',
+    },
+    {
+        id       => 'transform_lowercase',
+        label    => 'Lowercase',
+        icon     => 'terminal',
+        shortcut => '',
+        section  => 'TRANSFORM',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform_lowercase',
+    },
+    {
+        id       => 'transform_sort_lines',
+        label    => 'Sort Lines',
+        icon     => 'terminal',
+        shortcut => '',
+        section  => 'TRANSFORM',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform_sort_lines',
+    },
+    {
+        id       => 'transform_reverse_lines',
+        label    => 'Reverse Lines',
+        icon     => 'terminal',
+        shortcut => '',
+        section  => 'TRANSFORM',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform_reverse_lines',
+    },
+    {
+        id       => 'transform_unique_lines',
+        label    => 'Unique Lines',
+        icon     => 'terminal',
+        shortcut => '',
+        section  => 'TRANSFORM',
+        type     => 'action',
+        priority => 0,
+        method   => 'cmd_transform_unique_lines',
+    },
+
     # === AI section ===
     {
         id       => 'ai_setup',
@@ -651,7 +717,7 @@ my @COMMANDS = (
 my %BY_ID = map { $_->{id} => $_ } @COMMANDS;
 
 # Section ordering for palette display
-my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'AI', 'DOCUMENTATION', 'DIAGNOSTICS');
+my @SECTION_ORDER = ('FILE', 'EDIT', 'NAVIGATE', 'VIEW', 'TRANSFORM', 'AI', 'DOCUMENTATION', 'DIAGNOSTICS');
 
 # =============================================================================
 # Public API

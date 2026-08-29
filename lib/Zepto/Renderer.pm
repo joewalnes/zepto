@@ -3604,6 +3604,13 @@ sub _render_status_bar {
 
     # If there's a message, show it simply
     if ($message) {
+        # Truncate from the start (keep the tail — e.g. filename — visible)
+        # so a long message (e.g. "Saved: /very/long/path...") never
+        # overflows past $cols. An untruncated message longer than the
+        # terminal width wraps onto the next real terminal row, scrolling
+        # the whole screen and corrupting everything above the status bar.
+        my $max_msg_width = $cols - 1;
+        $message = _ellipsis($message, $max_msg_width, 'start') if $max_msg_width > 0;
         push @_out, $theme->color('status_bg') . $theme->color('warning_fg');
         push @_out, ' ' . $message;
         my $padding = $cols - length($message) - 1;
@@ -3883,6 +3890,13 @@ sub _render_context_status_bar {
 
     # If there's a message, show it simply
     if ($message) {
+        # Truncate from the start (keep the tail — e.g. filename — visible)
+        # so a long message (e.g. "Saved: /very/long/path...") never
+        # overflows past $cols. An untruncated message longer than the
+        # terminal width wraps onto the next real terminal row, scrolling
+        # the whole screen and corrupting everything above the status bar.
+        my $max_msg_width = $cols - 1;
+        $message = _ellipsis($message, $max_msg_width, 'start') if $max_msg_width > 0;
         my $fg = $message_is_error ? $theme->color('error_fg') : $theme->color('warning_fg');
         push @_out, $theme->color('status_bg') . $fg;
         push @_out, ' ' . $message;

@@ -52,8 +52,23 @@ In Markdown files, emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) are rendered
 
 **Fix:** Added a dedicated `TOKEN_FORMATTING_DELIM` token type (`Syntax/Base.pm`) distinct from `TOKEN_PUNCTUATION`. `Syntax/Markdown.pm` now emits it for the `**`/`__`, `*`/`_`, `***`/`___`, `~~`, and `==` delimiter pairs surrounding bold/italic/bold-italic/strikethrough/highlight text — no other punctuation (headings, list markers, blockquotes, code fences, link brackets, thematic breaks) is affected. Added `syntax_formatting_delim` color to both themes in `Theme.pm`: a faint blue-gray close to the dark bg (`fg_rgb(70,75,100)` vs `bg(26,27,38)`) and a faint light gray close to the light bg (`fg_rgb(200,203,212)` vs `bg(255,255,255)`) — both measurably closer to their theme's background than `syntax_punctuation`. No characters are hidden or concealed — only the delimiter color changes. Non-Markdown grammars are unaffected (e.g. Perl's `**` exponentiation operator still tokenizes as `TOKEN_OPERATOR`).
 
-### P2: Buffer word completion
+### ~~P2: Buffer word completion~~ ALREADY IMPLEMENTED
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
+
+**Verified 2026-08-29:** Fully implemented, and the shipped design exceeds this entry's ask — `lib/Zepto/Completion/CrossBufferWordProvider.pm` scans **every open tab's document**, not just the active buffer (cached per-document by `content_version`, rebuilt only when something changed; words from the active document get a proximity score bonus). Confirmed interactively via hangon: typed a distinctive identifier in tab A, switched to tab B, typed a 2-char prefix — ghost text suggested the tab-A-only word, and Tab accepted it into tab B.
+
+Shipped trigger model (`lib/Zepto/Completion/Controller.pm`, orchestrated from `Editor.pm`):
+- **Auto-trigger**: ghost text appears automatically after typing 2+ word characters — no dedicated key needed for the common case (this entry's suggested `Ctrl+N`/`Tab` triggers were never implemented as such; auto-trigger plus the existing `⌃Space` below covers the same need without demanding a key to memorize).
+- **`⌃Space`**: dual-purpose — if the cursor sits immediately after a word character, it explicitly opens the dropdown menu (multiple candidates) instead of the command palette; otherwise it opens the palette. This is intentional, pre-existing behavior, not new.
+- **`Tab`**: accepts the full ghost-text completion.
+- **`→` (Right arrow)**: accepts one character at a time, keeping the rest as ghost text.
+- **`↑`/`↓`**: navigate the dropdown menu; `Enter` accepts the highlighted item.
+- **`Esc`**: dismisses.
+- **`⌥[` / `⌥]`**: cycle ghost-text alternatives.
+
+Other providers already merged into the same ranked result set: `KeywordProvider` (language keywords), `SnippetProvider` (multi-line templates, e.g. Python `def`), `PathProvider`, `RecentProvider` (recently-accepted completions get a score boost), and AI completion (separate opt-in provider, rate-limited).
+
+No gap found — nothing to implement. Added `QA-CPLT-021` (cross-buffer path specifically; existing `QA-CPLT-001`–`020` covered same-buffer, dropdown, accept/dismiss/navigate, undo/redo, snippets, recent-pick, AI, the off-toggle, and paste-doesn't-trigger, but none exercised a SECOND open tab as the completion source).
 
 ### ~~P2: Session restore~~ FIXED
 Reopen the editor and get back exactly where you were: same tabs, cursor positions, scroll positions. The recent files infrastructure already exists (`~/.config/zepto/recent_files`). Extending to full session state eliminates the re-navigation tax every time the editor is restarted. Especially important for a terminal editor that gets opened/closed frequently.
@@ -106,8 +121,10 @@ These weren't added to the palette or `GLOBAL_PREFS` in the config-file fix abov
 ### P3: Tab Width's validation-error pattern exposed a pre-existing dead-code bug in Go to Line
 While adding the new "Tab Width" palette command, invalid input was (in the first draft) reported via `$self->{status_msg}`, which turned out to be a field the renderer never displays — errors vanished silently. Fixed in Tab Width by switching to `show_error_message()` (see QA-REG-120). `cmd_goto_line` (`lib/Zepto/Editor/Commands.pm`) has the exact same bug for its "Invalid format. Use: line, line:col, or :col" message — typing a malformed Go to Line input fails silently today. Not fixed here (out of scope for this task) — it's the only other `status_msg` writer in the codebase (`grep -rn status_msg lib/`), so this is the complete list.
 
-### P2: Shortcut key for Duplicate Down
+### ~~P2: Shortcut key for Duplicate Down~~ FIXED
 Duplicate Down currently has no keyboard shortcut — it's palette-only. Should have a direct keybinding for quick access. `⌃D` is taken (Select Next Occurrence). Candidates: `⌃⇧D` (Shift=reverse already used for Duplicate Up as `⌃U`, but `⌃⇧D` is intuitive as "duplicate" with Shift for the pair), or find another mnemonic. Also consider giving Duplicate Up a matching shortcut if it doesn't have one.
+
+**Fix:** `⌃⇧D` was rejected after checking `InputParser.pm`: classic terminals deliver Ctrl+letter as a single control byte (0x01-0x1a, `_parse_control`), which can only ever set `modifiers => ['ctrl']` — there is no wire representation of Shift for it, so Ctrl+D and Ctrl+Shift+D are indistinguishable in most terminals (confirmed interactively — `hangon`'s own key vocabulary has no `ctrl-shift-*` combos for exactly this reason). Bound `⌥U` instead (Alt+letter survives reliably as ESC+char). `⌥U` pairs mnemonically with the existing `⌃U` (Duplicate Up) — same letter, "up" vs "down" modifier — and doesn't collide with any other Alt+letter binding. Duplicate Up already had `⌃U` from the original multi-cursor work, so no change was needed there. Added to `CommandRegistry.pm` (`dup_line_down` shortcut) and `Editor.pm::handle_alt_char`. QA: `QA-LINE-010`, `QA-REG-125`.
 
 ### ~~P3: Automatic dark/light mode~~ FIXED
 Detect the system theme (dark/light) on startup and choose the matching editor theme. Detect when the system theme changes at runtime and automatically switch. Auto mode is optional — users can still manually set dark or light via `Ctrl+T` or config.
@@ -932,16 +949,22 @@ Noticed while writing QA-REG-105: with 3 matches and the cursor on match 3, togg
 
 **Fix:** New `_clamp_find_current()` resets the index when it exceeds the new match count, called at both sites that replace `find_matches` without re-jumping (`_update_find_matches`, which the ⌃R/⌃C toggles use with skip_jump, and the background-search completion in `run()`). Tests: `tests/find.t` "find_current clamped when matches shrink" and `reg_107_find_count_clamp.sh` (QA-REG-107) — both written first and verified failing ("3 of 1" on screen) before the fix. Side discovery captured in the QA script: Enter in the find bar closes it; ↑↓ navigate matches.
 
-### P3: No "Save As" command in palette
+### ~~P3: No "Save As" command in palette~~ FIXED
 The command palette has "Save" (⌃S) and "Save and Close Tab" (⌃W) but no "Save As" / "Save to different location" command. File→Save As is a standard editor operation. Users can only save to the original path.
+
+**Fix:** Added `cmd_save_as` (FILE section, no default shortcut) that always opens the footer input prompt — unlike `cmd_save`, which only prompts when the document has no path yet — prefilled with the document's current path (select-all active so retyping is quick). Confirms via `open_prompt` (Yes/No) before overwriting an existing file that isn't the document's own current path. On submit, writes via `Document::save()` (plain file I/O, no shell), updates the tab's `file_path`/`untitled_name`, and calls `active_highlighter()->set_file($filename)` to activate syntax highlighting for the new extension — same plumbing `cmd_save`'s inline "no path yet" flow already used, now shared via a `_finish_save_as` helper. **Security:** pure `open`/`rename`-based file I/O via the existing `Document::save()` path (already atomic: write to temp file, then rename) — no shell exec, no new attack surface; reviewed against `docs/SECURITY.md`.
+
+**Bug found along the way:** while testing Save As with a long absolute path, the status bar message ("Saved: /very/long/path...") was never truncated to the terminal width in `Renderer.pm` (`_render_status_bar` and `_render_context_status_bar`). A message longer than the terminal width wrapped onto the next real terminal row, scrolling the whole screen and corrupting everything above the status bar (tab bar disappeared, ruler/gutter misrendered) until a forced full redraw. Not specific to Save As — any long `show_message`/`show_error_message` call could trigger it — but Save As surfaces it easily since users often save to long paths. **Fixed** by truncating the message with `_ellipsis($message, $cols - 1, 'start')` (truncate-from-start, matching the existing path-truncation convention elsewhere in Renderer.pm) at both message render sites. QA: `QA-FILE-*` (Save As), `QA-REG-126` (message truncation).
 
 ### ~~P3: Preference state persists between sessions~~ NO LONGER A TEST HAZARD
 Toggle states (minimap, word wrap, nerd font, etc.) persist to preferences. This means QA tests that toggle features can affect subsequent tests. Tests must save and restore state. Not a bug per se, but a testing hazard worth documenting.
 
 **Resolution (2026-08-29):** Persisting preferences is intended product behavior; the test hazard is gone since QA sessions run with a per-test `--state-dir` (QA-REG-106) — toggles land in an isolated temp dir, never in shared or real state.
 
-### P3: Transform (Alt+T) is shell-pipe only
+### ~~P3: Transform (Alt+T) is shell-pipe only~~ FIXED
 The transform feature (Alt+T) opens a shell command prompt. There are no built-in text transforms (uppercase, lowercase, sort, etc.) — users must type shell commands like `tr '[:lower:]' '[:upper:]'` or `sort`. This works but is not discoverable for users unfamiliar with Unix pipes.
+
+**Fix:** Added 5 built-in, pure-Perl transforms in a new TRANSFORM palette section: Uppercase, Lowercase, Sort Lines, Reverse Lines, Unique Lines (first-occurrence order preserved, unlike shell `sort -u` which reorders). All operate on the current selection, or the whole document if nothing is selected — same auto-select-all scoping `cmd_transform` (⌥T) already uses. No shell exec: `cmd_transform_uppercase`/`cmd_transform_lowercase` call `_apply_text_transform`, a shared engine that reads the selected text, applies a coderef, and writes it back via `Document::replace()` (single undo entry; no-op — no undo entry, no dirty flag — if the transform doesn't change anything). `cmd_transform_sort_lines`/`cmd_transform_reverse_lines`/`cmd_transform_unique_lines` go through `_apply_line_transform`, which layers line-splitting on top (preserves whether the original text ended with a trailing newline). ⌥T / "Transform via Shell" is completely unchanged — still in the EDIT section, still shell-pipe. **Behavioral discovery along the way:** `⌃Space` is dual-purpose — if the cursor sits immediately after a word character, it's routed to the completion-trigger path instead of opening the palette (see `Editor.pm::handle_ctrl_char`, char `' '` case). This is intended, pre-existing behavior (not something this change touched), but it means interactive testing of a selection ending mid-word needs the cursor moved off the word boundary (e.g. `Home`, or extend the selection one more character past the word) before pressing `⌃Space`, or the palette won't open.
 
 ## Live debugging session (2026-08-28)
 

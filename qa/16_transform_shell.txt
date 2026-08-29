@@ -1,9 +1,11 @@
 ================================================================================
-16 — Transform via Shell
+16 — Transform via Shell & Built-in Transforms
 ================================================================================
 
 Covers: ⌥T transform, pipes selection or current line through sh -c,
-replaces inline, error handling, hint text.
+replaces inline, error handling, hint text. Also covers the built-in,
+pure-Perl transforms in the palette's TRANSFORM section (Uppercase,
+Lowercase, Sort Lines, Reverse Lines, Unique Lines) — no shell involved.
 
 --------------------------------------------------------------------------------
 
@@ -215,3 +217,102 @@ STEPS
 VERIFY
   - "Transform via Shell" command present under EDIT section with ⌥T
     shortcut.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-014
+NAME:     Built-in transforms are discoverable under a TRANSFORM section
+PRIORITY: P2
+FEATURE:  transform builtin palette
+RELATED:  bugs.md P3 "Transform (Alt+T) is shell-pipe only"
+
+STEPS
+  1. Open palette (⌃Space).
+
+VERIFY
+  - A "TRANSFORM" section header appears, distinct from EDIT.
+  - It lists: Uppercase, Lowercase, Sort Lines, Reverse Lines, Unique
+    Lines. None of these require typing a shell command.
+  - "Transform via Shell" (⌥T) still appears under EDIT, unchanged.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-015
+NAME:     Uppercase / Lowercase transform the selection, whole doc if none
+PRIORITY: P2
+FEATURE:  transform builtin case
+
+SETUP
+  Buffer:
+    one
+    two
+    three
+
+STEPS
+  1. Select just "one" (extend selection one char past the word so the
+     cursor isn't immediately after a word character — ⌃Space is
+     dual-purpose and would otherwise route to completion-trigger
+     instead of opening the palette; see NOTES).
+  2. ⌃Space → "Uppercase" → Enter.
+  3. Undo. With NO selection, ⌃Space → "Lowercase" → Enter (on a
+     buffer containing some uppercase text).
+
+VERIFY
+  - Step 2: only "one" becomes "ONE"; "two"/"three" untouched.
+  - Step 3: with nothing selected, the whole document is lowercased
+    (same auto-select-all scoping as ⌥T Transform via Shell).
+
+NOTES
+  ⌃Space is context-sensitive: if the cursor sits immediately after a
+  word character, it triggers word completion instead of opening the
+  palette (Editor.pm::handle_ctrl_char, char ' ' case — pre-existing,
+  unrelated to this feature). When selecting a whole word by hand,
+  either press Home first, or extend the selection one character past
+  the word boundary, before pressing ⌃Space.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-016
+NAME:     Sort Lines / Reverse Lines / Unique Lines
+PRIORITY: P2
+FEATURE:  transform builtin lines
+
+SETUP
+  Buffer:
+    banana
+    apple
+    cherry
+    apple
+
+STEPS
+  1. No selection. ⌃Space → "Sort Lines" → Enter.
+  2. Undo. ⌃Space → "Unique Lines" → Enter.
+  3. Undo. ⌃Space → "Reverse Lines" → Enter.
+
+VERIFY
+  - Step 1: apple, apple, banana, cherry (alphabetical).
+  - Step 2: banana, apple, cherry — duplicate "apple" removed, first
+    occurrence kept, original order preserved (NOT shell `sort -u`,
+    which would also reorder).
+  - Step 3: apple, cherry, apple, banana — line order fully reversed.
+  - Each step is undoable in one ⌃Z back to the original 4 lines.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-XFM-017
+NAME:     Built-in transforms use pure Perl, not the shell
+PRIORITY: P3
+FEATURE:  transform builtin security
+RELATED:  docs/SECURITY.md
+
+STEPS
+  1. Buffer contains a line that looks like a shell metacharacter
+     injection attempt, e.g. `foo; rm -rf /tmp/should_not_run`.
+  2. Select all, run "Uppercase".
+
+VERIFY
+  - The line is uppercased as literal text
+    (`FOO; RM -RF /TMP/SHOULD_NOT_RUN`) — no command execution, no
+    shell invoked. Unlike ⌥T (which intentionally does invoke `sh -c`
+    on user-typed shell commands), the built-in transforms never shell
+    out at all.

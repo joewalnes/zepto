@@ -10,6 +10,10 @@
 - Fixed the theme icon in the command palette staying a moon regardless of the current mode
 - New palette commands to set/toggle preferences that had no UI before: "Tab Width" (footer prompt, 1-16), "Soft Tabs (Spaces)", "Auto Indent", "Mouse", "Search Wrap Around", "Markdown Table Rendering" — all now persist across restarts like the other preferences
 - Fixed "Tab Width" (and any similarly invalid preference input) failing silently instead of showing an error message
+- Added a direct keyboard shortcut for Duplicate Down: ⌥U (pairs with ⌃U for Duplicate Up)
+- Added a "Save As" command to the palette (FILE section) — prompts for a path even when the document already has one, confirms before overwriting a different existing file, and activates syntax highlighting for the new extension
+- Added 5 built-in text transforms to the palette (new TRANSFORM section): Uppercase, Lowercase, Sort Lines, Reverse Lines, Unique Lines — operate on the selection, or the whole document if none, no shell required. "Transform via Shell" (⌥T) is unchanged
+- Fixed long status messages (e.g. "Saved: /very/long/path...") overflowing past the terminal width and scrolling/corrupting the screen — long messages are now truncated with a leading "…"
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

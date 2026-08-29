@@ -1628,6 +1628,11 @@ sub handle_alt_char {
     # Transform via shell
     elsif ($char eq 't') { $self->cmd_transform(); }
 
+    # Duplicate line down (⌃U duplicates up; ⌥U pairs it for down —
+    # ⌃⇧D is not usable here since classic terminals send the same
+    # control byte for Ctrl+D and Ctrl+Shift+D, see bugs.md)
+    elsif ($char eq 'u') { $self->do_duplicate_line_down(); }
+
     # Location history (Alt+- back, Alt+= forward)
     elsif ($char eq '-') { $self->cmd_go_back(); }
     elsif ($char eq '=') { $self->cmd_go_forward(); }

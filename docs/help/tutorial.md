@@ -38,7 +38,8 @@ If a file has never been saved, you'll be prompted for a filename.
 - **Ctrl+X / Ctrl+C / Ctrl+V** - Cut, Copy, Paste
 - **Ctrl+D** - Select next occurrence (multi-cursor)
 - **Alt+Up / Alt+Down** - Move line up/down
-- **Ctrl+U** - Duplicate line
+- **Ctrl+U** - Duplicate line up
+- **Alt+U** - Duplicate line down
 - **Ctrl+/** - Toggle comment
 
 ## Selection
