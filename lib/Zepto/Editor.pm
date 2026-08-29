@@ -19,6 +19,7 @@ use warnings;
 use utf8;
 use Carp;
 use File::Spec;
+use Cwd qw(getcwd);
 use Time::HiRes qw(time);
 
 use Exporter 'import';
@@ -175,6 +176,12 @@ sub new {
         # Completion state
         _completion            => undef,  # Completion::Controller
         _completion_pending_at => 0,      # Debounce timer (Time::HiRes timestamp)
+
+        # Session restore: whether this run is eligible to save its tab
+        # state at quit (see _save_session). Set from init() based on how
+        # zepto was launched; defaults on so direct unit-test calls to
+        # _save_session() (bypassing init()) behave as if bare-launched.
+        _session_eligible => 1,
     }, $class;
 
     # Initialize preferences (needs state_store for persistence)
@@ -362,6 +369,25 @@ sub _save_cursor_position {
     $self->{state_store}->put('history', { cursor_positions => $positions });
 }
 
+# Clamp a (line, col) pair to a document's current bounds. Shared by cursor
+# position and session restore — both load a position that may predate
+# on-disk edits to the file, so both need the same safety clamp.
+sub _clamp_position {
+    my ($self, $doc, $line, $col) = @_;
+    $line //= 0;
+    $col  //= 0;
+
+    my $max_line = $doc->line_count() - 1;
+    $line = $max_line if $line > $max_line;
+    $line = 0 if $line < 0;
+
+    my $line_len = length($doc->get_line_content($line) // '');
+    $col = $line_len if $col > $line_len;
+    $col = 0 if $col < 0;
+
+    return ($line, $col);
+}
+
 # Restore cursor position for a file (called when opening a file)
 sub _restore_cursor_position {
     my ($self, $file_path, $view) = @_;
@@ -373,20 +399,154 @@ sub _restore_cursor_position {
     my $pos = $positions->{$abs_path};
     return unless $pos;
 
-    my $line = $pos->{line} // 0;
-    my $col  = $pos->{col}  // 0;
-
-    # Clamp to document bounds
-    my $max_line = $view->{document}->line_count() - 1;
-    $line = $max_line if $line > $max_line;
-    $line = 0 if $line < 0;
-
-    my $line_len = length($view->{document}->get_line_content($line) // '');
-    $col = $line_len if $col > $line_len;
-    $col = 0 if $col < 0;
-
+    my ($line, $col) = $self->_clamp_position($view->{document}, $pos->{line}, $pos->{col});
     $view->set_cursor($line, $col);
     $view->ensure_cursor_visible();
+}
+
+# =============================================================================
+# Session Restore
+# =============================================================================
+#
+# Design (bugs.md P2 "Session restore"):
+#   - Keyed per-directory (cwd), not global — a terminal editor gets opened
+#     from many different projects, and a single global "last session"
+#     would fight between them.
+#   - Only restored (and only SAVED — see below) when zepto is launched
+#     with NO file/dir arguments. Explicit args always win — the user
+#     asked for those files, not a fight with whatever was open last time.
+#   - Save uses the exact same "bare launch" gate as restore
+#     (`_session_eligible`, set once in init()). Without this, a one-off
+#     `zepto some_file.txt` or a directory-browse `zepto .` in a project
+#     that has a saved session would silently overwrite or wipe it at
+#     quit, even though that run never restored anything and the user
+#     never asked to touch the session. Only a run that itself could have
+#     restored a session is allowed to update it.
+#   - Only tabs with a real file path are saved/restored. Unsaved
+#     "[untitled]" buffers are skipped: persisting their content would mean
+#     snapshotting unsaved text into StateStore, which is a bigger and
+#     riskier feature than "remember where I was".
+#   - Files that no longer exist at restore time are silently skipped
+#     (not an error) — the rest of the session still restores.
+#   - Gated by the `restore_session` preference (default on), toggleable
+#     from the command palette.
+#   - Saved at the well-defined "session end" points (Ctrl+Q, and closing
+#     the last tab, which also quits) rather than on every tab switch or
+#     save. Those are deliberate, infrequent user actions, so the extra
+#     StateStore write (flock + read + encode + rename) is cheap relative
+#     to them; wiring it into every tab switch would add that cost to a
+#     much hotter path for no benefit a clean quit doesn't already cover.
+#     A crash without a clean quit loses the latest session, same as the
+#     pre-existing cursor-position history.
+# =============================================================================
+
+# Storage key for the current working directory's session entry.
+sub _session_cwd_key {
+    my ($self) = @_;
+    return getcwd() // '.';
+}
+
+# Save open file-backed tabs (path, cursor, scroll) for the current cwd.
+# Called at quit time. No-op if the preference is off, or this run wasn't
+# a bare launch eligible to touch session state (see design note above).
+sub _save_session {
+    my ($self) = @_;
+    return unless $self->{_session_eligible};
+    return unless $self->{prefs}->restore_session();
+
+    my $tm = $self->{tab_manager};
+    my $cwd = $self->_session_cwd_key();
+
+    my @saved_tabs;
+    my $mapped_active = 0;
+    my $active_orig = $tm->active_index();
+
+    for my $i (0 .. $tm->tab_count() - 1) {
+        my $tab = $tm->tab_at($i);
+        next unless $tab && $tab->{file_path} && $tab->{view};
+
+        my $view = $tab->{view};
+        push @saved_tabs, {
+            file_path   => File::Spec->rel2abs($tab->{file_path}),
+            line        => $view->cursor_line(),
+            col         => $view->cursor_col(),
+            scroll_line => $view->scroll_line(),
+            scroll_col  => $view->scroll_col(),
+        };
+        $mapped_active = $#saved_tabs if $i == $active_orig;
+    }
+
+    my $history = $self->{state_store}->get('history');
+    my $sessions = { %{ $history->{sessions} || {} } };
+
+    if (@saved_tabs) {
+        $sessions->{$cwd} = { active_index => $mapped_active, tabs => \@saved_tabs };
+    }
+    else {
+        # Nothing worth restoring (all tabs were untitled) — clear any
+        # stale session so a later restore doesn't reopen old files.
+        delete $sessions->{$cwd};
+    }
+
+    $self->{state_store}->put('history', { sessions => $sessions });
+}
+
+# Look up the saved session for the current working directory.
+# Returns undef if the preference is off, or there's nothing saved.
+sub _load_session {
+    my ($self) = @_;
+    return undef unless $self->{prefs}->restore_session();
+
+    my $cwd = $self->_session_cwd_key();
+    my $history = $self->{state_store}->get('history');
+    my $session = $history->{sessions} && $history->{sessions}{$cwd};
+    return undef unless $session && $session->{tabs} && @{$session->{tabs}};
+
+    return $session;
+}
+
+# Restore session tabs for the current working directory into the tab
+# manager. Returns true if at least one tab was restored (files that no
+# longer exist are skipped individually and don't count against this).
+sub _restore_session {
+    my ($self) = @_;
+    my $session = $self->_load_session();
+    return 0 unless $session;
+
+    my $new_active = 0;
+    my $count = 0;
+
+    for my $i (0 .. $#{$session->{tabs}}) {
+        my $t = $session->{tabs}[$i];
+        next unless $t->{file_path} && -f $t->{file_path};
+
+        my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state($t->{file_path});
+        $self->{tab_manager}->add_tab(
+            document    => $doc,
+            view        => $view,
+            find_engine => $find_engine,
+            highlighter => $highlighter,
+            file_path   => $t->{file_path},
+        );
+
+        # Restore scroll first so ensure_cursor_visible() only nudges it if
+        # the saved position no longer fits (e.g. viewport size changed).
+        $view->{scroll_line} = $t->{scroll_line} // 0;
+        $view->{scroll_col}  = $t->{scroll_col}  // 0;
+
+        my ($line, $col) = $self->_clamp_position($doc, $t->{line}, $t->{col});
+        $view->set_cursor($line, $col);
+        $view->ensure_cursor_visible();
+
+        $self->_track_recent_file($t->{file_path});
+
+        $new_active = $count if $i == ($session->{active_index} // 0);
+        $count++;
+    }
+
+    return 0 unless $count;
+    $self->{tab_manager}->set_active($new_active);
+    return 1;
 }
 
 # =============================================================================
@@ -583,6 +743,13 @@ sub init {
         $self->{focus_tree} = 1;
     }
 
+    # Session restore only applies to a truly bare launch: no explicit
+    # files AND no directory arg (which is browse-the-tree mode, not
+    # "no arguments"). This same flag gates the quit-time save too, so a
+    # one-off `zepto file.txt` or `zepto .` in a directory that has a
+    # saved session can never overwrite or clear it.
+    $self->{_session_eligible} = (!@files && !$self->{focus_tree}) ? 1 : 0;
+
     # Load recent files list from disk
     $self->_load_recent_files();
 
@@ -609,14 +776,20 @@ sub init {
         # Activate the first tab
         $self->{tab_manager}->set_active(0);
     } else {
-        # No files specified — open one empty tab
-        my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state(undef);
-        $self->{tab_manager}->add_tab(
-            document    => $doc,
-            view        => $view,
-            find_engine => $find_engine,
-            highlighter => $highlighter,
-        );
+        # No files specified — restore last session for this directory,
+        # if this launch is eligible (see _session_eligible above).
+        my $restored = $self->{_session_eligible} ? $self->_restore_session() : 0;
+
+        unless ($restored) {
+            # Nothing to restore — open one empty tab
+            my ($doc, $view, $find_engine, $highlighter) = $self->_create_document_state(undef);
+            $self->{tab_manager}->add_tab(
+                document    => $doc,
+                view        => $view,
+                find_engine => $find_engine,
+                highlighter => $highlighter,
+            );
+        }
     }
 
     # Initialize file tree

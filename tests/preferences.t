@@ -42,6 +42,7 @@ subtest 'Default values' => sub {
     is($prefs->get('search_wrap'), 1, 'Default search_wrap');
     is($prefs->get('mouse_enabled'), 1, 'Default mouse_enabled');
     is($prefs->get('scroll_margin'), 3, 'Default scroll_margin');
+    is($prefs->get('restore_session'), 1, 'Default restore_session (on)');
 };
 
 # ============================================================================
@@ -224,6 +225,14 @@ subtest 'Other accessors' => sub {
     ok($prefs->search_wrap(), 'Search wrap getter');
 };
 
+subtest 'Restore session accessor' => sub {
+    my $prefs = Zepto::Preferences->new();
+    ok($prefs->restore_session(), 'Restore session getter (default on)');
+
+    $prefs->set_restore_session(0);
+    ok(!$prefs->restore_session(), 'Restore session setter');
+};
+
 # ============================================================================
 # Tab/space conversion
 # ============================================================================
@@ -300,12 +309,14 @@ subtest 'Persistence: round-trip via StateStore' => sub {
     $prefs1->set_theme('light');
     $prefs1->set_tab_width(2);
     $prefs1->set_nerd_font(0);
+    $prefs1->set_restore_session(0);
 
     # New instance loads the same values
     my $prefs2 = Zepto::Preferences->new(state_store => $store);
     is($prefs2->get('theme'), 'light', 'Theme round-trip');
     is($prefs2->get('tab_width'), 2, 'Tab width round-trip');
     is($prefs2->get('nerd_font'), 0, 'Nerd font round-trip');
+    is($prefs2->get('restore_session'), 0, 'Restore session round-trip');
 };
 
 subtest 'Persistence: cross-instance sync via on_change' => sub {

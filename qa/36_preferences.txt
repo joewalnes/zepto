@@ -218,3 +218,21 @@ NOTES
 
   Once config.toml support is added, add new tests here for loading,
   saving, and priority order (CLI > env > config > defaults).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PREF-015
+NAME:     Restore Session on Startup persists across sessions
+PRIORITY: P2
+FEATURE:  pref persistence
+RELATED:  QA-SESS-009
+
+STEPS
+  1. ⌃Space, filter "restore session", press Enter to toggle it off.
+  2. ⌃Q, relaunch.
+  3. ⌃Space, filter "restore session" again.
+
+VERIFY
+  - The command shows [off] after relaunch — the preference persisted
+    via StateStore like other global preferences (nerd_font, theme).
+  - Toggle it back on and confirm it shows [on] again.

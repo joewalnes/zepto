@@ -48,6 +48,7 @@ my %DEFAULTS = (
     confirm_quit_unsaved => 1,    # Confirm before closing unsaved
     mouse_enabled    => 1,
     scroll_margin    => 3,        # Lines to keep above/below cursor
+    restore_session  => 1,        # Restore open tabs/cursor/scroll on launch (per-cwd)
 
     # AI completion
     ai_api_url       => 'https://openrouter.ai/api/v1',
@@ -76,6 +77,7 @@ my %GLOBAL_PREFS = map { $_ => 1 } qw(
     mouse_enabled
     ai_api_url
     ai_model
+    restore_session
 );
 
 sub new {
@@ -253,6 +255,9 @@ sub set_auto_complete { $_[0]->set('auto_complete', $_[1]) }
 
 sub auto_pairs { $_[0]->get('auto_pairs') }
 sub set_auto_pairs { $_[0]->set('auto_pairs', $_[1]) }
+
+sub restore_session { $_[0]->get('restore_session') }
+sub set_restore_session { $_[0]->set('restore_session', $_[1]) }
 
 # Extensions that default to word wrap on (prose file types)
 my %WRAP_DEFAULT_EXTENSIONS = map { $_ => 1 } qw(md txt rst adoc markdown text);

@@ -1795,6 +1795,158 @@ subtest 'Recent files - palette items' => sub {
 };
 
 # ============================================================================
+# Session Restore Tests (bugs.md P2 "Session restore")
+# ============================================================================
+
+subtest 'Session restore - save and restore round trip' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+
+    my $file_a = create_temp_file("aaa\nbbb\nccc\nddd\neee\n");
+    my $file_b = create_temp_file("111\n222\n333\n");
+
+    my $editor1 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    my (undef, $view_a) = setup_editor_doc($editor1, $file_a);
+    my (undef, $view_b) = setup_editor_doc($editor1, $file_b);
+    $view_a->set_cursor(2, 1);
+    $view_a->{scroll_line} = 1;
+    $view_b->set_cursor(1, 2);
+    $editor1->{tab_manager}->set_active(0);  # a is the active tab
+
+    $editor1->_save_session();
+
+    my $editor2 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    my $restored = $editor2->_restore_session();
+    ok($restored, 'Session restored');
+    is($editor2->{tab_manager}->tab_count(), 2, 'Two tabs restored');
+    is($editor2->{tab_manager}->active_index(), 0, 'Active tab restored (a)');
+
+    my $tab0 = $editor2->{tab_manager}->tab_at(0);
+    is($tab0->{file_path}, File::Spec->rel2abs($file_a), 'First tab is file_a');
+    is($tab0->{view}->cursor_line(), 2, 'Cursor line restored');
+    is($tab0->{view}->cursor_col(), 1, 'Cursor col restored');
+    is($tab0->{view}->scroll_line(), 1, 'Scroll line restored');
+
+    my $tab1 = $editor2->{tab_manager}->tab_at(1);
+    is($tab1->{file_path}, File::Spec->rel2abs($file_b), 'Second tab is file_b');
+    is($tab1->{view}->cursor_line(), 1, 'Second tab cursor line restored');
+    is($tab1->{view}->cursor_col(), 2, 'Second tab cursor col restored');
+};
+
+subtest 'Session restore - no saved session returns false' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+
+    is($editor->_restore_session(), 0, 'Nothing to restore returns false');
+    is($editor->{tab_manager}->tab_count(), 0, 'No tabs added');
+};
+
+subtest 'Session restore - missing files are skipped individually' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+
+    my $file_a = create_temp_file("keep me\n");
+    my $to_delete = create_temp_file("will vanish before restore\n");
+
+    my $editor1 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor1, $to_delete); # tab 0: exists now, gone before restore
+    setup_editor_doc($editor1, $file_a);    # tab 1: still exists
+    $editor1->{tab_manager}->set_active(1); # active is file_a
+
+    $editor1->_save_session();
+
+    # Now delete the file for tab 0 — it should be skipped at restore time.
+    unlink $to_delete or die "unlink $to_delete: $!";
+
+    my $editor2 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    my $restored = $editor2->_restore_session();
+    ok($restored, 'Restore succeeds despite one missing file');
+    is($editor2->{tab_manager}->tab_count(), 1, 'Only the existing file was restored');
+    is($editor2->{tab_manager}->tab_at(0)->{file_path}, File::Spec->rel2abs($file_a),
+       'Surviving tab is file_a');
+    is($editor2->{tab_manager}->active_index(), 0, 'Active index remapped after skip');
+};
+
+subtest 'Session restore - untitled tabs are not saved' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    my $doc = Zepto::Document->new();
+    my $view = Zepto::View->new(document => $doc);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document => $doc, view => $view, find_engine => $find_engine,
+        highlighter => $highlighter, untitled_name => '[untitled]',
+        # no file_path — unsaved buffer
+    );
+
+    $editor->_save_session();
+
+    my $history = $store->get('history');
+    ok(!$history->{sessions} || !%{$history->{sessions}},
+       'Untitled-only session is not persisted');
+};
+
+subtest 'Session restore - gated by restore_session preference' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("pref gate\n");
+
+    my $editor1 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor1, $file_a);
+    $editor1->{prefs}->set_restore_session(0);
+    $editor1->_save_session();
+
+    my $history = $store->get('history');
+    ok(!$history->{sessions} || !%{$history->{sessions}},
+       'Nothing saved while preference is off');
+
+    # Turn it back on and save for real, then confirm a second editor with
+    # the preference off can't load it even though it's on disk.
+    $editor1->{prefs}->set_restore_session(1);
+    $editor1->_save_session();
+
+    my $editor2 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    $editor2->{prefs}->set_restore_session(0);
+    is($editor2->_restore_session(), 0, 'Restore is a no-op while preference is off');
+};
+
+subtest 'Session restore - not eligible on explicit-file / dir-focus launches' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("eligibility\n");
+
+    # Seed a real saved session first (bare-launch equivalent).
+    my $editor1 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor1, $file_a);
+    $editor1->_save_session();
+
+    my $history = $store->get('history');
+    ok($history->{sessions} && %{$history->{sessions}}, 'Session seeded');
+
+    # A run that isn't session-eligible (e.g. launched with an explicit
+    # file, or `zepto .`) must not touch — and in particular must not
+    # clear — the saved session, even if its own tabs are untitled.
+    my $editor2 = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    $editor2->{_session_eligible} = 0;
+    my $doc = Zepto::Document->new();
+    my $view = Zepto::View->new(document => $doc);
+    $editor2->{tab_manager}->add_tab(
+        document => $doc, view => $view,
+        find_engine => Zepto::FindEngine->new(document => $doc),
+        highlighter => Zepto::Highlighter->new(),
+    );
+    $editor2->_save_session();
+
+    my $history_after = $store->get('history');
+    ok($history_after->{sessions} && %{$history_after->{sessions}},
+       'Ineligible run does not clear the saved session');
+};
+
+# ============================================================================
 # Toggle Comment Tests
 # ============================================================================
 

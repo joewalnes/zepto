@@ -36,8 +36,19 @@ In Markdown files, emphasis delimiters (`**`, `*`, `_`, `~~`, `==`) are rendered
 ### P2: Buffer word completion
 Popup a menu of matching words from open buffers on a trigger key (e.g., `Ctrl+N` or `Tab` in context). No external dependencies needed — just scan tokens from open documents. Covers 80% of what developers use autocomplete for (variable names, function names already typed once). Reduces typos and memory load for long identifiers.
 
-### P2: Session restore
+### ~~P2: Session restore~~ FIXED
 Reopen the editor and get back exactly where you were: same tabs, cursor positions, scroll positions. The recent files infrastructure already exists (`~/.config/zepto/recent_files`). Extending to full session state eliminates the re-navigation tax every time the editor is restarted. Especially important for a terminal editor that gets opened/closed frequently.
+
+**Fix:** Added session save/restore to `Zepto::Editor`, keyed **per working directory** (not global) — a terminal editor gets opened from many different projects, and one global "last session" would fight between them. Storage: StateStore category `history`, new key `sessions` → `{ "<abs cwd>": { active_index, tabs: [{ file_path, line, col, scroll_line, scroll_col }, ...] } }`, alongside the existing `recent_files` and `cursor_positions` keys.
+
+Design decisions:
+- **Restore only on a truly bare launch** — no file args AND no directory arg. A directory arg (`zepto .`) is tree-focus mode, not "no arguments," and doesn't fight with the saved session.
+- **Save is gated by the same "bare launch" condition as restore**, tracked via `Editor->{_session_eligible}` (set once in `init()`). This was **not** the first design — an early version saved unconditionally at quit, which meant a one-off `zepto some_file.txt`, or just running `zepto .` to browse the tree and quitting immediately, would silently overwrite or clear a real saved session. Caught via interactive testing before release; see `QA-REG-115`/`QA-REG-116`.
+- **Only file-backed tabs are saved/restored.** Unsaved `[untitled]` buffers are skipped — persisting their content would mean snapshotting unsaved text into StateStore, a bigger and riskier feature than "remember where I was."
+- **Files deleted since the session was saved are skipped individually** at restore (not an error, and doesn't abort the rest of the session).
+- **Cursor and scroll are restored exactly**: cursor line/col reuses the existing `cursor_positions` clamp logic (factored into a shared `_clamp_position($doc, $line, $col)` helper used by both features); `scroll_line`/`scroll_col` are set directly on the `View` before `ensure_cursor_visible()`, so it only adjusts them if the saved viewport no longer fits (e.g. terminal resized) rather than always re-centering on the cursor.
+- **Saved only at well-defined quit points** (Ctrl+Q, and closing the last tab, which also quits) — not on every tab switch or save. Those are deliberate, infrequent actions, so the StateStore write (flock + read + encode + rename) is cheap relative to them; wiring it into tab-switch would add that cost to a much hotter path for no real benefit over a clean-quit save. A crash without a clean quit loses the latest session, same pre-existing limitation as cursor-position history.
+- **Preference-gated**: new `restore_session` pref (default on), persisted/synced like other global preferences. Discoverable via the command palette ("Restore Session on Startup", ⌃Space) per Rule 2 — no dedicated shortcut, following the same no-shortcut pattern as Auto Pairs/Auto Complete.
 
 ### P2: Persistent config file
 Save preferences to `~/.config/zepto/config.toml` (or similar) so they survive restarts. `Preferences.pm` already has all the defaults and a "for future use" comment — the infrastructure is ready. Without this, users can't persist their theme choice, tab width, minimap preference, etc. Power users need to make the editor theirs.
@@ -51,6 +62,9 @@ Detect the system theme (dark/light) on startup and choose the matching editor t
 ---
 
 ## Existing bugs
+
+### P3: Undo can leave the cursor column past the end of the (now shorter) line
+Found incidentally while interactively testing session restore (2026-08-29): type past the end of a short line (e.g. line is `line5`, type extra characters after it so the cursor sits at column 11), then Ctrl+Z. The text reverts to `line5`, but the cursor column stays at 11 — visibly past the end of the now-5-character line — until the next cursor-moving action (arrow key, Home/End, click) snaps it back in bounds. Not a crash or data loss; purely a transient visual/positional glitch. Not fixed here — out of scope for the session-restore work that surfaced it, and `Editor::_clamp_position` (added for session restore, shared with the pre-existing cursor-position-history feature) already defends downstream consumers of a saved cursor position against exactly this kind of out-of-range value, so it doesn't propagate into persisted state.
 
 ### ~~P2: Binary file tab looks editable~~ FIXED
 When opening a binary file, there was no visual indication that the file was read-only.

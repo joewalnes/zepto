@@ -444,6 +444,17 @@ my @COMMANDS = (
         priority => 0,
         method   => 'cmd_toggle_auto_pairs',
     },
+    {
+        id       => 'toggle_restore_session',
+        label    => 'Restore Session on Startup',
+        icon     => 'clock',
+        shortcut => '',
+        section  => 'VIEW',
+        type     => 'toggle',
+        pref     => 'restore_session',
+        priority => 0,
+        method   => 'cmd_toggle_restore_session',
+    },
 
     # === AI section ===
     {
