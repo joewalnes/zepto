@@ -2,6 +2,7 @@
 
 ## 2026-08-29
 
+- Status bar reworked: shortcuts are now grouped into a ⌃ (Ctrl) column and an ⌥ (Alt) column, each showing its modifier once instead of on every pill — the most useful action in each column (Save, Word Wrap) now stays visible even in a narrow terminal
 - Fixed find bar showing an out-of-range match counter (e.g. "3 of 1") after toggling regex/case shrinks the results
 
 ## 2026-08-28 (later)

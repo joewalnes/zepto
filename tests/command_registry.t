@@ -111,6 +111,38 @@ subtest 'commands_for_status_bar respects priority' => sub {
     }
 };
 
+# ============================================================================
+# Status bar rework: ⌃/⌥ modifier grouping (bugs.md P1 "Status bar rework")
+# ============================================================================
+# Renderer::_render_context_status_bar splits commands_for_status_bar()
+# results into a ⌃ (Ctrl) column and an ⌥ (Alt) column purely by looking at
+# the first character of `shortcut`. That means every status-bar-eligible
+# command's shortcut MUST start with exactly one of those two glyphs, or it
+# silently vanishes from the status bar entirely (it would still be in the
+# palette, but that defeats "always visible" for that command). This test
+# guards the registry side of that contract.
+subtest 'commands_for_status_bar entries all start with ⌃ or ⌥ (modifier-group contract)' => sub {
+    my $ctrl_sym = Zepto::CommandRegistry::SYM_CTRL();
+    my $alt_sym  = Zepto::CommandRegistry::SYM_ALT();
+
+    my @pills = Zepto::CommandRegistry->commands_for_status_bar('document', 200, undef);
+    ok(scalar @pills > 0, 'Got status bar commands');
+
+    for my $cmd (@pills) {
+        my $sc = $cmd->{shortcut} // '';
+        ok(index($sc, $ctrl_sym) == 0 || index($sc, $alt_sym) == 0,
+           "'$cmd->{id}' shortcut '$sc' starts with ⌃ or ⌥ (status bar group)");
+    }
+
+    # Each column has exactly one priority-1 (most important) command —
+    # the budget-negotiation guarantee in the renderer assumes a single
+    # top item per column, not a tie at priority 1.
+    my @ctrl_p1 = grep { index($_->{shortcut} // '', $ctrl_sym) == 0 && $_->{priority} == 1 } @pills;
+    my @alt_p1  = grep { index($_->{shortcut} // '', $alt_sym)  == 0 && $_->{priority} == 1 } @pills;
+    is(scalar @ctrl_p1, 1, 'Exactly one priority-1 command in the ⌃ column (Save)');
+    is(scalar @alt_p1, 1, 'Exactly one priority-1 command in the ⌥ column (Word Wrap)');
+};
+
 subtest 'toggle commands have correct type' => sub {
     my @toggles = grep { $_->{type} eq 'toggle' } Zepto::CommandRegistry->all_commands();
     ok(scalar @toggles >= 5, 'At least 5 toggle commands');

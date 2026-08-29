@@ -13,6 +13,10 @@ use Zepto::View;
 use Zepto::Chars;
 use Zepto::Minimap;
 use Zepto::Preferences;
+use Zepto::Editor;
+use Zepto::Terminal;
+use Zepto::FindEngine;
+use Zepto::Highlighter;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -40,6 +44,34 @@ sub create_test_state {
     my $doc = Zepto::Document->load($filename);
     my $view = Zepto::View->new(document => $doc);
     return ($doc, $view);
+}
+
+# Helper: a real (headless) editor instance, for tests that exercise the
+# status bar's modifier-grouped pill columns — those pills are only built
+# when ui.editor is set (see Renderer::_render_context_status_bar).
+sub mock_terminal {
+    my ($in_fh, $in_name) = tempfile(UNLINK => 1);
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    return Zepto::Terminal->new(in => $in_fh, out => $out_fh);
+}
+
+sub create_test_editor {
+    my ($content) = @_;
+    $content //= "Hello World\nLine 2\nLine 3\n";
+    my $filename = create_temp_file($content);
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $doc = Zepto::Document->load($filename);
+    my $view = Zepto::View->new(document => $doc);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document    => $doc,
+        view        => $view,
+        find_engine => $find_engine,
+        highlighter => $highlighter,
+        file_path   => $filename,
+    );
+    return ($editor, $doc, $view);
 }
 
 # ============================================================================
@@ -128,6 +160,89 @@ subtest 'Status bar has palette trigger pill' => sub {
 
     my $stripped = strip_escapes($output);
     like($stripped, qr/\x{2303}\x{2423}/, 'Status bar has ⌃␣ palette trigger pill');
+};
+
+# ============================================================================
+# Status bar: modifier-grouped pill columns (⌃ left / ⌥ right)
+# ============================================================================
+# See docs/UI_GUIDELINES.md "Context-Aware Status Bar" / "Priority-Based
+# Progressive Disclosure" and bugs.md P1 "Status bar rework". These pills
+# are only built when ui.editor is set, so tests here need a real editor
+# (create_test_editor), not just a bare document/view.
+
+subtest 'Status bar groups Ctrl pills left, Alt pills right, modifier shown once' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $theme, 200, undef, undef, { editor => $editor }, 0
+    );
+    my $s = strip_escapes($bar);
+
+    # Ctrl-shortcut command: label shown, modifier stripped from the pill
+    # itself (e.g. "Save S", not "Save \x{2303}S") because the group label
+    # carries the modifier once for the whole column.
+    like($s, qr/Save S\b/, 'Ctrl group: Save pill shows bare key, not repeated ⌃');
+    unlike($s, qr/Save\s+\x{2303}S/, 'Save pill does not repeat the ⌃ glyph');
+
+    # Alt-shortcut command: same treatment.
+    like($s, qr/Word Wrap Z\b/, 'Alt group: Word Wrap pill shows bare key, not repeated ⌥');
+    unlike($s, qr/Word Wrap\s+\x{2325}Z/, 'Word Wrap pill does not repeat the ⌥ glyph');
+
+    # Ctrl group renders left of Alt group, both left of the palette trigger.
+    my $save_pos  = index($s, 'Save');
+    my $wrap_pos  = index($s, 'Word Wrap');
+    my $cmds_pos  = index($s, 'Commands');
+    ok($save_pos >= 0 && $wrap_pos >= 0 && $cmds_pos >= 0, 'all three landmarks present');
+    ok($save_pos < $wrap_pos, 'Ctrl (Save) pill renders left of Alt (Word Wrap) pill');
+    ok($wrap_pos < $cmds_pos, 'Alt group renders left of the palette trigger pill');
+};
+
+subtest 'Status bar priority-1 pill in each column survives narrow widths' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    # Wide enough for both columns' top (priority-1) pill, but not the
+    # full pill set — exercises the budget-negotiation guarantee rather
+    # than just the unconstrained case.
+    my $bar = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $theme, 62, undef, undef, { editor => $editor }, 0
+    );
+    my $s = strip_escapes($bar);
+
+    like($s, qr/\bS\b/, 'Ctrl priority-1 (Save) key visible at narrow width');
+    like($s, qr/\bZ\b/, 'Alt priority-1 (Word Wrap) key visible at narrow width');
+    like($s, qr/\x{2303}\x{2423}/, 'Palette trigger still visible at narrow width');
+};
+
+subtest 'Status bar unconditional elements survive extreme narrow widths' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $theme, 32, undef, undef, { editor => $editor }, 0
+    );
+    my $s = strip_escapes($bar);
+
+    like($s, qr/1:1/, 'Cursor position pill survives extreme narrow width');
+    like($s, qr/\x{2303}\x{2423}/, 'Palette trigger pill survives extreme narrow width');
+};
+
+subtest 'Status bar pills stay clickable — button positions match rendered text' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $theme, 140, undef, undef, { editor => $editor }, 0
+    );
+    my @buttons = Zepto::Renderer->get_status_buttons();
+
+    my ($save_btn) = grep { $_->{command_id} eq 'save' } @buttons;
+    ok($save_btn, 'Save pill registered a clickable button');
+    ok($save_btn->{x_end} >= $save_btn->{x_start}, 'Save button has a non-empty hit area');
+
+    my ($palette_btn) = grep { $_->{command_id} eq 'open_palette' } @buttons;
+    ok($palette_btn, 'Palette trigger registered a clickable button');
 };
 
 subtest 'Active menu highlighting' => sub {

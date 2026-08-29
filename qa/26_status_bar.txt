@@ -245,3 +245,110 @@ STEPS
 VERIFY
   - Status bar spans full terminal width (last column filled).
   - No 1-column gap at right edge.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-016
+NAME:     Ctrl pills grouped left, Alt pills grouped right, modifier shown once
+PRIORITY: P1
+FEATURE:  sbar layout modifier-group
+RELATED:  bugs.md P1 "Status bar rework"
+
+STEPS
+  1. Open a file in the DOCUMENT context (default state, no find/tree/palette).
+  2. Observe the status bar between the cursor-pos pill and the Commands pill.
+
+VERIFY
+  - A `⌃` glyph appears once (a plain dim label, not a pill) followed by
+    Ctrl-shortcut pills (e.g. Save, Open File) whose own shortcut badges do
+    NOT repeat `⌃` — just the bare key (`S`, `O/P`).
+  - A `⌥` glyph appears once, further right, followed by Alt-shortcut pills
+    (e.g. Word Wrap) whose badges show just the bare key (`Z`), not `⌥Z`.
+  - The `⌃` group renders entirely to the left of the `⌥` group, which
+    renders entirely to the left of the `⌃␣ Commands` pill.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-017
+NAME:     Open File is an ordinary ⌃ column pill, not a hardcoded fixed pill (REGRESSION)
+PRIORITY: P2
+FEATURE:  sbar layout open-file
+RELATED:  bugs.md P1 "Status bar rework"
+
+STEPS
+  1. Open a file. Observe the Ctrl (`⌃`) column.
+  2. Narrow the terminal (or reduce candidate pills) until Open File would
+     be the first pill to drop.
+
+VERIFY
+  - Open File pill sits inside the `⌃` column next to Save/Find/etc, shown
+    as `Open File O/P` (not `⌃O/⌃P`) — it is no longer a second
+    hardcoded pill pinned next to the palette trigger.
+  - Only the `⌃␣ Commands` pill is unconditionally pinned rightmost; Open
+    File can drop at narrow widths like any other `⌃` column pill.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-018
+NAME:     Priority-1 pill in each column survives narrow widths (REGRESSION)
+PRIORITY: P1
+FEATURE:  sbar layout priority narrow
+RELATED:  bugs.md P1 "Status bar rework"
+
+STEPS
+  1. Open a file at a narrow-ish terminal width (default 80 cols already
+     drops several lower-priority pills — see QA-SBAR-006).
+
+VERIFY
+  - Save (`⌃` priority 1) is visible in some form (full `Save S` or
+    compact `S`).
+  - Word Wrap (`⌥` priority 1) is visible in some form (full `Word Wrap Z`
+    or compact `Z`).
+  - Cursor-position pill and `⌃␣ Commands` pill are always visible
+    regardless of width — the only two unconditional elements.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-019
+NAME:     Tutorial (F1) is no longer a status bar pill (behavioral discovery)
+PRIORITY: P3
+FEATURE:  sbar layout tutorial
+RELATED:  bugs.md P1 "Status bar rework"
+
+STEPS
+  1. Open a file, observe the status bar in DOCUMENT context.
+  2. Open the command palette (⌃Space) and search "Tutorial".
+  3. Press F1 directly.
+
+VERIFY
+  - No status bar pill reads "Tutorial" or shows a bare `F1` badge — F1 has
+    no ⌃/⌥ modifier so it doesn't fit either grouped column.
+  - Tutorial still appears in the command palette with its F1 shortcut.
+  - Pressing F1 directly still opens the Tutorial doc.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-020
+NAME:     Compact pill form keeps toggle on/off color without a label
+PRIORITY: P2
+FEATURE:  sbar layout compact toggle
+
+STEPS
+  1. Open a non-prose file (e.g. `.dat`/`.py`, not `.txt`/`.md` — those
+     default word wrap ON via Preferences::should_default_wrap) at a width
+     where Word Wrap renders in compact form (icon/key only, e.g. default
+     80 cols — see QA-SBAR-016). Screenshot it.
+  2. Toggle word wrap on (⌥Z) — screenshot the compact pill again.
+  3. Toggle word wrap off (⌥Z) — screenshot the compact pill again.
+
+VERIFY
+  - OFF: pill background is dimmed, matching the full-form OFF color.
+  - ON: pill background is bright/highlighted, matching the full-form ON
+    color — state is still conveyed by color alone even with no label text.
+  - Automated script (`sbar_020_compact_toggle_color.sh`) only checks that
+    the compact pill's underlying preference state is readable and
+    correct on load — it does NOT script a toggle-then-reread round trip
+    via the palette, because of `bugs.md` P2 "⌃Space can be silently
+    dropped when it isn't the very first key sent" (unrelated pre-existing
+    issue). The on/off color swap itself must be checked with the
+    screenshot steps above, or via `hangon screenshot` manually.
