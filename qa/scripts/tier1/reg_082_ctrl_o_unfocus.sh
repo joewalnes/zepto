@@ -14,7 +14,7 @@ sleep 0.3
 qa_keys "ctrl-o"
 sleep 0.5
 
-qa_screen
+qa_wait_screen 'Open|file|picker|search' || true
 if echo "$QA_SCREEN" | grep -qiE "Open|file|picker|search"; then
     qa_pass "Ctrl+O opened file picker from tree"
 else

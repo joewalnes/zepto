@@ -13,7 +13,7 @@ qa_start "$binfile"
 sleep 0.5
 
 # Should show binary placeholder
-qa_assert_screen "Binary file|binary file|READ ONLY" "binary placeholder shown"
+qa_assert_expect "Binary file|binary file|READ ONLY" "binary placeholder shown"
 
 # Verify no execution
 if [[ -f /tmp/zqa_exec_test ]]; then

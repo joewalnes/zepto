@@ -12,7 +12,7 @@ qa_keys "ctrl-c"
 sleep 0.3
 
 # Editor should not crash and content should still be visible
-qa_assert_screen "test content" "editor still responsive after copy"
+qa_assert_expect "test content" "editor still responsive after copy"
 
 # Paste
 qa_keys "end"
@@ -21,7 +21,7 @@ qa_keys "ctrl-v"
 sleep 0.3
 
 # Should see pasted content
-qa_assert_screen "test content" "paste worked without shell injection"
+qa_assert_expect "test content" "paste worked without shell injection"
 
 qa_keys "ctrl-q"
 sleep 0.2

@@ -22,7 +22,7 @@ sleep 0.5
 
 # Open find-in-files with a pattern containing shell metacharacters
 qa_keys "ctrl-shift-f" 0.2 || qa_keys "ctrl-space" 0.2
-qa_screen
+qa_wait_screen 'find|Find|command' || true
 if ! echo "$QA_SCREEN" | grep -qi "find in"; then
     qa_keys "ctrl-space"
     qa_send "find in files" 0.3

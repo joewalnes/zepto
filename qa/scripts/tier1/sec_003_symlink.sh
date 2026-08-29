@@ -13,10 +13,10 @@ qa_start --tree "$project_dir/subdir/real.txt"
 sleep 1
 
 # Tree should show the project but escape_link should be bounded
-qa_assert_screen "real.txt" "real file visible in tree"
+qa_assert_expect "real.txt" "real file visible in tree"
 
 # The tree should not expose /etc contents as navigable
-qa_screen
+qa_wait_screen 'real|subdir' || true
 if echo "$QA_SCREEN" | grep -q "passwd"; then
     qa_fail "symlink traversal bounded" "saw /etc/passwd in tree"
 else

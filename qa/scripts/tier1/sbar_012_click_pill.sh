@@ -15,7 +15,7 @@ hangon mouse-click "$QA_SESSION" --x 70 --y "$last_row"
 sleep 0.5
 
 # Command palette should open
-qa_assert_screen "FILE|EDIT|NAVIGATE|VIEW|Save|Quit" "clicking pill opened palette"
+qa_assert_expect "FILE|EDIT|NAVIGATE|VIEW|Save|Quit" "clicking pill opened palette"
 
 qa_keys "escape"
 qa_keys "escape"
@@ -25,7 +25,7 @@ hangon mouse-click "$QA_SESSION" --x 5 --y "$last_row"
 sleep 0.5
 
 # Should open goto line or some action
-qa_screen
+qa_wait_screen 'line|goto|Go' || true
 if echo "$QA_SCREEN" | grep -qiE "line|goto|Go to"; then
     qa_pass "clicking cursor pill triggered action"
 else

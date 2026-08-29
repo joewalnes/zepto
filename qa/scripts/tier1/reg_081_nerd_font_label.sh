@@ -12,7 +12,7 @@ sleep 0.5
 # Type to filter for nerd font
 qa_send "nerd" 0.3
 
-qa_screen
+qa_wait_screen 'Nerd|Powerline' || true
 if echo "$QA_SCREEN" | grep -qiE "Nerd Font|nerd font"; then
     qa_pass "palette shows 'Nerd Font' label"
 elif echo "$QA_SCREEN" | grep -qiE "Powerline|powerline"; then

@@ -13,7 +13,7 @@ qa_keys "shift-right" 0.1
 # 3 chars selected — typing should replace them
 qa_send "X"
 
-qa_assert_screen "Xdef" "shift+right selected 3 chars, typing replaced them"
+qa_assert_expect "Xdef" "shift+right selected 3 chars, typing replaced them"
 
 qa_keys "ctrl-q"
 sleep 0.2

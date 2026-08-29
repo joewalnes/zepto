@@ -13,7 +13,7 @@ qa_keys "ctrl-d"
 qa_keys "ctrl-d"
 
 # Status bar should show cursor count
-qa_screen
+qa_wait_screen '[23]' || true
 if echo "$QA_SCREEN" | grep -qE "[23].*cursor|cursor.*[23]|[23].*sel"; then
     qa_pass "multi-cursor count visible in status bar"
 else
