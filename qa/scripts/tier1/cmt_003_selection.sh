@@ -14,7 +14,7 @@ qa_keys "ctrl-a"
 # Toggle comment
 qa_raw $'\x1f'
 
-qa_assert_screen "# x = 1" "line 1 commented"
+qa_assert_expect "# x = 1" "line 1 commented"
 qa_assert_screen "# y = 2" "line 2 commented"
 qa_assert_screen "# z = 3" "line 3 commented"
 

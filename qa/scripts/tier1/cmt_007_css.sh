@@ -7,10 +7,10 @@ file=$(qa_tmpfile_nl "cmt007.css" "body { color: red; }")
 qa_start "$file"
 
 qa_raw $'\x1f'
-qa_assert_screen "/\\*" "CSS comment opening visible"
+qa_assert_expect "/\\*" "CSS comment opening visible"
 
 qa_raw $'\x1f'
-qa_assert_screen "body" "uncommented back"
+qa_assert_expect "body" "uncommented back"
 
 qa_keys "ctrl-q"
 qa_summary

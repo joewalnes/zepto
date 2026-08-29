@@ -7,14 +7,9 @@ file=$(qa_tmpfile_nl "cmt008.txt" "plain text line")
 qa_start "$file"
 
 qa_raw $'\x1f'
-qa_screen
 
 # Should either add # prefix or be a no-op
-if echo "$QA_SCREEN" | grep -qE "# plain text|plain text line"; then
-    qa_pass "toggle comment on .txt handled gracefully"
-else
-    qa_fail "toggle comment on .txt handled gracefully"
-fi
+qa_assert_expect "# plain text|plain text line" "toggle comment on .txt handled gracefully"
 
 qa_keys "ctrl-q"
 sleep 0.2
