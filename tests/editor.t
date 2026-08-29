@@ -2223,4 +2223,38 @@ subtest 'Save As activates syntax highlighting for new filename' => sub {
     unlink $py_file;
 };
 
+# ============================================================================
+# Render decision after input batches (QA-REG-101)
+# ============================================================================
+# Regression: after a mouse hover-motion event, the main loop skipped
+# rendering for ALL subsequent keyboard input — typed text and cursor moves
+# were applied to the document but never drawn until the next click/scroll.
+# The render decision must be per-batch: skip only when the batch contained
+# nothing but hover motion that changed no hover target.
+subtest 'Typing after hover motion still renders' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("alpha\nbeta\n");
+    my $editor = Zepto::Editor->new(terminal => $term);
+    setup_editor_doc($editor, $filename);
+
+    # Idle hover motion over the text area (no target change): no render needed
+    $editor->handle_input("\x1b[<35;10;3M");
+    ok(!$editor->_input_needs_render(),
+       'Idle hover motion alone does not require a render');
+
+    # A keypress in a LATER batch must render, even though the previous
+    # batch ended on a hover motion (the original bug: flag persisted)
+    $editor->handle_input("\x1b[B");
+    ok($editor->_input_needs_render(),
+       'Arrow key after an earlier hover motion requires a render');
+
+    # A batch that mixes hover motion and typing must render, even when
+    # the hover motion is the LAST event in the batch
+    $editor->handle_input("Z" . "\x1b[<35;12;3M");
+    ok($editor->_input_needs_render(),
+       'Batch with typing followed by hover motion requires a render');
+    like($editor->active_doc()->get_line(1), qr/Z/,
+         'Typed char was applied to the document');
+};
+
 done_testing();

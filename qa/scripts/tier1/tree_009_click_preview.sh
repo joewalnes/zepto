@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-009: Click preview confirms file"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 echo "content of alpha" > alpha.txt
 echo "content of beta" > beta.txt
 

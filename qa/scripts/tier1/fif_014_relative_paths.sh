@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-FIF-014: FIF shows relative paths"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 mkdir -p subdir
 echo "RELPATH content" > subdir/target.txt
 echo "other" > root.txt

@@ -696,14 +696,14 @@ sub run {
 
             if (length $input) {
                 $self->handle_input($input);
-                if ($self->{_hover_changed}) {
-                    # Hover-only change — only render if target changed
+                # Render unless the batch was ONLY hover motion that changed
+                # no hover target. The decision is per-batch: a batch that
+                # contains any keyboard/click/scroll event must render, even
+                # if hover-motion events surround it.
+                if ($self->_input_needs_render()) {
                     $needs_render = 1;
-                } elsif ($self->{_last_event_was_hover}) {
-                    # Motion without target change — skip render
-                } else {
-                    $needs_render = 1;
-                    $last_search_render = 0;  # Reset throttle on user input
+                    # Reset search-render throttle on real input, not hover
+                    $last_search_render = 0 if $self->{_batch_renderable};
                 }
             }
             else {
@@ -934,9 +934,22 @@ sub handle_input {
 
     my @events = $self->{parser}->parse($input);
 
+    # Per-batch render flags, consumed by _input_needs_render()
+    $self->{_hover_changed}    = 0;
+    $self->{_batch_renderable} = 0;
+
     for my $event (@events) {
         $self->handle_event($event);
     }
+}
+
+# Whether the input batch just processed by handle_input() requires a
+# render: yes unless it consisted only of hover motion with no hover-target
+# change. Hover-motion floods (?1003h any-event tracking) must not trigger
+# a render per event, but anything else in the batch must.
+sub _input_needs_render {
+    my ($self) = @_;
+    return $self->{_hover_changed} || $self->{_batch_renderable};
 }
 
 # Flush any pending escape sequence (call after read timeout, not immediately)
@@ -954,6 +967,11 @@ sub handle_event {
     my ($self, $event) = @_;
 
     return unless $event;
+
+    # Every event except idle hover motion makes the batch worth rendering.
+    # (Hover motion that changes a target sets _hover_changed separately.)
+    $self->{_batch_renderable} = 1
+        unless $event->{type} eq 'mouse' && $event->{action} eq 'move';
 
     # Bracketed paste mode: track paste state to suppress auto-indent
     if ($event->{type} eq 'key') {
@@ -1246,7 +1264,6 @@ sub handle_editing_event {
         }
     }
     elsif ($type eq 'mouse') {
-        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
 }
@@ -2225,7 +2242,6 @@ sub handle_footer_input_event {
     my $type   = $event->{type};
 
     if ($type eq 'mouse') {
-        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
     elsif ($type eq 'key') {
@@ -4225,7 +4241,6 @@ sub handle_tree_event {
         elsif ($char eq ' ') { $tree->toggle_current(); }
     }
     elsif ($event->{type} eq 'mouse') {
-        $self->{_last_event_was_hover} = ($event->{action} eq 'move');
         $self->handle_mouse_event($event);
     }
 }

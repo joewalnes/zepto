@@ -445,4 +445,70 @@ subtest 'describe_event' => sub {
     like(Zepto::InputParser::describe_event($mouse_evt), qr/mouse:press\@10,5/, 'Describe mouse');
 };
 
+# ============================================================================
+# Unknown sequences must not stall the event queue (QA-REG-102)
+# ============================================================================
+# Regression: a complete-but-unrecognized sequence must be discarded and
+# parsing must continue in the same batch. Previously parse() stopped at the
+# first EVT_NONE even when bytes had been consumed, so events behind junk sat
+# in the buffer until the NEXT input arrived — keys lagged one event behind.
+subtest 'Unknown CSI does not stall following events' => sub {
+    # Focus-in (ESC [ I) is not handled — must be discarded, Up must fire
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[I\x1b[A");
+    is(scalar @events, 1, 'One event from unknown-CSI + Up batch');
+    is($events[0]->{type}, 'key', 'Event is a key');
+    is($events[0]->{key}, 'up', 'Up arrow survived the unknown CSI');
+    is(length($parser->{buffer}), 0, 'No bytes left stuck in buffer');
+
+    # Unknown CSI followed by a typed character
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[Ox");
+    is(scalar @events, 1, 'One event from unknown-CSI + char batch');
+    is($events[0]->{type}, 'char', 'Char event');
+    is($events[0]->{char}, 'x', 'Typed char survived the unknown CSI');
+
+    # Multiple unknown sequences interleaved with real events
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[I" . "a" . "\x1b[O" . "\x1b[B");
+    is(scalar @events, 2, 'Two events from mixed batch');
+    is($events[0]->{char}, 'a', 'Char parsed');
+    is($events[1]->{key}, 'down', 'Down arrow parsed');
+};
+
+subtest 'Unknown SS3 does not stall following events' => sub {
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1bOZ" . "q");
+    is(scalar @events, 1, 'One event from unknown-SS3 + char batch');
+    is($events[0]->{char}, 'q', 'Char survived the unknown SS3');
+};
+
+subtest 'Out-of-range CSI-u does not stall following events' => sub {
+    # CSI u with codepoint outside 32..126 (e.g. Enter = 13) is unhandled
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[13;5u" . "a");
+    is(scalar @events, 1, 'One event from CSI-u + char batch');
+    is($events[0]->{char}, 'a', 'Char survived the unhandled CSI-u');
+};
+
+subtest 'Incomplete sequences still wait for more bytes' => sub {
+    # A truly incomplete sequence must NOT be discarded — it completes
+    # when the rest arrives (split across reads)
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[");
+    is(scalar @events, 0, 'Incomplete CSI produces no events');
+    @events = $parser->parse("A");
+    is(scalar @events, 1, 'Completed on next read');
+    is($events[0]->{key}, 'up', 'Split CSI decoded as Up');
+
+    # Split SGR mouse sequence
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[<35;10");
+    is(scalar @events, 0, 'Partial SGR mouse produces no events');
+    @events = $parser->parse(";5M");
+    is(scalar @events, 1, 'SGR mouse completed on next read');
+    is($events[0]->{type}, 'mouse', 'Mouse event');
+    is($events[0]->{action}, 'move', 'Motion decoded');
+};
+
 done_testing();

@@ -372,3 +372,24 @@ STEPS
 VERIFY
   - Buffer content reflects the typed characters, not remnants of find.
   - No find highlights left on screen.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-022
+NAME:     Unknown escape sequences do not stall queued input (REGRESSION)
+PRIORITY: P1
+FEATURE:  input parsing
+RELATED:  QA-REG-102, bugs.md 2026-08-28 P1 "InputParser stalls event queue"
+SCRIPT:   tier1/reg_102_unknown_seq_stall.sh
+
+STEPS
+  1. In one write, send an unrecognized-but-complete escape sequence
+     (e.g. focus-in `ESC [ I`) immediately followed by a Down arrow.
+  2. In one write, send the unknown sequence immediately followed by a
+     typed character.
+
+VERIFY
+  - The arrow key and the character take effect immediately, in the same
+    batch — not one input event later.
+  - Truly incomplete sequences (split across reads) still wait for the
+    remaining bytes and decode correctly once complete.

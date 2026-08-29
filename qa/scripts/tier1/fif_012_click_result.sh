@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-FIF-012: Click FIF result opens file"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 echo "CLICKME content" > file_target.txt
 echo "other stuff" > other.txt
 git add . && git commit -q -m "init"

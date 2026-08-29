@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-015: Tree refreshes on Save As"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 echo "existing" > existing.txt
 
 qa_start existing.txt

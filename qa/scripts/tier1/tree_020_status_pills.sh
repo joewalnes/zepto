@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-020: Tree status bar shows pills"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 echo "hello" > a.txt
 echo "world" > b.txt
 

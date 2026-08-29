@@ -76,8 +76,17 @@ sub parse {
     my @events;
 
     while (length $self->{buffer}) {
+        my $before = length $self->{buffer};
         my $event = $self->_parse_one();
-        last if !$event || $event->{type} eq EVT_NONE;
+        last unless $event;
+        if ($event->{type} eq EVT_NONE) {
+            # EVT_NONE with no bytes consumed: incomplete sequence — stop
+            # and wait for more input. EVT_NONE with bytes consumed: an
+            # unrecognized sequence was discarded — keep parsing so events
+            # behind it are not stalled until the next read.
+            last if length($self->{buffer}) == $before;
+            next;
+        }
         push @events, $event;
     }
 

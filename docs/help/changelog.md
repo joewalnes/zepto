@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-28
+
+- Fixed editor appearing frozen after mouse movement — typed text and cursor moves now render immediately instead of waiting for the next click
+- Fixed keystrokes lagging one event behind when the terminal sends unrecognized escape sequences
+
 ## 2026-04-23
 
 - Fixed move-line undo corruption — Ctrl+Z after Alt+Up/Down now correctly restores line order

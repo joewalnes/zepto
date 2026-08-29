@@ -110,27 +110,46 @@ qa_alive() {
 # ---------------------------------------------------------------------------
 
 # Create a project directory and cd into it. Auto-cleaned on exit.
-# Returns the directory path. QA_ZEPTO is already absolute.
-#   dir=$(qa_project)
+# Sets QA_PROJECT_DIR. QA_ZEPTO is already absolute.
+#
+#   qa_project; dir="$QA_PROJECT_DIR"
 #   echo "content" > "$dir/file.txt"
 #   qa_start file.txt
+#
+# MUST be called directly, never via command substitution: `$(qa_project)`
+# runs in a subshell, so the cd is silently lost and every subsequent
+# command — including git init/add/commit in qa_git_repo callers — runs in
+# the caller's original directory. That once committed junk into the real
+# zepto checkout (see bugs.md 2026-08-28). The guard below turns that
+# mistake into a hard abort instead of silent repo pollution.
 qa_project() {
+    # BASH_SUBSHELL (bash 3.0+; macOS ships 3.2 so BASHPID is unavailable)
+    if [[ "${BASH_SUBSHELL:-0}" -gt 0 ]]; then
+        echo "FATAL: qa_project/qa_git_repo must be called directly (qa_project; dir=\"\$QA_PROJECT_DIR\"), not via \$(...) or a subshell — the cd would be lost and later commands would run in the caller's directory" >&2
+        kill -TERM "$$" 2>/dev/null
+        exit 1
+    fi
     _QA_PROJECT_DIR=$(mktemp -d /tmp/zepto_qa_proj_XXXXXX)
     cd "$_QA_PROJECT_DIR"
-    echo "$_QA_PROJECT_DIR"
+    QA_PROJECT_DIR="$_QA_PROJECT_DIR"
 }
 
-# Create a git repo project directory. Cd into it.
-# Initializes git with test user config.
-#   dir=$(qa_git_repo)
+# Create a git repo project directory and cd into it (same calling rules
+# as qa_project). Initializes git with test user config.
+#   qa_git_repo; dir="$QA_PROJECT_DIR"
 #   echo "content" > file.txt && git add . && git commit -m "init"
 qa_git_repo() {
-    local dir
-    dir=$(qa_project)
+    qa_project
+    # Never git-init where a repo already exists (e.g. the zepto checkout
+    # itself) — a -q init there is a silent no-op and the following
+    # add/commit would target the real repo.
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "FATAL: qa_git_repo: refusing to init inside existing git repo at $PWD" >&2
+        exit 1
+    fi
     git init -q
     git config user.email "test@test.com"
     git config user.name "Test"
-    echo "$dir"
 }
 
 # Portable sed -i (macOS vs GNU)

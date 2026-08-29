@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-017: Sticky parent headers in tree"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 mkdir -p deep/nested/dir
 for i in $(seq 1 30); do
     echo "file $i" > "deep/nested/dir/file_$i.txt"

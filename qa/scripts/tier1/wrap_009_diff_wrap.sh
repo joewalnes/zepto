@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-WRAP-009: Diff view preserves wrap"
 
-dir=$(qa_git_repo)
+qa_git_repo; dir="$QA_PROJECT_DIR"
 long_line=$(python3 -c "print('original ' * 30)")
 echo "$long_line" > test.txt
 git add . && git commit -q -m "init"

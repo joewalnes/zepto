@@ -298,3 +298,25 @@ VERIFY
   - Palette list scrolls.
   - Highlight remains visible.
   - No scroll leakage to editor behind palette.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-021
+NAME:     Keyboard input renders after hover motion (REGRESSION)
+PRIORITY: P0
+FEATURE:  mouse hover render
+RELATED:  QA-MS-014, QA-REG-101, bugs.md 2026-08-28 P0 "Renders suppressed
+          after any mouse motion"
+SCRIPT:   tier1/reg_101_hover_type_render.sh
+
+STEPS
+  1. Move the mouse over the text area (no click) — send at least one
+     motion event that changes no hover target.
+  2. Without clicking, type a non-word character (e.g. `!`).
+  3. Move the mouse again, then press Down arrow.
+
+VERIFY
+  - The typed character appears on screen immediately (no click needed).
+  - The status bar cursor pill reflects the arrow-key move immediately.
+  - Idle hover motion alone still does NOT trigger a render per event
+    (the ?1003h motion-flood optimization is preserved).

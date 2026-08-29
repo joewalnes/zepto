@@ -932,3 +932,41 @@ PRIORITY: P2
 BUG:      P2 "More prominent ctrl-space hint"
 CROSS-REF: QA-PAL-019, QA-REG-045
 VERIFY    Rightmost pill shows `⌘ Commands ⌃␣` in distinctive color.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-101
+NAME:     Keyboard input renders after hover motion
+PRIORITY: P0
+BUG:      P0 "Renders suppressed after any mouse motion — typed text and
+          cursor moves invisible until next click" (2026-08-28)
+CROSS-REF: QA-MS-021, QA-MS-014
+VERIFY    After a hover-motion event, typed characters and arrow-key cursor
+          moves appear on screen immediately — no click/scroll needed to
+          "unstick" the display. Idle hover motion alone still skips renders.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-102
+NAME:     Unknown escape sequences do not stall input
+PRIORITY: P1
+BUG:      P1 "InputParser stalls event queue after unknown/discarded escape
+          sequences" (2026-08-28)
+CROSS-REF: QA-EDIT-022
+VERIFY    Keys arriving in the same read batch behind an unrecognized escape
+          sequence are processed immediately, not one input event later.
+          Incomplete sequences split across reads still decode correctly.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-103
+NAME:     QA helpers never touch a pre-existing repo
+PRIORITY: P0
+BUG:      P0 "QA suite commits junk into the real repository (sandbox escape
+          in qa-helpers)" (2026-08-28)
+CROSS-REF: (test infrastructure — qa/lib/qa-helpers.sh; no feature-file
+          counterpart)
+VERIFY    qa_project/qa_git_repo cd into a temp dir in the CALLING shell;
+          git init/add/commit from QA scripts land in that temp repo, never
+          in the caller's repo; invoking them via $(...) aborts loudly; a
+          victim repo's HEAD, worktree, and config stay untouched.

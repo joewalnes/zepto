@@ -3,7 +3,7 @@
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-023: Tree scrollbar drag"
 
-dir=$(qa_project)
+qa_project; dir="$QA_PROJECT_DIR"
 for i in $(seq 1 50); do
     echo "file $i" > "file_$(printf '%03d' $i).txt"
 done
