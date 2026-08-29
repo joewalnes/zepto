@@ -1025,3 +1025,16 @@ CROSS-REF: QA-FIND-027, QA-FIND-008
 VERIFY    On match 3 of 3, toggling regex off (matches drop to 1) shows
           "1 of 1", never "3 of 1". Note: ↑↓ navigate matches in the find
           bar; Enter closes it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-108
+NAME:     QA runner is concurrency-safe (no stopall)
+PRIORITY: P2
+BUG:      P2 "runner.pl hangon stopall killed all sessions on the machine"
+          (2026-08-29)
+CROSS-REF: QA-REG-106
+VERIFY    A runner invocation never stops live foreign hangon sessions or
+          live zqa_* sessions whose owning script PID is alive, and never
+          deletes ~/.hangon/state.json; stale zqa_* sessions (owner dead)
+          are cleaned up.

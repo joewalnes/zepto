@@ -850,8 +850,10 @@ Noticed while writing QA-REG-105: with 3 matches and the cursor on match 3, togg
 ### P3: No "Save As" command in palette
 The command palette has "Save" (⌃S) and "Save and Close Tab" (⌃W) but no "Save As" / "Save to different location" command. File→Save As is a standard editor operation. Users can only save to the original path.
 
-### P3: Preference state persists between sessions
+### ~~P3: Preference state persists between sessions~~ NO LONGER A TEST HAZARD
 Toggle states (minimap, word wrap, nerd font, etc.) persist to preferences. This means QA tests that toggle features can affect subsequent tests. Tests must save and restore state. Not a bug per se, but a testing hazard worth documenting.
+
+**Resolution (2026-08-29):** Persisting preferences is intended product behavior; the test hazard is gone since QA sessions run with a per-test `--state-dir` (QA-REG-106) — toggles land in an isolated temp dir, never in shared or real state.
 
 ### P3: Transform (Alt+T) is shell-pipe only
 The transform feature (Alt+T) opens a shell command prompt. There are no built-in text transforms (uppercase, lowercase, sort, etc.) — users must type shell commands like `tr '[:lower:]' '[:upper:]'` or `sort`. This works but is not discoverable for users unfamiliar with Unix pipes.
@@ -899,3 +901,6 @@ Note: months of QA runs may have already drifted the user's real `~/.config/zept
 
 ### P3: Remaining sleep-based QA scripts occasionally flake under full-suite load
 The 2026-08-28 isolation fixes eliminated the systematic cross-test failures, but a long tail of scripts still use fixed `sleep` + `qa_assert_screen` instead of the deadline-polling `qa_wait_screen`/`qa_assert_expect` helpers, and one occasionally blinks when the parallel suite starves its renders (observed: `sbar_001_cursor_pos` fast-fail on the startup assertion — now migrated; `wrap_009_diff_wrap` one transient session-start error, passes standalone). Migrate scripts to the polling helpers opportunistically whenever one flakes; there is no need for a big-bang rewrite.
+
+### ~~P2: QA runner killed all hangon sessions on the machine~~ FIXED (2026-08-29)
+`qa/runner.pl` ran `hangon stopall` before and after every suite run and deleted `~/.hangon/state.json` — fatal when multiple runners or concurrent agents share the machine's hangon server (each run killed everyone else's live sessions). Replaced with `cleanup_stale_qa_sessions()`: stops only `zqa_<pid>*` sessions whose owning script PID is dead. Test: `reg_108_runner_concurrent.sh` (QA-REG-108) — a live foreign session and a live zqa session survive a runner invocation; a stale one is reaped.

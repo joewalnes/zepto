@@ -244,14 +244,24 @@ sub print_result {
 sub hangon_quiet { system("hangon @_ >/dev/null 2>&1"); }
 
 # ---------------------------------------------------------------------------
-# Ensure clean hangon state
+# Ensure clean hangon state (concurrency-safe)
 # ---------------------------------------------------------------------------
 
-# Reset hangon state — stop all sessions and clean state file
-hangon_quiet('stopall');
-my $hangon_state = "$ENV{HOME}/.hangon/state.json";
-unlink $hangon_state if -e $hangon_state;
-sleep 0.5;
+# Stop only STALE zqa_* sessions — ones whose owning script PID (embedded
+# in the session name) is no longer alive. Never `stopall` and never
+# delete ~/.hangon/state.json: multiple runners/agents may share this
+# machine's hangon server, and nuking everything kills their live
+# sessions too.
+sub cleanup_stale_qa_sessions {
+    my $list = `hangon list 2>/dev/null` // '';
+    for my $line (split /\n/, $list) {
+        next unless $line =~ /^(zqa_(\d+)\S*)/;
+        my ($name, $pid) = ($1, $2);
+        next if kill(0, $pid);   # owning script still running — not ours to stop
+        hangon_quiet('stop', $name);
+    }
+}
+cleanup_stale_qa_sessions();
 
 # ---------------------------------------------------------------------------
 # Run scripts
@@ -364,7 +374,7 @@ if ($serial) {
     }
 }
 
-hangon_quiet('stopall');
+cleanup_stale_qa_sessions();
 clear_status();
 
 # ---------------------------------------------------------------------------
