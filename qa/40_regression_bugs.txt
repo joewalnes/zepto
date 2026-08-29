@@ -1093,3 +1093,18 @@ VERIFY    Command palette FILE section shows "Save As", distinct from
           whether the document already has one. Writes via plain file
           I/O (Document::save(), atomic temp-file-then-rename) — no
           shell exec.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-128
+NAME:     Built-in transforms exist in a TRANSFORM palette section
+PRIORITY: P3
+BUG:      P3 "Transform (Alt+T) is shell-pipe only" (2026-08-29)
+CROSS-REF: QA-XFM-014, QA-XFM-015, QA-XFM-016, QA-XFM-017
+VERIFY    Palette shows a TRANSFORM section (Uppercase, Lowercase, Sort
+          Lines, Reverse Lines, Unique Lines) alongside the unchanged
+          "Transform via Shell" (⌥T, EDIT section). All 5 built-ins
+          operate on the selection, or the whole document if nothing
+          is selected. Unique Lines preserves first-occurrence order
+          (does not reorder like shell `sort -u`). None of the 5 shell
+          out — pure Perl via Document::replace().

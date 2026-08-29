@@ -861,8 +861,10 @@ Toggle states (minimap, word wrap, nerd font, etc.) persist to preferences. This
 
 **Resolution (2026-08-29):** Persisting preferences is intended product behavior; the test hazard is gone since QA sessions run with a per-test `--state-dir` (QA-REG-106) — toggles land in an isolated temp dir, never in shared or real state.
 
-### P3: Transform (Alt+T) is shell-pipe only
+### ~~P3: Transform (Alt+T) is shell-pipe only~~ FIXED
 The transform feature (Alt+T) opens a shell command prompt. There are no built-in text transforms (uppercase, lowercase, sort, etc.) — users must type shell commands like `tr '[:lower:]' '[:upper:]'` or `sort`. This works but is not discoverable for users unfamiliar with Unix pipes.
+
+**Fix:** Added 5 built-in, pure-Perl transforms in a new TRANSFORM palette section: Uppercase, Lowercase, Sort Lines, Reverse Lines, Unique Lines (first-occurrence order preserved, unlike shell `sort -u` which reorders). All operate on the current selection, or the whole document if nothing is selected — same auto-select-all scoping `cmd_transform` (⌥T) already uses. No shell exec: `cmd_transform_uppercase`/`cmd_transform_lowercase` call `_apply_text_transform`, a shared engine that reads the selected text, applies a coderef, and writes it back via `Document::replace()` (single undo entry; no-op — no undo entry, no dirty flag — if the transform doesn't change anything). `cmd_transform_sort_lines`/`cmd_transform_reverse_lines`/`cmd_transform_unique_lines` go through `_apply_line_transform`, which layers line-splitting on top (preserves whether the original text ended with a trailing newline). ⌥T / "Transform via Shell" is completely unchanged — still in the EDIT section, still shell-pipe. **Behavioral discovery along the way:** `⌃Space` is dual-purpose — if the cursor sits immediately after a word character, it's routed to the completion-trigger path instead of opening the palette (see `Editor.pm::handle_ctrl_char`, char `' '` case). This is intended, pre-existing behavior (not something this change touched), but it means interactive testing of a selection ending mid-word needs the cursor moved off the word boundary (e.g. `Home`, or extend the selection one more character past the word) before pressing `⌃Space`, or the palette won't open.
 
 ## Live debugging session (2026-08-28)
 

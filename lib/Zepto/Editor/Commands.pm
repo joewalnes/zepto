@@ -1109,6 +1109,95 @@ sub cmd_transform {
 }
 
 # =============================================================================
+# Built-in Text Transforms (pure Perl, no shell exec — see cmd_transform
+# above for the ⌥T shell-pipe version, which is unchanged). Palette
+# section: TRANSFORM.
+# =============================================================================
+
+# Shared engine: apply $fn->($text) to the current selection, or the whole
+# document if nothing is selected (same auto-select-all scoping cmd_transform
+# uses). No-op (no undo entry, no dirty flag) if the transform doesn't
+# actually change the text.
+sub _apply_text_transform {
+    my ($self, $fn) = @_;
+
+    my $view = $self->active_view();
+    my $doc  = $self->active_doc();
+
+    my $auto_selected;
+    if (!$view->has_selection()) {
+        $view->select_all();
+        $auto_selected = 1;
+    }
+
+    my ($start_off, $end_off) = $view->selection_offsets();
+    my $input = $view->selected_text();
+    my $output = $fn->($input);
+
+    if (!defined $output || $output eq $input) {
+        $view->clear_selection() if $auto_selected;
+        return;
+    }
+
+    $view->clear_selection();
+    $doc->replace($start_off, $end_off, $output);
+    $view->invalidate_wrap_map();
+}
+
+# Line-oriented variant of _apply_text_transform: splits the selected text
+# into lines, calls $fn->(@lines) (which returns the transformed list of
+# lines), and rejoins — preserving whether the original text ended with a
+# trailing newline.
+sub _apply_line_transform {
+    my ($self, $fn) = @_;
+
+    $self->_apply_text_transform(sub {
+        my ($text) = @_;
+        return $text unless length($text);
+
+        my @lines = split /\n/, $text, -1;
+        my $trailing_nl = (@lines && $lines[-1] eq '') ? 1 : 0;
+        pop @lines if $trailing_nl;
+
+        @lines = $fn->(@lines);
+
+        my $result = join("\n", @lines);
+        $result .= "\n" if $trailing_nl;
+        return $result;
+    });
+}
+
+sub cmd_transform_uppercase {
+    my ($self) = @_;
+    $self->_apply_text_transform(sub { uc $_[0] });
+}
+
+sub cmd_transform_lowercase {
+    my ($self) = @_;
+    $self->_apply_text_transform(sub { lc $_[0] });
+}
+
+sub cmd_transform_sort_lines {
+    my ($self) = @_;
+    $self->_apply_line_transform(sub { sort @_ });
+}
+
+sub cmd_transform_reverse_lines {
+    my ($self) = @_;
+    $self->_apply_line_transform(sub { reverse @_ });
+}
+
+# Removes duplicate lines, keeping the first occurrence and preserving
+# original order (unlike shell `sort -u`, which reorders).
+sub cmd_transform_unique_lines {
+    my ($self) = @_;
+    $self->_apply_line_transform(sub {
+        my %seen;
+        return grep { !$seen{$_}++ } @_;
+    });
+}
+
+# =============================================================================
 # View Commands
 # =============================================================================
 

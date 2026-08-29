@@ -520,6 +520,151 @@ subtest 'Alt+U keybinding dispatches to Duplicate Down' => sub {
 };
 
 # ============================================================================
+# Built-in Text Transforms (bugs.md P3 "Transform (Alt+T) is shell-pipe only")
+#
+# Note: Document->load() strips the file's trailing newline for in-memory
+# editing (Document->save() adds it back per POSIX convention — see
+# Document.pm "Strip trailing newline for editing"). So text() on a
+# create_temp_file()-loaded document never ends with "\n" regardless of
+# what was on disk. Tests that need a real embedded "\n" inside the text
+# under test build the Document directly via Zepto::Document->new(text
+# => ...), which stores content as-is with no stripping.
+# ============================================================================
+subtest 'cmd_transform_uppercase on selection' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("hello world\nother line\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $view = $editor->active_view();
+    $view->set_cursor(0, 0, 0);
+    $view->set_cursor(0, 5, 1);  # select "hello"
+
+    $editor->cmd_transform_uppercase();
+
+    is($editor->active_doc()->text(), "HELLO world\nother line", 'Only selection uppercased');
+};
+
+subtest 'cmd_transform_lowercase on whole document when nothing selected' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("HELLO WORLD\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    ok(!$editor->active_view()->has_selection(), 'No selection to start');
+    $editor->cmd_transform_lowercase();
+
+    is($editor->active_doc()->text(), 'hello world', 'Whole document lowercased (auto-select-all)');
+};
+
+subtest 'cmd_transform_uppercase is a no-op (no undo entry) when already uppercase' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("ALREADY UPPER\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $doc = $editor->active_doc();
+    my $version_before = $doc->content_version();
+    $editor->cmd_transform_uppercase();
+
+    is($doc->text(), 'ALREADY UPPER', 'Text unchanged');
+    is($doc->content_version(), $version_before, 'No-op transform does not bump content_version (no undo entry)');
+};
+
+subtest 'cmd_transform_sort_lines sorts alphabetically' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_sort_lines();
+
+    is($editor->active_doc()->text(), "apple\nbanana\ncherry", 'Lines sorted');
+};
+
+subtest 'cmd_transform_sort_lines preserves trailing newline on a partial selection' => sub {
+    my $term = mock_terminal();
+    # Built directly (not via create_temp_file/load), so the embedded "\n"
+    # characters are real — this is what a partial, mid-document selection
+    # actually looks like in memory.
+    my $doc = Zepto::Document->new(text => "banana\napple\ncherry\n");
+    my $view = Zepto::View->new(document => $doc);
+    my $term2 = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term2);
+    my $find_engine = Zepto::FindEngine->new(document => $doc);
+    my $highlighter = Zepto::Highlighter->new();
+    $editor->{tab_manager}->add_tab(
+        document => $doc, view => $view, find_engine => $find_engine,
+        highlighter => $highlighter, file_path => undef,
+    );
+
+    # Select "banana\napple\n" (first two lines, including their trailing
+    # newlines) — leaves "cherry\n" out of the selection entirely.
+    $view->set_cursor(0, 0, 0);
+    $view->set_cursor(2, 0, 1);
+
+    $editor->cmd_transform_sort_lines();
+
+    is($doc->text(), "apple\nbanana\ncherry\n",
+       'Selected lines sorted with trailing newline preserved; unselected "cherry" untouched');
+};
+
+subtest 'cmd_transform_reverse_lines reverses line order' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("one\ntwo\nthree\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_reverse_lines();
+
+    is($editor->active_doc()->text(), "three\ntwo\none", 'Line order reversed');
+};
+
+subtest 'cmd_transform_unique_lines keeps first occurrence, preserves order' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\napple\nbanana\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_unique_lines();
+
+    is($editor->active_doc()->text(), "banana\napple\ncherry",
+       'Duplicates removed, first-occurrence order preserved (not re-sorted)');
+};
+
+subtest 'Built-in transforms are undoable in one step' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("banana\napple\ncherry\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    my $doc = $editor->active_doc();
+    my $original = $doc->text();
+
+    $editor->cmd_transform_sort_lines();
+    isnt($doc->text(), $original, 'Text changed after sort');
+
+    $doc->undo();
+    is($doc->text(), $original, 'Single undo restores original order');
+};
+
+subtest 'Built-in transforms never shell out (pure Perl, no injection risk)' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $marker = "$tmpdir/should_never_run";
+
+    my $term = mock_terminal();
+    my $filename = create_temp_file("foo; touch $marker; echo hi\n");
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+
+    $editor->cmd_transform_uppercase();
+
+    is($editor->active_doc()->text(), 'FOO; TOUCH ' . uc($marker) . '; ECHO HI',
+       'Shell-metacharacter line treated as literal text, uppercased in place');
+    ok(!-e $marker, 'No command was ever executed');
+};
+
+# ============================================================================
 # Copy/paste
 # ============================================================================
 subtest 'Copy and paste' => sub {
