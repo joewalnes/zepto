@@ -17,7 +17,7 @@ qa_keys "shift-down" 0.1
 qa_send "X"
 
 qa_assert_not_screen "line 1 " "selection replaced first lines"
-qa_assert_screen "X" "replacement visible"
+qa_assert_expect "X" "replacement visible"
 
 qa_keys "ctrl-q"
 sleep 0.2

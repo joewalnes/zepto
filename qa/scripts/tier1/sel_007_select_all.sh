@@ -12,7 +12,7 @@ qa_keys "ctrl-a"
 qa_send "X"
 
 # All content replaced with X
-qa_assert_screen "X" "all text replaced"
+qa_assert_expect "X" "all text replaced"
 qa_assert_not_screen "line one" "original line 1 gone"
 qa_assert_not_screen "line three" "original line 3 gone"
 

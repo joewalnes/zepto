@@ -14,7 +14,7 @@ qa_keys "shift-down" 0.1
 # Two lines selected — typing replaces them
 qa_send "X"
 
-qa_assert_screen "X" "selection replaced"
+qa_assert_expect "X" "selection replaced"
 qa_assert_not_screen "line one" "line one gone"
 qa_assert_not_screen "line two" "line two gone"
 

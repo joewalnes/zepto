@@ -17,7 +17,7 @@ qa_keys "right" 0.1
 # Typing should insert, not replace
 qa_send "X"
 
-qa_assert_screen "abcdXef" "arrow cleared selection, X inserted at cursor"
+qa_assert_expect "abcdXef" "arrow cleared selection, X inserted at cursor"
 
 qa_keys "ctrl-q"
 sleep 0.2

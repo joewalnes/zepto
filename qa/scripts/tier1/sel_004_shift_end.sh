@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "shift-end"
 qa_send "X"
 
-qa_assert_screen "X" "entire line replaced"
+qa_assert_expect "X" "entire line replaced"
 qa_assert_not_screen "hello" "original text gone"
 
 qa_keys "ctrl-q"

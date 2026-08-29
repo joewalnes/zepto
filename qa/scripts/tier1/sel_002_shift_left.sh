@@ -15,7 +15,7 @@ for i in $(seq 1 5); do qa_keys "shift-left" 0.05; done
 # Type to replace
 qa_send "X"
 
-qa_assert_screen "hello X" "shift-left selected and replaced 'world'"
+qa_assert_expect "hello X" "shift-left selected and replaced 'world'"
 
 qa_keys "ctrl-q"
 sleep 0.2

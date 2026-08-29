@@ -15,7 +15,7 @@ qa_keys "shift-right" 0.1
 
 qa_keys "backspace"
 
-qa_assert_screen " world" "backspace deleted selection"
+qa_assert_expect " world" "backspace deleted selection"
 
 qa_keys "ctrl-q"
 sleep 0.2
