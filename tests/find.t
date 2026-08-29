@@ -653,4 +653,31 @@ subtest 'Extract capture positions for highlighting' => sub {
     is($positions->[1]{group}, 2, 'Second capture is group 2');
 };
 
+# ============================================================================
+# Current-match index clamped when match list shrinks (QA-REG-107)
+# ============================================================================
+# Regression: with the cursor on match 3 of 3, toggling regex/case re-runs
+# the search with skip_jump — if the new list has fewer matches, the stale
+# index rendered as "3 of 1" in the find bar.
+subtest 'find_current clamped when matches shrink' => sub {
+    my $editor = create_editor_with_content("fooXbar\nfoo.bar\nfooYbar\n");
+    $editor->enter_find_mode();
+    $editor->{find_widget}->set_value('foo.bar');
+    $editor->{find_regex} = 1;
+    $editor->_update_find_matches();
+    is(scalar @{$editor->{find_matches}}, 3, 'Regex dot matches all 3 lines');
+
+    # Navigate to the last match
+    $editor->_find_navigate(1);
+    $editor->_find_navigate(1);
+    is($editor->{find_current}, 2, 'On match 3 of 3');
+
+    # Toggle to literal (as the ⌃R handler does: re-search with skip_jump)
+    $editor->{find_regex} = 0;
+    $editor->_update_find_matches(1);
+    is(scalar @{$editor->{find_matches}}, 1, 'Literal search matches 1 line');
+    ok($editor->{find_current} < scalar @{$editor->{find_matches}},
+       'find_current clamped within new match count (no "3 of 1")');
+};
+
 done_testing();

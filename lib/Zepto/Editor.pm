@@ -778,6 +778,7 @@ sub run {
                     $needs_render = 1;
                     my $old_count = scalar(@{$self->{find_matches} // []});
                     $self->{find_matches} = $engine->matches();
+                    $self->_clamp_find_current();
                     # Jump to nearest match if background found new matches
                     if (!$old_count && @{$self->{find_matches}}) {
                         $self->_find_nearest_match();
@@ -2691,8 +2692,18 @@ sub _update_find_matches {
     # Get all available matches (viewport + any completed background)
     # Note: if background search is still running, this returns partial results
     $self->{find_matches} = $engine->matches();
+    $self->_clamp_find_current();
 
     $self->_find_nearest_match() unless $skip_jump;
+}
+
+# Keep the current-match index valid after the match list changes —
+# toggling regex/case can shrink the results while skip_jump preserves
+# the index, which rendered as "3 of 1" in the find bar (QA-REG-107)
+sub _clamp_find_current {
+    my ($self) = @_;
+    my $count = scalar @{$self->{find_matches} // []};
+    $self->{find_current} = 0 if ($self->{find_current} // 0) >= $count;
 }
 
 sub _find_nearest_match {

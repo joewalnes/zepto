@@ -1013,3 +1013,15 @@ VERIFY    Pref toggles land in the per-test QA_STATE_DIR (never the real
           parallel session (--no-system-clipboard); helpers poll the
           rendered screen (qa_wait_screen), never `hangon expect`, for
           screen content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-107
+NAME:     Find counter clamps when match count shrinks
+PRIORITY: P3
+BUG:      P3 "Find match counter not clamped when match count shrinks"
+          (2026-08-28, fixed 2026-08-29)
+CROSS-REF: QA-FIND-027, QA-FIND-008
+VERIFY    On match 3 of 3, toggling regex off (matches drop to 1) shows
+          "1 of 1", never "3 of 1". Note: ↑↓ navigate matches in the find
+          bar; Enter closes it.

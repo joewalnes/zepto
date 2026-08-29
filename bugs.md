@@ -842,8 +842,10 @@ The find bar starts with regex mode enabled by default. Most editors (VS Code, S
 
 **Fix:** `find_regex` now initializes to 0 in Editor.pm — literal search by default, ⌃R toggles regex on. The `qa/09_find_replace.txt` spec already described this behavior ("Without regex: literal `\d+` is searched"); only the code disagreed. Updated `tests/find.t` default assertion and `reg_049_find_regex_pipe.sh` (which assumed regex-on default; it now presses ⌃R first, preserving its original pipe-handling regression intent). All other find/replace QA scripts pass unchanged. Test: `reg_105_find_literal_default.sh` (QA-REG-105) — written first, verified failing ("3 of 3" via regex dot) before the fix.
 
-### P3: Find match counter not clamped when match count shrinks
+### ~~P3: Find match counter not clamped when match count shrinks~~ FIXED
 Noticed while writing QA-REG-105: with 3 matches and the cursor on match 3, toggling regex off (matches drop to 1) briefly shows "↑↓ 3 of 1" in the find bar — the current-match index isn't clamped to the new match count. Cosmetic; the next navigation normalizes it.
+
+**Fix:** New `_clamp_find_current()` resets the index when it exceeds the new match count, called at both sites that replace `find_matches` without re-jumping (`_update_find_matches`, which the ⌃R/⌃C toggles use with skip_jump, and the background-search completion in `run()`). Tests: `tests/find.t` "find_current clamped when matches shrink" and `reg_107_find_count_clamp.sh` (QA-REG-107) — both written first and verified failing ("3 of 1" on screen) before the fix. Side discovery captured in the QA script: Enter in the find bar closes it; ↑↓ navigate matches.
 
 ### P3: No "Save As" command in palette
 The command palette has "Save" (⌃S) and "Save and Close Tab" (⌃W) but no "Save As" / "Save to different location" command. File→Save As is a standard editor operation. Users can only save to the original path.
@@ -894,3 +896,6 @@ Originally logged as "the render paints the previous hover state, one event late
 **Fix:** (1) Isolation now travels as CLI flags — `qa_start` passes `--state-dir "$QA_STATE_DIR"` plus new `--no-system-clipboard`; the three scripts that invoke `hangon start` directly were updated too. (2) New `--no-system-clipboard` flag (build.pl → Editor → Terminal) skips OSC 52 and pbcopy/xclip entirely so copy/paste use the internal per-process clipboard. (3) `qa_wait_screen`/`qa_assert_expect` helpers poll the rendered screen with a deadline (NOT `hangon expect`, which matches the raw escape-code stream where patterns like `()` never appear adjacent); edit_020, clip_009, ms_012, gut_012 rewritten onto them, and ms_012's pipelines guarded with `|| true`. Verified: pref-toggling test leaves the real `~/.config/zepto` mtimes untouched; two parallel sessions no longer share a clipboard. Test: `reg_106_session_isolation.sh` (QA-REG-106).
 
 Note: months of QA runs may have already drifted the user's real `~/.config/zepto/preferences.json` (auto-pair/minimap/theme toggles) — worth a manual review.
+
+### P3: Remaining sleep-based QA scripts occasionally flake under full-suite load
+The 2026-08-28 isolation fixes eliminated the systematic cross-test failures, but a long tail of scripts still use fixed `sleep` + `qa_assert_screen` instead of the deadline-polling `qa_wait_screen`/`qa_assert_expect` helpers, and one occasionally blinks when the parallel suite starves its renders (observed: `sbar_001_cursor_pos` fast-fail on the startup assertion — now migrated; `wrap_009_diff_wrap` one transient session-start error, passes standalone). Migrate scripts to the polling helpers opportunistically whenever one flakes; there is no need for a big-bang rewrite.
