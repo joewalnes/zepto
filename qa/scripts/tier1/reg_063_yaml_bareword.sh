@@ -11,9 +11,9 @@ qa_start "$file"
 
 # The word "region" should be visible as plain text, not highlighted as keyword
 # Just verify the file opens and displays correctly without issues
-qa_assert_screen "region" "region displayed correctly"
-qa_assert_screen "enabled" "enabled displayed"
-qa_assert_screen "frontend" "frontend displayed"
+qa_assert_expect "region" "region displayed correctly"
+qa_assert_expect "enabled" "enabled displayed"
+qa_assert_expect "frontend" "frontend displayed"
 
 # Editor should not crash or misbehave
 qa_alive

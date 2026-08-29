@@ -25,7 +25,7 @@ sleep 0.5
 
 # After saving as .py, syntax highlighting should activate
 # Check if status bar shows Python language indicator
-qa_screen
+qa_wait_screen 'def|print|Python|py' || true
 if echo "$QA_SCREEN" | grep -qiE "Python|py"; then
     qa_pass "Python syntax detected after Save As"
 else

@@ -11,7 +11,7 @@ qa_keys "escape"
 sleep 0.5
 
 # Check if palette or some response appeared
-qa_screen
+qa_wait_screen 'Commands|FILE|EDIT' || true
 if echo "$QA_SCREEN" | grep -qiE "Commands|FILE|EDIT|palette|NAVIGATE"; then
     qa_pass "Esc opened command palette"
 else

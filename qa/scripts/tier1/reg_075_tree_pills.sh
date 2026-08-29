@@ -14,12 +14,7 @@ qa_keys "ctrl-b"
 sleep 0.5
 
 # Status bar should show tree-relevant info
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "Commands|Open|⌃"; then
-    qa_pass "status bar pills visible in tree mode"
-else
-    qa_fail "status bar pills in tree mode"
-fi
+qa_assert_expect "Commands|Open|⌃" "status bar pills visible in tree mode"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

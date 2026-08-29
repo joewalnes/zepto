@@ -9,7 +9,7 @@ printf 'hello\x00world\x01\x02' > "$binfile"
 
 qa_start "$binfile"
 
-qa_assert_screen "Binary|binary|bytes" "binary file detected"
+qa_assert_expect "Binary|binary|bytes" "binary file detected"
 
 # Try to type — should be blocked
 qa_send "test" 0.3

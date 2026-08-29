@@ -9,7 +9,7 @@ qa_start "$file"
 qa_keys "ctrl-u"
 
 # Should have two copies
-qa_screen
+qa_wait_screen 'original line' || true
 count=$(echo "$QA_SCREEN" | grep -c "original line" || true)
 if [[ $count -ge 2 ]]; then
     qa_pass "line duplicated up ($count copies)"

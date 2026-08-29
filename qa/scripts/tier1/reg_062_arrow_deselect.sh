@@ -16,15 +16,7 @@ sleep 0.2
 # Type — should insert, not replace
 qa_send "X"
 
-qa_screen
-# "hello" should still be there with X inserted after it
-if echo "$QA_SCREEN" | grep -q "helloX\|hello X"; then
-    qa_pass "arrow deselected, typing inserts"
-elif echo "$QA_SCREEN" | grep -q "hello"; then
-    qa_pass "arrow deselected (hello preserved)"
-else
-    qa_fail "arrow deselected"
-fi
+qa_assert_expect "hello" "arrow deselected (hello preserved)"
 
 qa_keys "ctrl-q"
 sleep 0.2

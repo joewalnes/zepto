@@ -11,7 +11,7 @@ qa_keys "ctrl-s"
 sleep 0.3
 
 # Check for saved message
-qa_screen
+qa_wait_screen 'saved|wrote' || true
 saved_before=$(echo "$QA_SCREEN" | grep -ci "saved\|wrote\|✓" || true)
 
 # Wait 2 seconds — message should still be there
