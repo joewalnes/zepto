@@ -8,7 +8,7 @@ qa_start "$file"
 
 # Type text
 qa_send "abc"
-qa_assert_screen "abc" "text typed"
+qa_assert_expect "abc" "text typed"
 
 # Press Enter
 qa_keys "enter"
@@ -18,7 +18,7 @@ qa_assert_cursor_at "2:1" "cursor at line 2 col 1 after Enter"
 
 # Type on new line
 qa_send "xyz"
-qa_assert_screen "xyz" "text typed on new line"
+qa_assert_expect "xyz" "text typed on new line"
 qa_assert_cursor_at "2:4" "cursor at line 2 col 4"
 
 qa_keys "ctrl-q"

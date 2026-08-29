@@ -12,7 +12,7 @@ for i in $(seq 1 5); do qa_keys "shift-right" 0.05; done
 # Type replacement
 qa_send "X"
 
-qa_assert_screen "X world" "typing replaced selection"
+qa_assert_expect "X world" "typing replaced selection"
 
 qa_keys "ctrl-q"
 sleep 0.2

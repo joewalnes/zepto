@@ -21,12 +21,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should see a save/discard prompt
-qa_screen
-if echo "$QA_SCREEN" | grep -qiE "save|discard|unsaved"; then
-    qa_pass "quit shows prompt for dirty tab"
-else
-    qa_pass "quit prompt handled"
-fi
+qa_assert_expect "save|discard|unsaved" "quit shows prompt for dirty tab"
 
 # Discard
 qa_send "n" 0.3

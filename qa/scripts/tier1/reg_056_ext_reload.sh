@@ -6,7 +6,7 @@ qa_header "QA-REG-056: External file change detection"
 file=$(qa_tmpfile_nl "reg056.txt" "original content")
 qa_start "$file"
 
-qa_assert_screen "original content" "initial content shown"
+qa_assert_expect "original content" "initial content shown"
 
 # Modify file externally
 echo "modified externally" > "$file"
@@ -15,7 +15,7 @@ echo "modified externally" > "$file"
 qa_keys "escape"
 sleep 1.5
 
-qa_screen
+qa_wait_screen 'modified|Reload|changed' || true
 if echo "$QA_SCREEN" | grep -q "modified externally"; then
     qa_pass "buffer reloaded with external changes"
 elif echo "$QA_SCREEN" | grep -qiE "Reload|changed|modified"; then

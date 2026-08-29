@@ -10,19 +10,14 @@ qa_start "$f1" "$f2" "$f3"
 
 # Switch to tab 2
 qa_keys "alt-."
-qa_assert_screen "BBB" "on tab 2"
+qa_assert_expect "BBB" "on tab 2"
 
 # Close tab 2 (Ctrl+W saves and closes)
 qa_keys "ctrl-w"
 sleep 0.3
 
 # Should switch to an adjacent tab (tab 1 or tab 3)
-qa_screen
-if echo "$QA_SCREEN" | grep -qE "AAA|CCC"; then
-    qa_pass "closing middle tab switched to adjacent"
-else
-    qa_fail "closing middle tab switched to adjacent"
-fi
+qa_assert_expect "AAA|CCC" "closing middle tab switched to adjacent"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -40,12 +40,7 @@ qa_keys "alt-d"
 sleep 0.5
 
 # Editor should show diff without crash
-qa_screen
-if echo "$QA_SCREEN" | grep -q "CHANGED\|long line\|wrap"; then
-    qa_pass "diff view renders with word wrap enabled"
-else
-    qa_pass "diff view + word wrap handled without crash"
-fi
+qa_assert_expect "CHANGED|long line|wrap" "diff view renders with word wrap enabled"
 
 qa_keys "ctrl-q"
 rm -rf "$repo_dir"

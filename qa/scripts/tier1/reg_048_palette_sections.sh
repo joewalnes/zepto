@@ -10,7 +10,7 @@ qa_start "$file"
 qa_keys "ctrl-space"
 sleep 0.5
 
-qa_screen
+qa_wait_screen 'FILE|EDIT|NAVIGATE|VIEW' || true
 found=0
 for section in FILE EDIT NAVIGATE VIEW; do
     if echo "$QA_SCREEN" | grep -q "$section"; then

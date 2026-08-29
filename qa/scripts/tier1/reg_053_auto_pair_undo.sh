@@ -10,18 +10,13 @@ qa_start "$file"
 qa_send "("
 sleep 0.2
 
-qa_screen
-if echo "$QA_SCREEN" | grep -qF "()"; then
-    qa_pass "auto-pair inserted ()"
-else
-    qa_pass "character inserted"
-fi
+qa_assert_expect '\\(\\)' "auto-pair inserted ()"
 
 # Undo should remove both ( and )
 qa_keys "ctrl-z"
 sleep 0.2
 
-qa_screen
+qa_wait_screen '.' || true
 if ! echo "$QA_SCREEN" | grep -qF "("; then
     qa_pass "undo removed both auto-pair chars"
 else

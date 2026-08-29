@@ -8,14 +8,7 @@ qa_start "$file"
 
 qa_keys "ctrl-space" 0.3
 
-qa_screen
-# Palette should be visible and properly constrained
-# At default terminal width (~80 cols), palette should be ~60 cols
-if echo "$QA_SCREEN" | grep -qiE "command|save|new|file"; then
-    qa_pass "palette rendered at appropriate width"
-else
-    qa_pass "palette opened"
-fi
+qa_assert_expect "command|save|new|file" "palette rendered at appropriate width"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
