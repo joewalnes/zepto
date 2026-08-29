@@ -361,4 +361,129 @@ subtest 'Light theme syntax colors' => sub {
     ok(has_color_code($output, 180, 60, 10), 'Light theme number color found');
 };
 
+# =============================================================================
+# Markdown Formatting Delimiter Dimming
+# =============================================================================
+# bugs.md P3 "Dim Markdown formatting delimiters" — **, *, _, ~~, ==
+# should tokenize as TOKEN_FORMATTING_DELIM (not TOKEN_PUNCTUATION) so they
+# can be themed distinctly (faint), while the delimited content keeps its
+# normal bold/italic/strikethrough/highlight token type. No characters are
+# hidden -- only the color assigned to the delimiter changes.
+
+subtest 'Markdown emphasis delimiters use a dedicated dim token type' => sub {
+    require Zepto::Syntax::Markdown;
+    my $md = Zepto::Syntax::Markdown->new();
+
+    my %cases = (
+        '**bold**'                 => ['**', 'bold', '**', 'bold'],
+        '*italic*'                 => ['*', 'italic', '*', 'italic'],
+        '__bold__'                 => ['__', 'bold', '__', 'bold'],
+        '_italic_'                 => ['_', 'italic', '_', 'italic'],
+        '***bolditalic***'         => ['***', 'bolditalic', '***', 'bold_italic'],
+        '~~struck~~'               => ['~~', 'struck', '~~', 'strikethrough'],
+        '==marked=='                => ['==', 'marked', '==', 'highlight'],
+    );
+
+    for my $line (sort keys %cases) {
+        my ($open, $content, $close, $content_type) = @{ $cases{$line} };
+        my ($tokens) = $md->tokenize($line, 0);
+
+        my @delim_tokens = grep { $_->{type} eq 'formatting_delim' } @$tokens;
+        is(scalar(@delim_tokens), 2, "$line: exactly 2 formatting_delim tokens (open+close)");
+
+        # No TOKEN_PUNCTUATION should be emitted for the emphasis delimiters
+        # themselves (this line has no other punctuation-worthy chars).
+        my @punct_tokens = grep { $_->{type} eq 'punctuation' } @$tokens;
+        is(scalar(@punct_tokens), 0, "$line: no punctuation tokens for emphasis delimiters");
+
+        my @content_tokens = grep { $_->{type} eq $content_type } @$tokens;
+        ok(@content_tokens >= 1, "$line: delimited content tagged as $content_type");
+
+        # Character coverage: delimiter tokens must cover exactly the
+        # delimiter chars, not conceal/hide any characters (same char count
+        # as before -- only the token TYPE changed, not the tokenization span).
+        my $covered = 0;
+        $covered += ($_->{end} - $_->{start}) for @$tokens;
+        is($covered, length($line), "$line: full line still covered by tokens (no concealment)");
+    }
+};
+
+subtest 'Theme defines faint colors for formatting_delim in both themes' => sub {
+    for my $theme_name (qw(dark light)) {
+        my $theme = Zepto::Theme->get_theme($theme_name);
+
+        my $delim_color = $theme->color('syntax_formatting_delim');
+        ok($delim_color, "$theme_name: syntax_formatting_delim color exists");
+        like($delim_color, qr/38;2;/, "$theme_name: formatting_delim uses RGB format");
+
+        my $punct_color = $theme->color('syntax_punctuation');
+        isnt($delim_color, $punct_color,
+            "$theme_name: formatting_delim color differs from punctuation color");
+
+        # "Fainter" = closer to the background color than punctuation is.
+        my ($bg_r, $bg_g, $bg_b) = $theme->color('bg') =~ /48;2;(\d+);(\d+);(\d+)/;
+        my ($dr, $dg, $db) = $delim_color =~ /38;2;(\d+);(\d+);(\d+)/;
+        my ($pr, $pg, $pb) = $punct_color =~ /38;2;(\d+);(\d+);(\d+)/;
+
+        ok(defined $bg_r && defined $dr && defined $pr,
+            "$theme_name: parsed bg/delim/punctuation RGB triples");
+
+        my $dist = sub {
+            my ($r, $g, $b) = @_;
+            return sqrt(($r - $bg_r)**2 + ($g - $bg_g)**2 + ($b - $bg_b)**2);
+        };
+        my $delim_dist = $dist->($dr, $dg, $db);
+        my $punct_dist = $dist->($pr, $pg, $pb);
+
+        ok($delim_dist < $punct_dist,
+            "$theme_name: formatting_delim ($delim_dist) is closer to bg than "
+            . "punctuation ($punct_dist) -- i.e. visibly fainter");
+    }
+};
+
+subtest 'Rendered markdown shows dimmed delimiter distinct from bold content' => sub {
+    my $doc = Zepto::Document->new(text => 'This is **bold** text.');
+    my $view = Zepto::View->new(document => $doc);
+    $view->set_viewport_size(20, 80);
+
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.md');
+    ok($hl->has_grammar(), 'Highlighter has Markdown grammar');
+
+    for my $theme_name (qw(dark light)) {
+        my $theme = Zepto::Theme->get_theme($theme_name);
+        my $prefs = Zepto::Preferences->new(nerd_font => 0);
+
+        my $output = Zepto::Renderer->render_string(
+            document    => $doc,
+            view        => $view,
+            theme       => $theme,
+            prefs       => $prefs,
+            rows        => 24,
+            cols        => 80,
+            highlighter => $hl,
+        );
+
+        my ($dr, $dg, $db) = $theme->color('syntax_formatting_delim') =~ /38;2;(\d+);(\d+);(\d+)/;
+        my ($br, $bgc, $bb) = $theme->color('syntax_bold') =~ /38;2;(\d+);(\d+);(\d+)/;
+
+        ok(has_color_code($output, $dr, $dg, $db),
+            "$theme_name: rendered output contains formatting_delim color for **");
+        ok(has_color_code($output, $br, $bgc, $bb),
+            "$theme_name: rendered output contains bold color for delimited content");
+    }
+};
+
+subtest 'Non-Markdown languages are unaffected by formatting_delim' => sub {
+    # Perl's ** is the exponentiation operator; must stay TOKEN_OPERATOR,
+    # never TOKEN_FORMATTING_DELIM, even though the raw characters match.
+    require Zepto::Syntax::Perl;
+    my $perl = Zepto::Syntax::Perl->new();
+    my ($tokens) = $perl->tokenize('my $x = 2 ** 3;', 0);
+    my @delim_tokens = grep { $_->{type} eq 'formatting_delim' } @$tokens;
+    is(scalar(@delim_tokens), 0, 'Perl ** exponentiation is never formatting_delim');
+    my @op_on_stars = grep { $_->{type} eq 'operator' } @$tokens;
+    ok(@op_on_stars >= 2, 'Perl ** still tokenizes as operator');
+};
+
 done_testing();

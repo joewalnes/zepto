@@ -146,6 +146,7 @@ BEGIN {
         TOKEN_HEADING4 TOKEN_HEADING5 TOKEN_HEADING6
         TOKEN_BOLD TOKEN_ITALIC TOKEN_BOLD_ITALIC TOKEN_LINK
         TOKEN_UNDERLINE TOKEN_STRIKETHROUGH TOKEN_HIGHLIGHT
+        TOKEN_FORMATTING_DELIM
         STATE_NORMAL STATE_STRING_DOUBLE STATE_STRING_SINGLE
         STATE_STRING_TEMPLATE STATE_COMMENT_BLOCK STATE_HEREDOC
         STATE_POD STATE_STRING_RAW
@@ -188,6 +189,7 @@ use constant {
     TOKEN_UNDERLINE   => 'underline',    # Underlined text in prose formats
     TOKEN_STRIKETHROUGH => 'strikethrough', # Strikethrough text in prose formats
     TOKEN_HIGHLIGHT     => 'highlight',      # Highlighted/marked text in prose formats
+    TOKEN_FORMATTING_DELIM => 'formatting_delim', # Emphasis delimiters (**, *, _, ~~, ==) - rendered faint
 };
 
 # =============================================================================
