@@ -1303,6 +1303,7 @@ VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
 
 --------------------------------------------------------------------------------
 
+<<<<<<< HEAD
 ID:       QA-REG-154
 NAME:     File-tree preview failure surfaces an error message, not silence
 PRIORITY: P3
@@ -1429,3 +1430,33 @@ VERIFY    In a large word-wrapped file, an edit near the top of the file
           each of 25 randomized boundary-crossing edits) plus first-line/
           last-line/sequential-multi-edit cases; mutation-tested by
           deliberately breaking the fix two different ways, both caught.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-145
+NAME:     Legacy-format (non-SGR) mouse report does not stall input
+PRIORITY: P3
+BUG:      P3 "Dead code — _in_modal_state and an empty tautological
+          InputParser branch" (2026-08-30). InputParser.pm:250-254 had an
+          empty, tautological (length(...) >= 0) if-block for legacy
+          "basic format" mouse reports, left over from an abandoned
+          partial implementation ("Actually buffer was already
+          consumed... handle differently"). Confirmed dead: Terminal.pm
+          only ever enables SGR mouse mode ("?1003h?1006h", never bare
+          "?1000h"), so no real terminal sends this legacy format; and
+          the branch was already a structural no-op even before removal
+          (ESC [ M with no params terminates as its own complete CSI
+          sequence, so the block's own condition, when reached, does
+          nothing and falls through to "Unknown CSI" -> EVT_NONE).
+          Deleted the dead block.
+CROSS-REF: QA-REG-102 (unknown-sequence stall), tests/input_parser.t
+          subtest "Basic-format (non-SGR) mouse report is not decoded —
+          treated as unknown CSI"
+VERIFY    A hand-crafted legacy-format mouse report (ESC [ M + 3 raw data
+          bytes) is not specially decoded — it is discarded as an
+          unrecognized CSI sequence, the 3 data bytes are parsed as
+          ordinary characters, and a real keystroke sent immediately
+          behind it in the same write is processed without delay (not
+          stalled behind the unrecognized sequence). Behavior is
+          byte-for-byte identical before and after the dead-code
+          deletion.
