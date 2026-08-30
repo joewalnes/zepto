@@ -1283,7 +1283,7 @@ sub _toggle_pref {
 
     my $new = !$getter->();
     $setter->($new);
-    $self->{message} = "$label: " . ($new ? $on_label : $off_label);
+    $self->show_message("$label: " . ($new ? $on_label : $off_label));
     return $new;
 }
 
