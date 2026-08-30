@@ -1662,3 +1662,88 @@ VERIFY    InputParser only resolved a lone pending ESC via Editor.pm's
           dismisses it -> wait 0.2s/0.5s/1.0s -> type " moreWords")
           correctly produces "dist moreWords" (space preserved) at all
           three gaps, where it previously produced "distmoreWords".
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-171
+NAME:     Quit (⌃Q) has an on-screen hint in the tab bar corner
+PRIORITY: P1
+BUG:      P1 "Discoverability Contract gaps" (2026-08-30) — quit had NO
+          on-screen hint anywhere, at any width, in any theme, in the
+          DOCUMENT context — confirmed absent in 80x24/60x20/40x15,
+          both themes, by both a manual sweep and an 8-screenshot
+          LLM-vision sweep (8/8 consistent).
+CROSS-REF: QA-TAB-013 (qa/21_tabs.txt), tests/renderer.t "Tab bar corner
+           hint shows labeled form when there is room" /
+           "...degrades to compact glyphs (with quit)..."
+VERIFY    `close_tab`/`next_tab`/`prev_tab` already rendered via a
+          hardcoded corner hint in Renderer.pm::_render_tab_bar despite
+          being `priority => 0` in CommandRegistry (never a status-bar
+          pill) — but `quit` had no equivalent coverage anywhere. Fix:
+          added Quit to the same tab-bar corner-hint region, as
+          `⌃Q quit` (labeled tier) / `⌃Q` (compact tier). Verified via
+          hangon at 80x24: hint text includes "quit", and pressing ⌃Q
+          actually quits the process (not just a cosmetic label).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-172
+NAME:     Tab bar close/tab-nav corner hint shows plain-language labels,
+          not just bare modifier glyphs, when there's room
+PRIORITY: P1
+BUG:      P1 "Discoverability sweep run 2" (2026-08-30) — an LLM-vision
+          judge flagged the pre-existing hint (`⌃W ×  ⌥, ←  ⌥. →`) as
+          "unlabeled and ambiguous" in 6/6 relevant screenshots: it was
+          technically on screen but not comprehensible to a first-time
+          user, which the manual-only sweep had missed (it only checked
+          whether the hint rendered at all, not whether it was legible
+          to someone unfamiliar with the shortcuts).
+CROSS-REF: QA-TAB-013 (qa/21_tabs.txt), tests/renderer.t "Tab bar corner
+           hint shows labeled form when there is room"
+VERIFY    Renderer.pm::_render_tab_bar now tries a labeled form
+          (`⌃W close   ⌥←/→ tabs   ⌃Q quit`) first — mirroring
+          `_fit_pill_group`'s "full form first, compact only if it
+          doesn't fit" idiom used elsewhere on the status bar — and
+          falls back to the original bare-glyph compact form
+          (`⌃W × ⌥, ← ⌥. → ⌃Q`) only when there isn't room for labels.
+          The compact tier still survives down to ~40 cols (confirmed via
+          hangon at 80x24/60x20/40x15, both themes, both nerd-font
+          modes) — this property is unchanged from before, it just now
+          also includes quit. Below the width where even the compact
+          form fits, the hint blanks out honestly instead of truncating
+          mid-glyph.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-173
+NAME:     Compact status-bar pill always shows its icon, never degrades
+          to a bare key letter
+PRIORITY: P2
+BUG:      P2 "Discoverability sweep run 2" (2026-08-30) — an LLM-vision
+          judge flagged the compact Word Wrap pill as reading like an
+          unlabeled, context-free "Z" in 3/4 document screenshots.
+CROSS-REF: QA-SBAR-021 (qa/26_status_bar.txt), tests/renderer.t "No
+           priority > 0 command ever compacts to a bare key with no icon
+           (either nerd-font mode)"
+VERIFY    Investigated against the actual code and the live character
+          stream (not taken on faith — see bugs.md's own established
+          convention for spot-checking LLM-vision claims before treating
+          them as confirmed bugs): every priority > 0 command's icon,
+          including `wrap` -> `W`, already resolves to a non-empty glyph
+          in both nerd-font and ASCII-fallback mode in
+          Zepto::Chars.pm's %CHARS table. Confirmed via
+          `Zepto::Chars->get('wrap')` (returns 'W' in ASCII mode),
+          raw-byte inspection of a live nerd-font-mode session (the
+          NF_WRAP codepoint \x{f036} IS present in the output stream),
+          and a rendered screenshot showing "W Z" correctly in
+          --no-nerd-font mode. The claimed "bare Z" traces to the
+          LLM-vision sweep's screenshot-rendering tool not having a
+          patched Nerd Font glyph for that one specific PUA codepoint
+          while rendering others (Save, folder, palette hamburger) fine
+          — a font-completeness artifact of that tool, not a Zepto
+          defect. No code change was needed in Chars.pm; added
+          `tests/renderer.t`'s general regression guard (asserts this
+          for the WHOLE registry, not just Word Wrap) so a future
+          priority > 0 command with a genuinely missing icon mapping
+          would be caught immediately instead of relying on a screenshot
+          sweep to notice.

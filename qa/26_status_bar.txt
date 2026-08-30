@@ -352,3 +352,35 @@ VERIFY
     dropped when it isn't the very first key sent" (unrelated pre-existing
     issue). The on/off color swap itself must be checked with the
     screenshot steps above, or via `hangon screenshot` manually.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-021
+NAME:     Compact pill form always shows an icon before the key, never a
+          bare letter (REGRESSION)
+PRIORITY: P2
+FEATURE:  sbar layout compact icon
+RELATED:  bugs.md "Discoverability sweep run 2" — QA-REG-173
+
+STEPS
+  1. Open a file with `--no-nerd-font`, at a width where a toggle pill
+     (e.g. Word Wrap) renders in compact form (icon + key, no label — the
+     default 80-col session already does this, see QA-SBAR-020).
+  2. Observe the compact pill text.
+  3. Repeat with nerd font enabled (default, omit `--no-nerd-font`).
+
+VERIFY
+  - The pill shows an icon character immediately before the key (e.g.
+    `W Z` for Word Wrap: icon 'W', key 'Z'), in BOTH modes — never just a
+    bare key letter with nothing in front of it.
+  - This was investigated as a possible bug (an LLM-vision sweep flagged
+    the compact Word Wrap pill as reading like a bare "Z") but did not
+    reproduce against the actual character stream in either mode —
+    confirmed via raw byte inspection and screenshot. It traced to the
+    screenshot tool used by that sweep not having a patched Nerd Font
+    glyph for one specific icon (`\x{f036}`) while rendering others fine
+    — a font-completeness artifact of that tool, not a Zepto defect.
+    `tests/renderer.t` "No priority > 0 command ever compacts to a bare
+    key with no icon" is the general, whole-registry regression guard —
+    it asserts this for every current and future status-bar-eligible
+    command, not just Word Wrap.

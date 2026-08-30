@@ -7,6 +7,14 @@ package Zepto::CommandRegistry;
 # and keyboard shortcut dispatch. Each command has an id, label, icon,
 # shortcut, section, type, priority, and method.
 #
+# core_nav => 1 (optional) marks a command as "core navigation" per
+# docs/UI_GUIDELINES.md's Discoverability Contract: it must always have a
+# persistent, always-visible on-screen hint in whatever context the user is
+# currently in, even if that hint isn't a status-bar pill (priority => 0).
+# This is the single source of truth for "must always be visible somewhere"
+# — see tests/discoverability_core_nav.t, which checks
+# `core_nav => 1 || priority > 0` for the command set named in the Contract.
+#
 # Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW
 # Types: action (one-shot), toggle (binary on/off), setting (multi-value)
 #
@@ -88,6 +96,7 @@ my @COMMANDS = (
         section  => 'FILE',
         type     => 'action',
         priority => 0,
+        core_nav => 1,   # always-visible via the tab-bar corner hint, not a status-bar pill — see docs/UI_GUIDELINES.md
         method   => 'cmd_close_tab',
     },
     {
@@ -98,6 +107,7 @@ my @COMMANDS = (
         section  => 'FILE',
         type     => 'action',
         priority => 0,
+        core_nav => 1,   # always-visible via the tab-bar corner hint, not a status-bar pill — see docs/UI_GUIDELINES.md
         method   => 'cmd_quit',
     },
     {
@@ -108,6 +118,7 @@ my @COMMANDS = (
         section  => 'FILE',
         type     => 'action',
         priority => 0,
+        core_nav => 1,   # always-visible via the tab-bar corner hint, not a status-bar pill — see docs/UI_GUIDELINES.md
         method   => 'cmd_next_tab',
     },
     {
@@ -118,6 +129,7 @@ my @COMMANDS = (
         section  => 'FILE',
         type     => 'action',
         priority => 0,
+        core_nav => 1,   # always-visible via the tab-bar corner hint, not a status-bar pill — see docs/UI_GUIDELINES.md
         method   => 'cmd_prev_tab',
     },
     {
@@ -139,6 +151,7 @@ my @COMMANDS = (
         type     => 'toggle',
         pref     => 'show_tree',
         priority => 3,   # status bar: ⌃ group
+        core_nav => 1,   # already covered via priority > 0, tagged for a single source of truth — see docs/UI_GUIDELINES.md
         method   => 'cmd_toggle_tree',
     },
 

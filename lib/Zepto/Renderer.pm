@@ -1106,18 +1106,51 @@ sub _render_tab_bar {
         };
     }
 
-    # Fill remaining space, with right-aligned tab hints if room
+    # Fill remaining space, with a right-aligned core-nav hint if room —
+    # close tab, prev/next tab, AND quit (see docs/UI_GUIDELINES.md
+    # "Discoverability Contract": core navigation needs a persistent
+    # on-screen hint in the current context, and quit previously had none
+    # at all here — see bugs.md).
+    #
+    # Two-tier degradation, mirroring _fit_pill_group's idiom elsewhere in
+    # this file: try the labeled form first (plain-language words next to
+    # the glyphs — a bare glyph cluster like "⌃W ×  ⌥, ←  ⌥. →" is
+    # technically "on screen" but was flagged by an LLM-vision discoverability
+    # sweep as unlabeled/ambiguous to a first-time user, see bugs.md); fall
+    # back to the compact glyphs-only form when there isn't room for labels;
+    # finally fall back to a blank fill so the hint degrades honestly
+    # (never overlaps or truncates mid-glyph) instead of disappearing with
+    # no trace. The compact tier must keep fitting down to 40 cols — that
+    # property was confirmed working before quit was added here and must
+    # not regress.
     my $remaining = $tab_cols - $x;
-    my $hint_close = "\x{2303}W \x{00d7}";  # ⌃W ×
-    my $hint_nav   = "\x{2325}, \x{2190}  \x{2325}. \x{2192}";  # ⌥, ←  ⌥. →
-    my $hint_full  = "$hint_close  $hint_nav";
-    my $hint_width = length($hint_full) + 2;  # +2 for surrounding spaces
 
-    if ($remaining >= $hint_width) {
+    my $hint_close_lbl = "\x{2303}W close";                         # ⌃W close
+    my $hint_nav_lbl   = "\x{2325}\x{2190}/\x{2192} tabs";           # ⌥←/→ tabs
+    my $hint_quit_lbl  = "\x{2303}Q quit";                           # ⌃Q quit
+    my $hint_labeled   = "$hint_close_lbl   $hint_nav_lbl   $hint_quit_lbl";
+
+    my $hint_close_compact = "\x{2303}W \x{00d7}";                          # ⌃W ×
+    my $hint_nav_compact   = "\x{2325}, \x{2190} \x{2325}. \x{2192}";       # ⌥, ← ⌥. →
+    my $hint_quit_compact  = "\x{2303}Q";                                   # ⌃Q
+    my $hint_compact = "$hint_close_compact $hint_nav_compact $hint_quit_compact";
+
+    my $labeled_width = length($hint_labeled) + 2;  # +2 for surrounding spaces
+    my $compact_width = length($hint_compact) + 2;
+
+    my $hint;
+    if ($remaining >= $labeled_width) {
+        $hint = $hint_labeled;
+    } elsif ($remaining >= $compact_width) {
+        $hint = $hint_compact;
+    }
+
+    if (defined $hint) {
+        my $hint_width = length($hint) + 2;
         my $fill = $remaining - $hint_width;
         push @_out, $bar_bg;
         push @_out, ' ' x $fill if $fill > 0;
-        push @_out, ' ' . $theme->color('tab_shortcut_fg') . $hint_full . ' ';
+        push @_out, ' ' . $theme->color('tab_shortcut_fg') . $hint . ' ';
     } elsif ($remaining > 0) {
         push @_out, $bar_bg;
         push @_out, ' ' x $remaining;
