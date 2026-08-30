@@ -39,11 +39,23 @@ terminal width, and every focus state, not just the document-editing view.
   `bugs.md`). The hint shows plain-language labels when there's room
   (`⌃W close   ⌥←/→ tabs   ⌃Q quit`) and degrades to a compact glyphs-only
   form at narrow widths (`⌃W × ⌥, ← ⌥. → ⌃Q`, surviving down to ~40 cols)
-  rather than a bare, unlabeled glyph cluster or nothing at all. **Still
-  open:** this coverage is DOCUMENT-context only — the FILE_TREE status
-  bar has no equivalent hint yet for switching focus back to the editor,
-  tab navigation, or quitting while the tree is focused; tracked as debt
-  in `bugs.md`.
+  rather than a bare, unlabeled glyph cluster or nothing at all.
+  As of 2026-08-30 the FILE_TREE-context hint row (`Renderer.pm::
+  _render_context_status_bar`) has matching coverage: a `⌃B back` pill
+  (highest priority of the tree-context pills — the way to switch focus
+  back to the editor without dismissing the tree, distinct from `Esc`,
+  which dismisses it) plus the same close/tab-nav/quit segment DOCUMENT
+  context shows, sharing wording with a single `_core_nav_hint_text()`
+  helper used by both contexts instead of two copies that could drift
+  apart. **Partial gap remains:** the FILE_TREE row carries more fixed
+  chrome (a breadcrumb path plus `Open ⌃O` / `⌃␣ Commands`) than the
+  DOCUMENT tab bar does, so the close/tab-nav/quit segment only has room
+  at wider widths (~100-110 cols) than DOCUMENT context's (~40 cols), and
+  at extreme widths (~40 cols) none of the tree-specific or `⌃B back`
+  hints fit at all — though the unconditional `⌃␣ Commands` signpost never
+  drops, even there. See `bugs.md`'s "FILE_TREE-context discoverability"
+  entry for the full writeup and a candidate follow-up (compact-form
+  `Open`/`Commands` pills) that would close this remaining width gap.
 - **"On screen" means in the CURRENT context**, not "reachable in two
   keystrokes." A hint that only appears in the DOCUMENT status bar doesn't
   count while the user is focused on the file tree, in the find bar, or

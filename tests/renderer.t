@@ -2015,6 +2015,94 @@ subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits
 };
 
 # ============================================================================
+# FILE_TREE-context hint row: ⌃B back-to-editor hint + shared core-nav hint
+# ============================================================================
+# See docs/UI_GUIDELINES.md "Discoverability Contract" and bugs.md
+# "FILE_TREE-context discoverability" — the tree-focused hint row
+# previously had NO on-screen hint for switching focus back to the editor
+# (⌃B), nor any of the close-tab/switch-tabs/quit hint DOCUMENT context's
+# tab bar shows. A minimal fake tree stands in for Zepto::FileTree here
+# (only `focused()` and `cursor_node()` are read by the renderer) so these
+# tests don't depend on filesystem scanning.
+package Test::FakeTree;
+sub new { my ($class, %args) = @_; return bless { path => $args{path} // '.claude', focused => 1 }, $class; }
+sub focused { return $_[0]->{focused}; }
+sub cursor_node { return { path => $_[0]->{path} }; }
+package main;
+
+subtest 'FILE_TREE hint row shows a ⌃B back-to-editor pill when there is room' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new();
+    my $ui = { file_tree => $tree };
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 80, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/\x{2303}B/, 'FILE_TREE hint row shows the ⌃B shortcut glyph');
+    like($s, qr/back/, 'FILE_TREE hint row labels ⌃B with "back" (not a bare, unlabeled glyph)');
+};
+
+subtest 'FILE_TREE ⌃B back pill is highest priority — survives narrower widths than the other tree pills' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new();
+    my $ui = { file_tree => $tree };
+
+    # 60 cols: confirmed via a direct-render probe as a width where ⌃B back
+    # fits but the lower-priority tree pills (↵ open, ↑↓, ←→ fold) do not —
+    # must not regress below this floor.
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 60, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/\x{2303}B/, '60 cols: ⌃B back-to-editor hint still visible');
+    like($s, qr/\x{2303}\x{2423}|Commands/, '60 cols: ⌃␣ Commands fallback signpost still visible');
+};
+
+subtest 'FILE_TREE hint row degrades to blank fill (not garbage) at extreme widths, Commands pill never drops' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new();
+    my $ui = { file_tree => $tree };
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 40, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    unlike($s, qr/back/, '40 cols: no tree-specific hint leaks through at extreme scarcity');
+    like($s, qr/Commands/, '40 cols: ⌃␣ Commands fallback signpost still visible even here');
+};
+
+subtest 'FILE_TREE hint row shares the core-nav hint (close/tabs/quit) with DOCUMENT context, identical wording' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new();
+    my $ui = { file_tree => $tree };
+
+    # Needs more width than DOCUMENT context's tab bar before this segment
+    # has room — the FILE_TREE row carries more fixed chrome (breadcrumb +
+    # Open/Commands pills). Confirmed via probe this appears by 130 cols.
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 130, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/close/, 'FILE_TREE hint row labels the close-tab shortcut ("close")');
+    like($s, qr/tabs/,  'FILE_TREE hint row labels the tab-nav shortcut ("tabs")');
+    like($s, qr/quit/,  'FILE_TREE hint row labels the quit shortcut ("quit")');
+    like($s, qr/\x{2303}Q/, 'FILE_TREE hint row shows the actual ⌃Q shortcut glyph for quit');
+};
+
+subtest 'DOCUMENT-context tab bar corner hint is unaffected by the FILE_TREE hint-row refactor' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [{ display_name => 'test.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/close/, 'DOCUMENT tab bar corner hint still labels close');
+    like($s, qr/tabs/,  'DOCUMENT tab bar corner hint still labels tabs');
+    like($s, qr/quit/,  'DOCUMENT tab bar corner hint still labels quit');
+};
+
+# ============================================================================
 # Status bar compact pills: icon-fallback regression guard (Fix 3)
 # ============================================================================
 # See bugs.md "Discoverability sweep run 2" — a compact status-bar pill
