@@ -241,6 +241,30 @@ subtest 'Ctrl+Space in palette closes it' => sub {
     is($editor->{state}, STATE_EDITING, 'Ctrl+Space closes palette');
 };
 
+# Regression test for bugs.md P2 "Ctrl+Space (open palette) can be
+# silently dropped when it isn't the very first key sent" / QA-REG-169.
+# Root cause: handle_ctrl_char's space-handler treated "one word character
+# before the cursor" as sufficient reason to try the completion menu
+# instead of the palette, but Completion::Controller::trigger() requires a
+# 2+ char prefix to produce anything — with a 1-char prefix, trigger()
+# dismisses immediately, is_active() stays false, and the old code
+# returned right there without ever falling back to cmd_open_palette(),
+# so Ctrl+Space did nothing at all.
+subtest 'Ctrl+Space opens the palette when mid-word but no completion is available' => sub {
+    my $editor = make_editor();
+    is($editor->{state}, STATE_EDITING, 'Starts in editing state');
+
+    my $doc  = $editor->active_doc();
+    my $view = $editor->active_view();
+    $doc->insert(0, 'hello world');
+    $view->set_cursor(0, 1);  # cursor right after the single word char 'h'
+
+    $editor->handle_event({ type => 'char', char => ' ', modifiers => ['ctrl'] });
+    is($editor->{state}, STATE_PALETTE,
+        'Ctrl+Space falls back to opening the palette (1-char prefix has no real completion)');
+    is($doc->get_text(), 'hello world', 'document text is untouched');
+};
+
 # =============================================================================
 # Event routing
 # =============================================================================

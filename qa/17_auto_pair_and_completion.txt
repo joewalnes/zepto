@@ -401,3 +401,45 @@ NOTES
   reg_165_ghost_completion_self_match_render.sh` for the executable
   regression coverage — it asserts ON-SCREEN content directly, since
   this bug never touched the document.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-023
+NAME:     Escape-dismiss of ghost text, then a delayed burst starting with
+          a space, does not drop or corrupt the leading character
+PRIORITY: P1
+FEATURE:  completion, input parsing
+CROSS-REF: QA-REG-170 (bugs.md P2 "Escape immediately followed by a burst
+           keystroke send can drop or corrupt the next character(s)")
+
+SETUP
+  A word that will trigger ghost-text completion (2+ char prefix
+  matching an existing word elsewhere in the document).
+
+STEPS
+  1. Type a prefix that produces an active ghost-text suggestion.
+  2. Press Escape to dismiss it.
+  3. Wait somewhere between ~0.1s and ~1s (any gap under the full
+     idle-read timeout but long enough that the Escape and the next
+     keystroke arrive in genuinely separate reads).
+  4. Type a burst of text whose first character is a space (e.g.
+     " moreWords").
+
+VERIFY
+  - The leading space is preserved — the new text is NOT glued
+    directly onto the previously-typed word with no separator.
+  - No spurious newline appears in place of the space.
+
+NOTES
+  Root cause: InputParser only resolved a lone ESC via the ~0.5s
+  idle-timeout flush. If the next byte arrived in a separate read
+  before that full timeout elapsed, it got appended to the pending
+  ESC and reparsed as a continuation — and since space (0x20) is in
+  the Alt-key byte range (32-126), "ESC" + later space fused into
+  "Alt+Space", which has no handler, silently dropping the space.
+  Fixed by adding ESC_DISAMBIGUATION_TIMEOUT (30ms) in InputParser.pm:
+  a lone ESC older than that is resolved as a standalone Escape key
+  before any newly-arrived bytes are treated as its continuation. Not
+  actually specific to completion-dismissal — any Escape followed by a
+  32-126 byte in a separate read within the old ~0.5s window triggered
+  it; ghost-text dismissal was just the discovery scenario.

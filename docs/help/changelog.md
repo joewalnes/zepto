@@ -11,6 +11,8 @@
 - Improved color contrast across dozens of UI elements in both themes: gutter and ruler line numbers, tab close/shortcut/VCS icons, the file tree panel (borders, indent guides, scrollbar), the command palette's selected-row text, completion dropdown borders and ghost text, the minimap, table borders, the word-wrap indicator, and status bar warning/position colors — all previously fell short of the WCAG 3:1 minimum for UI elements and are now fixed, with no more known contrast debt in either theme
 - Fixed editing/scrolling large files getting slower the bigger the file gets: reading a single line no longer re-copies the entire document (was happening 40-80x per rendered frame), and most single-character typing/backspacing no longer triggers a full-document rescan of the line index. Typing-and-rendering on a 30,000-line file is now roughly 19x faster; reading a line while scrolling is roughly 34x faster
 - Fixed typing at the front of an existing word (e.g. jumping to a line and typing a prefix) sometimes showing a stale, duplicated copy of that word's own trailing text on screen — was never a data-correctness issue (saved files were always correct), just a confused word-completion suggestion offering to "complete" text that was already there
+- Fixed ⌃Space (open command palette) sometimes doing nothing at all when the cursor sat right after a single typed character — it now always opens the palette (or the completion menu, when a real completion is actually available)
+- Fixed typing a space right after pressing Escape (e.g. to dismiss ghost-text suggestions) occasionally dropping that space, gluing the new text onto the previous word with no separator
 
 ## 2026-08-29
 

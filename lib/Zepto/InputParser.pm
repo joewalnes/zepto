@@ -5,6 +5,7 @@ package Zepto::InputParser;
 use strict;
 use warnings;
 use utf8;
+use Time::HiRes qw(time);
 
 # Event types
 use constant {
@@ -19,6 +20,26 @@ use constant {
 # terminator) — guards against a runaway/unterminated OSC body stalling
 # the parser forever if a terminal never sends BEL/ST.
 use constant OSC_MAX_LEN => 512;
+
+# How long a lone ESC (nothing after it yet) is allowed to wait in the
+# buffer for a same-keystroke continuation byte before parse() gives up on
+# it and resolves it as a standalone Escape key on its own, even though the
+# outer read-timeout (Editor.pm's flush_pending_input, ~0.5s) hasn't fired
+# yet. A real Alt-chord (ESC + printable byte) is written by the terminal
+# as a single atomic write and arrives in one sysread() together — never
+# observed split across separate reads in testing, even with zero
+# inter-byte delay. So any continuation byte that shows up in a genuinely
+# separate read, this much later, is a new, unrelated keystroke (e.g. the
+# user pressed Escape, then — after actually seeing it register — started
+# typing again), not part of an Alt-chord. Without this, ESC-then-later-
+# space (or any 32-126 byte) fuses into "Alt+<byte>", which usually has no
+# handler and silently drops that byte instead of registering as two
+# separate keystrokes (see bugs.md P2 "Escape immediately followed by a
+# burst keystroke send can drop or corrupt the next character(s)").
+# 30ms is generous headroom above any observed local-pty scheduling
+# jitter while remaining far below the fastest realistic human
+# keystroke-to-keystroke gap.
+use constant ESC_DISAMBIGUATION_TIMEOUT => 0.03;
 
 # Key constants
 use constant {
@@ -67,6 +88,7 @@ sub new {
     my $self = bless {
         buffer => '',          # Accumulated input bytes
         _pending_esc => 0,     # Waiting to see if ESC is standalone
+        _esc_pending_at => undef,  # Time::HiRes timestamp a lone ESC started waiting (see ESC_DISAMBIGUATION_TIMEOUT)
     }, $class;
 
     return $self;
@@ -77,8 +99,20 @@ sub parse {
     my ($self, $bytes) = @_;
     return () unless defined $bytes && length $bytes;
 
-    $self->{buffer} .= $bytes;
     my @events;
+
+    # A lone ESC left over from a previous parse() call that's been
+    # waiting too long for a continuation byte is not part of whatever
+    # just arrived — resolve it as a standalone Escape first (see
+    # ESC_DISAMBIGUATION_TIMEOUT).
+    if ($self->{buffer} eq "\x1b" && defined $self->{_esc_pending_at}
+        && (time() - $self->{_esc_pending_at}) >= ESC_DISAMBIGUATION_TIMEOUT) {
+        $self->{buffer} = '';
+        $self->{_esc_pending_at} = undef;
+        push @events, { type => EVT_KEY, key => KEY_ESCAPE, modifiers => [] };
+    }
+
+    $self->{buffer} .= $bytes;
 
     while (length $self->{buffer}) {
         my $before = length $self->{buffer};
@@ -95,6 +129,15 @@ sub parse {
         push @events, $event;
     }
 
+    # Track (or clear) how long a lone pending ESC has been waiting, so the
+    # next parse() call can decide whether a just-arrived continuation byte
+    # is still plausibly part of the same atomic Alt-chord write.
+    if ($self->{buffer} eq "\x1b") {
+        $self->{_esc_pending_at} = time() unless defined $self->{_esc_pending_at};
+    } else {
+        $self->{_esc_pending_at} = undef;
+    }
+
     return @events;
 }
 
@@ -105,6 +148,7 @@ sub flush_pending {
 
     if ($self->{buffer} eq "\x1b") {
         $self->{buffer} = '';
+        $self->{_esc_pending_at} = undef;
         return { type => EVT_KEY, key => KEY_ESCAPE, modifiers => [] };
     }
 
