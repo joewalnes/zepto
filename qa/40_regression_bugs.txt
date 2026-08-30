@@ -1950,3 +1950,31 @@ VERIFY    `Renderer.pm::_render_context_status_bar`'s document branch
           unpatched binary. Verified interactively via `hangon` at
           80x24/60x20/50x18/40x15 with both trivial and realistic
           filenames.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-186
+NAME:     FILE_TREE-context breadcrumb path never overflows the terminal
+          width
+PRIORITY: P1
+BUG:      P1 "FILE_TREE-context breadcrumb path can overflow the terminal
+          width, corrupting the screen" (2026-08-30)
+CROSS-REF: QA-REG-179 (same failure class, DOCUMENT-context), tests/renderer.t
+           breadcrumb property sweep
+VERIFY    `_render_context_status_bar`'s tree-focused branch built the
+          breadcrumb (`$node_path`, from the tree's cursor node path)
+          completely unbounded and pushed it to the output buffer before
+          the fixed Open/Commands pills' width was even computed. At
+          40x15, even a short realistic path (e.g. ".claude", 7 chars)
+          pushed the row past 40 columns; the terminal wrapped the
+          overflow onto a phantom row it didn't have room for, scrolling
+          the whole screen up and pushing the tab bar off the top. Fix:
+          the right-side pills' width is now computed first, and the
+          breadcrumb is ellipsized (from the start, keeping the
+          filename tail visible) against whatever room is left,
+          dropping to empty rather than overflowing when there's none.
+          `qa/scripts/tier1/reg_186_filetree_breadcrumb_overflow.sh`
+          confirms the tab bar (row 1) stays visible (not scrolled off)
+          and the Commands pill remains on screen at 40x15 with a
+          realistic path -- confirmed to fail against the unpatched
+          binary and pass after, run standalone 3x with no flakiness.

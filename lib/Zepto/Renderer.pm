@@ -4020,6 +4020,43 @@ sub _render_context_status_bar {
         my $node = $tree->cursor_node();
         my $node_path = $node ? $node->{path} : '';
 
+        my $round_l = Zepto::Chars->get('round_left');
+        my $round_r = Zepto::Chars->get('round_right');
+
+        # Right: Open File + palette trigger pills. Computed BEFORE the
+        # left breadcrumb so the breadcrumb can be bounded against the
+        # width these two fixed, never-dropped pills actually need — see
+        # bugs.md "FILE_TREE breadcrumb + Open + Commands can overflow the
+        # terminal width" for the incident this guards against (an
+        # unbounded tree cursor path, e.g. several nested directories deep,
+        # pushed the whole row past $cols and the terminal soft-wrapped the
+        # overflow, scrolling the tab bar/ruler out of view).
+        my $open_icon = Zepto::Chars->get('folder_open');
+        my $open_text = " $open_icon Open \x{2303}O ";
+        my $open_width = length($open_text) + ($nerd_font ? 2 : 0);
+
+        my $palette_icon = Zepto::Chars->get('palette');
+        my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";  # ⌃␣
+        my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
+
+        my $right_width = $open_width + 1 + $palette_width;  # +1 for gap
+
+        # Bound the breadcrumb to whatever's left after the fixed right
+        # pills (plus the icon+spaces overhead and the nerd-font edge cap),
+        # never letting it alone push the row past $cols. Ellipsize from
+        # the start so the tail (the file/dir's own name, the most useful
+        # part of a nested path) stays visible; if there's no room at all,
+        # drop it to an empty string rather than emitting a negative-width
+        # substr or overflowing — degrades honestly like every other hint
+        # in this row, never garbles the line.
+        my $left_fixed_overhead = length(" $cursor_icon  ") + ($nerd_font ? 1 : 0);
+        my $max_path_width = $cols - $left_fixed_overhead - $right_width;
+        if ($max_path_width < 1) {
+            $node_path = '';
+        } elsif (length($node_path) > $max_path_width) {
+            $node_path = _ellipsis($node_path, $max_path_width, 'start');
+        }
+
         push @_out, $theme->color('status_file_bg') . $theme->color('status_file_fg');
         my $left_text = " $cursor_icon $node_path ";
         push @_out, $left_text;
@@ -4031,20 +4068,6 @@ sub _render_context_status_bar {
             push @_out, $tree_round_r;
             $left_width += 1;
         }
-
-        my $round_l = Zepto::Chars->get('round_left');
-        my $round_r = Zepto::Chars->get('round_right');
-
-        # Right: Open File + palette trigger pills
-        my $open_icon = Zepto::Chars->get('folder_open');
-        my $open_text = " $open_icon Open \x{2303}O ";
-        my $open_width = length($open_text) + ($nerd_font ? 2 : 0);
-
-        my $palette_icon = Zepto::Chars->get('palette');
-        my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";  # ⌃␣
-        my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
-
-        my $right_width = $open_width + 1 + $palette_width;  # +1 for gap
 
         # Middle: tree-context hint pills. Ordered highest-priority first
         # (see docs/UI_GUIDELINES.md "Discoverability Contract"):

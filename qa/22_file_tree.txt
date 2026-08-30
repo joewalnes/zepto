@@ -515,3 +515,27 @@ VERIFY
   - When there's enough room (~100+ cols), the same close-tab/switch-tabs/
     quit hint DOCUMENT context's tab bar shows also appears in the tree's
     hint row, in identical wording.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-029
+NAME:     Tree status bar breadcrumb never overflows the terminal width (REGRESSION)
+PRIORITY: P1
+FEATURE:  tree discoverability
+RELATED:  bugs.md P1 "FILE_TREE-context breadcrumb path can overflow the
+          terminal width, corrupting the screen" (QA-REG-186)
+
+STEPS
+  1. Open zepto on a directory containing an entry with a realistic-length
+     name (even something short like ".claude" reproduces this).
+  2. Resize the terminal to 40x15 with the tree focused.
+
+VERIFY
+  - The status bar row never wraps onto a second terminal row — the tab
+    bar (the screen's first row) stays visible, not scrolled off the top.
+  - The breadcrumb path shortens with a leading ellipsis ("…") when there
+    isn't room for it in full, keeping the file/folder's own name (the
+    tail of the path) visible rather than the front of the path.
+  - `Open ⌃O` and `Commands ⌃␣` remain visible and functional throughout.
+  - At a wide enough terminal (~100+ cols), the full un-ellipsized path
+    renders normally.

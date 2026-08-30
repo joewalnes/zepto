@@ -3,6 +3,7 @@
 ## 2026-08-30
 
 - The file tree's status bar now shows a "⌃B back" hint for switching focus back to the editor (the tree stays open — this is different from Esc, which closes it) — previously there was no on-screen hint for this anywhere while the tree was focused. When there's enough room, the tree's status bar also shows the same close-tab/switch-tabs/quit hint the editor's tab bar shows
+- Fixed the file tree's status bar overflowing and corrupting the screen at narrow terminal widths when the selected file/folder's path was more than a few characters long — the path now shortens with an ellipsis instead of pushing the row off-screen
 - Quit (⌃Q) now has an always-visible on-screen hint in the tab bar, the same as close/next/prev-tab already did — previously it had no on-screen hint anywhere at all
 - The tab bar's close/tab-nav/quit hint now shows plain-language labels ("close", "tabs", "quit") next to the shortcut glyphs when there's room, instead of raw glyphs alone — falls back to the compact glyphs-only form at narrower widths
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)

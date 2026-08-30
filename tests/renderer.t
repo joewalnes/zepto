@@ -2304,6 +2304,80 @@ subtest 'FILE_TREE hint row shares the core-nav hint (close/tabs/quit) with DOCU
     like($s, qr/\x{2303}Q/, 'FILE_TREE hint row shows the actual ⌃Q shortcut glyph for quit');
 };
 
+# ============================================================================
+# QA-REG-186: the FILE_TREE-context hint row's breadcrumb (cursor node path)
+# must never, combined with the fixed Open/Commands pills, push the row past
+# $cols. Confirmed via direct screenshot: opening a nested/long-named tree
+# entry at 40 cols (e.g. ".claude", or several directories deep) produced a
+# row wider than the terminal, which soft-wrapped onto a phantom line and
+# corrupted the screen above it — the exact same failure mode QA-REG-179
+# fixed for the DOCUMENT-context status bar, but in the FILE_TREE branch,
+# which computed the breadcrumb's width unconditionally before the fixed
+# Open/Commands pills' width was ever accounted for. Fix: the breadcrumb is
+# now ellipsized (from the start, keeping the tail visible) against however
+# much room is left after the fixed right-side pills, and drops to empty
+# rather than negative-width if there's truly no room at all.
+#
+# Below ~32-38 cols (depending on nerd-font mode), the fixed Open/Commands
+# pills alone already exceed the terminal width even with a completely
+# empty breadcrumb — a pre-existing structural floor (same class as the
+# DOCUMENT-context "Commands pill alone can't fit below ~25 cols" floor
+# noted elsewhere in this file), not a gap in this fix. The sweep below
+# starts at 40 cols, the "essential chrome" floor this codebase already
+# targets elsewhere, rather than asserting an unsupported guarantee below it.
+# ============================================================================
+subtest 'FILE_TREE breadcrumb never pushes the hint row past $cols, at any path length/width (QA-REG-186)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $checks = 0;
+    my $failures = 0;
+    my @first_failures;
+
+    my @paths = (
+        '.claude',
+        'src/main.py',
+        'aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/somefile.txt',
+        'x',
+        '',
+    );
+
+    for my $nerd_font (0, 1) {
+        Zepto::Chars->set_enabled($nerd_font);
+        for my $cols (40, 45, 50, 60, 80, 120) {
+            for my $path (@paths) {
+                my $tree = Test::FakeTree->new(path => $path);
+                my $ui = { file_tree => $tree };
+                my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, $cols, '', 0, $ui, 0);
+                my $plain = strip_escapes($bar);
+                $plain =~ s/\x1b\[K//g;
+
+                $checks++;
+                if (length($plain) > $cols) {
+                    $failures++;
+                    push @first_failures,
+                        "nerd_font=$nerd_font cols=$cols path='$path' len=" . length($plain)
+                        if @first_failures < 10;
+                }
+            }
+        }
+    }
+    Zepto::Chars->set_enabled(1);  # restore default for subsequent tests
+
+    is($failures, 0, "FILE_TREE hint row never exceeds \$cols across $checks combinations")
+        or diag(join("\n", @first_failures));
+};
+
+subtest 'FILE_TREE breadcrumb keeps the tail (most useful part) visible when ellipsized' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new(path => 'aaaaaaaa/bbbbbbbb/cccccccc/dddddddd/somefile.txt');
+    my $ui = { file_tree => $tree };
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 40, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/somefile\.txt|\x{2026}/, '40 cols: breadcrumb keeps the filename tail visible (ellipsized from the start), not silently empty or truncated from the end');
+};
+
 subtest 'DOCUMENT-context tab bar corner hint is unaffected by the FILE_TREE hint-row refactor' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $ui = {
