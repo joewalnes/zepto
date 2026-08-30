@@ -1681,12 +1681,14 @@ sub _render_table_line {
 
     if ($is_separator) {
         # Render: ├───┼───┼───┤
-        my $full = $border_fg . BOX_VERTICAL_RIGHT;
+        my @sep_out;
+        push @sep_out, $border_fg;
+        push @sep_out, BOX_VERTICAL_RIGHT;
         for my $ci (0 .. $num_cols - 1) {
-            $full .= BOX_HORIZONTAL x ($col_widths->[$ci] + 2);  # +2 for padding
-            $full .= ($ci < $num_cols - 1) ? BOX_CROSS : BOX_VERTICAL_LEFT;
+            push @sep_out, BOX_HORIZONTAL x ($col_widths->[$ci] + 2);  # +2 for padding
+            push @sep_out, ($ci < $num_cols - 1) ? BOX_CROSS : BOX_VERTICAL_LEFT;
         }
-        push @out, $full;
+        push @out, join('', @sep_out);
     } else {
         # Get syntax tokens for this line to apply within cells
         my @syntax_colors;  # maps original source char position → ANSI color
@@ -1703,7 +1705,9 @@ sub _render_table_line {
         }
 
         # Render: │ cell │ cell │
-        my $full = $border_fg . BOX_VERTICAL;
+        my @row_out;
+        push @row_out, $border_fg;
+        push @row_out, BOX_VERTICAL;
         my $cell_offsets = $table->{cell_offsets}[$row_in_table];
         for my $ci (0 .. $num_cols - 1) {
             my $cell_text = defined $cells->[$ci] ? $cells->[$ci] : '';
@@ -1725,7 +1729,8 @@ sub _render_table_line {
                 $rpad = $pad;
             }
 
-            $full .= $fg . ' ' . (' ' x $lpad);
+            push @row_out, $fg;
+            push @row_out, ' ' . (' ' x $lpad);
 
             # Render cell text with syntax highlighting
             my $src_offset = $cell_offsets->[$ci] // 0;
@@ -1735,18 +1740,19 @@ sub _render_table_line {
                 my $src_pos = $src_offset + $j;
                 my $c = $syntax_colors[$src_pos] // '';
                 if ($c ne $prev_color) {
-                    $full .= $c || ($fg . $bg);
+                    push @row_out, $c || ($fg . $bg);
                     $prev_color = $c;
                 }
-                $full .= substr($cell_text, $j, 1);
+                push @row_out, substr($cell_text, $j, 1);
             }
             # Reset after cell content
-            $full .= $fg . $bg if $prev_color;
+            push @row_out, $fg . $bg if $prev_color;
 
-            $full .= (' ' x $rpad) . ' ';
-            $full .= $border_fg . BOX_VERTICAL;
+            push @row_out, (' ' x $rpad) . ' ';
+            push @row_out, $border_fg;
+            push @row_out, BOX_VERTICAL;
         }
-        push @out, $full;
+        push @out, join('', @row_out);
     }
 
     # Compute total rendered width for scroll/truncation
