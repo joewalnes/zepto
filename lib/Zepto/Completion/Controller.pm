@@ -68,6 +68,11 @@ sub trigger {
         return $self->dismiss();
     }
 
+    # Text already sitting immediately after the cursor on this line. Used
+    # below to reject self-referential candidates -- see the filter after
+    # dedup for why this matters.
+    my $after_cursor = substr($line_content, $col);
+
     # Build context for providers
     my $language = '';
     if ($highlighter) {
@@ -117,6 +122,25 @@ sub trigger {
 
     # Filter out exact matches (prefix == text)
     @unique = grep { $_->{text} ne $prefix } @unique;
+
+    # Filter out self-referential candidates: a provider (most commonly
+    # CrossBufferWordProvider, which re-scans the active document on every
+    # keystroke) can trivially "discover" the word the user is mid-typing
+    # as a match for its own prefix -- e.g. typing "ab" at the front of an
+    # existing word "row2000text" makes the buffer momentarily contain
+    # "abrow2000text", which the word scanner happily returns as a
+    # candidate for prefix "ab". Its suggested suffix ("row2000text") is
+    # then just the text that's ALREADY sitting right after the cursor.
+    # Ghost-text rendering has no way to know that and paints the suffix
+    # straight after the real content, producing an on-screen duplicate of
+    # the line's own tail (does not touch the buffer -- purely cosmetic,
+    # but confusing and persistent). Reject any candidate whose suffix
+    # would just reconstruct text already present after the cursor.
+    @unique = grep {
+        my $suffix = substr($_->{text}, length($prefix));
+        length($suffix) == 0
+            || substr($after_cursor, 0, length($suffix)) ne $suffix
+    } @unique;
 
     if (!@unique) {
         return $self->dismiss();

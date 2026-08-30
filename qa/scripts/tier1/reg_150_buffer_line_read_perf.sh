@@ -4,15 +4,17 @@
 #
 # NOTE: content assertions for the line actively under the cursor are
 # verified by SAVING and reading the file back from disk, not by
-# grepping the raw on-screen render of that one row. See bugs.md P2
-# "Stale duplicated tail on the cursor's own line after typing into a
-# large file" (found 2026-08-30) -- a pre-existing (confirmed present
-# before this session's Buffer.pm changes too), unrelated rendering
-# artifact that can leave a stale duplicate tail on just the cursor's
-# own row on screen, even though the underlying document content is
-# always correct on save. Neighboring (non-edited) rows and the status
-# bar's cursor line:col were never observed to be affected, so those
-# are still asserted directly on screen below.
+# grepping the raw on-screen render of that one row. This originally
+# routed around bugs.md's "Stale duplicated tail on the cursor's own
+# line" P2 (found 2026-08-30) -- since FIXED (root cause: a
+# self-referential ghost-text completion candidate, see bugs.md and
+# QA-REG-165). Left as a save-based check anyway: the same
+# investigation found a broader, still-open P1 ("Ghost-text completion
+# renders at the end of the line's real content, not at the cursor")
+# that can garble the cursor's own row via a *different*, legitimate
+# completion candidate. Neighboring (non-edited) rows and the status
+# bar's cursor line:col were never observed to be affected by either
+# bug, so those are still asserted directly on screen below.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-REG-150: Buffer line reads correct at gap boundary (large file)"
 
