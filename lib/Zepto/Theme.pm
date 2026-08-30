@@ -250,21 +250,23 @@ sub dark_theme {
         tab_active_fg       => fg_rgb(255, 255, 255),  # Bright white text
         tab_active_bg       => bg_rgb(52, 79, 138),    # Blue accent — clearly active
         tab_active_edge     => fg_rgb(52, 79, 138),    # Matches active bg for smooth transition
-        tab_inactive_fg     => fg_rgb(140, 148, 190),  # Readable muted text
-        tab_inactive_bg     => bg_rgb(40, 44, 62),     # Subtle, between bar and menu
-        tab_inactive_edge   => fg_rgb(40, 44, 62),     # Matches inactive bg
-        tab_hover_fg        => fg_rgb(200, 208, 240),  # Brighter than inactive
-        tab_hover_bg        => bg_rgb(50, 55, 78),     # Between inactive and active
-        tab_hover_edge      => fg_rgb(50, 55, 78),
-        tab_modified_fg     => fg_rgb(224, 175, 104),  # Yellow dot for unsaved
-        # WCAG fix (2026-08-30): lightened from (100,106,134) — was as low
-        # as 1.50:1 against tab_active_bg (checked against all 3 tab
-        # surfaces: active/inactive/hover).
-        tab_close_fg        => fg_rgb(156, 160, 178),  # Dim close button
-        # WCAG fix (2026-08-30): lightened from (120,130,170) — was 2.12:1
-        # against tab_active_bg.
-        tab_shortcut_fg     => fg_rgb(152, 160, 190),  # Readable hint
-        tab_vcs_fg          => fg_rgb(224, 175, 104),   # VCS-changed file tint (warm amber)
+        # Tabby redesign (2026-08-30, see bugs.md): old inactive_bg
+        # (40,44,62) sat at only 1.17:1 contrast against tab_bar_bg —
+        # inactive tabs had effectively no visible boundary. Bumped bg to
+        # 1.8:1 for a clearly filled, bounded region (still visibly
+        # subordinate to tab_active_bg), and brightened the fg colors that
+        # render on top of it to keep every one at or above WCAG 3:1
+        # against all three tab surfaces (active/inactive/hover).
+        tab_inactive_fg     => fg_rgb(162, 170, 206),  # Readable muted text
+        tab_inactive_bg     => bg_rgb(66, 72, 100),    # Clearly filled, still subtle vs active
+        tab_inactive_edge   => fg_rgb(66, 72, 100),    # Matches inactive bg
+        tab_hover_fg        => fg_rgb(210, 217, 246),  # Brighter than inactive
+        tab_hover_bg        => bg_rgb(80, 87, 116),    # Between inactive and active
+        tab_hover_edge      => fg_rgb(80, 87, 116),
+        tab_modified_fg     => fg_rgb(232, 186, 120),  # Yellow dot for unsaved
+        tab_close_fg        => fg_rgb(176, 180, 196),  # Dim close button
+        tab_shortcut_fg     => fg_rgb(172, 180, 206),  # Readable hint
+        tab_vcs_fg          => fg_rgb(232, 186, 120),   # VCS-changed file tint (warm amber)
         tab_baseline_ul     => "\x1b[58;2;55;60;85m",   # Underline color (SGR 58) for baseline
 
         # Minimap / scrollbar
@@ -564,31 +566,26 @@ sub light_theme {
         tab_active_fg       => fg_rgb(255, 255, 255),  # White text on accent bg
         tab_active_bg       => bg_rgb(114, 135, 253),  # Lavender accent — clearly active
         tab_active_edge     => fg_rgb(114, 135, 253),  # Matches active bg
-        tab_inactive_fg     => fg_rgb(100, 104, 120),  # Muted text
-        tab_inactive_bg     => bg_rgb(210, 214, 226),  # Subtle, slightly darker than bar
-        tab_inactive_edge   => fg_rgb(210, 214, 226),  # Matches inactive bg
-        tab_hover_fg        => fg_rgb(60, 64, 80),     # Darker than inactive
-        tab_hover_bg        => bg_rgb(195, 200, 215),  # Between inactive and active
-        tab_hover_edge      => fg_rgb(195, 200, 215),
-        # Dark burnt-amber, not the dark theme's bright yellow — light theme's
-        # tab backgrounds (active lavender, inactive/hover light gray-blue)
-        # are all light, so a light-yellow dot had ~1.2-1.8:1 contrast and
-        # was nearly invisible (QA-REG-140). Darkening within the same warm
-        # hue family restores the "unsaved" cue while passing WCAG 3:1
-        # against all three tab surfaces it can render on.
-        tab_modified_fg     => fg_rgb(95, 40, 0),   # Amber dot for unsaved
-        # WCAG fix (2026-08-30): darkened from (156,160,176) — was as low
-        # as 1.22:1 against tab_active_bg (checked against all 3 tab
-        # surfaces: active/inactive/hover — the lavender active_bg is the
-        # hardest surface, forcing a much darker gray than the light-only
-        # inactive/hover backgrounds would need alone).
-        tab_close_fg        => fg_rgb(66, 67, 74),  # Dim close button
-        # WCAG fix (2026-08-30): darkened from (130,136,156) — was 1.11:1
-        # against tab_active_bg.
-        tab_shortcut_fg     => fg_rgb(65, 68, 78),  # Readable hint
-        # WCAG fix (2026-08-30): darkened from (140,90,20) — was 1.84:1
-        # against tab_active_bg. Same amber/brown hue family.
-        tab_vcs_fg          => fg_rgb(95, 61, 14),     # VCS-changed file tint
+        # Tabby redesign (2026-08-30, see bugs.md): old inactive_bg
+        # (210,214,226) sat at only 1.19:1 contrast against tab_bar_bg —
+        # inactive tabs had effectively no visible boundary. Darkened bg to
+        # 1.5:1 for a clearly filled, bounded region (still visibly
+        # subordinate to tab_active_bg), and darkened the fg colors that
+        # render on top of it to keep every one at or above WCAG 3:1
+        # against all three tab surfaces (active/inactive/hover). Dot/VCS
+        # tint stays dark burnt-amber, not the dark theme's bright yellow —
+        # a light-yellow dot on these light bg surfaces was nearly
+        # invisible (QA-REG-140); the amber hue passes 3:1 everywhere.
+        tab_inactive_fg     => fg_rgb(80, 84, 102),    # Muted text
+        tab_inactive_bg     => bg_rgb(184, 189, 206),  # Clearly filled, still subtle vs active
+        tab_inactive_edge   => fg_rgb(184, 189, 206),  # Matches inactive bg
+        tab_hover_fg        => fg_rgb(48, 52, 68),     # Darker than inactive
+        tab_hover_bg        => bg_rgb(166, 172, 192),  # Between inactive and active
+        tab_hover_edge      => fg_rgb(166, 172, 192),
+        tab_modified_fg     => fg_rgb(85, 32, 0),   # Amber dot for unsaved
+        tab_close_fg        => fg_rgb(56, 57, 64),  # Dim close button
+        tab_shortcut_fg     => fg_rgb(55, 58, 68),  # Readable hint
+        tab_vcs_fg          => fg_rgb(85, 52, 10),     # VCS-changed file tint
         tab_baseline_ul     => "\x1b[58;2;190;194;208m", # Underline color (SGR 58) for baseline
 
         # Minimap / scrollbar
