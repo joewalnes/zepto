@@ -80,6 +80,16 @@ use constant {
     MINIMAP_WIDTH         => Zepto::Minimap::MINIMAP_TOTAL_WIDTH,
     TREE_INDENT_PER_LEVEL => Zepto::FileTree::INDENT_PER_LEVEL,
     TREE_MAX_INDENT       => Zepto::FileTree::MAX_INDENT,
+    # Below this terminal width, the minimap auto-hides regardless of how
+    # much room the dynamic MIN_TEXT_WIDTH check would otherwise leave it.
+    # At 40 cols (the documented floor for essential chrome — see
+    # docs/UI_GUIDELINES.md "surviving down to ~40 cols") a minimap is
+    # barely legible at that zoom and crowds out content/status bar space
+    # that matters more. 60 sits a tier above that floor, matching the
+    # pattern of reserving 40 cols for must-survive elements (status bar,
+    # tab bar hints) and dropping purely-decorative/supplementary ones
+    # (minimap) earlier. See bugs.md / QA-REG-177.
+    MINIMAP_MIN_COLS      => 60,
 };
 
 
@@ -376,6 +386,7 @@ sub get_minimap_width {
     $tree_width //= 0;
     return 0 unless $prefs && $prefs->show_minimap();
     return 0 unless $line_count > $text_height;
+    return 0 if $cols < MINIMAP_MIN_COLS;
     my $tentative_text = $cols - $tree_width - $gutter_width - MINIMAP_WIDTH;
     return $tentative_text >= MIN_TEXT_WIDTH ? MINIMAP_WIDTH : 0;
 }
@@ -450,10 +461,13 @@ sub render {
         }
     }
 
-    # Determine minimap width (drops before file tree at narrow widths)
+    # Determine minimap width (drops before file tree at narrow widths, and
+    # auto-hides entirely below MINIMAP_MIN_COLS regardless of remaining
+    # room — see MINIMAP_MIN_COLS above / bugs.md QA-REG-177).
     my $show_minimap = $prefs && $prefs->show_minimap();
     my $minimap_width = 0;
-    if ($show_minimap && $doc && ($line_count + $spacer_estimate) > $text_height) {
+    if ($show_minimap && $doc && $cols >= MINIMAP_MIN_COLS
+            && ($line_count + $spacer_estimate) > $text_height) {
         my $tentative_text = $cols - $tree_width - $gutter_width - MINIMAP_WIDTH;
         if ($tentative_text >= MIN_TEXT_WIDTH) {
             $minimap_width = MINIMAP_WIDTH;
@@ -4099,6 +4113,29 @@ sub _render_context_status_bar {
 
     # === Document context: build pill-based status bar ===
 
+    # RIGHT: Palette trigger pill (always visible, rightmost — see
+    # UI_GUIDELINES.md "Context-Aware Status Bar"). Open File used to be a
+    # second hardcoded pill here; it's now an ordinary ⌃ group candidate
+    # (⌃O/⌃P) like every other Ctrl shortcut, so it can drop at very narrow
+    # widths just like the rest of that column.
+    #
+    # Computed FIRST (before the left segment) because it has fixed width
+    # and never shrinks — everything else on this line has to be bounded
+    # against it, not the other way around. See QA-REG-179 / bugs.md: this
+    # bar used to build the left (cursor/COL/multi-cursor) segment and emit
+    # it unconditionally, then only *reduce* the center ⌃/⌥ pill groups to
+    # fit — with nothing left to shrink, a wide left segment plus this fixed
+    # palette pill could together exceed $cols, and the terminal would
+    # soft-wrap the overflow onto a phantom row, scrolling and corrupting
+    # the whole screen. Computing the reservation up front lets the left
+    # segment (below) check its own budget before emitting anything.
+    my $palette_icon = Zepto::Chars->get('palette');
+    my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
+    my $palette_text_width = length($palette_text);
+    # Total palette width includes the round caps (left + right)
+    my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
+    my $nerd_cap = $nerd_font ? 1 : 0;  # round_r cap closing the left segment
+
     # 1. LEFT: Cursor position pill with ⌃G shortcut (always visible, fixed width)
     my $cursor_icon = Zepto::Chars->get('cursor_pos');
     my $goto_shortcut = "\x{2303}G";
@@ -4115,6 +4152,17 @@ sub _render_context_status_bar {
     my $pad_needed = $min_cursor_width - length($cursor_text);
     $cursor_text .= ' ' x $pad_needed if $pad_needed > 0;
 
+    # Hard floor: cursor pill + round cap + gap + palette pill + gap must
+    # never exceed $cols, even in pathological cases (huge line/col numbers
+    # on a giant file, or a very long single line pushing the column number
+    # into the thousands). Ellipsize the cursor pill's own text if it alone
+    # would blow the budget — same backstop already used for transient
+    # messages above (_ellipsis). No-op in the overwhelming common case.
+    my $cursor_budget = $cols - 2 - $nerd_cap - $palette_total_width - 2;
+    $cursor_budget = 1 if $cursor_budget < 1;
+    $cursor_text = _ellipsis($cursor_text, $cursor_budget, 'end')
+        if length($cursor_text) > $cursor_budget;
+
     push @_out, $theme->color('status_pos_bg') . $theme->color('status_pos_fg');
     push @_out, " $cursor_text ";
     my $left_width = length($cursor_text) + 2;
@@ -4124,7 +4172,9 @@ sub _render_context_status_bar {
         command_id => 'goto_line',
     };
 
-    # Column mode indicator (inline, if active)
+    # Column mode indicator (inline, if active) — supplementary context,
+    # not essential. Drop it rather than let it push the bar past $cols;
+    # the cursor pill and palette pill always win. See QA-REG-179.
     if ($view && $view->column_select()) {
         my $col_text;
         if ($view->has_selection()) {
@@ -4135,18 +4185,28 @@ sub _render_context_status_bar {
         } else {
             $col_text = "COL";
         }
-        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-        push @_out, " $col_text ";
-        $left_width += length($col_text) + 2;
+        my $col_seg_width = length($col_text) + 2;
+        if ($left_width + $col_seg_width + $nerd_cap + $palette_total_width + 2 <= $cols) {
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+            push @_out, " $col_text ";
+            $left_width += $col_seg_width;
+        }
     }
 
-    # Multi-cursor indicator
+    # Multi-cursor indicator — same optional-drop treatment as COL above.
+    # This is the segment that actually overflowed in the confirmed repro:
+    # ⌃D ("select next occurrence") a handful of times grows "N cursors"
+    # past the point where the left segment + palette pill still fit in a
+    # 40-column terminal. See QA-REG-179.
     if ($view && $view->has_multi_cursors()) {
         my $mc_count = $view->cursor_count();
         my $mc_text = "${mc_count} cursors";
-        push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
-        push @_out, " $mc_text ";
-        $left_width += length($mc_text) + 2;
+        my $mc_seg_width = length($mc_text) + 2;
+        if ($left_width + $mc_seg_width + $nerd_cap + $palette_total_width + 2 <= $cols) {
+            push @_out, $theme->color('column_indicator_bg') . $theme->color('column_indicator_fg');
+            push @_out, " $mc_text ";
+            $left_width += $mc_seg_width;
+        }
     }
 
     my $round_l = Zepto::Chars->get('round_left');
@@ -4157,17 +4217,6 @@ sub _render_context_status_bar {
         push @_out, $round_r;
         $left_width += 1;
     }
-
-    # 2. RIGHT: Palette trigger pill only (always visible, rightmost — see
-    # UI_GUIDELINES.md "Context-Aware Status Bar"). Open File used to be a
-    # second hardcoded pill here; it's now an ordinary ⌃ group candidate
-    # (⌃O/⌃P) like every other Ctrl shortcut, so it can drop at very narrow
-    # widths just like the rest of that column.
-    my $palette_icon = Zepto::Chars->get('palette');
-    my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
-    my $palette_text_width = length($palette_text);
-    # Total palette width includes the round caps (left + right)
-    my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
 
     # 3. CENTER: two modifier-grouped pill columns — ⌃ (Ctrl) on the left,
     # ⌥ (Alt) on the right — each showing its modifier glyph once instead

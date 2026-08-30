@@ -384,3 +384,48 @@ VERIFY
     key with no icon" is the general, whole-registry regression guard —
     it asserts this for every current and future status-bar-eligible
     command, not just Word Wrap.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-022
+NAME:     Status bar never overflows terminal width, even with
+          multi-cursor or column-select indicators active (REGRESSION)
+PRIORITY: P1
+FEATURE:  sbar layout narrow-width multi-cursor column-select
+RELATED:  bugs.md 2026-08-30 "Status bar overflow with multi-cursor /
+          column-select indicators at narrow widths" — QA-REG-178,
+          QA-REG-179
+
+STEPS
+  1. Open a file at 40x15 (file tree closed), with a realistic filename
+     (~15-20 chars, e.g. `zdisc_check.demo.txt`).
+  2. Confirm the baseline status bar (`1:1 ⌃G ... Commands ⌃␣`) fits
+     cleanly with no wrap.
+  3. Toggle column select mode (⌥C), then extend the selection down a
+     few lines (arrow keys). Confirm the `COL n` indicator appears
+     inline and the whole bar — cursor pill, COL indicator, Commands
+     pill — still fits within 40 columns with no wrap/scroll/corruption.
+  4. In a file with several repeated words, select multiple occurrences
+     (⌃D repeated) to grow the multi-cursor count into double digits.
+     Confirm no wrap/scroll occurs and, once the transient "N cursors"
+     confirmation message clears (e.g. after typing), the persistent
+     `N cursors` indicator (when visible) still fits within the terminal
+     width.
+  5. Repeat at 50x18, 60x20, 80x24.
+
+VERIFY
+  - The status bar's printable width (ANSI stripped) never exceeds the
+    terminal's column count, at any tested width, for any combination of
+    multi-cursor count / column-select state / nerd-font mode.
+  - No terminal soft-wrap/scroll occurs — the tab bar and ruler row
+    remain in place after every redraw.
+  - Supplementary indicators (COL rect, multi-cursor count) degrade by
+    dropping entirely when they don't fit — the cursor-position pill and
+    the `Commands ⌃␣` palette trigger never drop (UI_GUIDELINES.md:
+    the palette pill "must never be droppable by width or context").
+  - See tests/renderer.t "Context status bar never exceeds terminal
+    width: multi-cursor / column-select property sweep (QA-REG-179)"
+    and the two other QA-REG-179 property tests alongside it for the
+    automated regression coverage (swept across ~5000+ combinations of
+    width, multi-cursor count, column-select state, nerd-font mode, and
+    filename).

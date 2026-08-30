@@ -1747,3 +1747,122 @@ VERIFY    Investigated against the actual code and the live character
           priority > 0 command with a genuinely missing icon mapping
           would be caught immediately instead of relying on a screenshot
           sweep to notice.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-177
+NAME:     Minimap auto-hides below MINIMAP_MIN_COLS (60 cols)
+PRIORITY: P1
+BUG:      Confirmed via direct screenshot inspection at 40 columns
+          (2026-08-30): the minimap still rendered, eating a meaningful
+          fraction of an already-scarce 40 columns for a zoomed-out view
+          barely legible at that scale, crowding out document content
+          and status bar pills that matter more.
+CROSS-REF: QA-GUT-020 (qa/27_gutter_ruler_minimap.txt), tests/renderer.t
+           "get_minimap_width returns 0 below MINIMAP_MIN_COLS even with
+           plenty of room" / "Minimap auto-hides via full render at
+           narrow widths (QA-REG-177)" / "Manual minimap preference
+           still works normally above MINIMAP_MIN_COLS (QA-REG-177)"
+VERIFY    `Renderer.pm::get_minimap_width` and the inline duplicate in
+          `render()` previously only checked whether dynamic room
+          remained after gutter/tree width (`MIN_TEXT_WIDTH`) — no hard
+          floor for whether a minimap was worth it at all. Added
+          `MINIMAP_MIN_COLS` (60): below this the minimap auto-hides
+          unconditionally, regardless of remaining room. 60 was chosen
+          relative to `docs/UI_GUIDELINES.md`'s existing "~40 cols"
+          floor for essential chrome — the minimap, being purely
+          supplementary, now drops a tier earlier than that. This is
+          automatic, not a new user toggle; the existing manual Minimap
+          preference (⌥M) is unaffected above the threshold. Confirmed
+          via `hangon` at 80x24 (present), 60x20 (present, inclusive
+          boundary), 59x20 (absent, no glitch), 50x18 and 40x15 (absent,
+          clean layout), and confirmed `qa/scripts/tier1/
+          reg_177_minimap_narrow_hide.sh` actually catches the
+          regression (fails at 40/59 cols) when run against the
+          unpatched binary.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-178
+NAME:     Status bar column-select indicator ("COL n×m") can overflow
+          the terminal width
+PRIORITY: P1
+BUG:      Same root cause and discovery session as QA-REG-179 below —
+          the column-select rectangle indicator, like the multi-cursor
+          indicator, was appended to the status bar's left segment
+          unconditionally, with no check against the fixed-width
+          `Commands ⌃␣` palette pill. At 40 cols, extending a column
+          selection into a genuine rectangle (both row and column
+          extent, rendering as "COL n×m" rather than the shorter "COL
+          n" vertical-only form) pushed the assembled line past 40
+          columns, causing the terminal to soft-wrap and scroll —
+          losing the tab bar and ruler from view.
+CROSS-REF: QA-SBAR-022 (qa/26_status_bar.txt), tests/renderer.t "Context
+           status bar never exceeds terminal width: multi-cursor /
+           column-select property sweep (QA-REG-179)"
+VERIFY    Fixed alongside QA-REG-179 (see that entry for the full
+          root-cause/fix write-up — both indicators share the same
+          gating fix in `_render_context_status_bar`). QA script
+          `qa/scripts/tier1/reg_178_statusbar_colselect_overflow.sh`
+          drives an actual down+right rectangle selection (not just
+          vertical, which turns out to stay just within budget even on
+          the unpatched code — confirmed while writing this script) at
+          80x24/60x20/50x18/40x15, and was confirmed to actually catch
+          the regression (detects the resulting tab-bar/scroll
+          corruption) when run against the unpatched binary.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-179
+NAME:     Status bar multi-cursor indicator ("N cursors") can overflow
+          the terminal width and corrupt the whole screen
+PRIORITY: P1
+BUG:      Confirmed via direct PNG screenshot inspection (2026-08-30,
+          not an LLM-vision guess): at 40x15 with a realistic filename
+          and the file tree closed, growing the multi-cursor count
+          (⌃D "select next occurrence" a handful of times, then typing
+          to dismiss the transient "N cursors" confirmation message and
+          reveal the PERSISTENT indicator underneath) pushed the
+          assembled status bar line past 40 columns. The terminal then
+          soft-wrapped the overflow onto a phantom row -- an actual
+          scroll the app's fixed-position redraw didn't account for.
+          The tab bar and ruler vanished from view and a bare, unstyled
+          fragment (e.g. "8 cursors") appeared at the bottom, bleeding
+          into what should have been document content. Note: the
+          original repro framing (realistic filename driving this) was
+          a red herring -- the document status bar's left pill shows
+          cursor *position*, not filename (filenames only live in the
+          tab bar). The actual trigger is the multi-cursor/column-select
+          supplementary indicator text, independent of filename length.
+CROSS-REF: QA-SBAR-022 (qa/26_status_bar.txt), tests/renderer.t "Context
+           status bar never exceeds terminal width: multi-cursor /
+           column-select property sweep (QA-REG-179)", "No row of a
+           full rendered frame ever exceeds terminal width, across
+           filenames and widths (QA-REG-179)"
+VERIFY    `Renderer.pm::_render_context_status_bar`'s document branch
+          built the cursor-position pill plus optional COL/multi-cursor
+          text and pushed it into the output buffer unconditionally,
+          before the fixed-width palette pill's width was even known —
+          the only width-aware logic (the ⌃/⌥ pill-group budget) could
+          shrink to zero, but by then an already-too-wide left segment
+          was already emitted with nothing downstream able to un-emit
+          it. Fix: palette pill width is now computed first; the COL
+          and multi-cursor segments are each only emitted if they still
+          fit the remaining budget (dropped whole, never truncated
+          mid-text) -- the same idiom `_fit_pill_group` already uses.
+          The cursor-position pill itself is now ellipsized as a
+          last-resort backstop for pathological cases (huge line/col
+          numbers). The `Commands ⌃␣` palette trigger remains
+          unconditional per docs/UI_GUIDELINES.md ("never droppable by
+          width or context") -- only the supplementary indicators
+          degrade. Confirmed `qa/scripts/tier1/
+          reg_179_statusbar_multicursor_overflow.sh` actually catches
+          the regression: an earlier draft that only pressed ⌃D
+          repeatedly passed vacuously against the unpatched code
+          (the transient message masks the persistent pill every time),
+          so the script now also types a character to dismiss the
+          message and reach the actual persistent-pill render path,
+          where it correctly detects the scroll corruption against the
+          unpatched binary. Verified interactively via `hangon` at
+          80x24/60x20/50x18/40x15 with both trivial and realistic
+          filenames.
