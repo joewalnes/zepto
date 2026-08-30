@@ -14,12 +14,6 @@ use warnings;
 package Zepto::Editor;
 use IPC::Open3;
 
-# Check if editor is in a modal input state (footer_input, prompt, find, dialog)
-sub _in_modal_state {
-    my ($self) = @_;
-    my $s = $self->{state};
-    return $s eq 'footer_input' || $s eq 'prompt' || $s eq 'find' || $s eq 'dialog';
-}
 use Symbol 'gensym';
 
 use Zepto::Theme;
