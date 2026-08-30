@@ -1536,3 +1536,33 @@ VERIFY    Single-character inserts/deletes (no newline in the edited
           file after a mixed sequence of single-char and newline-crossing
           edits. Benchmarked ~19x faster on a realistic
           interleaved-typing-and-render workload.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-162
+NAME:     Editor's default StateStore never touches the real machine
+          config, in unit tests or in docs-following interactive testing
+PRIORITY: P1
+BUG:      P1 "Zepto::Editor->new() defaults to the developer's real
+          ~/.config/zepto StateStore" (2026-08-30, fixed same day)
+CROSS-REF: tests/editor.t subtest "Editor->new() with no state_store
+          never touches the real config dir under the test harness",
+          tests/state_store.t
+VERIFY    Editor.pm's default-StateStore fallback (used by 100+
+          `Zepto::Editor->new(...)` calls across tests/editor.t,
+          tests/find.t, tests/multi_cursor.t, tests/renderer.t that pass
+          no state_store) redirects to a fresh per-call temp directory
+          under $ENV{HARNESS_ACTIVE} (set by prove), instead of the real
+          $XDG_CONFIG_HOME/zepto or ~/.config/zepto — confirmed by
+          constructing two Editor instances and checking their
+          resolved base_dir()s are neither the real path nor each
+          other's (no cross-test sharing), then flipping a preference
+          and confirming the real preferences.json's mtime is
+          unchanged. Outside the harness, behavior is unchanged: the
+          real config dir is used exactly as before. Separately,
+          CLAUDE.md's Testing Workflow example now shows --state-dir
+          explicitly, and a real end-to-end run of the compiled binary
+          with an explicit --state-dir (toggling Soft Tabs, the same
+          action that corrupted the dev machine's real prefs in the
+          original incident) confirms the write lands only in the
+          given --state-dir, never in the real config dir.

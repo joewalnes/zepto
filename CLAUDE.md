@@ -179,8 +179,11 @@ make build
 # Clean up any stale sessions first
 hangon stopall
 
-# Start zepto in a session
-hangon start process --name zepto -- ./zepto /tmp/testfile.txt
+# Start zepto in a session — always pass --state-dir pointing at a scratch
+# directory. Without it, zepto reads/writes your real ~/.config/zepto
+# preferences and history (see bugs.md QA-REG-162 for an incident where
+# skipping this flipped real preferences on a dev machine).
+hangon start process --name zepto -- ./zepto --state-dir /tmp/zepto-qa-state /tmp/testfile.txt
 
 # Wait for it to load, then inspect the screen
 sleep 1

@@ -3199,4 +3199,48 @@ subtest 'Tree preview of unreadable file surfaces an error message' => sub {
     ok($ok, 'Test body completed without dying') or diag("error: $err");
 };
 
+# ============================================================================
+# StateStore test isolation (bugs.md P1: "Zepto::Editor->new() defaults to
+# the developer's real ~/.config/zepto StateStore")
+# ============================================================================
+subtest 'Editor->new() with no state_store never touches the real config dir under the test harness' => sub {
+    # Sanity check the whole guard rests on: Test::Harness/prove sets this
+    # env var automatically. If it's not set here, the rest of this subtest
+    # would prove nothing (the harness-only redirect wouldn't engage).
+    ok($ENV{HARNESS_ACTIVE}, 'Sanity: HARNESS_ACTIVE is set while running under prove');
+
+    my $real_home = $ENV{HOME} || (getpwuid($<))[7] || '.';
+    my $real_xdg  = $ENV{XDG_CONFIG_HOME} || "$real_home/.config";
+    my $real_default_base_dir = "$real_xdg/zepto";
+    my $real_prefs_file = File::Spec->catfile($real_default_base_dir, 'preferences.json');
+    my $mtime_before = -e $real_prefs_file ? (stat($real_prefs_file))[9] : undef;
+
+    # Two independent Editor instances, neither given a state_store — this is
+    # exactly the pattern used by 100+ call sites in this file.
+    my $editor_a = Zepto::Editor->new(terminal => mock_terminal());
+    my $editor_b = Zepto::Editor->new(terminal => mock_terminal());
+
+    my $base_a = $editor_a->{state_store}->base_dir();
+    my $base_b = $editor_b->{state_store}->base_dir();
+
+    isnt($base_a, $real_default_base_dir,
+        'Resolved base_dir is not the real $XDG_CONFIG_HOME/zepto or ~/.config/zepto');
+    unlike($base_a, qr{^\Q$real_home\E(/|$)},
+        "Resolved base_dir is not anywhere under the real HOME ($real_home)");
+    isnt($base_a, $base_b,
+        'Two separate Editor->new() calls get separate per-call temp dirs (no cross-test sharing)');
+
+    # Actually flip a preference through the editor (the exact action that
+    # corrupted the real machine's preferences.json in the incident this
+    # guards against) and confirm the real file was never touched.
+    $editor_a->{prefs}->set_soft_tabs(0);
+
+    ok(-e File::Spec->catfile($base_a, 'preferences.json'),
+        'The preference write did land somewhere — in the isolated temp base_dir');
+
+    my $mtime_after = -e $real_prefs_file ? (stat($real_prefs_file))[9] : undef;
+    is($mtime_after, $mtime_before,
+        "Real $real_prefs_file was not created or modified by this test");
+};
+
 done_testing();
