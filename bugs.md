@@ -1091,11 +1091,19 @@ The SIGALRM(1) timeout (`FindEngine.pm:455-462`) wraps `qr//` compilation only, 
 ### P3: Renderer::_render_table_line still uses string-concat, unlike the rest of the file
 `Renderer.pm:1654-1749` builds `$full` via 8 `.=` concatenations per cell/row (including a per-character loop at line 1741) — the exact anti-pattern QA-REG-099 fixed elsewhere in this same file (`_render_line_with_highlights` correctly uses `push @_out`/`join`). Added after that sweep, for the markdown-table feature, so it never got the fix.
 
-### P3: SECURITY.md is stale in several places
-- Claims "Zepto makes zero network connections. This must remain true permanently" — false since `AIComplete.pm` makes opt-in HTTPS calls when a key is configured (disabled by default).
-- Shell-exec inventory is incomplete: missing `ImageConverter.pm` (backtick `which` lookup, hardcoded literals only, safe), `Editor/Commands.pm` `cmd_transform` (Alt+T, intentional user-typed-shell-command feature), and `AIComplete.pm` (list-form `curl` exec, safe).
-- References a `_shell_quote()` helper that no longer exists — the codebase moved entirely to list-form exec (stronger), but the doc wasn't updated.
-- The FileTree/FilePicker symlink-traversal item is marked open but is actually resolved (`Cwd::realpath` + correct prefix-with-slash check) — should move to "Resolved."
+### ~~P3: SECURITY.md is stale in several places~~ FIXED
+
+**Fix:** Updated `docs/SECURITY.md` with accurate information:
+
+1. **Network connections:** Rewritten the Network threat to reflect reality: "Zepto makes zero network connections by default. Optional AI completion feature (disabled by default, requires explicit user configuration of API endpoint + key) makes opt-in HTTPS calls to OpenAI-compatible APIs via curl. No network calls are made for any other feature."
+
+2. **Shell execution inventory:** Expanded from "three places" to complete list of six actual locations, all using safe list-form `exec()` / `system()` with argument arrays (no shell interpolation): VCS integration (git), Clipboard tools, File search (git grep/rg/grep), Image format conversion (sips/convert via `which` on hardcoded literals), Text transformation (user-typed shell command via `cmd_transform`/Alt+T — intentional capability, not injection), and AI completion (curl for HTTPS). Each location documented with its approach.
+
+3. **_shell_quote() function:** Removed dead reference. Replaced the outdated example showing `_shell_quote()` with explanation that current codebase uses list-form pipes and `exec()` throughout, which is fundamentally safer (eliminates shell interpretation entirely rather than relying on quoting).
+
+4. **Symlink traversal:** Moved from "Open Items" to "Resolved Items". Documented that FileTree.pm and FilePicker.pm use `Cwd::realpath()` to resolve symlinks in root and all discovered paths, with correct prefix-with-slash traversal check (`index($real, "$root/") == 0`) that prevents "/root" vs "/rootevil" bypass bug. Both implementations audited and correct.
+
+5. **Audit Checklist:** Updated to reflect current mitigation (list-form exec) instead of dead `_shell_quote()` function. Added guidance about `Cwd::realpath()` for symlink handling and opt-in nature of AI completion.
 
 ### ~~P3: Two hardcoded /Users/joe paths in QA scripts (repeats a documented past mistake)~~ FIXED
 `qa/scripts/tier1/reg_019_natural_sort.sh:12` and `qa/scripts/tier1/reg_021_new_file_tree.sh:9` both hardcoded `QA_ZEPTO=$(cd /Users/joe/src/zepto && pwd)/zepto` — the exact pattern `CLAUDE.md:150` itself cites as a past CI-breaking incident ("cd /Users/joe/src/zepto hardcoded in 5 test scripts — broke on Ubuntu"). Will break on any other machine or CI.
