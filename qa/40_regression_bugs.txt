@@ -1300,3 +1300,35 @@ VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
           3:1 against tab_active_bg/tab_inactive_bg/tab_hover_bg. Verified
           via direct contrast math and the actual emitted ANSI bytes on a
           live dirty tab (38;2;95;40;0).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-154
+NAME:     File-tree preview failure surfaces an error message, not silence
+PRIORITY: P3
+BUG:      P3 "Silent eval swallow in file-tree preview open" (2026-08-30)
+CROSS-REF: QA-TREE-027
+VERIFY    _tree_preview_current() (lib/Zepto/Editor.pm) wrapped document
+          creation in a bare `eval {}` with no `if ($@)` check, so a
+          failed preview (permission error, decode failure) produced no
+          feedback at all. Fixed to match the established pattern used
+          by every other file-open path in this file (cmd_save,
+          _load_file, the external-reload paths): check $@ after the
+          eval and call show_error_message(_user_error("Preview
+          failed", $@)) on failure.
+
+          The tree only lists files that pass `-r` at scan time
+          (FileTree::_scan_dir_one_level), so a file unreadable from
+          the start never appears in the tree to navigate to — the
+          practical trigger is a TOCTOU race (readable when scanned,
+          unreadable by the time it's previewed). tests/editor.t
+          reproduces exactly that race directly against
+          _tree_preview_current().
+
+          Also resets preview_active/preview_path/pre_preview_tab_index
+          bookkeeping and switches back to the pre-preview tab on
+          failure (mirroring the existing directory-cancel branch in
+          the same function), so rapid arrow-key navigation past
+          several broken files in a row can't accumulate stale preview
+          state or leave a dangling tab reference — each failed
+          attempt cleanly reverts before the next one starts.
