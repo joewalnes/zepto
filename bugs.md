@@ -1062,3 +1062,53 @@ While building `docs/UI_GUIDELINES.md`'s new "Discoverability Contract" section 
 Only 5 screenshots (document context: 3 widths × mostly-dark plus one light; file-tree: 1) were reviewed — this is a sample, not an exhaustive sweep. FIND/PROMPT/palette contexts, and the light-theme file-tree/narrow-width variants, were not checked. The durable fix for "exhaustive" is running `qa/scripts/tier2/discoverability_sweep.sh` with a real API key configured, which covers the full matrix automatically and repeatably.
 
 **Not fixed here** — pending a scope decision, same as the theme contrast debt above. Candidate fixes: give `quit` a corner-hint-style always-visible affordance (mirroring how close/next/prev tab already work) in every context, not just DOCUMENT; extend the FILE_TREE status bar to include a focus-switch hint and the tab-nav corner hint; consider whether `CommandRegistry` should have a formal `core_nav => 1` tag so `commands_for_status_bar`-style logic and the corner-hint renderer both derive from one source of truth instead of two independent, silently-divergent code paths (the actual root cause of finding #1 — the registry and the tab bar's hardcoded hint don't agree on what's "always visible").
+
+## Scorecard audit backlog (2026-08-30)
+
+Findings from a 5-agent parallel codebase audit (architecture, code quality, security, tests/docs, performance/duplication). Each item below will be marked FIXED with a root-cause/fix/test writeup by whichever agent picks it up, following this file's normal convention.
+
+### P1: FindEngine.pm ReDoS timeout only covers regex compilation, not matching
+The SIGALRM(1) timeout (`FindEngine.pm:455-462`) wraps `qr//` compilation only, then is cancelled before the actual match. Catastrophic backtracking happens at MATCH time, not compile time — a pattern like `(a+)+$` against long input can still hang `tick()` indefinitely (`FindEngine.pm:126,532,549,646`); the 10ms incremental-search deadline check only runs *between* completed matches, not during one. `bugs.md`'s existing "SIGALRM(1) timeout... provides defense-in-depth against catastrophic backtracking" claim (QA-REG-011) is inaccurate for this reason. Self-inflicted only (a user's own search pattern hangs their own search of their own file) — not exploitable by another party — but a real, live gap in a control the docs claim is closed.
+
+### P2: message_is_error can leak stale error styling onto non-error messages
+`show_message()` (`Editor.pm:5062-5066`) always resets `message_is_error => 0`, but 10 call sites in toggle commands (`Editor/Commands.pm:1280,1287,1294,1306,1313,1320,1327,1334,1357,1376`) write `$self->{message} = "..."` directly, bypassing the reset. The top-of-loop guard (`Editor.pm:944-947`) only clears `message_is_error` when a message was already showing at the START of that input batch. If an error message is showing and a toggle command is processed in the same batch (plausible with fast/pasted/scripted input), the toggle's confirmation text renders in error styling.
+
+### P2: Buffer::get_text() re-concatenates the whole document on every line read
+`Buffer.pm:159-171` `get_text()` unconditionally builds `pre_gap . post_gap` even to fetch a single line — `get_line`/`get_line_content` (`Buffer.pm:244-260`, called once per visible row from the renderer, ~40-80×/frame) call it under the hood. Every rendered frame re-concatenates the full document buffer 40-80 times: O(viewport × document_size) per frame, growing unboundedly with file size. Only edits are O(1) in this "gap buffer"; reads are not, contrary to the module's own docstring claim.
+
+### P2: Buffer::_ensure_line_index() does a full O(n) rescan on every edit
+`Buffer.pm:205-234` — `insert`/`delete` (`Buffer.pm:128-156`) unconditionally invalidate the line index; the next `line_count()`/`get_line()` call rebuilds the entire newline index from a fresh full-buffer `text()` call. One full-document scan per keystroke on large files, compounding the `get_text()` issue above.
+
+### P2: ~9 near-identical cmd_toggle_* methods, and a duplicated cursor-clamp block
+`Editor/Commands.pm:1283-1330` (approx) — `cmd_toggle_auto_pairs`, `cmd_toggle_restore_session`, `cmd_toggle_search_wrap`, `cmd_toggle_markdown_tables`, `cmd_toggle_soft_tabs`, `cmd_toggle_auto_indent`, and others all share the identical 4-line shape (`$new = !prefs->X(); prefs->set_X($new); message = "Label: ON/OFF"`) — copy-paste, and the source of the asymmetric-feedback inconsistency below. Separately, `Editor.pm:5147-5153` and `Editor.pm:5175-5181` are a byte-for-byte duplicated 7-line cursor-clamp-after-reload block.
+
+### P2: CrossBufferWordProvider rescans every open tab on every trigger, not just the changed one
+`Completion/CrossBufferWordProvider.pm:69-127` — bugs.md's existing "cached per-document by content_version" claim is only true for the skip case. When ANY open document's `content_version` changes, `_rebuild_cache` (lines 79-97) wholesale rescans *every* open tab (up to `MAX_SCAN_LINES=10000` each) and rebuilds `%all_words` from scratch — not an incremental per-doc merge. Mitigated by the 100ms completion debounce, so not literally per-keystroke, but contradicts the caching description and rescans N tabs on every trigger regardless of which one changed.
+
+### P3: WrapMap::invalidate_line() has an O(remaining-lines) tail on wrap-boundary changes
+`WrapMap.pm:91-109` — when a single-char edit changes a line's wrapped-segment count (`delta != 0`), it walks every subsequent document line to shift `_doc_to_vrow` offsets. Only triggers on wrap-boundary crossings (not every keystroke), but for large word-wrapped files this is a periodic per-frame spike, not the truly amortized O(1) the "incremental" framing implies. Note: WrapMap invalidation is called out in `docs/CODE_QUALITY.md`'s own pitfall list as a known fragile area — fix with extra care and correctness tests, not just a speed benchmark.
+
+### P3: Renderer::_render_table_line still uses string-concat, unlike the rest of the file
+`Renderer.pm:1654-1749` builds `$full` via 8 `.=` concatenations per cell/row (including a per-character loop at line 1741) — the exact anti-pattern QA-REG-099 fixed elsewhere in this same file (`_render_line_with_highlights` correctly uses `push @_out`/`join`). Added after that sweep, for the markdown-table feature, so it never got the fix.
+
+### P3: SECURITY.md is stale in several places
+- Claims "Zepto makes zero network connections. This must remain true permanently" — false since `AIComplete.pm` makes opt-in HTTPS calls when a key is configured (disabled by default).
+- Shell-exec inventory is incomplete: missing `ImageConverter.pm` (backtick `which` lookup, hardcoded literals only, safe), `Editor/Commands.pm` `cmd_transform` (Alt+T, intentional user-typed-shell-command feature), and `AIComplete.pm` (list-form `curl` exec, safe).
+- References a `_shell_quote()` helper that no longer exists — the codebase moved entirely to list-form exec (stronger), but the doc wasn't updated.
+- The FileTree/FilePicker symlink-traversal item is marked open but is actually resolved (`Cwd::realpath` + correct prefix-with-slash check) — should move to "Resolved."
+
+### P3: Two hardcoded /Users/joe paths in QA scripts (repeats a documented past mistake)
+`qa/scripts/tier1/reg_019_natural_sort.sh:12` and `qa/scripts/tier1/reg_021_new_file_tree.sh:9` both do `QA_ZEPTO=$(pwd)/zepto` — the exact pattern `CLAUDE.md:150` itself cites as a past CI-breaking incident ("cd /Users/joe/src/zepto hardcoded in 5 test scripts — broke on Ubuntu"). Will break on any other machine or CI.
+
+### P3: Dead code — _in_modal_state and an empty tautological InputParser branch
+- `Editor/Commands.pm:18-22` `_in_modal_state` is defined but has zero call sites anywhere in `lib/` or `tests/`. `bugs.md`'s own changelog claims it replaced guard blocks in `cmd_open_file`/`cmd_recent_files`/`cmd_find_in_files` — those functions contain no call to it; the claim appears to be incorrect, not just the code being later-orphaned.
+- `InputParser.pm:250-254` — an empty no-op `if` block for legacy "basic format" (non-SGR) mouse events, whose own comment admits the logic was abandoned mid-implementation ("Actually buffer was already consumed... handle differently"); also contains a tautological `length(...) >= 0` condition. Not currently reachable/harmful (Zepto only enables SGR mouse mode, `?1006h`), but should be deleted or finished. Treat with extra care given this file's history of subtle input-parsing bugs this session (QA-REG-102, OSC handling) — verify no live basic-mouse-format path depends on it before removing.
+
+### P3: Renderer.pm palette/dialog layout uses inline magic numbers
+Sizing literals with no named constants: 120/80/60/30 (palette width tiers, `Renderer.pm:514-520`), 45 (`:623`), 40 (`:632`), 50/15 (menu width, `:765-766`), 10/20 (input width, `:567-576`), `mark_interval=10` (`:1263`). Contrast with the same file's proper `use constant` blocks (`TAB_WIDTH`, `DIALOG_WIDTH`, `FILE_EXISTS_CACHE_TTL`).
+
+### P3: Silent eval swallow in file-tree preview open
+`_start_preview` (`Editor.pm:4605-4618`) wraps document creation in a bare `eval {}` with no `if ($@)` check afterward — if opening a preview fails (permission error, decode failure), nothing happens: no message, no log. Inconsistent with every other file-open path in the same file, which all route failures through `_user_error()`/`show_error_message()`.
+
+### P3: [Architecture] Editor is a 6000-line god object across 3 files — SKIPPED (numbers now stale)
+Original entry deferred this as multi-session work; still the right call, but current numbers are understated. As of this audit: `Editor.pm` + `Editor/Commands.pm` + `Editor/Palette.pm` (all three `package Zepto::Editor;`, no real encapsulation boundary between them) total **7,729 lines, 220 methods** (up from the cited 6000/162) — a ~29% line and ~36% method growth since the entry was written, with no extraction having occurred. `Editor/TabManager.pm` (318 lines, a genuine separate `Zepto::Editor::TabManager` class) proves the team can extract a subsystem when it chooses to — the god object isn't a capability gap, just deferred. Not assigned to the current agent fleet (too large/cross-cutting for a bounded background task) — flagging the stale numbers only.

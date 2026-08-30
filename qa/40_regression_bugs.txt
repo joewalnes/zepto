@@ -1287,3 +1287,16 @@ VERIFY    Typing a 2+ char prefix of a word that exists only in a
           never exercised — they only ever typed the target word into
           the SAME buffer being completed. Regression here would mean
           completion silently regressed to single-buffer-only.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-140
+NAME:     Light-theme tab modified-dot has adequate contrast
+PRIORITY: P1
+BUG:      P1 "Light-theme tab unsaved dot has ~1.2-1.8:1 contrast, nearly
+          invisible" (2026-08-30)
+CROSS-REF: tests/theme_contrast.t
+VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
+          3:1 against tab_active_bg/tab_inactive_bg/tab_hover_bg. Verified
+          via direct contrast math and the actual emitted ANSI bytes on a
+          live dirty tab (38;2;95;40;0).
