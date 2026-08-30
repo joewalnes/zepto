@@ -349,3 +349,38 @@ STEPS
 VERIFY
   - Home jumps to first command.
   - End jumps to last command.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PAL-024
+NAME:     ⌃Space falls back to the palette when the cursor is mid-word but
+          no completion is actually available
+PRIORITY: P1
+FEATURE:  palette
+RELATED:  QA-PAL-001, QA-CPLT series
+CROSS-REF: QA-REG-169 (bugs.md P2 "⌃Space can be silently dropped")
+
+SETUP
+  Cursor sits immediately after a single word character (a 1-char
+  prefix — too short for Completion::Controller to produce any
+  results; auto-trigger/⌃Space-completion both require a 2+ char
+  prefix).
+
+STEPS
+  1. Move the cursor so exactly one word character precedes it (e.g.
+     press → once at the start of "hello").
+  2. Press ⌃Space.
+
+VERIFY
+  - The command palette opens (title bar "⌃␣ Commands") — NOT a
+    silent no-op.
+  - Typing afterward filters the palette list; it does not land as
+    literal text in the document.
+
+NOTES
+  The "context-sensitive ⌃Space" behavior (open completion menu
+  instead of the palette when mid-word) only applies when a
+  completion is actually available. A 1-char prefix looks "mid-word"
+  by the naive check (character before cursor matches \w) but
+  Completion::Controller::trigger() requires 2+ chars to produce any
+  results, so the old code silently did nothing — see QA-REG-169.

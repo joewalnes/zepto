@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use utf8;
 use Test::More;
+use Time::HiRes qw(sleep);
 use lib 'lib';
 use Zepto::InputParser;
 
@@ -316,6 +317,70 @@ subtest 'Escape key' => sub {
     my $event = $parser->flush_pending();
     ok($event, 'Flush returns event');
     is($event->{key}, 'escape', 'Escape key');
+};
+
+# ============================================================================
+# ESC disambiguation across separate parse() calls (regression: bugs.md P2
+# "Escape immediately followed by a burst keystroke send can drop or
+# corrupt the next character(s)" / QA-REG-170)
+#
+# A real Alt-chord (ESC + printable byte) is written by the terminal as a
+# single atomic write and always arrives together in one parse() call — see
+# the "Alt+key" subtest above, which feeds both bytes in a single string.
+# But when a lone ESC is fed in one parse() call and the continuation byte
+# arrives in a genuinely LATER, separate parse() call (as happens when the
+# two bytes come from separate underlying reads), the parser must not wait
+# indefinitely (up to the ~0.5s outer idle-read timeout in Editor.pm) to
+# decide the ESC was standalone — otherwise a byte in the 32-126 range
+# (like a space) arriving after a human-perceptible pause gets fused into
+# "Alt+<byte>" instead of being a separate Escape + character.
+# ============================================================================
+subtest 'ESC resolves as standalone once a continuation byte arrives too late' => sub {
+    my $parser = Zepto::InputParser->new();
+
+    my @events = $parser->parse("\x1b");
+    is(scalar @events, 0, 'lone ESC alone: no events yet (still waiting)');
+
+    # Wait past ESC_DISAMBIGUATION_TIMEOUT (30ms) before the next byte
+    # arrives in a separate parse() call.
+    sleep(0.06);
+
+    @events = $parser->parse(' ');
+    is(scalar @events, 2, 'two separate events: stale ESC resolved, then the new byte parsed fresh');
+    is($events[0]->{type}, 'key', 'first event is a key event');
+    is($events[0]->{key}, 'escape', 'first event is standalone Escape');
+    is($events[1]->{type}, 'char', 'second event is a plain char');
+    is($events[1]->{char}, ' ', 'second event is the space, unmodified');
+    ok(!Zepto::InputParser::has_modifier($events[1], 'alt'),
+        'space is NOT fused into Alt+Space');
+};
+
+subtest 'ESC + continuation byte arriving quickly (same "burst") still forms an Alt-chord' => sub {
+    my $parser = Zepto::InputParser->new();
+
+    my @events = $parser->parse("\x1b");
+    is(scalar @events, 0, 'lone ESC alone: no events yet (still waiting)');
+
+    # No meaningful delay — matches how a real terminal delivers an
+    # atomic Alt-chord write, even if split across two parse() calls by
+    # the read loop (e.g. very fast successive reads with no real gap).
+    @events = $parser->parse(' ');
+    is(scalar @events, 1, 'single fused event, not resolved as standalone Escape');
+    is($events[0]->{type}, 'char', 'event is a char');
+    is($events[0]->{char}, ' ', 'char is space');
+    ok(Zepto::InputParser::has_modifier($events[0], 'alt'), 'Alt+Space when bytes arrive with no real gap');
+};
+
+subtest 'ESC disambiguation does not affect genuine same-call Alt-chords' => sub {
+    # Sanity check this fix didn't regress the base case: both bytes fed
+    # in a single parse() call (how every real terminal actually sends
+    # an Alt-chord) must still resolve as one Alt+key event regardless of
+    # ESC_DISAMBIGUATION_TIMEOUT.
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1bz");
+    is(scalar @events, 1, 'single event for same-call ESC+z');
+    is($events[0]->{char}, 'z', 'char is z');
+    ok(Zepto::InputParser::has_modifier($events[0], 'alt'), 'has alt modifier');
 };
 
 # ============================================================================

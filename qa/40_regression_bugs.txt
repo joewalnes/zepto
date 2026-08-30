@@ -1536,3 +1536,66 @@ VERIFY    Single-character inserts/deletes (no newline in the edited
           file after a mixed sequence of single-char and newline-crossing
           edits. Benchmarked ~19x faster on a realistic
           interleaved-typing-and-render workload.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-169
+NAME:     Ctrl+Space opens the palette (not silently swallowed) when the
+          cursor is mid-word but no completion is actually available
+PRIORITY: P2
+BUG:      P2 "⌃Space (open palette) can be silently dropped when it isn't
+          the very first key sent" (2026-08-30)
+CROSS-REF: QA-PAL-024 (qa/25_command_palette.txt), tests/command_palette.t
+VERIFY    Editor::handle_ctrl_char's space-handler used "one word
+          character before the cursor" as the trigger for "try the
+          completion menu instead of the palette" — but
+          Completion::Controller::trigger() requires a 2+ char prefix to
+          produce any results. A 1-char prefix made trigger() dismiss
+          immediately (is_active() false), and the old code returned
+          without ever falling back to cmd_open_palette(), so ⌃Space did
+          nothing at all whenever the cursor sat right after a single
+          word character. Confirmed NOT an InputParser/Terminal timing
+          issue — instrumented byte-level tracing showed ⌃Space always
+          decoded correctly as char:' '+ctrl regardless of the preceding
+          key; the swallow happened purely in command dispatch. Fix:
+          only skip the palette when the completion menu actually opened
+          (is_active() true after trigger()); otherwise always fall
+          through to cmd_open_palette(). Verified via hangon: → then
+          ⌃Space now reliably opens the palette (previously silently did
+          nothing), and typing a filter afterward lands in the palette
+          search box instead of as literal document text (the original
+          "hWord Wrapello world" corruption repro). Real mid-word
+          completions (2+ char prefix with actual candidates) are
+          unaffected — still open the completion menu as before.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-170
+NAME:     Escape followed by a delayed burst starting with a space does
+          not drop or corrupt the leading character
+PRIORITY: P2
+BUG:      P2 "Escape immediately followed by a burst keystroke send can
+          drop or corrupt the next character(s)" (2026-08-30)
+CROSS-REF: QA-CPLT-022 (qa/17_auto_pair_and_completion.txt),
+           tests/input_parser.t
+VERIFY    InputParser only resolved a lone pending ESC via Editor.pm's
+          ~0.5s full-idle-read-timeout flush. If the next byte arrived in
+          a genuinely separate read before that 0.5s elapsed (e.g. a
+          100-400ms human pause), it was appended to the still-pending
+          "\x1b" buffer and reparsed as a continuation — and since space
+          (0x20) is in the Alt-key byte range (32-126), "ESC" + a later
+          space fused into "Alt+Space", which has no handler, silently
+          dropping the space. NOT specific to completion-dismissal —
+          reproduced identically with plain Escape and no popup active;
+          ghost-text dismissal was just the discovery scenario. Fix:
+          InputParser.pm now tracks how long a lone ESC has been waiting
+          (ESC_DISAMBIGUATION_TIMEOUT = 30ms); a continuation byte
+          arriving after that window resolves the stale ESC as a
+          standalone Escape key first, before being treated as part of
+          it. Real atomic Alt-chords (terminal writes ESC+char as one
+          write()) are unaffected — confirmed via 50+ automated trials at
+          delays 0-1s, zero splits ever observed. Verified via hangon:
+          the exact repro (type "dist" -> ghost text appears -> Escape
+          dismisses it -> wait 0.2s/0.5s/1.0s -> type " moreWords")
+          correctly produces "dist moreWords" (space preserved) at all
+          three gaps, where it previously produced "distmoreWords".

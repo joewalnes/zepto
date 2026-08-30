@@ -1567,9 +1567,21 @@ sub handle_ctrl_char {
 
     # Command palette / completion menu
     elsif ($char eq ' ') {
-        # Context-sensitive: if cursor is mid-word, open completion menu instead
+        # Context-sensitive: if cursor is mid-word, try to open the
+        # completion menu instead of the palette. But "mid-word" (one word
+        # character before the cursor) is only a necessary condition, not a
+        # sufficient one — Completion::Controller::trigger() requires a 2+
+        # char prefix to actually produce results (see _extract_prefix /
+        # auto-trigger minimum). A 1-char prefix (or a prefix with zero
+        # matches) makes trigger() dismiss immediately, leaving is_active()
+        # false — if we returned unconditionally here as before, ⌃Space
+        # would silently do nothing at all (bugs.md P2 "⌃Space can be
+        # silently dropped when it isn't the very first key sent" /
+        # QA-REG-169). Always fall back to the palette when the completion
+        # menu didn't actually open.
         my $_view = $self->active_view();
         my $_doc = $self->active_doc();
+        my $_opened_completion = 0;
         if ($_view && $_doc && $self->{_completion}) {
             my $_line_num = $_view->cursor_line();
             my $_col = $_view->cursor_col();
@@ -1580,13 +1592,15 @@ sub handle_ctrl_char {
                     # Trigger completion and open menu
                     my $_hl = $self->active_highlighter();
                     $self->{_completion}->trigger($_doc, $_view, $_hl);
-                    $self->{_completion}->open_menu() if $self->{_completion}->is_active();
-                    $self->{_completion_pending_at} = 0;
-                    return;
+                    if ($self->{_completion}->is_active()) {
+                        $self->{_completion}->open_menu();
+                        $self->{_completion_pending_at} = 0;
+                        $_opened_completion = 1;
+                    }
                 }
             }
         }
-        $self->cmd_open_palette();
+        $self->cmd_open_palette() unless $_opened_completion;
     }
 
     # Reset quit pending for any other command
