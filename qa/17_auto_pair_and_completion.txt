@@ -356,3 +356,48 @@ NOTES
   covers cross-buffer, which the original ask didn't even require.
   QA-CPLT-009 already covers same-buffer triggering; this test is the
   one that actually exercises the cross-tab path.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-022
+NAME:     Completion never offers a self-referential suggestion that just
+          reconstructs the word's own already-present tail (REGRESSION)
+PRIORITY: P2
+FEATURE:  completion word self-match
+RELATED:  bugs.md P2 "Stale duplicated tail on the cursor's own line
+          after typing into a large file" (fixed 2026-08-30);
+          QA-REG-165
+
+STEPS
+  1. Open a large file where a line reads e.g. `row2000text` and jump
+     the cursor to the very front of that line (before the `r`).
+  2. Type 2+ characters, e.g. `a`, then `b` (matching the completion
+     min-trigger length), with a real pause between keystrokes so the
+     debounced completion trigger fires between them, same as a human
+     typing.
+
+VERIFY
+  - Screen shows exactly `abrow2000text` — no duplicated ghost-text
+    copy of `row2000text` appended after it.
+  - Waiting past the completion debounce window (~1-2s) does not cause
+    a duplicate to appear later either.
+  - Typing further characters into the same word never produces a
+    duplicate, at any position in the file (start, middle, end).
+  - A genuinely DIFFERENT completion candidate elsewhere in the buffer
+    that happens to share the same prefix still ghost-completes
+    normally — only self-referential candidates (whose suggested
+    suffix would just reconstruct text already sitting after the
+    cursor) are rejected.
+
+NOTES
+  Root cause was in `Completion::Controller::trigger()`, not rendering:
+  CrossBufferWordProvider rescans the active document on every
+  keystroke, so typing at the front of an existing word makes the
+  scanner "discover" the word-so-far as a completion candidate for its
+  own prefix. Its suggested suffix is then just the text already
+  sitting after the cursor, and ghost-text rendering paints it right
+  after the real content, producing an on-screen-only duplicate (the
+  saved document was always correct). See `qa/scripts/tier1/
+  reg_165_ghost_completion_self_match_render.sh` for the executable
+  regression coverage — it asserts ON-SCREEN content directly, since
+  this bug never touched the document.

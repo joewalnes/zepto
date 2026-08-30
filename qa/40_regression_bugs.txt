@@ -1536,3 +1536,36 @@ VERIFY    Single-character inserts/deletes (no newline in the edited
           file after a mixed sequence of single-char and newline-crossing
           edits. Benchmarked ~19x faster on a realistic
           interleaved-typing-and-render workload.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-165
+NAME:     No stale self-match ghost-text duplicate when typing into an
+          existing word
+PRIORITY: P2
+BUG:      P2 "Stale duplicated tail on the cursor's own line after typing
+          into a large file" (found 2026-08-30, fixed 2026-08-30)
+CROSS-REF: QA-CPLT-022, QA-REG-150, QA-REG-151, tests/completion.t
+VERIFY    Typing at the FRONT of an existing word (e.g. jumping to line
+          2000 of a 5000-line file, where the line reads "row2000text",
+          and typing "a","b") used to render a stale duplicate of that
+          word's own pre-edit tail on screen only (e.g.
+          "abrow2000textrow2000text"), even though the saved document was
+          always correct. Root cause: Completion::Controller::trigger()
+          let CrossBufferWordProvider offer the word the user is
+          mid-typing back as a completion candidate for its own prefix,
+          since the word scanner re-indexes the buffer on every keystroke
+          and trivially "discovers" it; the suggested ghost-text suffix
+          was then just the text already sitting after the cursor.
+          trigger() now rejects any completion candidate whose suffix
+          would just reconstruct text already present after the cursor.
+          Verified ON SCREEN directly (not save-then-read — the document
+          was never wrong, only the screen paint was) at the front of a
+          word: partway through a large file (original repro), at the
+          very start of the file, at the very end of the file, across
+          multiple further keystrokes into the same word, and with word
+          wrap enabled. Also verified a genuinely different (non-self-
+          match) completion candidate still ghost-completes normally —
+          the fix only rejects self-referential suggestions. Confirmed
+          this test fails (5/14 assertions) against the pre-fix code and
+          passes (14/14) after.
