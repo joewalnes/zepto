@@ -319,6 +319,36 @@ subtest 'Empty lines beyond document use distinct background' => sub {
     like($output, qr/\x1b\[48;2;20;21;30m/, 'Has empty line background color');
 };
 
+# QA-REG-174: rows below EOF must use the CURRENT theme's own empty_line_bg,
+# not the dark theme's — regression guard for a reported (but not reproduced
+# against tmux's authoritative terminal state — see bugs.md 2026-08-30
+# "Light-theme dark background fill investigation") bug claiming the
+# below-EOF fill stayed dark-themed after switching to light. Asserts the
+# actual RGB byte sequence, not just "renders without crashing" — a
+# hardcoded/stale color or wrong theme-role name here would fail this.
+subtest 'Empty lines beyond document use the light theme own background, not dark theme' => sub {
+    my ($doc, $view) = create_test_state("Short\n");
+    my $theme = Zepto::Theme->light_theme();
+
+    my $output = Zepto::Renderer->render_string(
+        document => $doc,
+        view     => $view,
+        theme    => $theme,
+        rows     => 24,
+        cols     => 80,
+    );
+
+    # Light theme's empty_line_bg is rgb(250,250,252) — near-white.
+    like($output, qr/\x1b\[48;2;250;250;252m/,
+        'Has light theme empty line background color');
+    # Dark theme's empty_line_bg (20,21,30) must never leak into a light-theme frame.
+    unlike($output, qr/\x1b\[48;2;20;21;30m/,
+        'Does not contain dark theme empty line background color');
+    # Dark theme's main bg (26,27,38) must not leak in either.
+    unlike($output, qr/\x1b\[48;2;26;27;38m/,
+        'Does not contain dark theme main background color');
+};
+
 # ============================================================================
 # Status bar
 # ============================================================================
@@ -1698,6 +1728,65 @@ subtest 'Image spacer insertion in render' => sub {
     ok($frame->{inline_images}[0]{width} > 0, 'Width is positive');
     cmp_ok($frame->{inline_images}[0]{height_rows}, '>=', 3, 'Height is at least 3 rows');
     cmp_ok($frame->{inline_images}[0]{height_rows}, '<=', 20, 'Height is at most 20 rows');
+};
+
+# QA-REG-175: image spacer rows (blank rows reserved below a Markdown inline
+# image) must fill with the theme's real 'bg' role, not a nonexistent
+# 'editor_bg' role. Found via code audit while investigating QA-REG-174
+# (see bugs.md 2026-08-30) — Theme::color() silently returns '' for an
+# unknown role name, so this previously emitted NO background color at all
+# for the spacer row's text area in both themes. Isolates the exact spacer
+# rows via inline_images{screen_row,height_rows} (not a whole-frame
+# substring search) so this can't pass merely because an unrelated content
+# row elsewhere in the frame happens to use the same 'bg' role.
+subtest 'Image spacer rows use the real theme bg color, not a blank/missing role' => sub {
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+
+    my $img_path = File::Spec->catfile($tmpdir, 'photo.png');
+    open my $ifh, '>:raw', $img_path or die;
+    print $ifh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $ifh;
+
+    my $md_path = File::Spec->catfile($tmpdir, 'test.md');
+    open my $fh, '>', $md_path or die;
+    print $fh "# Title\n";
+    print $fh "![photo](photo.png)\n";
+    print $fh "After image\n";
+    close $fh;
+
+    local $ENV{TERM_PROGRAM} = 'ghostty';
+    Zepto::Terminal->_reset_kitty_cache();
+
+    for my $spec (
+        { name => 'light', theme => Zepto::Theme->light_theme(), bg => '255;255;255' },
+        { name => 'dark',  theme => Zepto::Theme->dark_theme(),  bg => '26;27;38' },
+    ) {
+        my $doc = Zepto::Document->load($md_path);
+        my $view = Zepto::View->new(document => $doc);
+
+        my $frame = Zepto::Renderer->render(
+            document => $doc,
+            view     => $view,
+            theme    => $spec->{theme},
+            rows     => 24,
+            cols     => 80,
+        );
+
+        is(scalar @{$frame->{inline_images}}, 1, "$spec->{name} theme: one image placement");
+        my $placement = $frame->{inline_images}[0];
+        my $first_spacer_idx = $placement->{screen_row} - 1;  # screen_row is 1-based
+        my $last_spacer_idx  = $first_spacer_idx + $placement->{height_rows} - 1;
+
+        for my $i ($first_spacer_idx .. $last_spacer_idx) {
+            like($frame->{rows}[$i], qr/\x1b\[48;2;$spec->{bg}m/,
+                "$spec->{name} theme: spacer row $i has the real bg color, not a blank/missing role");
+        }
+    }
 };
 
 subtest 'Image spacer respects cell_aspect parameter' => sub {

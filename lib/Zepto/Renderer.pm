@@ -2173,7 +2173,7 @@ sub _render_text_area {
 
         # Handle image spacer entries (blank rows for inline Markdown images)
         if ($entry && ($entry->{type} // '') eq 'image_spacer') {
-            my $bg = $theme->color('editor_bg');
+            my $bg = $theme->color('bg');
             my $gutter_bg = $theme->color('gutter_bg');
             # Blank gutter
             push @_out, $gutter_bg . (' ' x $gutter_width);
