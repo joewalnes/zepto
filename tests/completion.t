@@ -16,6 +16,7 @@ use utf8;
 use Test::More;
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
+use Scalar::Util qw(refaddr);
 
 use Zepto::Completion::Controller;
 use Zepto::Completion::KeywordProvider;
@@ -186,6 +187,94 @@ subtest 'CrossBufferWordProvider (multi-tab)' => sub {
     my @alpha = grep { $_->{text} eq 'unique_word_alpha' } @$results;
     my @gamma = grep { $_->{text} eq 'unique_word_gamma' } @$results;
     ok($alpha[0]{score} > $gamma[0]{score}, 'active doc word has higher score (proximity boost)');
+};
+
+# =============================================================================
+# CrossBufferWordProvider (per-document cache isolation)
+# =============================================================================
+# Regression coverage for QA-REG-152 / bugs.md "CrossBufferWordProvider
+# rescans every open tab on every trigger, not just the changed one".
+# Confirms that editing ONE open tab only rescans that tab's document —
+# other open tabs' per-document caches are left untouched — while the
+# merged completion results still reflect the edit correctly.
+subtest 'CrossBufferWordProvider (per-document cache isolation)' => sub {
+    my $doc1 = make_doc("alpha_one alpha_two\n");
+    my $doc2 = make_doc("beta_one beta_two\n");
+
+    my $mock_tm = bless {
+        tabs => [
+            { document => $doc1 },
+            { document => $doc2 },
+        ],
+    }, 'MockTabManager2';
+
+    {
+        no strict 'refs';
+        no warnings 'once';
+        *MockTabManager2::tabs = sub { $_[0]->{tabs} };
+    }
+
+    my $provider = Zepto::Completion::CrossBufferWordProvider->new(
+        tab_manager => $mock_tm,
+    );
+
+    my $context1 = {
+        prefix   => 'alpha',
+        line     => 'alpha',
+        line_num => 0,
+        col      => 5,
+        doc      => $doc1,
+        language => '',
+    };
+
+    # Prime the cache — first trigger necessarily scans both docs.
+    $provider->complete($context1);
+
+    my $doc1_id = "$doc1";
+    my $doc2_id = "$doc2";
+
+    ok($provider->{_doc_words}{$doc2_id}, 'doc2 has a per-document cache entry after priming');
+    my $doc2_cache_before = $provider->{_doc_words}{$doc2_id};
+
+    # Instrument doc2's line scanning so we can prove it is NOT rescanned
+    # when only doc1 changes. Wrap the original coderef and count calls
+    # made against doc2 specifically; `local *glob` restores the original
+    # sub automatically when this block exits.
+    my $doc2_scan_calls = 0;
+    {
+        no strict 'refs';
+        no warnings 'redefine';
+        my $orig = \&Zepto::Document::get_line_content;
+        local *Zepto::Document::get_line_content = sub {
+            my ($scanned_doc, @rest) = @_;
+            $doc2_scan_calls++ if refaddr($scanned_doc) == refaddr($doc2);
+            return $orig->($scanned_doc, @rest);
+        };
+
+        # Edit doc1 only (bumps its content_version); doc2 is untouched.
+        $doc1->insert($doc1->length, " alpha_three");
+        $provider->complete({ %$context1, prefix => 'alpha' });
+    }
+
+    is($doc2_scan_calls, 0, 'editing doc1 does not trigger any line scan of doc2');
+
+    ok(refaddr($provider->{_doc_words}{$doc2_id}) == refaddr($doc2_cache_before),
+        "doc2's per-document cache entry is the same hashref (untouched) after editing doc1");
+
+    ok(exists $provider->{_doc_words}{$doc1_id}{alpha_three},
+        "doc1's per-document cache entry was rebuilt and reflects the edit");
+
+    # The merged completion results must still be correct after the
+    # targeted rescan — not just faster, but accurate.
+    my $results = $provider->complete({ %$context1, prefix => 'alpha' });
+    my %found = map { $_->{text} => 1 } @$results;
+    ok($found{'alpha_three'}, 'new word from edited doc1 appears in merged completions');
+    ok($found{'alpha_one'}, 'pre-existing doc1 word still present after targeted rescan');
+
+    my $results_beta = $provider->complete({ %$context1, prefix => 'beta' });
+    my %found_beta = map { $_->{text} => 1 } @$results_beta;
+    ok($found_beta{'beta_one'} && $found_beta{'beta_two'},
+       "doc2's words are still present in merged completions (its cache wasn't lost, just untouched)");
 };
 
 # =============================================================================
