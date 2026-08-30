@@ -1383,3 +1383,24 @@ VERIFY    A pattern that is cheap to compile but catastrophically
           and interactively via hangon, confirming the editor stays
           responsive when the pathological pattern is typed into the
           find bar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-152
+NAME:     Cross-buffer completion cache stays accurate across edits
+PRIORITY: P2
+BUG:      P2 "CrossBufferWordProvider rescans every open tab on every
+          trigger, not just the changed one" (2026-08-30)
+CROSS-REF: QA-CPLT-021, QA-REG-129, tests/completion.t
+VERIFY    CrossBufferWordProvider.pm now caches each open document's word
+          list separately (_doc_words, keyed by that doc's content_version)
+          instead of one shared cache rebuilt from every open tab on any
+          change. Editing tab A only rescans tab A's cache entry — tab B's
+          and tab C's entries are untouched (proven at the unit level via a
+          same-hashref check plus an instrumented line-scan call counter in
+          tests/completion.t). This script is the black-box companion:
+          opens 3 tabs, confirms tab A's word completes while editing tab
+          B, edits tab A to add a brand-new word, then confirms (a) tab B
+          immediately sees the new word and (b) tab C's word (never
+          touched) still completes correctly too — the merge across
+          per-document caches is accurate, not just faster.
