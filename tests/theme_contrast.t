@@ -40,33 +40,14 @@ use Zepto::Theme;
 use constant MIN_CONTRAST => 3.0;
 
 # Pre-existing contrast debt, found by this test's first run (2026-08-30)
-# and not yet fixed — tracked in bugs.md ("P2: Pre-existing theme contrast
-# debt found by tests/theme_contrast.t"). This list must only ever SHRINK:
+# and fixed the same day — see bugs.md ("P2: Pre-existing theme contrast
+# debt found by tests/theme_contrast.t") for the full before/after table
+# of every role's old and new RGB values. This list must only ever SHRINK:
 # do not add a role here to silence a NEW regression — fix the color
 # instead. New roles are held to the full threshold from day one.
-my %KNOWN_DEBT = map { $_ => 1 } (
-    'dark:completion_border_fg/dropdown_bg', 'dark:completion_border_fg/menu_bg',
-    'dark:gutter_fg/gutter_bg', 'dark:menu_pill_fg/menu_pill_bg',
-    'dark:minimap_text_fg/bg', 'dark:ruler_fg/ruler_bg',
-    'dark:tab_close_fg/tab_active_bg', 'dark:tab_close_fg/tab_hover_bg',
-    'dark:tab_close_fg/tab_inactive_bg', 'dark:tab_shortcut_fg/tab_active_bg',
-    'dark:table_border_fg/bg', 'dark:tree_border_fg/tree_bg',
-    'dark:tree_indent_fg/tree_bg', 'dark:tree_scrollbar_fg/tree_scrollbar_bg',
-    'dark:wrap_indicator_fg/bg',
-    'light:completion_border_fg/dropdown_bg', 'light:completion_border_fg/menu_bg',
-    'light:completion_ghost_fg/bg', 'light:dropdown_selected_fg/dropdown_selected_bg',
-    'light:gutter_fg/gutter_bg', 'light:menu_active_fg/menu_active_bg',
-    'light:menu_pill_fg/menu_pill_bg', 'light:minimap_text_fg/bg',
-    'light:ruler_fg/ruler_bg', 'light:status_modified_fg/status_bg',
-    'light:status_pos_fg/status_pos_bg', 'light:tab_close_fg/tab_active_bg',
-    'light:tab_close_fg/tab_hover_bg', 'light:tab_close_fg/tab_inactive_bg',
-    'light:tab_shortcut_fg/tab_active_bg', 'light:tab_shortcut_fg/tab_hover_bg',
-    'light:tab_shortcut_fg/tab_inactive_bg', 'light:tab_vcs_fg/tab_active_bg',
-    'light:table_border_fg/bg', 'light:tree_border_active_fg/tree_bg',
-    'light:tree_border_drag_fg/tree_bg', 'light:tree_border_fg/tree_bg',
-    'light:tree_indent_fg/tree_bg', 'light:tree_scrollbar_fg/tree_scrollbar_bg',
-    'light:warning_fg/bg', 'light:warning_fg/status_bg', 'light:wrap_indicator_fg/bg',
-);
+# Deliberately left empty (not deleted) so the TODO-tracking machinery
+# below stays in place for any future debt.
+my %KNOWN_DEBT = ();
 
 # ---------------------------------------------------------------------------
 # WCAG relative luminance / contrast ratio

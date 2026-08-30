@@ -8,6 +8,7 @@
 - Fixed preference-toggle confirmations (Auto Pairs, Mouse, Search Wrap Around, etc.) occasionally rendering in error (red) styling instead of normal styling if they appeared right after an error message
 - Improved search robustness: an unusual regex pattern (in regex-find or replace) can no longer make the editor stop responding — matching is now time-bounded the same way regex compilation already was
 - Fixed a periodic per-edit slowdown in word wrap: editing a line that gains or loses a wrapped visual row, near the top of a large wrapped file, used to briefly re-scan every line below it. Wrapped display is unaffected — this is a speed-only fix, verified with the full existing word-wrap test/QA coverage plus new correctness checks
+- Improved color contrast across dozens of UI elements in both themes: gutter and ruler line numbers, tab close/shortcut/VCS icons, the file tree panel (borders, indent guides, scrollbar), the command palette's selected-row text, completion dropdown borders and ghost text, the minimap, table borders, the word-wrap indicator, and status bar warning/position colors — all previously fell short of the WCAG 3:1 minimum for UI elements and are now fixed, with no more known contrast debt in either theme
 
 ## 2026-08-29
 

@@ -84,9 +84,13 @@ sub dark_theme {
         bg          => bg_rgb(26, 27, 38),     # Deep night blue
 
         # Line numbers gutter
-        gutter_fg   => fg_rgb(86, 95, 137),    # Muted blue-gray
+        # WCAG fix (2026-08-30): lightened from (86,95,137) — was 2.91:1
+        # against gutter_bg, just under the 3:1 UI-component minimum. Same
+        # muted blue-gray hue, shared with ruler_fg/table_border_fg below.
+        gutter_fg   => fg_rgb(100, 108, 146),  # Muted blue-gray
         gutter_bg   => bg_rgb(22, 22, 30),     # Darker blue
-        wrap_indicator_fg => fg_rgb(65, 72, 104),  # Dim gutter color for ↪ wrap indicator
+        # WCAG fix (2026-08-30): lightened from (65,72,104) — was 1.91:1.
+        wrap_indicator_fg => fg_rgb(99, 105, 131),  # Dim gutter color for ↪ wrap indicator
 
         # Selection
         selection_fg => fg_rgb(192, 202, 245),
@@ -120,7 +124,10 @@ sub dark_theme {
         menu_active_bg => bg_rgb(52, 79, 138),    # Inside pill background
         menu_active_edge => fg_rgb(52, 79, 138),  # Active pill bg as fg (for edges)
         menu_active_text => fg_rgb(255, 255, 255), # Text inside active pill
-        menu_pill_fg => fg_rgb(65, 72, 104),      # Inactive pill border (subtle)
+        # WCAG fix (2026-08-30): lightened from (65,72,104) — was 1.40:1.
+        # (Role currently unreferenced by Renderer.pm — menu_pill_text is
+        # what actually renders — but fixed for correctness/consistency.)
+        menu_pill_fg => fg_rgb(122, 127, 149),    # Inactive pill border (subtle)
         menu_pill_bg => bg_rgb(45, 51, 74),       # Inactive pill background
         menu_pill_edge => fg_rgb(45, 51, 74),     # Inactive pill bg as fg (for edges)
         menu_pill_text => fg_rgb(169, 177, 214), # Text inside inactive pill
@@ -182,7 +189,8 @@ sub dark_theme {
         pill_diff_deleted_edge => fg_rgb(140, 50, 60),
 
         # Table rendering (Markdown pretty tables)
-        table_border_fg  => fg_rgb(86, 95, 137),      # Muted blue-gray (matches gutter)
+        # WCAG fix (2026-08-30): lightened from (86,95,137) — was 2.76:1.
+        table_border_fg  => fg_rgb(100, 108, 146),      # Muted blue-gray (matches gutter)
         table_header_bg  => bg_rgb(35, 39, 55),        # Slightly lighter than editor bg
         table_header_fg  => fg_rgb(192, 202, 245) . "\x1b[1m",  # Bold text
 
@@ -212,7 +220,8 @@ sub dark_theme {
         prompt_pill_edge => fg_rgb(180, 110, 30),
 
         # Ruler bar
-        ruler_fg     => fg_rgb(86, 95, 137),     # Muted, like line numbers
+        # WCAG fix (2026-08-30): lightened from (86,95,137) — was 2.61:1.
+        ruler_fg     => fg_rgb(100, 108, 146),     # Muted, like line numbers
         ruler_bg     => bg_rgb(30, 32, 44),      # Slightly darker than menu
         ruler_mark   => fg_rgb(61, 66, 91),      # Separator marks
         ruler_cursor_fg   => fg_rgb(255, 255, 255),
@@ -248,15 +257,21 @@ sub dark_theme {
         tab_hover_bg        => bg_rgb(50, 55, 78),     # Between inactive and active
         tab_hover_edge      => fg_rgb(50, 55, 78),
         tab_modified_fg     => fg_rgb(224, 175, 104),  # Yellow dot for unsaved
-        tab_close_fg        => fg_rgb(100, 106, 134),  # Dim close button
-        tab_shortcut_fg     => fg_rgb(120, 130, 170),  # Readable hint
+        # WCAG fix (2026-08-30): lightened from (100,106,134) — was as low
+        # as 1.50:1 against tab_active_bg (checked against all 3 tab
+        # surfaces: active/inactive/hover).
+        tab_close_fg        => fg_rgb(156, 160, 178),  # Dim close button
+        # WCAG fix (2026-08-30): lightened from (120,130,170) — was 2.12:1
+        # against tab_active_bg.
+        tab_shortcut_fg     => fg_rgb(152, 160, 190),  # Readable hint
         tab_vcs_fg          => fg_rgb(224, 175, 104),   # VCS-changed file tint (warm amber)
         tab_baseline_ul     => "\x1b[58;2;55;60;85m",   # Underline color (SGR 58) for baseline
 
         # Minimap / scrollbar
         minimap_bg          => bg_rgb(22, 23, 34),     # Slightly darker than editor bg
         minimap_viewport_bg => bg_rgb(45, 50, 72),     # Highlighted viewport region
-        minimap_text_fg     => fg_rgb(70, 78, 110),    # Dim text density
+        # WCAG fix (2026-08-30): lightened from (70,78,110) — was 2.10:1.
+        minimap_text_fg     => fg_rgb(96, 103, 130),    # Dim text density
         minimap_separator   => fg_rgb(45, 50, 70),     # Subtle separator line
         minimap_cursor_fg   => fg_rgb(122, 162, 247),  # Cursor line indicator
 
@@ -288,16 +303,19 @@ sub dark_theme {
         tree_current_bg       => bg_rgb(45, 55, 85),
         tree_current_fg       => BOLD . fg_rgb(220, 225, 245),
         tree_dir_fg           => fg_rgb(125, 207, 255),
-        tree_indent_fg        => fg_rgb(61, 66, 91),
+        # WCAG fix (2026-08-30): lightened from (61,66,91) — was 1.80:1.
+        tree_indent_fg        => fg_rgb(100, 104, 124),
         tree_result_dir_fg    => fg_rgb(150, 160, 195),
         tree_sticky_bg        => bg_rgb(30, 32, 44),
         tree_sticky_fg        => fg_rgb(120, 130, 165),
         tree_filter_bg        => bg_rgb(36, 40, 59),
         tree_filter_fg        => fg_rgb(192, 202, 245),
         tree_match_fg         => fg_rgb(125, 207, 255),
-        tree_scrollbar_fg     => fg_rgb(86, 95, 137),
+        # WCAG fix (2026-08-30): lightened from (86,95,137) — was 2.88:1.
+        tree_scrollbar_fg     => fg_rgb(93, 101, 142),
         tree_scrollbar_bg     => bg_rgb(22, 23, 34),
-        tree_border_fg        => fg_rgb(61, 66, 91),
+        # WCAG fix (2026-08-30): lightened from (61,66,91) — was 1.80:1.
+        tree_border_fg        => fg_rgb(100, 104, 124),
         tree_border_active_fg => fg_rgb(125, 207, 255),
         tree_border_drag_fg   => fg_rgb(125, 207, 255),
         tree_vcs_modified     => fg_rgb(224, 175, 104),
@@ -346,7 +364,9 @@ sub dark_theme {
         completion_selected_bg  => bg_rgb(52, 79, 138),
         completion_selected_fg  => fg_rgb(255, 255, 255),
         completion_kind_fg      => fg_rgb(125, 207, 255),
-        completion_border_fg    => fg_rgb(61, 66, 91),
+        # WCAG fix (2026-08-30): lightened from (61,66,91) — was 1.48:1
+        # against both dropdown_bg and menu_bg.
+        completion_border_fg    => fg_rgb(111, 115, 134),
     });
 }
 
@@ -360,9 +380,13 @@ sub light_theme {
         bg          => bg_rgb(255, 255, 255),  # Pure white
 
         # Line numbers gutter
-        gutter_fg   => fg_rgb(156, 160, 176),  # Overlay0
+        # WCAG fix (2026-08-30): darkened from (156,160,176) — was 2.60:1
+        # against gutter_bg. Same muted gray hue, shared with
+        # ruler_fg/table_border_fg below.
+        gutter_fg   => fg_rgb(128, 131, 144),  # Overlay0
         gutter_bg   => bg_rgb(255, 255, 255),  # Match main bg
-        wrap_indicator_fg => fg_rgb(188, 192, 204),  # Dim gutter color for ↪ wrap indicator
+        # WCAG fix (2026-08-30): darkened from (188,192,204) — was 1.82:1.
+        wrap_indicator_fg => fg_rgb(143, 146, 155),  # Dim gutter color for ↪ wrap indicator
 
         # Selection
         selection_fg => fg_rgb(76, 79, 105),
@@ -392,11 +416,18 @@ sub light_theme {
         menu_bg      => bg_rgb(239, 241, 245),  # Base (lighter, matches main bg)
         menu_bg_fg   => fg_rgb(239, 241, 245),  # Menu bg as foreground (for pill edges)
         menu_hotkey  => fg_rgb(30, 102, 245),   # Blue accent
-        menu_active_fg => fg_rgb(114, 135, 253),  # Pill border (lavender)
+        # WCAG fix (2026-08-30): darkened from (114,135,253) — this was
+        # IDENTICAL to menu_active_bg (1.00:1, the worst pair in the whole
+        # audit). Role is currently unreferenced by Renderer.pm — the
+        # actual pill text uses menu_active_text (white) — but fixed for
+        # correctness in case it's ever wired up as real text/border color.
+        menu_active_fg => fg_rgb(52, 62, 116),  # Pill border (lavender)
         menu_active_bg => bg_rgb(114, 135, 253),  # Inside pill background
         menu_active_edge => fg_rgb(114, 135, 253), # Active pill bg as fg (for edges)
         menu_active_text => fg_rgb(255, 255, 255), # Text inside active pill
-        menu_pill_fg => fg_rgb(172, 176, 190),    # Inactive pill border
+        # WCAG fix (2026-08-30): darkened from (172,176,190) — was 1.40:1.
+        # (Also currently unreferenced — menu_pill_text is what renders.)
+        menu_pill_fg => fg_rgb(110, 113, 122),    # Inactive pill border
         menu_pill_bg => bg_rgb(204, 208, 218),    # Inactive pill background
         menu_pill_edge => fg_rgb(204, 208, 218),  # Inactive pill bg as fg (for edges)
         menu_pill_text => fg_rgb(76, 79, 105),   # Text inside inactive pill
@@ -404,7 +435,11 @@ sub light_theme {
         # Dropdown menu
         dropdown_fg  => fg_rgb(76, 79, 105),
         dropdown_bg  => bg_rgb(230, 233, 239),
-        dropdown_selected_fg => fg_rgb(239, 241, 245),
+        # WCAG fix (2026-08-30): brightened from (239,241,245) to pure
+        # white — was 2.81:1 against dropdown_selected_bg. Matches the
+        # white-on-lavender pattern already used for tab_active_fg,
+        # status_file_fg, pill_toggle_on_fg, pill_palette_fg in this theme.
+        dropdown_selected_fg => fg_rgb(255, 255, 255),
         dropdown_selected_bg => bg_rgb(114, 135, 253),
         dropdown_border => fg_rgb(172, 176, 190),
         dropdown_shortcut => fg_rgb(124, 127, 147),
@@ -424,9 +459,16 @@ sub light_theme {
         status_file_bg   => bg_rgb(114, 135, 253),  # Lavender segment
         status_file_edge => fg_rgb(114, 135, 253),
         status_pos_fg    => fg_rgb(255, 255, 255),
-        status_pos_bg    => bg_rgb(156, 160, 176),  # Muted segment
-        status_pos_edge  => fg_rgb(156, 160, 176),
-        status_modified_fg => fg_rgb(223, 142, 29), # Yellow for modified
+        # WCAG fix (2026-08-30): status_pos_fg is already pure white (can't
+        # brighten further), so darkened the bg/edge pair instead — was
+        # 2.60:1. Darkened from (156,160,176); edge must mirror bg exactly
+        # (existing convention for seamless pill caps).
+        status_pos_bg    => bg_rgb(144, 147, 162),  # Muted segment
+        status_pos_edge  => fg_rgb(144, 147, 162),
+        # WCAG fix (2026-08-30): darkened from (223,142,29) — was 1.98:1
+        # against status_bg. Same amber hue as warning_fg below (shared
+        # value, both fixed together).
+        status_modified_fg => fg_rgb(174, 111, 23), # Yellow for modified
         # Status bar pills
         pill_toggle_on_fg   => fg_rgb(255, 255, 255),
         pill_toggle_on_bg   => bg_rgb(114, 135, 253),  # Lavender (same as file segment)
@@ -458,7 +500,8 @@ sub light_theme {
         pill_diff_deleted_edge => fg_rgb(190, 50, 60),
 
         # Table rendering (Markdown pretty tables)
-        table_border_fg  => fg_rgb(156, 160, 176),     # Muted gray (matches gutter)
+        # WCAG fix (2026-08-30): darkened from (156,160,176) — was 2.60:1.
+        table_border_fg  => fg_rgb(128, 131, 144),     # Muted gray (matches gutter)
         table_header_bg  => bg_rgb(231, 234, 242),     # Slightly darker than editor bg
         table_header_fg  => fg_rgb(76, 79, 105) . "\x1b[1m",  # Bold text
 
@@ -477,7 +520,10 @@ sub light_theme {
 
         # Messages
         error_fg     => fg_rgb(210, 15, 57),    # Red
-        warning_fg   => fg_rgb(223, 142, 29),   # Yellow
+        # WCAG fix (2026-08-30): darkened from (223,142,29) — was 2.62:1
+        # against bg and 1.98:1 against status_bg. Same shared amber value
+        # as status_modified_fg above.
+        warning_fg   => fg_rgb(174, 111, 23),   # Yellow
         info_fg      => fg_rgb(30, 102, 245),   # Blue
 
         # Prompt bar (unsaved changes, confirmations)
@@ -488,7 +534,8 @@ sub light_theme {
         prompt_pill_edge => fg_rgb(160, 100, 20),
 
         # Ruler bar
-        ruler_fg     => fg_rgb(156, 160, 176),  # Muted, like line numbers
+        # WCAG fix (2026-08-30): darkened from (156,160,176) — was 2.14:1.
+        ruler_fg     => fg_rgb(128, 131, 144),  # Muted, like line numbers
         ruler_bg     => bg_rgb(230, 233, 239),  # Matches gutter
         ruler_mark   => fg_rgb(172, 176, 190),  # Separator marks
         ruler_cursor_fg   => fg_rgb(255, 255, 255),
@@ -530,15 +577,25 @@ sub light_theme {
         # hue family restores the "unsaved" cue while passing WCAG 3:1
         # against all three tab surfaces it can render on.
         tab_modified_fg     => fg_rgb(95, 40, 0),   # Amber dot for unsaved
-        tab_close_fg        => fg_rgb(156, 160, 176),  # Dim close button
-        tab_shortcut_fg     => fg_rgb(130, 136, 156),  # Readable hint
-        tab_vcs_fg          => fg_rgb(140, 90, 20),     # VCS-changed file tint
+        # WCAG fix (2026-08-30): darkened from (156,160,176) — was as low
+        # as 1.22:1 against tab_active_bg (checked against all 3 tab
+        # surfaces: active/inactive/hover — the lavender active_bg is the
+        # hardest surface, forcing a much darker gray than the light-only
+        # inactive/hover backgrounds would need alone).
+        tab_close_fg        => fg_rgb(66, 67, 74),  # Dim close button
+        # WCAG fix (2026-08-30): darkened from (130,136,156) — was 1.11:1
+        # against tab_active_bg.
+        tab_shortcut_fg     => fg_rgb(65, 68, 78),  # Readable hint
+        # WCAG fix (2026-08-30): darkened from (140,90,20) — was 1.84:1
+        # against tab_active_bg. Same amber/brown hue family.
+        tab_vcs_fg          => fg_rgb(95, 61, 14),     # VCS-changed file tint
         tab_baseline_ul     => "\x1b[58;2;190;194;208m", # Underline color (SGR 58) for baseline
 
         # Minimap / scrollbar
         minimap_bg          => bg_rgb(240, 242, 248),  # Slightly different from main bg
         minimap_viewport_bg => bg_rgb(210, 215, 228),  # Highlighted viewport region
-        minimap_text_fg     => fg_rgb(170, 175, 190),  # Dim text density
+        # WCAG fix (2026-08-30): darkened from (170,175,190) — was 2.19:1.
+        minimap_text_fg     => fg_rgb(143, 147, 160),  # Dim text density
         minimap_separator   => fg_rgb(200, 204, 215),  # Subtle separator line
         minimap_cursor_fg   => fg_rgb(114, 135, 253),  # Cursor line indicator
 
@@ -570,18 +627,22 @@ sub light_theme {
         tree_current_bg       => bg_rgb(195, 202, 220),
         tree_current_fg       => BOLD . fg_rgb(30, 35, 60),
         tree_dir_fg           => fg_rgb(10, 80, 190),
-        tree_indent_fg        => fg_rgb(172, 176, 190),
+        # WCAG fix (2026-08-30): darkened from (172,176,190) — was 1.93:1.
+        tree_indent_fg        => fg_rgb(134, 137, 148),
         tree_result_dir_fg    => fg_rgb(80, 85, 105),
         tree_sticky_bg        => bg_rgb(230, 233, 239),
         tree_sticky_fg        => fg_rgb(100, 104, 120),
         tree_filter_bg        => bg_rgb(239, 241, 245),
         tree_filter_fg        => fg_rgb(76, 79, 105),
         tree_match_fg         => fg_rgb(30, 102, 209),
-        tree_scrollbar_fg     => fg_rgb(156, 160, 176),
+        # WCAG fix (2026-08-30): darkened from (156,160,176) — was 2.33:1.
+        tree_scrollbar_fg     => fg_rgb(134, 138, 151),
         tree_scrollbar_bg     => bg_rgb(240, 242, 248),
-        tree_border_fg        => fg_rgb(172, 176, 190),
-        tree_border_active_fg => fg_rgb(114, 135, 253),
-        tree_border_drag_fg   => fg_rgb(114, 135, 253),
+        # WCAG fix (2026-08-30): darkened from (172,176,190) — was 1.93:1.
+        tree_border_fg        => fg_rgb(134, 137, 148),
+        # WCAG fix (2026-08-30): darkened from (114,135,253) — was 2.84:1.
+        tree_border_active_fg => fg_rgb(109, 130, 243),
+        tree_border_drag_fg   => fg_rgb(109, 130, 243),
         tree_vcs_modified     => fg_rgb(140, 90, 20),
         tree_vcs_added        => fg_rgb(22, 120, 55),
         tree_vcs_untracked    => fg_rgb(22, 120, 55),
@@ -622,13 +683,16 @@ sub light_theme {
         syntax_formatting_delim => fg_rgb(200, 203, 212),  # Faint light gray, close to bg(255,255,255) - emphasis delimiters (**, *, _, ~~, ==)
 
         # Completion (ghost text + dropdown menu)
-        completion_ghost_fg     => DIM . fg_rgb(160, 165, 180),   # DIM + muted gray
+        # WCAG fix (2026-08-30): darkened from (160,165,180) — was 2.46:1.
+        completion_ghost_fg     => DIM . fg_rgb(141, 145, 158),   # DIM + muted gray
         completion_menu_bg      => bg_rgb(235, 237, 243),
         completion_menu_fg      => fg_rgb(76, 79, 105),
         completion_selected_bg  => bg_rgb(114, 135, 253),
         completion_selected_fg  => fg_rgb(255, 255, 255),
         completion_kind_fg      => fg_rgb(30, 102, 245),
-        completion_border_fg    => fg_rgb(172, 176, 190),
+        # WCAG fix (2026-08-30): darkened from (172,176,190) — was 1.78:1
+        # against dropdown_bg and 1.91:1 against menu_bg.
+        completion_border_fg    => fg_rgb(127, 130, 141),
     });
 }
 

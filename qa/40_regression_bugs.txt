@@ -1459,3 +1459,41 @@ VERIFY    A hand-crafted legacy-format mouse report (ESC [ M + 3 raw data
           stalled behind the unrecognized sequence). Behavior is
           byte-for-byte identical before and after the dead-code
           deletion.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-160
+NAME:     Light-theme command-palette selected-item text has adequate contrast
+PRIORITY: P2
+BUG:      P2 "Pre-existing theme contrast debt found by tests/theme_contrast.t"
+          — dropdown_selected_fg/dropdown_selected_bg was 2.81:1 (2026-08-30,
+          fixed same day). Also fixes the unrelated-but-adjacent
+          menu_active_fg/menu_active_bg pair (1.00:1, the worst ratio in the
+          whole audit) — investigation found that role is dead code, never
+          consumed by Renderer.pm, so it has no live QA-observable surface;
+          the real user-visible "selected item text" path is
+          dropdown_selected_fg, covered here.
+CROSS-REF: tests/theme_contrast.t, qa/25_command_palette.txt
+VERIFY    dropdown_selected_fg (light theme) is fg_rgb(255,255,255) (pure
+          white, was 239,241,245), clearing WCAG 3:1 against
+          dropdown_selected_bg (114,135,253 lavender). Verified via direct
+          contrast math and the actual emitted ANSI bytes on a live,
+          selected command-palette row (38;2;255;255;255).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-161
+NAME:     Light-theme tab close/shortcut icons have adequate contrast on the
+          active tab
+PRIORITY: P2
+BUG:      P2 "Pre-existing theme contrast debt found by tests/theme_contrast.t"
+          — tab_close_fg/tab_active_bg was 1.22:1 and
+          tab_shortcut_fg/tab_active_bg was 1.11:1, both nearly invisible on
+          a selected/active tab (2026-08-30, fixed same day).
+CROSS-REF: tests/theme_contrast.t, qa/21_tabs.txt
+VERIFY    tab_close_fg (light theme) is fg_rgb(66,67,74) (was 156,160,176)
+          and tab_shortcut_fg is fg_rgb(65,68,78) (was 130,136,156), both
+          clearing WCAG 3:1 against all three tab-state surfaces
+          (active/inactive/hover). Verified via direct contrast math and
+          the actual emitted ANSI bytes on a live active tab
+          (38;2;66;67;74).

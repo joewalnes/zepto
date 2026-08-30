@@ -1045,14 +1045,72 @@ User-reported: in light theme, the unsaved-changes dot icon in the document tab 
 
 **First run surfaced 41 additional pre-existing violations** (see below) beyond the one reported — confirming this is systemic, not a one-off. These are tracked as `%KNOWN_DEBT` in the test (rendered as TAP `TODO`, visible in verbose output, never silently passing) so the new gate is live for all *future* colors without retroactively failing the build on undecided pre-existing debt. QA: `qa/scripts/tier1/reg_140_tab_modified_contrast.sh` (`QA-REG-140`).
 
-### P2: Pre-existing theme contrast debt found by tests/theme_contrast.t (2026-08-30, not yet fixed)
-41 fg/bg pairs across both themes fail the WCAG 3:1 UI-component contrast minimum, discovered by the new `tests/theme_contrast.t` audit (see above) built while fixing the tab-modified-dot bug. Full list (theme:fg_role/bg_role, ratio):
+### ~~P2: Pre-existing theme contrast debt found by tests/theme_contrast.t~~ FIXED (2026-08-30)
+42 fg/bg pairs across both themes (15 dark, 27 light — not 41/26 as originally miscounted) failed the WCAG 3:1 UI-component contrast minimum, discovered by the `tests/theme_contrast.t` audit built while fixing the tab-modified-dot bug. All 42 are now fixed in `lib/Zepto/Theme.pm`; `%KNOWN_DEBT` in `tests/theme_contrast.t` is now empty (left as `my %KNOWN_DEBT = ();` rather than deleted, per the file's own convention, with a comment explaining why) and `prove -lv tests/theme_contrast.t` shows 79 genuine `ok`s across both themes with zero `TODO`s.
 
-Dark theme (15): `completion_border_fg/dropdown_bg` 1.48, `completion_border_fg/menu_bg` 1.48, `gutter_fg/gutter_bg` 2.91, `menu_pill_fg/menu_pill_bg` 1.40, `minimap_text_fg/bg` 2.10, `ruler_fg/ruler_bg` 2.61, `tab_close_fg/tab_active_bg` 1.50, `tab_close_fg/tab_hover_bg` 2.20, `tab_close_fg/tab_inactive_bg` 2.60, `tab_shortcut_fg/tab_active_bg` 2.12, `table_border_fg/bg` 2.76, `tree_border_fg/tree_bg` 1.80, `tree_indent_fg/tree_bg` 1.80, `tree_scrollbar_fg/tree_scrollbar_bg` 2.88, `wrap_indicator_fg/bg` 1.91.
+**Approach:** for each pair, lightened (dark theme) or darkened (light theme) the foreground within its existing hue family until it cleared 3.0:1 against every background surface that role can render on (some orphan roles like `tab_close_fg` render on 3 different tab-state backgrounds simultaneously — the fix had to satisfy the hardest of the three). Two roles whose fg was already at/near pure white and couldn't be brightened further (`status_pos_fg`, `dropdown_selected_fg`) were fixed by adjusting the background instead (`status_pos_bg`/`status_pos_edge` darkened as a matched pair; `dropdown_selected_fg` pushed to pure white, which was still enough headroom). A handful of roles that shared an identical RGB value for an explicit, commented design reason (`gutter_fg`/`ruler_fg`/`table_border_fg` — "matches gutter"/"like line numbers") were fixed to the same new shared value in each theme, rather than drifting independently.
 
-Light theme (26): `completion_border_fg/dropdown_bg` 1.78, `completion_border_fg/menu_bg` 1.91, `completion_ghost_fg/bg` 2.46, `dropdown_selected_fg/dropdown_selected_bg` 2.81, `gutter_fg/gutter_bg` 2.60, `menu_active_fg/menu_active_bg` 1.00 (worst in the audit — effectively invisible), `menu_pill_fg/menu_pill_bg` 1.40, `minimap_text_fg/bg` 2.19, `ruler_fg/ruler_bg` 2.14, `status_modified_fg/status_bg` 1.98, `status_pos_fg/status_pos_bg` 2.60, `tab_close_fg/tab_active_bg` 1.22, `tab_close_fg/tab_hover_bg` 1.56, `tab_close_fg/tab_inactive_bg` 1.79, `tab_shortcut_fg/tab_active_bg` 1.11, `tab_shortcut_fg/tab_hover_bg` 2.11, `tab_shortcut_fg/tab_inactive_bg` 2.43, `tab_vcs_fg/tab_active_bg` 1.84, `table_border_fg/bg` 2.60, `tree_border_active_fg/tree_bg` 2.84, `tree_border_drag_fg/tree_bg` 2.84, `tree_border_fg/tree_bg` 1.93, `tree_indent_fg/tree_bg` 1.93, `tree_scrollbar_fg/tree_scrollbar_bg` 2.33, `warning_fg/bg` 2.62, `warning_fg/status_bg` 1.98, `wrap_indicator_fg/bg` 1.82.
+**Notable finding — two roles are dead code:** `menu_active_fg` (light theme's 1.00:1 pair — fg literally identical to its own bg, the single worst ratio in the whole audit) and `menu_pill_fg` are both defined in `Theme.pm` but never consumed by `Renderer.pm` (confirmed via `grep -rn` across `lib/`) — the actual text color rendered inside those pills is `menu_active_text`/`menu_pill_text` (already fine, both white). So the "selected menu item's text is the same color as its own background" framing in the original report was inaccurate — no user ever saw that specific pair. Both were fixed anyway for correctness/consistency and in case they're ever wired up as real border/text colors, but the real user-visible "worst offender" is `dropdown_selected_fg/dropdown_selected_bg` (2.81:1, command-palette/dropdown selected-row text) — covered by `QA-REG-160`.
 
-Notably worse in light theme (26 vs 15 in dark) and `menu_active_fg/menu_active_bg` at 1.00:1 is the single worst pair found — the active/selected menu item's text is essentially the same color as its own highlight background. User has not yet decided whether to fix all 41 now or track as follow-up work; do not add new entries to `%KNOWN_DEBT` to silence future regressions — only pre-existing debt belongs there.
+**Full before/after table** (theme: role, old ratio → new ratio, old RGB → new RGB):
+
+Dark theme (15):
+| Role / bg | Old ratio | New ratio | Old RGB | New RGB |
+|---|---|---|---|---|
+| `completion_border_fg` / `dropdown_bg`+`menu_bg` | 1.48 | 3.10 | (61,66,91) | (111,115,134) |
+| `gutter_fg` / `gutter_bg` | 2.91 | 3.16–3.19 | (86,95,137) | (100,108,146) |
+| `menu_pill_fg` / `menu_pill_bg` | 1.40 | 3.15 | (65,72,104) | (122,127,149) |
+| `minimap_text_fg` / `bg` | 2.10 | 3.06 | (70,78,110) | (96,103,130) |
+| `ruler_fg` / `ruler_bg` | 2.61 | 3.16–3.19 | (86,95,137) | (100,108,146) |
+| `tab_close_fg` / active+hover+inactive `_bg` | 1.50 (worst) | 3.07+ | (100,106,134) | (156,160,178) |
+| `tab_shortcut_fg` / `tab_active_bg` | 2.12 | 3.08+ | (120,130,170) | (152,160,190) |
+| `table_border_fg` / `bg` | 2.76 | 3.16–3.19 | (86,95,137) | (100,108,146) |
+| `tree_border_fg` / `tree_bg` | 1.80 | 3.23 | (61,66,91) | (100,104,124) |
+| `tree_indent_fg` / `tree_bg` | 1.80 | 3.23 | (61,66,91) | (100,104,124) |
+| `tree_scrollbar_fg` / `tree_scrollbar_bg` | 2.88 | 3.15 | (86,95,137) | (93,101,142) |
+| `wrap_indicator_fg` / `bg` | 1.91 | 3.16 | (65,72,104) | (99,105,131) |
+
+Light theme (27):
+| Role / bg | Old ratio | New ratio | Old RGB | New RGB |
+|---|---|---|---|---|
+| `completion_border_fg` / `dropdown_bg`+`menu_bg` | 1.78 / 1.91 | 3.15+ | (172,176,190) | (127,130,141) |
+| `completion_ghost_fg` / `bg` | 2.46 | 3.15 | (160,165,180) | (141,145,158) |
+| `dropdown_selected_fg` / `dropdown_selected_bg` | 2.81 | 3.18 | (239,241,245) | (255,255,255) |
+| `gutter_fg` / `gutter_bg` | 2.60 | 3.10 | (156,160,176) | (128,131,144) |
+| `menu_active_fg` / `menu_active_bg` | **1.00** (worst overall; dead code) | 3.16 | (114,135,253) | (52,62,116) |
+| `menu_pill_fg` / `menu_pill_bg` | 1.40 (dead code) | 3.16 | (172,176,190) | (110,113,122) |
+| `minimap_text_fg` / `bg` | 2.19 | 3.07 | (170,175,190) | (143,147,160) |
+| `ruler_fg` / `ruler_bg` | 2.14 | 3.10 | (156,160,176) | (128,131,144) |
+| `status_modified_fg` / `status_bg` | 1.98 | 3.12 | (223,142,29) | (174,111,23) |
+| `status_pos_fg` / `status_pos_bg`+`_edge` | 2.60 | 3.05 | bg/edge (156,160,176) | bg/edge (144,147,162) (fg unchanged, already white) |
+| `tab_close_fg` / active+hover+inactive `_bg` | 1.22 (worst tab pair) | 3.09+ | (156,160,176) | (66,67,74) |
+| `tab_shortcut_fg` / active+hover+inactive `_bg` | 1.11 | 3.05+ | (130,136,156) | (65,68,78) |
+| `tab_vcs_fg` / `tab_active_bg` | 1.84 | 3.05 | (140,90,20) | (95,61,14) |
+| `table_border_fg` / `bg` | 2.60 | 3.05 | (156,160,176) | (128,131,144) |
+| `tree_border_active_fg` / `tree_bg` | 2.84 | 3.06 | (114,135,253) | (109,130,243) |
+| `tree_border_drag_fg` / `tree_bg` | 2.84 | 3.06 | (114,135,253) | (109,130,243) |
+| `tree_border_fg` / `tree_bg` | 1.93 | 3.12 | (172,176,190) | (134,137,148) |
+| `tree_indent_fg` / `tree_bg` | 1.93 | 3.12 | (172,176,190) | (134,137,148) |
+| `tree_scrollbar_fg` / `tree_scrollbar_bg` | 2.33 | 3.08 | (156,160,176) | (134,138,151) |
+| `warning_fg` / `bg`+`status_bg` | 2.62 / 1.98 | 4.13 / 3.12 | (223,142,29) | (174,111,23) |
+| `wrap_indicator_fg` / `bg` | 1.82 | 3.11 | (188,192,204) | (143,146,155) |
+
+(`status_modified_fg` and `warning_fg` intentionally share one new value — they were already the same amber and both needed the same fix.)
+
+**Verification:** `prove -lv tests/theme_contrast.t` — 79/79 checks pass, zero `TODO`s, both subtests green. `make check`, `make build`, `make test` all pass with zero noise (`1111` tests, `Result: PASS`). Interactive verification via `hangon` across both themes covering gutter/ruler numbers, tab bar (dirty dot, close icon, shortcut hint on active/inactive/hover), file tree panel, command palette / dropdown selected-row text, and completion ghost text — all read correctly, still recognizably the same muted/subtle hue family as before, not garish. QA: `qa/scripts/tier1/reg_160_dropdown_selected_contrast.sh` (`QA-REG-160`, the real "worst offender" — selected palette-row text) and `qa/scripts/tier1/reg_161_tab_close_shortcut_contrast.sh` (`QA-REG-161`, tab close/shortcut icons on the active tab, the worst *live* tab pair at 1.11–1.22:1), alongside the pre-existing `QA-REG-140`.
+
+**Incidental fix:** `tests/syntax_rendering.t` had a stale assertion (`Comment color (gray) found in output` checking for raw bytes `38;2;86;95;137`) that was never actually testing `syntax_comment` (dark theme's real value is `fg_rgb(150,175,200)`) — it was coincidentally matching `gutter_fg`'s old shared muted-blue-gray value, which also appears in the same combined render output via the line-number gutter. Changing `gutter_fg` broke this mislabeled assertion; fixed the test to check the actual `syntax_comment` color it was always supposed to verify.
+
+**Incidental finding — see new bug below (not fixed here, out of scope for a color-values task).**
+
+### P2: Stale-theme partial redraw after theme change or panel toggle (2026-08-30, not yet fixed)
+Found incidentally while interactively verifying the contrast fixes above with `hangon` — not caused by, or related to, the color-value changes themselves (confirmed: a subsequent full repaint always shows the *correct* new-theme colors, proving the underlying theme data is right).
+
+Reproduced twice:
+1. Switch theme (e.g. dark → light via the command palette's "Theme: Light"), then open the file tree (`⌃B`). The tree panel renders using the *previous* theme's colors (e.g. still dark-navy background/text) while the main editor pane correctly shows the new theme — a visible split down the middle of the screen. Confirmed NOT a screenshot/capture artifact: reproduced 3 times across separate screenshots with settle time in between, and resolved instantly once any dialog (e.g. the command palette) is opened and closed, which forces a full-screen repaint.
+2. Open a new empty/`[untitled]` tab (`⌃N`) in light theme: the single content row renders correctly (light bg), but the empty rows below it render dark instead of `empty_line_bg`'s light value — again fixed by any action that forces a full repaint.
+
+Both point to the same root cause: some code path that invalidates/repaints on theme change or tab/panel switch is only repainting the region it thinks changed, not the whole screen, leaving stale previous-theme pixels in untouched regions until an unrelated full-repaint event (opening a dialog) papers over it. Not investigated further — likely in `Renderer.pm`'s dirty-region tracking or wherever `cmd_toggle_theme`/tab-creation triggers a redraw. Cosmetic (self-correcting on the next full repaint) but visible and worth a dedicated fix; flagging for the next bug-bash pass rather than fixing here, since this task's scope was `Theme.pm` color values only and this is a `Renderer.pm` invalidation-logic bug.
 
 ### P1: Discoverability Contract gaps found by manual visual sweep (2026-08-30, not yet fixed)
 While building `docs/UI_GUIDELINES.md`'s new "Discoverability Contract" section (user-requested: at all times, the most relevant actions and shortcuts should be visible on screen, including core navigation — not just document-editing commands — with a clear fallback for anything that doesn't fit), a static `CommandRegistry` audit (`tests/discoverability_core_nav.t`) and a manual screenshot sweep across widths/themes/contexts (no `ANTHROPIC_API_KEY` was configured to run the new `qa/scripts/tier2/discoverability_sweep.sh` through the LLM judge, so this pass was done by direct visual inspection instead) found:

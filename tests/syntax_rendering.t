@@ -141,8 +141,14 @@ PERL
     # Dark theme string color: fg_rgb(158, 206, 106) -> 38;2;158;206;106
     ok(has_color_code($output, 158, 206, 106), 'String color (green) found in output');
 
-    # Dark theme comment color: fg_rgb(86, 95, 137) -> 38;2;86;95;137
-    ok(has_color_code($output, 86, 95, 137), 'Comment color (gray) found in output');
+    # Dark theme comment color: fg_rgb(150, 175, 200) -> 38;2;150;175;200
+    # (Previously asserted (86,95,137), which was never syntax_comment's
+    # actual value — that RGB was gutter_fg/ruler_fg's shared muted
+    # blue-gray, which also happened to appear in this combined render
+    # output via the gutter. The WCAG contrast fix for gutter_fg (2026-08-30,
+    # see bugs.md) changed that shared value, which surfaced this stale/
+    # mislabeled assertion. Fixed to check the actual syntax_comment color.)
+    ok(has_color_code($output, 150, 175, 200), 'Comment color (gray) found in output');
 
     # Dark theme variable color: fg_rgb(224, 175, 104) -> 38;2;224;175;104
     ok(has_color_code($output, 224, 175, 104), 'Variable color (yellow) found in output');
