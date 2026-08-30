@@ -142,15 +142,19 @@ ID:       QA-SBAR-009
 NAME:     Tree context shows pill hints (REGRESSION)
 PRIORITY: P2
 FEATURE:  sbar tree
-RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills"
+RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills";
+          bugs.md P1 "FILE_TREE-context discoverability" (QA-REG-183/184/185)
 
 STEPS
   1. Focus file tree.
 
 VERIFY
-  - Status bar shows pills: `↑↓ nav`, `←→ fold`, `↵ open`, `/ filter`,
-    `Esc back`.
-  - Each pill has icon and rounded caps (not plain text).
+  - Status bar shows pills, highest priority first: `⌃B back`, `↵ open`,
+    `↑↓`, `←→ fold`, plus the fixed `Open ⌃O` / `⌃␣ Commands` pills.
+  - Each pill has icon/glyph and rounded caps (not plain text).
+  - When there's room (~100+ cols), the same close/switch-tabs/quit hint
+    DOCUMENT context's tab bar shows also appears here, in identical
+    wording (both share `Renderer.pm::_core_nav_hint_text()`).
 
 --------------------------------------------------------------------------------
 

@@ -1112,38 +1112,13 @@ sub _render_tab_bar {
     # on-screen hint in the current context, and quit previously had none
     # at all here — see bugs.md).
     #
-    # Two-tier degradation, mirroring _fit_pill_group's idiom elsewhere in
-    # this file: try the labeled form first (plain-language words next to
-    # the glyphs — a bare glyph cluster like "⌃W ×  ⌥, ←  ⌥. →" is
-    # technically "on screen" but was flagged by an LLM-vision discoverability
-    # sweep as unlabeled/ambiguous to a first-time user, see bugs.md); fall
-    # back to the compact glyphs-only form when there isn't room for labels;
-    # finally fall back to a blank fill so the hint degrades honestly
-    # (never overlaps or truncates mid-glyph) instead of disappearing with
-    # no trace. The compact tier must keep fitting down to 40 cols — that
-    # property was confirmed working before quit was added here and must
-    # not regress.
+    # Text/degradation logic lives in _core_nav_hint_text(), shared with
+    # the FILE_TREE-context hint row (_render_context_status_bar) so the
+    # two contexts can't drift apart again. The compact tier must keep
+    # fitting down to 40 cols — that property was confirmed working before
+    # quit was added here and must not regress.
     my $remaining = $tab_cols - $x;
-
-    my $hint_close_lbl = "\x{2303}W close";                         # ⌃W close
-    my $hint_nav_lbl   = "\x{2325}\x{2190}/\x{2192} tabs";           # ⌥←/→ tabs
-    my $hint_quit_lbl  = "\x{2303}Q quit";                           # ⌃Q quit
-    my $hint_labeled   = "$hint_close_lbl   $hint_nav_lbl   $hint_quit_lbl";
-
-    my $hint_close_compact = "\x{2303}W \x{00d7}";                          # ⌃W ×
-    my $hint_nav_compact   = "\x{2325}, \x{2190} \x{2325}. \x{2192}";       # ⌥, ← ⌥. →
-    my $hint_quit_compact  = "\x{2303}Q";                                   # ⌃Q
-    my $hint_compact = "$hint_close_compact $hint_nav_compact $hint_quit_compact";
-
-    my $labeled_width = length($hint_labeled) + 2;  # +2 for surrounding spaces
-    my $compact_width = length($hint_compact) + 2;
-
-    my $hint;
-    if ($remaining >= $labeled_width) {
-        $hint = $hint_labeled;
-    } elsif ($remaining >= $compact_width) {
-        $hint = $hint_compact;
-    }
+    my $hint = _core_nav_hint_text($remaining);
 
     if (defined $hint) {
         my $hint_width = length($hint) + 2;
@@ -3867,6 +3842,48 @@ sub _render_pill {
 # Modifier-Grouped Pill Columns (⌃ left / ⌥ right — see UI_GUIDELINES.md)
 # =============================================================================
 #
+# Build the "core navigation" hint text (close tab / switch tabs / quit) —
+# shared between the DOCUMENT-context tab bar corner hint
+# (_render_tab_bar) and the FILE_TREE-context hint row
+# (_render_context_status_bar) so both contexts render identical wording
+# from one source instead of two copies that can silently drift out of
+# sync (see bugs.md "Discoverability Contract gaps" — this exact
+# diverging-sources-of-truth problem is what caused the original
+# DOCUMENT-context Quit gap; don't recreate it here).
+#
+# Two-tier degradation, mirroring _fit_pill_group's idiom: try the labeled
+# form first (plain-language words next to the glyphs — a bare glyph
+# cluster like "⌃W ×  ⌥, ←  ⌥. →" was flagged by an LLM-vision
+# discoverability sweep as unlabeled/ambiguous to a first-time user); fall
+# back to the compact glyphs-only form when there isn't room for labels;
+# return undef when nothing fits so the caller can degrade to a blank fill
+# instead of truncating mid-glyph.
+#
+# $available is the FULL width budget, including the one-space padding the
+# caller renders on each side of the returned text (matches the historical
+# accounting in _render_tab_bar, where "remaining" already included that
+# padding) — callers must not add the padding on top of what they pass in.
+sub _core_nav_hint_text {
+    my ($available) = @_;
+
+    my $hint_close_lbl = "\x{2303}W close";                         # ⌃W close
+    my $hint_nav_lbl   = "\x{2325}\x{2190}/\x{2192} tabs";           # ⌥←/→ tabs
+    my $hint_quit_lbl  = "\x{2303}Q quit";                           # ⌃Q quit
+    my $hint_labeled   = "$hint_close_lbl   $hint_nav_lbl   $hint_quit_lbl";
+
+    my $hint_close_compact = "\x{2303}W \x{00d7}";                          # ⌃W ×
+    my $hint_nav_compact   = "\x{2325}, \x{2190} \x{2325}. \x{2192}";       # ⌥, ← ⌥. →
+    my $hint_quit_compact  = "\x{2303}Q";                                   # ⌃Q
+    my $hint_compact = "$hint_close_compact $hint_nav_compact $hint_quit_compact";
+
+    my $labeled_width = length($hint_labeled) + 2;  # +2 for surrounding spaces
+    my $compact_width = length($hint_compact) + 2;
+
+    return $hint_labeled if $available >= $labeled_width;
+    return $hint_compact if $available >= $compact_width;
+    return undef;
+}
+
 # Greedily fit as many candidate pills (sorted ascending by priority, i.e.
 # highest-importance first) into $budget columns. Tries the full pill form
 # (icon + label + key) first; if even the highest-priority candidate can't
@@ -4015,23 +4032,51 @@ sub _render_context_status_bar {
 
         my $right_width = $open_width + 1 + $palette_width;  # +1 for gap
 
-        # Middle: tree-context hint pills
+        # Middle: tree-context hint pills. Ordered highest-priority first
+        # (see docs/UI_GUIDELINES.md "Discoverability Contract"):
+        #
+        #   1. ⌃B back — the way to switch focus back to the editor
+        #      (keeping the tree open) without dismissing it. Previously
+        #      there was NO on-screen hint for this anywhere in the
+        #      FILE_TREE context — see bugs.md "FILE_TREE context is
+        #      missing on-screen hints... switching focus back to the
+        #      editor" (P1, confirmed by both the automated LLM vision-judge
+        #      sweep and manual testing). This is the single most important
+        #      addition here, so it goes first.
+        #   2. ↵ open — opening the highlighted file (arrow-key navigation
+        #      already previews/opens files, so this is a close second, not
+        #      a first-time-blocking gap the way #1 was).
+        #   3. ↑↓ / ←→ fold — navigation basics a user is more likely to
+        #      already know or find via ⌃␣ Commands (the always-visible
+        #      fallback pill on the right), so these drop first.
+        #
+        # Width-fitting reuses _fit_pill_group (shared with the DOCUMENT
+        # status bar's ⌃/⌥ pill columns) instead of a hand-rolled
+        # last-item-wins loop: it guarantees the top-priority pill (⌃B back)
+        # renders in *some* form — full or compact — whenever there's any
+        # budget at all, rather than vanishing outright just because its
+        # full label didn't quite fit.
         my $nav_icon = Zepto::Chars->get('cursor_pos');
-        my @tree_pills = (
-            { text => "$nav_icon \x{2191}\x{2193}", fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
-            { text => "\x{2190}\x{2192} fold",      fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
-            { text => "\x{21B5} open",               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
-            { text => "Esc back",                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+        my @tree_pill_candidates = (
+            { full_text => "\x{2303}B back",  compact_text => "\x{2303}B",
+              fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { full_text => "\x{21B5} open",   compact_text => "\x{21B5}",
+              fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { full_text => "$nav_icon \x{2191}\x{2193}", compact_text => "\x{2191}\x{2193}",
+              fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            { full_text => "\x{2190}\x{2192} fold", compact_text => "\x{2190}\x{2192}",
+              fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
         );
+        $_->{full_width}    = length($_->{full_text}) + 2    for @tree_pill_candidates;
+        $_->{compact_width} = length($_->{compact_text}) + 2 for @tree_pill_candidates;
 
         my $available = $cols - $left_width - $right_width;
         $available = 0 if $available < 0;
         my $center_col = $left_width + 1;
 
-        for my $pill (@tree_pills) {
-            my $pw = length($pill->{text}) + 2 + ($nerd_font ? 3 : 1);
-            last if ($center_col - $left_width) + $pw > $available;
+        my ($fit_tree_pills, undef) = _fit_pill_group(\@tree_pill_candidates, $available, $nerd_font);
 
+        for my $pill (@$fit_tree_pills) {
             if ($nerd_font) {
                 push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
                 push @_out, $round_l;
@@ -4049,11 +4094,29 @@ sub _render_context_status_bar {
             $center_col += 1;
         }
 
-        # Fill remaining space
+        # Fill remaining space, with the same core-nav hint (close tab /
+        # switch tabs / quit) the DOCUMENT-context tab bar shows, if there's
+        # still room after the tree-specific pills above. Lowest priority
+        # of everything in this row — a user already knows how to quit or
+        # switch tabs, or can find it via ⌃␣ Commands, so this is the first
+        # thing to drop under width pressure; dropping it never removes the
+        # only hint for a feature the way the FILE_TREE gap this fix
+        # addresses did, since quit/tab-nav still have their DOCUMENT-context
+        # hint and the palette fallback. Shares _core_nav_hint_text() with
+        # _render_tab_bar so wording can't drift between the two contexts.
         my $remaining = $cols - $center_col - $right_width + 1;
         $remaining = 0 if $remaining < 0;
+        my $nav_hint = _core_nav_hint_text($remaining);
+
         push @_out, $theme->color('status_bg');
-        push @_out, ' ' x $remaining if $remaining > 0;
+        if (defined $nav_hint) {
+            my $hint_width = length($nav_hint) + 2;
+            my $fill = $remaining - $hint_width;
+            push @_out, ' ' x $fill if $fill > 0;
+            push @_out, ' ' . $theme->color('tab_shortcut_fg') . $nav_hint . $theme->color('status_bg') . ' ';
+        } elsif ($remaining > 0) {
+            push @_out, ' ' x $remaining;
+        }
 
         # Open File pill
         if ($nerd_font) {

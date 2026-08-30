@@ -1747,3 +1747,87 @@ VERIFY    Investigated against the actual code and the live character
           priority > 0 command with a genuinely missing icon mapping
           would be caught immediately instead of relying on a screenshot
           sweep to notice.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-183
+NAME:     FILE_TREE context has an on-screen hint for ⌃B, the way back to
+          the editor
+PRIORITY: P1
+BUG:      P1 "FILE_TREE-context discoverability" (2026-08-30) — with the
+          file tree open and focused, there was ZERO on-screen indication
+          of how to switch focus back to the editor. Confirmed
+          independently twice: an automated LLM vision-judge sweep and a
+          direct manual `hangon` pass. A pre-existing `Esc back` pill did
+          not close this gap — Esc dismisses the tree (closes it), a
+          different and more destructive action than ⌃B (switches focus,
+          leaves the tree open) — and lost the width-fitting race to
+          other pills before it at most widths tested.
+CROSS-REF: QA-TREE-020/QA-TREE-028 (qa/22_file_tree.txt), QA-SBAR-009
+           (qa/26_status_bar.txt), tests/renderer.t FILE_TREE hint-row
+           subtests
+VERIFY    Renderer.pm::_render_context_status_bar's tree-focused hint row
+          now includes a `⌃B back` pill, given the highest priority of
+          all tree-context pills (fit first via `_fit_pill_group`, shared
+          with the DOCUMENT status bar's ⌃/⌥ pill columns). Verified via
+          `qa/scripts/tier1/reg_183_tree_back_hint.sh`: the pill is
+          visible at 80x24, and pressing ⌃B actually returns focus to the
+          editor while the tree panel stays open (a focus switch, not a
+          dismiss).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-184
+NAME:     FILE_TREE context's core-nav hint (close/tabs/quit) shares
+          wording with DOCUMENT context, not a second independent copy
+PRIORITY: P2
+BUG:      P1 "FILE_TREE-context discoverability" (2026-08-30) — the
+          FILE_TREE context had no coverage at all for quit or tab
+          navigation while the tree was focused, and the risk (per
+          bugs.md's "Discoverability Contract gaps" finding #1) was
+          fixing it with a second, independently-maintained copy of the
+          DOCUMENT-context hint text that could silently drift apart —
+          exactly what happened once already with the tab-bar corner
+          hint before `core_nav => 1` existed.
+CROSS-REF: QA-REG-171/172 (this file), QA-TREE-028 (qa/22_file_tree.txt),
+           tests/renderer.t FILE_TREE hint-row subtests
+VERIFY    `_core_nav_hint_text()` was extracted out of
+          Renderer.pm::_render_tab_bar into a shared helper, now called
+          by both _render_tab_bar (DOCUMENT) and
+          _render_context_status_bar (FILE_TREE). Verified via
+          `qa/scripts/tier1/reg_184_tree_core_nav_hint.sh` at 130x24: the
+          FILE_TREE hint row shows the identical labeled wording
+          (`⌃W close   ⌥←/→ tabs   ⌃Q quit`) DOCUMENT context uses. This
+          segment needs a wider terminal in FILE_TREE context (~100-110
+          cols) than DOCUMENT context (~40 cols) before there's room for
+          it, since the FILE_TREE row carries more fixed chrome (a
+          breadcrumb path plus `Open ⌃O` / `⌃␣ Commands`) — see bugs.md
+          for the full writeup and a candidate follow-up.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-185
+NAME:     FILE_TREE hint row degrades honestly at narrow widths — ⌃B
+          survives longer than the other tree pills, ⌃␣ Commands never
+          drops
+PRIORITY: P2
+BUG:      P1 "FILE_TREE-context discoverability" (2026-08-30) — the old
+          hint-row pill loop was single-tier (full text only, no compact
+          fallback) and strictly sequential (stopped at the first pill
+          that didn't fit), so a pill could vanish outright at a width
+          where a compact form of it would have fit.
+CROSS-REF: QA-REG-183/184 (this file), tests/renderer.t FILE_TREE hint-row
+           subtests
+VERIFY    The tree-context pills (`⌃B back`, `↵ open`, `↑↓`, `←→ fold`)
+          now each have a compact fallback and are fit via
+          `_fit_pill_group` (all-full-or-fall-back-to-all-compact per
+          group), same idiom as the DOCUMENT status bar's ⌃/⌥ pill
+          columns. Verified via
+          `qa/scripts/tier1/reg_185_tree_hint_narrow_degrade.sh`: at
+          60x20, `⌃B back` is still visible after the lower-priority tree
+          pills have dropped; at 40x15 (genuine extreme scarcity — the
+          row's fixed chrome alone consumes most of the width), no
+          tree-specific hint fits, but the row degrades to blank fill
+          (not garbled glyphs), the editor stays alive and responsive,
+          and `⌃␣ Commands` (the Discoverability Contract's unconditional
+          fallback signpost) remains visible throughout.

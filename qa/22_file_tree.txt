@@ -333,15 +333,21 @@ ID:       QA-TREE-020
 NAME:     Status bar pills in tree context (REGRESSION)
 PRIORITY: P2
 FEATURE:  tree ui
-RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills"
+RELATED:  bugs.md P2 "File tree status bar hints are plain text, not pills";
+          bugs.md P1 "FILE_TREE-context discoverability" (QA-REG-183/184/185)
 
 STEPS
   1. Focus tree (⌃B).
 
 VERIFY
-  - Status bar shows pills with icons, not plain text:
-    `↑↓ nav`, `←→ fold`, `↵ open`, `/ filter`, `Esc back`.
-  - Pills drop off at narrow widths.
+  - Status bar shows pills with icons, not plain text, highest priority
+    first: `⌃B back` (switch focus to the editor, tree stays open),
+    `↵ open`, `↑↓`, `←→ fold`.
+  - `⌃B back` is the highest-priority tree pill — it degrades to a bare
+    `⌃B` before disappearing, and survives narrower widths than the other
+    tree-specific pills (see QA-REG-183/185 for the dedicated width checks).
+  - Pills drop off at narrow widths (widest-first, per the ordering above);
+    `Open ⌃O` and `⌃␣ Commands` never drop.
 
 --------------------------------------------------------------------------------
 
@@ -479,3 +485,33 @@ NOTES
   a TOCTOU race: readable at scan time, unreadable by the time the
   user previews it (step 3 above). Root cause and fix: bugs.md P3
   "Silent eval swallow in file-tree preview open" (FIXED).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-028
+NAME:     ⌃B back-to-editor hint is discoverable from the tree itself (REGRESSION)
+PRIORITY: P1
+FEATURE:  tree discoverability
+RELATED:  bugs.md P1 "FILE_TREE-context discoverability" (QA-REG-183/184/185),
+          docs/UI_GUIDELINES.md "Discoverability Contract"
+
+STEPS
+  1. Open zepto with a project directory, focus tree (⌃B).
+  2. Look at the tree's status bar hint row — do not consult docs/help.
+
+VERIFY
+  - Without reading any documentation, a first-time user can see how to
+    get back to editing: a `⌃B back` pill is visible in the hint row.
+  - Pressing ⌃B returns focus to the editor; the tree panel stays open
+    (this is a focus switch, not a dismiss — contrast with `Esc`, which
+    closes the tree per docs/UI_GUIDELINES.md "Navigation And Focus").
+  - At narrow widths (~60 cols), `⌃B back` is still visible even after
+    other tree-specific pills (`↵ open`, `↑↓`, `←→ fold`) have dropped —
+    it has the highest priority of the tree-context pills.
+  - At extreme widths (~40 cols), if `⌃B back` doesn't fit, the row
+    degrades to blank fill (not garbled glyphs) and `⌃␣ Commands` (the
+    universal fallback signpost) is still visible — a user can always
+    find "the place that has all shortcuts" even here.
+  - When there's enough room (~100+ cols), the same close-tab/switch-tabs/
+    quit hint DOCUMENT context's tab bar shows also appears in the tree's
+    hint row, in identical wording.
