@@ -195,18 +195,31 @@ VERIFY
 --------------------------------------------------------------------------------
 
 ID:       QA-TAB-013
-NAME:     Tab bar nav hints visible (REGRESSION)
-PRIORITY: P3
+NAME:     Tab bar nav hints visible, labeled, and include Quit (REGRESSION)
+PRIORITY: P2
 FEATURE:  tab ui
-RELATED:  bugs.md P2 "Non-obvious tab keys"
+RELATED:  bugs.md P2 "Non-obvious tab keys"; bugs.md P1 "Discoverability
+          Contract gaps" (quit had no hint anywhere; hint was unlabeled
+          bare glyphs) — QA-REG-171, QA-REG-172
 
 STEPS
   1. At least 1 tab open.
-  2. Observe right side of tab bar at wide terminal.
+  2. Observe right side of tab bar at wide terminal (>= ~65 cols with a
+     short filename).
+  3. Narrow the terminal progressively.
 
 VERIFY
-  - Right-aligned hints visible: `⌃W ×  ⌥, ←  ⌥. →`.
-  - Hints disappear at narrow widths.
+  - At wide widths, the hint shows plain-language labels next to the
+    glyphs: `⌃W close   ⌥←/→ tabs   ⌃Q quit`.
+  - Quit (⌃Q) is included — it previously had no on-screen hint at all,
+    anywhere.
+  - As the terminal narrows past the point where labels fit, the hint
+    degrades to the compact glyphs-only form (`⌃W × ⌥, ← ⌥. → ⌃Q`) —
+    still includes ⌃Q — rather than disappearing outright.
+  - This compact form persists down to ~40 cols (exact threshold depends
+    on tab name length: see tests/renderer.t for the deterministic
+    width math). Below that, the hint blanks out honestly (no truncated
+    or overlapping glyphs) rather than showing garbage.
 
 --------------------------------------------------------------------------------
 

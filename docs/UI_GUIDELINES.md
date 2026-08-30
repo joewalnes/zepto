@@ -27,11 +27,23 @@ terminal width, and every focus state, not just the document-editing view.
   needs within their first few seconds in the app — before they've
   discovered the command palette exists. They must have a persistent,
   always-visible on-screen hint in whatever context they're currently in,
-  the same way Save and Find already do — not be palette-only. (As of
-  2026-08-30 this is **not yet true**: `next_tab`, `prev_tab`, `close_tab`,
-  and `quit` are `priority => 0` in `CommandRegistry.pm`, meaning they
-  never appear as a status bar pill in any context — tracked as debt, see
-  `bugs.md`.)
+  the same way Save and Find already do — not be palette-only.
+  `next_tab`, `prev_tab`, `close_tab`, and `quit` are still `priority => 0`
+  in `CommandRegistry.pm` (never a status bar pill), but as of 2026-08-30
+  this no longer means they're palette-only in the DOCUMENT context: all
+  four render via a dedicated, always-visible tab-bar corner hint
+  (`Renderer.pm::_render_tab_bar`), tagged `core_nav => 1` in
+  `CommandRegistry.pm` so the registry has one explicit, greppable source
+  of truth for "must always be visible somewhere" instead of two
+  independent mechanisms that used to only agree by accident (see
+  `bugs.md`). The hint shows plain-language labels when there's room
+  (`⌃W close   ⌥←/→ tabs   ⌃Q quit`) and degrades to a compact glyphs-only
+  form at narrow widths (`⌃W × ⌥, ← ⌥. → ⌃Q`, surviving down to ~40 cols)
+  rather than a bare, unlabeled glyph cluster or nothing at all. **Still
+  open:** this coverage is DOCUMENT-context only — the FILE_TREE status
+  bar has no equivalent hint yet for switching focus back to the editor,
+  tab navigation, or quitting while the tree is focused; tracked as debt
+  in `bugs.md`.
 - **"On screen" means in the CURRENT context**, not "reachable in two
   keystrokes." A hint that only appears in the DOCUMENT status bar doesn't
   count while the user is focused on the file tree, in the find bar, or
@@ -101,9 +113,13 @@ category-ordered list with the modifier repeated on every pill:
   always shows the full, un-stripped shortcut.
 - Within a column, pills are ordered by priority (see below) and can render
   in two forms: **full** (`icon label key`, e.g. `Save S`) when there's
-  room, or **compact** (`icon key`, e.g. `S`) when there isn't. A pill's
-  on/off color still conveys toggle state in compact form even though the
-  label text is gone.
+  room, or **compact** (`icon key`, e.g. `W Z` for Word Wrap: icon `W`, key
+  `Z`) when there isn't. A pill's on/off color still conveys toggle state
+  in compact form even though the label text is gone. **The icon is never
+  optional in compact form** — a compact pill that degraded to a bare key
+  letter with no icon would be indistinguishable from random text to a
+  first-time user, which the Discoverability Contract prohibits (see
+  `tests/renderer.t`'s whole-registry regression guard for this).
 - Open File (`⌃O/⌃P`) is an ordinary `⌃` column pill, not a hardcoded
   fixed-position pill — only the `⌃␣` palette trigger is unconditionally
   pinned to the rightmost position.
@@ -132,6 +148,7 @@ category-ordered list with the modifier repeated on every pill:
 - The registry is the source of truth for: command palette display, status bar pills, and shortcut dispatch.
 - Every command has: id, label, icon, shortcut, section, type, priority, and method.
 - Sections group commands in the palette: FILE, EDIT, NAVIGATE, VIEW, TRANSFORM, AI, DOCUMENTATION, DIAGNOSTICS.
+- An optional `core_nav => 1` tag marks a command as "core navigation" per the Discoverability Contract above — it must always have an on-screen hint somewhere, even when `priority => 0` keeps it off the status bar. This is the single source of truth other code (e.g. `tests/discoverability_core_nav.t`) checks instead of independently guessing which commands need always-on visibility.
 
 ## Mouse And Keyboard Behavior
 

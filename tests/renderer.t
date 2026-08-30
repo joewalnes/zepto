@@ -17,6 +17,7 @@ use Zepto::Editor;
 use Zepto::Terminal;
 use Zepto::FindEngine;
 use Zepto::Highlighter;
+use Zepto::CommandRegistry;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -1950,6 +1951,101 @@ subtest 'Tab bar cache invalidates on theme change' => sub {
     my $light_output = Zepto::Renderer->_render_tab_bar($light_theme, $cols, $ui, 0);
 
     isnt($dark_output, $light_output, 'Tab bar output differs between dark and light themes');
+};
+
+# ============================================================================
+# Tab bar corner hint: labeled two-tier degradation (close/tabs/quit)
+# ============================================================================
+# See docs/UI_GUIDELINES.md "Discoverability Contract" and bugs.md
+# "Discoverability Contract gaps" — quit previously had no on-screen hint
+# anywhere, and the close/tab-nav corner hint was bare glyphs with no
+# plain-language label (flagged by an LLM-vision discoverability sweep as
+# unlabeled/ambiguous). Mirrors _fit_pill_group's "full form first, falls
+# back to compact only if it doesn't fit" idiom, applied to this hint.
+subtest 'Tab bar corner hint shows labeled form when there is room' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [{ display_name => 'test.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/close/, 'Labeled hint includes "close"');
+    like($s, qr/tabs/, 'Labeled hint includes "tabs"');
+    like($s, qr/quit/, 'Labeled hint includes "quit" — quit previously had no on-screen hint at all');
+    like($s, qr/\x{2303}Q/, 'Labeled hint shows the actual ⌃Q shortcut for quit');
+};
+
+subtest 'Tab bar corner hint degrades to compact glyphs (with quit) at narrow width, never disappears below 40 cols' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [{ display_name => 'testfile.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    # 40 cols with a 12-char tab name is the exact width this property was
+    # confirmed working at (via hangon) before quit was added to this
+    # hint — must not regress.
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 40, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    unlike($s, qr/close/, 'Narrow width: labeled form not used (no room)');
+    like($s, qr/\x{2303}W/, 'Narrow width: compact close hint (⌃W) still visible');
+    like($s, qr/\x{2325}/, 'Narrow width: compact tab-nav hint (⌥) still visible');
+    like($s, qr/\x{2303}Q/, 'Narrow width: quit hint (⌃Q) still visible — the actual gap this fix closes');
+};
+
+subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [{ display_name => 'a-much-longer-filename-that-eats-the-row.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 60, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    unlike($s, qr/quit/, 'Extreme narrow: no labeled hint leaks through');
+    unlike($s, qr/\x{2303}Q/, 'Extreme narrow: hint honestly absent, not truncated mid-glyph');
+};
+
+# ============================================================================
+# Status bar compact pills: icon-fallback regression guard (Fix 3)
+# ============================================================================
+# See bugs.md "Discoverability sweep run 2" — a compact status-bar pill
+# (icon + key, label dropped) must never silently degrade to a bare key
+# letter because its icon has no glyph mapping in the active mode. This is
+# a general assertion over the WHOLE registry (not just Word Wrap) so a
+# newly-added command with priority > 0 can't reintroduce this gap.
+# Investigated against the current registry (both modes): every
+# priority > 0 command's icon already resolves to a non-empty glyph in
+# both nerd-font and ASCII-fallback mode (Zepto::Chars.pm's %CHARS table
+# has an entry for every icon name currently used at priority > 0). This
+# test locks that guarantee in so it can't silently regress later.
+subtest 'No priority > 0 command ever compacts to a bare key with no icon (either nerd-font mode)' => sub {
+    for my $nerd_font (0, 1) {
+        Zepto::Chars->set_enabled($nerd_font);
+        my $mode = $nerd_font ? 'nerd-font' : 'ASCII fallback';
+
+        for my $cmd (Zepto::CommandRegistry->all_commands()) {
+            next unless ($cmd->{priority} // 0) > 0;
+
+            my $icon_name = $cmd->{icon} // 'menu';
+            # Theme pill's icon is dynamic (theme_auto/dark/light) at render
+            # time, but all three variants resolve through the same lookup
+            # table as the declared base name, so checking the declared
+            # icon name is a sufficient stand-in here.
+            my $icon = Zepto::Chars->get($icon_name);
+            ok(length($icon) > 0,
+               "'$cmd->{id}' icon '$icon_name' has a non-empty glyph in $mode mode");
+        }
+    }
+    Zepto::Chars->set_enabled(1);  # restore default for subsequent test files sharing this process
 };
 
 done_testing();
