@@ -2992,4 +2992,83 @@ subtest 'Typing after hover motion still renders' => sub {
          'Typed char was applied to the document');
 };
 
+# ============================================================================
+# QA-REG-154: File-tree preview failure must surface an error message
+# ============================================================================
+
+subtest 'Tree preview of unreadable file surfaces an error message' => sub {
+    plan skip_all => 'chmod permission test not meaningful as root' if $> == 0;
+
+    # _tree_preview_current() passes the tree node's path (relative to the
+    # tree root) straight into _create_document_state(), which resolves it
+    # against the process cwd (not the tree's root_path) — so the test has
+    # to actually chdir into the tree root, same as the real editor does
+    # when it opens a directory. Restore cwd unconditionally afterward.
+    my $orig_cwd = Cwd::getcwd();
+    my $dir = Cwd::realpath(tempdir(CLEANUP => 1));
+    my $bad_path = "$dir/secret.txt";
+
+    my $ok = eval {
+        open(my $fh, '>', $bad_path) or die $!;
+        print $fh "top secret\n";
+        close $fh;
+
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+
+        # Give the editor an initial tab so it has somewhere to return to
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        # Build the tree with the file readable at scan time.
+        # NOTE (behavioral discovery): FileTree::_scan_dir_one_level only
+        # lists files that pass `-r` at scan time, so a chmod-000 file
+        # never appears in the tree in the first place — you can't
+        # navigate to it to trigger a preview. The realistic way this bug
+        # fires is a TOCTOU race: the file was readable when the tree was
+        # scanned but becomes unreadable (permissions revoked, unmounted,
+        # etc.) by the time the user arrows onto it and a preview is
+        # attempted. We simulate that race here.
+        require Zepto::FileTree;
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+
+        # Point the tree cursor at the file's node (scanned while readable)
+        my $flat = $editor->{file_tree}->{flat_list};
+        my ($idx) = grep { $flat->[$_]{path} eq 'secret.txt' } 0 .. $#$flat;
+        ok(defined $idx, 'File appears in the tree listing while readable');
+        $editor->{file_tree}->{cursor} = $idx;
+
+        # Now revoke read permission — simulating the race — right before preview.
+        chmod 0000, $bad_path or die "chmod failed: $!";
+
+        # Sanity check: previewing should actually fail (permission denied)
+        # in this test environment, otherwise this test proves nothing.
+        my $probe = eval { Zepto::Document->load($bad_path) };
+        ok(!$probe, 'Sanity check: loading the now-unreadable file dies as expected')
+            or diag("Test environment can read chmod 0000 files (e.g. running as "
+                  . "root) — this test cannot exercise the failure path here.");
+
+        $editor->{message} = '';
+        $editor->{message_is_error} = 0;
+
+        $editor->_tree_preview_current();
+
+        ok($editor->{message_is_error}, 'An error message is surfaced for the failed preview')
+            or diag("message=" . ($editor->{message} // '(undef)'));
+        like($editor->{message}, qr/preview/i, 'Error message mentions the preview failure')
+            if $editor->{message};
+
+        1;
+    };
+    my $err = $@;
+
+    chmod 0644, $bad_path;  # restore so tempdir cleanup can remove it
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
 done_testing();

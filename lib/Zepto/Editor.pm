@@ -4616,6 +4616,27 @@ sub _tree_preview_current {
         $tree->{preview_path} = $path;
         $tree->{_preview_is_existing_tab} = 0;
     };
+    if ($@) {
+        # Preview failed (permission error, decode failure, or a TOCTOU
+        # race where the file was readable when the tree was scanned but
+        # not by the time it was previewed). No new tab was created, so
+        # there's nothing to close — just make sure preview state doesn't
+        # dangle referencing a tab that was never added, and return to
+        # whatever tab the preview session started from (same restore
+        # used above when the cursor lands on a directory). This also
+        # keeps rapid arrow-key navigation past several broken files from
+        # accumulating stale preview state — each failed attempt cleanly
+        # reverts before the next one starts.
+        $tree->{preview_active} = 0;
+        $tree->{preview_path} = undef;
+        $tree->{_preview_is_existing_tab} = 0;
+        if (defined $tree->{pre_preview_tab_index}) {
+            my $idx = $tree->{pre_preview_tab_index};
+            $idx = 0 if $idx >= $self->{tab_manager}->tab_count();
+            $self->_switch_to_tab($idx);
+        }
+        $self->show_error_message(_user_error("Preview failed", $@));
+    }
 }
 
 sub _close_preview_tab {

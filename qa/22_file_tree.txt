@@ -438,3 +438,44 @@ STEPS
 VERIFY
   - Tree scrolls (not the editor).
   - Smooth one-line-per-event scrolling.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-027
+NAME:     Failed preview shows an error message instead of silence
+PRIORITY: P2
+FEATURE:  tree preview
+RELATED:  QA-REG-154, QA-TREE-002, QA-TREE-024, QA-TREE-025
+
+STEPS
+  1. Open a directory containing a readable file. Open tree (⌃B).
+  2. Arrow onto the file — preview shows its content.
+  3. Outside zepto, revoke read permission on that file
+     (`chmod 000 <file>`), simulating permissions changing or the
+     file becoming unavailable after the tree scanned it.
+  4. Arrow off the file, then back onto it, to trigger a fresh
+     preview attempt.
+
+VERIFY
+  - Status bar shows an error message, e.g.
+    "Preview failed: Cannot open <path>: Permission denied" —
+    not silence.
+  - Editor does not crash; no Perl stack trace on screen.
+  - The broken-preview attempt doesn't leave a stuck tab or stale
+    tree state: switching to a different, readable file previews it
+    normally right after.
+  - Arrowing rapidly past several broken files does not stack
+    messages or leave multiple broken preview tabs open — each
+    failed attempt cleanly reverts to the pre-preview tab before the
+    next attempt starts, and the message is replaced (not appended)
+    by the next action, per the status-bar "persist until replaced"
+    convention (docs/UI_GUIDELINES.md).
+
+NOTES
+  The file tree only lists files that pass `-r` at scan time
+  (FileTree::_scan_dir_one_level), so a file that is already
+  unreadable when the tree scans never appears in the listing at
+  all — you cannot navigate to it. The realistic way this fires is
+  a TOCTOU race: readable at scan time, unreadable by the time the
+  user previews it (step 3 above). Root cause and fix: bugs.md P3
+  "Silent eval swallow in file-tree preview open" (FIXED).
