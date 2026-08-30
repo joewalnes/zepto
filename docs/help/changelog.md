@@ -15,6 +15,7 @@
 - Fixed typing at the front of an existing word (e.g. jumping to a line and typing a prefix) sometimes showing a stale, duplicated copy of that word's own trailing text on screen — was never a data-correctness issue (saved files were always correct), just a confused word-completion suggestion offering to "complete" text that was already there
 - Fixed ⌃Space (open command palette) sometimes doing nothing at all when the cursor sat right after a single typed character — it now always opens the palette (or the completion menu, when a real completion is actually available)
 - Fixed typing a space right after pressing Escape (e.g. to dismiss ghost-text suggestions) occasionally dropping that space, gluing the new text onto the previous word with no separator
+- Fixed the blank rows reserved below an inline Markdown image (Kitty-graphics-capable terminals) sometimes showing the wrong background color instead of the current theme's real background
 
 ## 2026-08-29
 

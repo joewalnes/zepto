@@ -205,11 +205,54 @@ VERIFY
 --------------------------------------------------------------------------------
 
 ID:       QA-MD-011
-NAME:     Inline images (future)
+NAME:     Inline images
 PRIORITY: P3
 FEATURE:  md image
-RELATED:  bugs.md P3 "Inline image rendering in Markdown preview" SKIPPED
+RELATED:  QA-MD-012, QA-TERM-014
+
+STEPS
+  1. Open a `.md` file containing `![alt](relative/path.png)` in a
+     Kitty-graphics-capable terminal (Ghostty, Kitty, WezTerm, or any
+     `TERM`/`TERM_PROGRAM` matched by
+     `Zepto::Terminal->supports_kitty_graphics()`).
+
+VERIFY
+  - The image renders inline via the Kitty graphics protocol, reserving
+    blank "spacer" rows in the text area sized to the image's aspect
+    ratio (`Renderer::_detect_markdown_images` /
+    `_render_text_area`'s `image_spacer` entries).
+  - Non-Kitty terminals and non-Markdown files are unaffected — the
+    literal `![alt](path)` text renders as plain Markdown syntax.
 
 NOTES
-  Not yet implemented. When added: Markdown `![alt](path)` should render
-  inline on Kitty-protocol terminals.
+  This entry previously said "future / not yet implemented" — stale;
+  corrected 2026-08-30 while investigating QA-REG-175 (found the feature
+  is fully implemented, just untested by this file until now). The
+  original P3 "Inline image rendering" bugs.md entry it referenced was
+  already SKIPPED as superseded, not a live blocker.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-012
+NAME:     Inline-image spacer rows use the real theme background
+          (REGRESSION)
+PRIORITY: P2
+FEATURE:  md image background-fill
+RELATED:  QA-MD-011, QA-REG-175
+SCRIPT:   tier1/reg_175_image_spacer_bg.sh
+
+STEPS
+  1. Open a `.md` file with an inline image (see QA-MD-011) in a
+     Kitty-graphics-capable terminal.
+  2. Inspect the raw ANSI bytes for the blank spacer rows reserved below
+     the image (e.g. via `tmux capture-pane -e`).
+
+VERIFY
+  - The spacer rows' text-area cells carry the current theme's real `bg`
+    color, in both dark and light theme.
+  - Regression guard for a bug where the spacer-row fill read a
+    nonexistent `editor_bg` theme role (only `bg` exists) — silently
+    emitted no color of its own and showed the preceding gutter fill's
+    color bleeding through instead, in both themes. Found via code audit
+    while investigating QA-REG-174 (see bugs.md 2026-08-30 "Light-theme
+    dark background fill investigation").

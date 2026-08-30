@@ -1747,3 +1747,62 @@ VERIFY    Investigated against the actual code and the live character
           priority > 0 command with a genuinely missing icon mapping
           would be caught immediately instead of relying on a screenshot
           sweep to notice.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-174
+NAME:     Below-EOF / status-bar fill uses the current theme's own
+          background, not a dark fallback
+PRIORITY: P1
+BUG:      Reported P1 "light theme shows a solid dark rectangle below
+          EOF" — investigated, did NOT reproduce against the terminal's
+          authoritative state (see bugs.md 2026-08-30 "Light-theme dark
+          background fill investigation" for the full write-up,
+          including the `hangon screenshot` rendering artifact this
+          traced to).
+CROSS-REF: QA-TERM-016 (qa/39_terminal_rendering.txt)
+SCRIPT:   tier1/reg_174_light_theme_empty_row_bg.sh
+VERIFY    Asserts the RAW ANSI byte stream (via `tmux capture-pane -e`,
+          the terminal's own authoritative tracked cell state — not
+          `hangon screenshot`, which was shown to be unreliable for this
+          specific full-frame shape) for a short file in light theme: a
+          row below EOF carries light theme's `empty_line_bg`
+          (`48;2;250;250;252`), and dark theme's `empty_line_bg`
+          (`48;2;20;21;30`) never appears anywhere on screen. No code
+          change was needed for this path — it was already correct;
+          this is the "confirmed correct, keep it that way" regression
+          guard, using the byte-inspection technique that ultimately
+          disproved the report (raw ANSI bytes via `tmux capture-pane
+          -e`, not screen text and not a screenshot).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-175
+NAME:     Markdown inline-image spacer rows use the real theme
+          background, not a blank/missing role
+PRIORITY: P3
+BUG:      P3 "`editor_bg` — stale/nonexistent theme role name in the
+          Markdown inline-image spacer-row path" (bugs.md 2026-08-30) —
+          found via code audit while investigating QA-REG-174 above, a
+          real (if narrower) bug matching that report's own hypothesis
+          about a stale theme-role name, just in a different code path
+          (Markdown files with inline images on Kitty-graphics-capable
+          terminals, spacer rows specifically) than the one reported.
+CROSS-REF: QA-MD-012 (qa/33_markdown_rendering.txt)
+SCRIPT:   tier1/reg_175_image_spacer_bg.sh
+VERIFY    `Renderer.pm`'s image-spacer row handler read
+          `$theme->color('editor_bg')` — no theme defines that role (the
+          real role is `bg`), and `Theme::color()` silently returns ''
+          for an unknown role, so the spacer row's text-area cells never
+          got their own background color escape code and showed the
+          preceding gutter fill's color bleeding through instead, in
+          both themes. Fixed to `$theme->color('bg')`. Confirmed
+          test-before/fix/test-after: reverted the fix and re-ran the QA
+          script — it correctly failed (spacer row showed gutter_bg
+          `48;2;22;22;30` instead of the real bg `48;2;26;27;38`);
+          restored the fix and re-ran — passes. Requires
+          `TERM_PROGRAM=ghostty` (or another Kitty-capable value) on the
+          *invoked zepto command itself* via `env`, not exported in the
+          calling shell — `hangon` sessions do not inherit the client's
+          environment (see `qa_start`'s own comment in
+          `qa/lib/qa-helpers.sh`).

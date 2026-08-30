@@ -269,3 +269,53 @@ NOTES
   logging any FAIL from this script as a real bug: re-run just that
   scenario, open the actual screenshot, and check "is this just the
   cursor?" first.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-016
+NAME:     Below-EOF and status-bar fill use the CURRENT theme's own
+          background at every width/height, in both themes (REGRESSION)
+PRIORITY: P1
+FEATURE:  term rendering theme background-fill
+RELATED:  QA-REG-174
+SCRIPT:   tier1/reg_174_light_theme_empty_row_bg.sh
+
+STEPS
+  1. Open a file shorter than the terminal height (e.g. 2 lines) in a
+     fresh session (dark theme, the default).
+  2. Switch to light theme (`⌃T` or "Theme: Light" in the command
+     palette).
+  3. Repeat at several terminal sizes: a very short file, a file that
+     exactly fills the viewport, and a file taller than the viewport;
+     at 80×24, 60×20, and 40×15.
+
+VERIFY
+  - Every row below the last line of document content uses light theme's
+    own near-white `empty_line_bg` (`rgb(250,250,252)`), not any dark
+    theme color, at every size tested.
+  - The status bar's own unfilled-gap areas use light theme's `status_bg`,
+    not a dark fallback.
+  - Switching back to dark theme still looks correct (don't regress the
+    coincidentally-working case that let this go unnoticed for so long).
+  - This was investigated as a reported P1 (a direct — not LLM — screenshot
+    showed a large solid dark rectangle covering most of the light-theme
+    screen) but did NOT reproduce against the terminal's own authoritative
+    state: `tmux capture-pane -e` against the SAME live session (which
+    reads tmux's actual tracked per-cell SGR attributes, independent of
+    how any particular screenshot tool chooses to rasterize them) showed
+    the correct light-theme color underneath the screenshot's dark
+    rectangle the entire time. Root-caused to `hangon screenshot`'s own
+    image-rendering pipeline mishandling that specific frame shape (ruler
+    row + status bar row both present in one frame) — reproduced
+    byte-for-byte with zero Zepto code involved, and the "dark" pixels in
+    the broken screenshot are `rgb(30,30,46)`, a color that appears
+    nowhere in either Zepto theme and matches `hangon`'s own default
+    unset-cell background exactly. Full investigation: bugs.md 2026-08-30
+    "Light-theme dark background fill investigation".
+  - When investigating a claimed background-color bug spanning a large
+    fraction of a full-size frame that doesn't reproduce in a small/
+    isolated repro: cross-check with `tmux capture-pane -e -p -t
+    hangon-<holder PID>` (get the holder PID from `hangon status <name>`
+    or `hangon list`) BEFORE trusting `hangon screenshot` alone — this is
+    the first confirmed case of the screenshot tool showing a flatly
+    wrong pixel color rather than a merely-hard-to-read one.
