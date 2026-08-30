@@ -21,7 +21,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should see a save/discard prompt
-qa_assert_expect "save|discard|unsaved" "quit shows prompt for dirty tab"
+qa_assert_expect "[Ss]ave|[Dd]iscard|[Uu]nsaved" "quit shows prompt for dirty tab"
 
 # Discard
 qa_send "n" 0.3

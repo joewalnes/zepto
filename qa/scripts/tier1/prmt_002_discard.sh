@@ -15,7 +15,7 @@ qa_keys "ctrl-q"
 sleep 0.3
 
 # Should show save/discard prompt
-qa_assert_expect "save|discard|unsaved|modified" "quit shows save/discard prompt"
+qa_assert_expect "[Ss]ave|[Dd]iscard|[Uu]nsaved|[Mm]odified" "quit shows save/discard prompt"
 
 # Discard (N)
 qa_send "n" 0.3

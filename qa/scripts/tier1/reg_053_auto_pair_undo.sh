@@ -10,7 +10,7 @@ qa_start "$file"
 qa_send "("
 sleep 0.2
 
-qa_assert_expect '\\(\\)' "auto-pair inserted ()"
+qa_assert_expect '\(\)' "auto-pair inserted ()"
 
 # Undo should remove both ( and )
 qa_keys "ctrl-z"

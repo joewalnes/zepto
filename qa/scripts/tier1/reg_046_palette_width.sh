@@ -8,7 +8,7 @@ qa_start "$file"
 
 qa_keys "ctrl-space" 0.3
 
-qa_assert_expect "command|save|new|file" "palette rendered at appropriate width"
+qa_assert_expect "[Cc]ommand|[Ss]ave|[Nn]ew|[Ff]ile" "palette rendered at appropriate width"
 
 qa_keys "escape"
 qa_keys "ctrl-q"
