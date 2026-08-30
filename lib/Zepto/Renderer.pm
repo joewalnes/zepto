@@ -86,6 +86,42 @@ use constant {
 # Tab width for visual rendering
 use constant TAB_WIDTH => 4;
 
+# Command palette sizing: width tiers (adapts to terminal width/mode) and
+# visible-item-count bounds. Used by both _render_command_palette and the
+# cursor-positioning code that must mirror its layout exactly.
+use constant {
+    PALETTE_WIDTH_WIDE    => 120,  # File pickers (find-in-files/files/recent): wide for long paths
+    PALETTE_WIDTH_MEDIUM  => 80,   # Wide terminal (>=120 cols): moderately wider
+    PALETTE_WIDTH_NARROW  => 60,   # Standard terminal: default width
+    PALETTE_WIDTH_MIN     => 30,   # Absolute minimum palette width
+    PALETTE_MAX_ITEMS_MIN => 5,    # Fewest visible result rows regardless of terminal height
+    PALETTE_MAX_ITEMS_MAX => 30,   # Most visible result rows regardless of terminal height
+    PALETTE_SHORTCUT_WIDTH_MIN => 8,  # Floor for shortcut-hint column before truncation
+};
+
+# Completion dropdown menu width bounds
+use constant {
+    COMPLETION_MENU_WIDTH_MAX => 50,
+    COMPLETION_MENU_WIDTH_MIN => 15,
+};
+
+# Find/replace bar input field sizing
+use constant {
+    FIND_BAR_RIGHT_SIDE_BASE_WIDTH => 45,  # ".* ^R" + "Aa ^C" + "X Esc" + "check Enter" + spaces
+    FIND_INPUT_WIDTH_MIN           => 8,
+    FIND_INPUT_WIDTH_MAX           => 40,  # Cap at reasonable width
+};
+
+# Footer input field sizing (goto-line pill, generic prompts)
+use constant {
+    FOOTER_INPUT_WIDTH_GOTO_LINE => 10,
+    FOOTER_INPUT_WIDTH_WIDE_MIN  => 20,
+    FOOTER_INPUT_WIDTH_DEFAULT   => 12,
+};
+
+# Column ruler: mark every Nth column (e.g. |10, |20, |30...)
+use constant RULER_MARK_INTERVAL => 10;
+
 # Terminal display width of a single character.
 # Returns 2 for wide chars (CJK, emoji), 0 for control/combining, 1 otherwise.
 # Based on Unicode East Asian Width property (EAW=W or F only).
@@ -511,13 +547,13 @@ sub render {
         my $pal_mode = $palette->{mode} // 'commands';
         my $pal_width = $cols - 4;
         if ($pal_mode eq 'find_in_files' || $pal_mode eq 'files' || $pal_mode eq 'recent_files') {
-            $pal_width = 120 if $pal_width > 120;
-        } elsif ($cols >= 120) {
-            $pal_width = 80 if $pal_width > 80;
+            $pal_width = PALETTE_WIDTH_WIDE if $pal_width > PALETTE_WIDTH_WIDE;
+        } elsif ($cols >= PALETTE_WIDTH_WIDE) {
+            $pal_width = PALETTE_WIDTH_MEDIUM if $pal_width > PALETTE_WIDTH_MEDIUM;
         } else {
-            $pal_width = 60 if $pal_width > 60;
+            $pal_width = PALETTE_WIDTH_NARROW if $pal_width > PALETTE_WIDTH_NARROW;
         }
-        $pal_width = 30 if $pal_width < 30;
+        $pal_width = PALETTE_WIDTH_MIN if $pal_width < PALETTE_WIDTH_MIN;
         my $pal_x = int(($cols - $pal_width) / 2);
         $pal_x = 1 if $pal_x < 1;
         my $query_cursor_in_view;
@@ -531,8 +567,8 @@ sub render {
         # Compute palette height to match _render_command_palette
         my $has_footer_row = ($pal_mode eq 'find_in_files') ? 1 : 0;
         my $max_items = $rows - 6 - $has_footer_row;
-        $max_items = 5 if $max_items < 5;
-        $max_items = 30 if $max_items > 30;
+        $max_items = PALETTE_MAX_ITEMS_MIN if $max_items < PALETTE_MAX_ITEMS_MIN;
+        $max_items = PALETTE_MAX_ITEMS_MAX if $max_items > PALETTE_MAX_ITEMS_MAX;
         my $pal_height = 3 + $max_items + $has_footer_row + 1;
         # Filter input is on row 2 of palette (y_start + 1), starting at x + 4 (box_v + space + icon + space)
         my $pal_y = int(($rows - $pal_height) / 2);
@@ -564,16 +600,16 @@ sub render {
         if ($input_id eq 'goto_line') {
             my $cursor_icon = Zepto::Chars->get('cursor_pos');
             $prompt_len = length(" $cursor_icon ");
-            $input_width = 10;
+            $input_width = FOOTER_INPUT_WIDTH_GOTO_LINE;
         } else {
             $prompt_len = length($input->{prompt} // '') + 2;  # +2 for leading/trailing space
             if ($input->{wide}) {
                 my $hint = $input->{hint} // '';
                 my $hint_str = $hint ? " ($hint)" : '';
                 $input_width = $cols - $prompt_len - length($hint_str) - 2;
-                $input_width = 20 if $input_width < 20;
+                $input_width = FOOTER_INPUT_WIDTH_WIDE_MIN if $input_width < FOOTER_INPUT_WIDTH_WIDE_MIN;
             } else {
-                $input_width = 12;
+                $input_width = FOOTER_INPUT_WIDTH_DEFAULT;
             }
         }
         my $cursor_in_view;
@@ -620,7 +656,7 @@ sub render {
         }
         my $capture_hint_width = length($capture_hint) ? length($capture_hint) + 1 : 0;
         my $replace_active = $find->{replace_active} // 0;
-        my $right_side_width = 45 + length($match_text) + $capture_hint_width;
+        my $right_side_width = FIND_BAR_RIGHT_SIDE_BASE_WIDTH + length($match_text) + $capture_hint_width;
         my $available;
         if ($replace_active) {
             $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
@@ -628,8 +664,8 @@ sub render {
             $available = $cols - 2 - 5 - $right_side_width;
         }
         my $input_width = $replace_active ? int($available / 2) : $available;
-        $input_width = 8 if $input_width < 8;
-        $input_width = 40 if $input_width > 40;
+        $input_width = FIND_INPUT_WIDTH_MIN if $input_width < FIND_INPUT_WIDTH_MIN;
+        $input_width = FIND_INPUT_WIDTH_MAX if $input_width > FIND_INPUT_WIDTH_MAX;
 
         if ($focus eq 'replace') {
             my $cursor_in_field;
@@ -762,8 +798,8 @@ sub _render_completion_menu {
         $max_item_len = $len if $len > $max_item_len;
     }
     my $menu_width = $max_item_len + 2;  # +2 for borders
-    $menu_width = 50 if $menu_width > 50;
-    $menu_width = 15 if $menu_width < 15;
+    $menu_width = COMPLETION_MENU_WIDTH_MAX if $menu_width > COMPLETION_MENU_WIDTH_MAX;
+    $menu_width = COMPLETION_MENU_WIDTH_MIN if $menu_width < COMPLETION_MENU_WIDTH_MIN;
 
     # Position menu at cursor column (aligned to prefix start)
     my $menu_col = $tree_width + $gutter_width + ($cursor_col - $prefix_len) + 1;
@@ -1260,7 +1296,7 @@ sub _render_ruler_bar {
 
     # Build ruler string: |10      |20      |30 ... (1-indexed columns, marks at multiples of 10)
     my $ruler = '';
-    my $mark_interval = 10;
+    my $mark_interval = RULER_MARK_INTERVAL;
     my $x = 0;
 
     while ($x < $ruler_width) {
@@ -4467,11 +4503,11 @@ sub _render_footer_input {
     if ($input->{wide}) {
         # Use most available space for the input field
         $input_width = $cols - $prompt_len - $hint_len - 2;
-        $input_width = 20 if $input_width < 20;
+        $input_width = FOOTER_INPUT_WIDTH_WIDE_MIN if $input_width < FOOTER_INPUT_WIDTH_WIDE_MIN;
     } elsif ($input_id eq 'goto_line') {
-        $input_width = 10;
+        $input_width = FOOTER_INPUT_WIDTH_GOTO_LINE;
     } else {
-        $input_width = 12;
+        $input_width = FOOTER_INPUT_WIDTH_DEFAULT;
     }
 
     # Get viewport (handles overflow scrolling)
@@ -4727,7 +4763,7 @@ sub _render_find_bar {
 
     # Fixed widths for buttons/toggles on right side
     # ".* ^R" (9+1) + "Aa ^C" (9+1) + "X Esc" (9+1) + "✓ Enter" (11) + spaces
-    my $right_side_width = 45 + length($match_text) + $capture_hint_width;
+    my $right_side_width = FIND_BAR_RIGHT_SIDE_BASE_WIDTH + length($match_text) + $capture_hint_width;
 
     # Calculate input field widths
     my $available;
@@ -4737,8 +4773,8 @@ sub _render_find_bar {
         $available = $cols - 2 - 5 - $right_side_width;  # " Find:" only
     }
     my $input_width = $replace_active ? int($available / 2) : $available;
-    $input_width = 8 if $input_width < 8;
-    $input_width = 40 if $input_width > 40;  # Cap at reasonable width
+    $input_width = FIND_INPUT_WIDTH_MIN if $input_width < FIND_INPUT_WIDTH_MIN;
+    $input_width = FIND_INPUT_WIDTH_MAX if $input_width > FIND_INPUT_WIDTH_MAX;
 
     my $content = '';
     my $x = 1;  # Track position for click regions
@@ -5068,18 +5104,18 @@ sub _render_command_palette {
     my $mode = $palette->{mode} // 'commands';
     my $pal_width = $total_cols - 4;
     if ($mode eq 'find_in_files' || $mode eq 'files' || $mode eq 'recent_files') {
-        $pal_width = 120 if $pal_width > 120;  # File pickers: wide for long paths
-    } elsif ($total_cols >= 120) {
-        $pal_width = 80 if $pal_width > 80;    # Wide terminal: moderately wider
+        $pal_width = PALETTE_WIDTH_WIDE if $pal_width > PALETTE_WIDTH_WIDE;  # File pickers: wide for long paths
+    } elsif ($total_cols >= PALETTE_WIDTH_WIDE) {
+        $pal_width = PALETTE_WIDTH_MEDIUM if $pal_width > PALETTE_WIDTH_MEDIUM;    # Wide terminal: moderately wider
     } else {
-        $pal_width = 60 if $pal_width > 60;    # Standard: default width
+        $pal_width = PALETTE_WIDTH_NARROW if $pal_width > PALETTE_WIDTH_NARROW;    # Standard: default width
     }
-    $pal_width = 30 if $pal_width < 30;
+    $pal_width = PALETTE_WIDTH_MIN if $pal_width < PALETTE_WIDTH_MIN;
 
     my $has_footer_row = ($mode eq 'find_in_files') ? 1 : 0;
     my $max_items = $total_rows - 6 - $has_footer_row;
-    $max_items = 5 if $max_items < 5;
-    $max_items = 30 if $max_items > 30;
+    $max_items = PALETTE_MAX_ITEMS_MIN if $max_items < PALETTE_MAX_ITEMS_MIN;
+    $max_items = PALETTE_MAX_ITEMS_MAX if $max_items > PALETTE_MAX_ITEMS_MAX;
 
     my $item_count = scalar @$filtered;
     # Fixed height: always use max_items so palette doesn't resize when filtering
@@ -5356,7 +5392,7 @@ sub _render_command_palette {
                 my $shortcut_display = $shortcut;
                 my $shortcut_width = length($shortcut_display);
                 my $max_shortcut = int($inner_width / 2) - 4;
-                $max_shortcut = 8 if $max_shortcut < 8;
+                $max_shortcut = PALETTE_SHORTCUT_WIDTH_MIN if $max_shortcut < PALETTE_SHORTCUT_WIDTH_MIN;
                 if ($shortcut_width > $max_shortcut) {
                     $shortcut_display = _ellipsis($shortcut, $max_shortcut, 'start');
                     $shortcut_width = length($shortcut_display);
