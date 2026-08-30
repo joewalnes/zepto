@@ -523,7 +523,13 @@ sub light_theme {
         tab_hover_fg        => fg_rgb(60, 64, 80),     # Darker than inactive
         tab_hover_bg        => bg_rgb(195, 200, 215),  # Between inactive and active
         tab_hover_edge      => fg_rgb(195, 200, 215),
-        tab_modified_fg     => fg_rgb(223, 142, 29),   # Yellow dot for unsaved
+        # Dark burnt-amber, not the dark theme's bright yellow — light theme's
+        # tab backgrounds (active lavender, inactive/hover light gray-blue)
+        # are all light, so a light-yellow dot had ~1.2-1.8:1 contrast and
+        # was nearly invisible (QA-REG-140). Darkening within the same warm
+        # hue family restores the "unsaved" cue while passing WCAG 3:1
+        # against all three tab surfaces it can render on.
+        tab_modified_fg     => fg_rgb(95, 40, 0),   # Amber dot for unsaved
         tab_close_fg        => fg_rgb(156, 160, 176),  # Dim close button
         tab_shortcut_fg     => fg_rgb(130, 136, 156),  # Readable hint
         tab_vcs_fg          => fg_rgb(140, 90, 20),     # VCS-changed file tint

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-30
+
+- Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)
+- Added an automated contrast check (`make test`) covering every color pair in both themes, to catch this kind of readability bug before it ships
+
 ## 2026-08-29
 
 - Status bar reworked: shortcuts are now grouped into a ⌃ (Ctrl) column and an ⌥ (Alt) column, each showing its modifier once instead of on every pill — the most useful action in each column (Save, Word Wrap) now stays visible even in a narrow terminal
