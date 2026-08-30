@@ -1332,3 +1332,29 @@ VERIFY    _tree_preview_current() (lib/Zepto/Editor.pm) wrapped document
           several broken files in a row can't accumulate stale preview
           state or leave a dangling tab reference — each failed
           attempt cleanly reverts before the next one starts.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-142
+NAME:     Toggle confirmation messages don't inherit stale error styling
+PRIORITY: P2
+BUG:      P2 "message_is_error can leak stale error styling onto non-error
+          messages" (2026-08-30)
+CROSS-REF: tests/editor.t ("Toggle confirmation does not inherit stale
+          error styling")
+VERIFY    Real "Invalid tab width" error renders with error_fg (red,
+          38;2;247;118;142 dark / 38;2;210;15;57 light). A subsequent,
+          separate "Auto Pairs: ON/OFF" toggle confirmation renders with
+          warning_fg (amber, 38;2;224;175;104 dark / 38;2;223;142;29
+          light), never error_fg — confirms cmd_toggle_* commands and
+          the replace-all message now route through show_message()
+          (which always resets message_is_error) instead of writing
+          $self->{message} directly. NOTE: hangon drives zepto through
+          separate process invocations that each land in their own
+          read_blocking()/handle_input() batch, so this script cannot
+          reproduce the exact same-input-batch race that caused the bug
+          (Editor.pm's top-of-loop guard already resets the flag between
+          separate hangon commands, both before and after the fix) — the
+          actual race is covered by the unit test cross-referenced above,
+          which calls show_error_message() then a toggle command directly
+          to model the same-batch scenario deterministically.

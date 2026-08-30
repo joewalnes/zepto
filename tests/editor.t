@@ -180,6 +180,30 @@ subtest 'Show message' => sub {
 };
 
 # ============================================================================
+# message_is_error must not leak onto later non-error messages (QA-REG-142)
+# ============================================================================
+subtest 'Toggle confirmation does not inherit stale error styling' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    # An error is showing (e.g. from a prior failed action in the same
+    # input batch -- run()'s top-of-batch reset only fires once per batch,
+    # before any commands in that batch have run).
+    $editor->show_error_message('Something went wrong');
+    ok($editor->{message_is_error}, 'Error flag set after show_error_message');
+
+    # A toggle command fires next and writes its own confirmation message.
+    # That confirmation must render as a normal message, not an error.
+    $editor->cmd_toggle_autocomplete();
+    is($editor->{message}, 'Auto Complete: OFF', 'Toggle confirmation message set');
+    ok(!$editor->{message_is_error}, 'Toggle confirmation is not flagged as an error');
+};
+
+# ============================================================================
 # Quit handling
 # ============================================================================
 subtest 'Quit pending' => sub {

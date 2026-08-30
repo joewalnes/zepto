@@ -1271,21 +1271,21 @@ sub cmd_toggle_autocomplete {
     if (!$new && $self->{_completion}) {
         $self->{_completion}->dismiss();
     }
-    $self->{message} = "Auto Complete: " . ($new ? "ON" : "OFF");
+    $self->show_message("Auto Complete: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_auto_pairs {
     my ($self) = @_;
     my $new = !$self->{prefs}->auto_pairs();
     $self->{prefs}->set_auto_pairs($new);
-    $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
+    $self->show_message("Auto Pairs: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_restore_session {
     my ($self) = @_;
     my $new = !$self->{prefs}->restore_session();
     $self->{prefs}->set_restore_session($new);
-    $self->{message} = "Restore Session on Startup: " . ($new ? "ON" : "OFF");
+    $self->show_message("Restore Session on Startup: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_mouse {
@@ -1297,35 +1297,35 @@ sub cmd_toggle_mouse {
     if ($term) {
         $new ? $term->enable_mouse() : $term->disable_mouse();
     }
-    $self->{message} = "Mouse: " . ($new ? "ON" : "OFF");
+    $self->show_message("Mouse: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_search_wrap {
     my ($self) = @_;
     my $new = !$self->{prefs}->search_wrap();
     $self->{prefs}->set_search_wrap($new);
-    $self->{message} = "Search Wrap Around: " . ($new ? "ON" : "OFF");
+    $self->show_message("Search Wrap Around: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_markdown_tables {
     my ($self) = @_;
     my $new = !$self->{prefs}->render_markdown_tables();
     $self->{prefs}->set_render_markdown_tables($new);
-    $self->{message} = "Markdown Table Rendering: " . ($new ? "ON" : "OFF");
+    $self->show_message("Markdown Table Rendering: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_toggle_soft_tabs {
     my ($self) = @_;
     my $new = !$self->{prefs}->soft_tabs();
     $self->{prefs}->set_soft_tabs($new);
-    $self->{message} = "Soft Tabs: " . ($new ? "ON (spaces)" : "OFF (tabs)");
+    $self->show_message("Soft Tabs: " . ($new ? "ON (spaces)" : "OFF (tabs)"));
 }
 
 sub cmd_toggle_auto_indent {
     my ($self) = @_;
     my $new = !$self->{prefs}->auto_indent();
     $self->{prefs}->set_auto_indent($new);
-    $self->{message} = "Auto Indent: " . ($new ? "ON" : "OFF");
+    $self->show_message("Auto Indent: " . ($new ? "ON" : "OFF"));
 }
 
 sub cmd_set_tab_width {
@@ -1348,7 +1348,7 @@ sub cmd_set_tab_width {
             }
 
             $prefs->set_tab_width($input + 0);
-            $self->{message} = "Tab Width: $input";
+            $self->show_message("Tab Width: $input");
         },
     );
 }
@@ -1367,7 +1367,7 @@ sub cmd_toggle_ai {
     if (!$ai->{enabled}) {
         $ai->cancel();
     }
-    $self->{message} = "AI Completion: " . ($ai->{enabled} ? "ON" : "OFF");
+    $self->show_message("AI Completion: " . ($ai->{enabled} ? "ON" : "OFF"));
 }
 
 sub cmd_ai_setup {

@@ -5,6 +5,7 @@
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)
 - Added an automated contrast check (`make test`) covering every color pair in both themes, to catch this kind of readability bug before it ships
 - Fixed file-tree preview failing silently (e.g. a file's permissions change after it's listed in the tree) — an error message now appears in the status bar instead of nothing happening
+- Fixed preference-toggle confirmations (Auto Pairs, Mouse, Search Wrap Around, etc.) occasionally rendering in error (red) styling instead of normal styling if they appeared right after an error message
 
 ## 2026-08-29
 

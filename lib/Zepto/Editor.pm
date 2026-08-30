@@ -3179,7 +3179,7 @@ sub _replace_all {
     $self->_update_find_matches();
 
     # Show message
-    $self->{message} = "Replaced $total occurrence" . ($total == 1 ? '' : 's');
+    $self->show_message("Replaced $total occurrence" . ($total == 1 ? '' : 's'));
     $self->{message_time} = time();
 }
 
@@ -3210,7 +3210,7 @@ sub _replace_all_sync {
     $self->_update_find_matches();
 
     my $count = scalar @sorted;
-    $self->{message} = "Replaced $count occurrence" . ($count == 1 ? '' : 's');
+    $self->show_message("Replaced $count occurrence" . ($count == 1 ? '' : 's'));
     $self->{message_time} = time();
 }
 
