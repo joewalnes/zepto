@@ -228,7 +228,8 @@ category-ordered list with the modifier repeated on every pill:
 ## Tab Bar
 
 - The tab bar is the topmost chrome row.
-- Each tab shows: a Nerd Font file-type icon, the file name (or `[untitled]`), an `⌥N` shortcut label for direct access, and a `×` close button.
+- Each tab is a solid filled pill — both edges capped with a full-block glyph (`█`) and the whole tab body filled with one continuous background color — not just underlined text. Active, inactive, and hover states each use a distinct, clearly-visible fill color in both themes (see `Theme.pm`'s `tab_active_bg`/`tab_inactive_bg`/`tab_hover_bg`); an inactive tab must always read as a distinct bounded rectangle against the bar, not blend into it. A visible gap separates adjacent tabs. (Redesigned 2026-08-30 — see `bugs.md` "Tab bar visual redesign" for the before/after and why.)
+- Each tab shows: the file name (or `[untitled]`), an `⌥N` shortcut label for direct access, and a `×` close button.
 - A `●` indicator appears in the tab title when the buffer has unsaved modifications. It is added on first edit and removed on save.
 - Tab names truncate with an ellipsis (`…`) when the terminal is too narrow to fit the full name.
 - When closing a tab with unsaved changes, a confirmation prompt appears in the status bar: `Save changes to <name>?  [Y]es  [N]o  [C]ancel`. `Y` saves and closes, `N` discards and closes, `C` (or `Esc`) cancels the close.

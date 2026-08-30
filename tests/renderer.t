@@ -1954,6 +1954,128 @@ subtest 'Tab bar cache invalidates on theme change' => sub {
 };
 
 # ============================================================================
+# Tab bar "tabby" redesign (2026-08-30) — see bugs.md and
+# qa/21_tabs.txt. User feedback: tabs "really don't look great" — inactive
+# tabs had no visible background fill (only underlined plain text) and the
+# old ◢/◣ diagonal-corner glyphs were a 1-cell wedge, confirmed via a
+# zoomed screenshot to be nearly invisible at normal viewing size. Fix:
+# every tab (active/inactive/hover) is now a solid filled pill capped on
+# both edges with a full block glyph (█, U+2588), and tab_inactive_bg/
+# tab_hover_bg were both given meaningfully higher contrast against
+# tab_bar_bg in both themes (see Theme.pm "Tabby redesign" comments).
+# ============================================================================
+subtest 'Tab caps use the solid full-block glyph, not the old diagonal triangle notches' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [
+            { display_name => 'active.txt',   is_dirty => 0, has_vcs_changes => 0 },
+            { display_name => 'inactive.txt', is_dirty => 0, has_vcs_changes => 0 },
+        ],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+
+    unlike($bar, qr/\x{25e2}/, 'Old ◢ lower-right-triangle glyph is gone');
+    unlike($bar, qr/\x{25e3}/, 'Old ◣ lower-left-triangle glyph is gone');
+    # 2 tabs x 2 caps each = 4 full-block glyphs minimum
+    my $cap_count = () = $bar =~ /\x{2588}/g;
+    cmp_ok($cap_count, '>=', 4, 'Full-block (█) cap glyph appears for every tab edge');
+};
+
+subtest 'Inactive tab background is visually distinct from the bar background' => sub {
+    for my $theme_name (qw(dark_theme light_theme)) {
+        my $theme = Zepto::Theme->$theme_name();
+        my $ui = {
+            tabs => [
+                { display_name => 'active.txt',   is_dirty => 0, has_vcs_changes => 0 },
+                { display_name => 'inactive.txt', is_dirty => 0, has_vcs_changes => 0 },
+            ],
+            active_tab_index => 0,
+            tab_manager => undef,
+        };
+
+        # The fix was specifically that tab_inactive_bg must differ from
+        # tab_bar_bg (previously they were nearly identical — 1.17:1/1.19:1
+        # contrast, indistinguishable at a glance). Assert at the theme
+        # level (not a no-op check — this fails if a future edit reverts
+        # inactive_bg back to matching the bar) and confirm the rendered
+        # output actually emits that inactive-bg color for the inactive tab.
+        my $bar_bg      = $theme->color('tab_bar_bg');
+        my $inactive_bg = $theme->color('tab_inactive_bg');
+        isnt($inactive_bg, $bar_bg, "$theme_name: tab_inactive_bg differs from tab_bar_bg");
+
+        my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+        ok(index($bar, $inactive_bg) >= 0,
+            "$theme_name: rendered tab bar actually uses tab_inactive_bg for the inactive tab");
+    }
+};
+
+subtest 'Tab bar buttons remain correctly ordered and hit-testable after the redesign' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [
+            { display_name => 'one.txt',   is_dirty => 0, has_vcs_changes => 0 },
+            { display_name => 'two.txt',   is_dirty => 1, has_vcs_changes => 0 },
+            { display_name => 'three.txt', is_dirty => 0, has_vcs_changes => 0 },
+        ],
+        active_tab_index => 1,
+        tab_manager => undef,
+    };
+
+    Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+    my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+
+    my @tab_buttons   = grep { $_->{type} eq 'tab' } @buttons;
+    my @close_buttons = grep { $_->{type} eq 'close' } @buttons;
+
+    is(scalar(@tab_buttons), 3, 'One tab button per tab');
+    is(scalar(@close_buttons), 3, 'One close button per tab');
+
+    # Buttons must be well-formed (start <= end) and appear left-to-right
+    # in tab index order — a click-targeting regression would show up here
+    # as overlapping or out-of-order ranges even without a live mouse click.
+    my @by_index = sort { $a->{start} <=> $b->{start} } @tab_buttons;
+    for my $i (0 .. $#by_index) {
+        my $btn = $by_index[$i];
+        cmp_ok($btn->{start}, '<=', $btn->{end}, "Tab button $i has a valid (start<=end) range");
+        is($btn->{index}, $i, "Tab button $i in left-to-right order maps to tab index $i");
+    }
+
+    # Close buttons must sit inside their own tab's [start,end] span, not a
+    # neighboring tab's — this is exactly the kind of thing a cap-glyph
+    # width change could silently break.
+    for my $close_btn (@close_buttons) {
+        my ($tab_btn) = grep { $_->{index} == $close_btn->{index} } @tab_buttons;
+        ok(defined $tab_btn, "Close button for tab $close_btn->{index} has a matching tab button");
+        cmp_ok($close_btn->{start}, '>=', $tab_btn->{start},
+            "Close button for tab $close_btn->{index} starts within its own tab's span");
+        cmp_ok($close_btn->{end}, '<=', $tab_btn->{end},
+            "Close button for tab $close_btn->{index} ends within its own tab's span");
+    }
+};
+
+subtest 'Tab bar overflow still produces scroll buttons after the redesign' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my @tabs = map { { display_name => "file_number_$_.txt", is_dirty => 0, has_vcs_changes => 0 } } (1 .. 10);
+    my $ui = {
+        tabs => \@tabs,
+        active_tab_index => 5,
+        tab_manager => undef,
+    };
+
+    # Narrow width forces overflow with 10 tabs
+    Zepto::Renderer->_render_tab_bar($theme, 60, $ui, 0);
+    my @buttons = Zepto::Renderer->get_tab_bar_buttons();
+    my @scroll_left  = grep { $_->{type} eq 'scroll_left' } @buttons;
+    my @scroll_right = grep { $_->{type} eq 'scroll_right' } @buttons;
+
+    ok(@scroll_left,  'Scroll-left button present when active tab is scrolled past the start');
+    ok(@scroll_right, 'Scroll-right button present when more tabs exist past the visible range');
+};
+
+# ============================================================================
 # Tab bar corner hint: labeled two-tier degradation (close/tabs/quit)
 # ============================================================================
 # See docs/UI_GUIDELINES.md "Discoverability Contract" and bugs.md

@@ -6,6 +6,11 @@
 # at just 1.11:1 — both nearly invisible on an active (selected) tab.
 # Fixed by darkening both to a near-black gray that clears WCAG 3:1
 # against all three tab-state surfaces (active/inactive/hover).
+# Updated 2026-08-30 (bugs.md "Tab bar visual redesign"): the redesign
+# darkened tab_inactive_bg/tab_hover_bg further (for the "tabby" fix
+# itself) and re-darkened this color along with it, fg_rgb(66,67,74) ->
+# fg_rgb(56,57,64), to keep clearing WCAG 3:1 against the new backgrounds —
+# re-verified against all three tab-state surfaces before landing.
 # Deterministic contrast math lives in tests/theme_contrast.t; this script
 # verifies the actual rendered ANSI bytes on a live active tab.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
@@ -24,10 +29,10 @@ qa_assert_expect "reg161" "file is open"
 tmux_sess=$(hangon list 2>/dev/null | awk -v n="$QA_SESSION" '$1==n {print $3}')
 raw=$(tmux capture-pane -t "hangon-${tmux_sess}" -p -e 2>/dev/null | sed -n '1p')
 
-if echo "$raw" | grep -q '38;2;66;67;74'; then
+if echo "$raw" | grep -q '38;2;56;57;64'; then
     qa_pass "tab close icon uses the fixed dark-gray color"
 else
-    qa_fail "tab close icon uses the fixed dark-gray color" "expected 38;2;66;67;74 in tab bar row"
+    qa_fail "tab close icon uses the fixed dark-gray color" "expected 38;2;56;57;64 in tab bar row"
 fi
 
 if echo "$raw" | grep -q '38;2;156;160;176'; then

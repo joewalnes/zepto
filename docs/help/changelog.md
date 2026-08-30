@@ -2,6 +2,7 @@
 
 ## 2026-08-30
 
+- Redesigned the tab bar to actually look like tabs: inactive tabs previously had no background fill at all (just underlined text blending into the toolbar), and the tab-shape corner glyphs were nearly invisible at normal viewing size. Every tab is now a solid filled pill — active, inactive, and hover states each have their own clearly distinguishable background color in both themes — with a real boundary and a visible gap between adjacent tabs
 - Quit (⌃Q) now has an always-visible on-screen hint in the tab bar, the same as close/next/prev-tab already did — previously it had no on-screen hint anywhere at all
 - The tab bar's close/tab-nav/quit hint now shows plain-language labels ("close", "tabs", "quit") next to the shortcut glyphs when there's room, instead of raw glyphs alone — falls back to the compact glyphs-only form at narrower widths
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)

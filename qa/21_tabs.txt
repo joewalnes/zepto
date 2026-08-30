@@ -17,9 +17,26 @@ STEPS
   1. ./zepto /tmp/a.txt /tmp/b.txt
 
 VERIFY
-  - Tab bar shows two tabs.
-  - First tab is active (brighter background).
-  - Tab labels show filenames with icons.
+  - Tab bar shows two tabs, each rendered as a solid filled "pill": both
+    edges capped with a full-block glyph (█) and the whole tab body —
+    caps included — filled with one continuous background color. This is
+    the tab bar redesign from 2026-08-30 (bugs.md "Tab bar visual
+    redesign") — previously inactive tabs had no background fill at all
+    (just underlined plain text) and the cap glyphs were a nearly
+    invisible 1-cell diagonal wedge (◢/◣); confirm neither of those old
+    glyphs appears anywhere in the tab bar.
+  - First (active) tab has a clearly brighter/more saturated fill color
+    than the second (inactive) tab — the two must be visually
+    distinguishable as separate elements at a glance, without zooming in,
+    in BOTH the dark and light themes (switch via the command palette's
+    "Theme: Dark"/"Theme: Light" and re-check).
+  - The inactive tab must still read as a distinct bounded rectangle
+    against the surrounding tab-bar background — not just underlined
+    text. (This was the core complaint the redesign fixes; if the
+    inactive tab's fill blends into the bar again, that's a regression.)
+  - A visible gap separates the two tabs — they must not read as one
+    continuous strip.
+  - Tab labels show filenames (no file-type icons in the current design).
 
 --------------------------------------------------------------------------------
 

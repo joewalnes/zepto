@@ -1747,3 +1747,66 @@ VERIFY    Investigated against the actual code and the live character
           priority > 0 command with a genuinely missing icon mapping
           would be caught immediately instead of relying on a screenshot
           sweep to notice.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-180
+NAME:     Tab bar caps use the solid full-block glyph, not the old
+          diagonal-triangle notches
+PRIORITY: P2
+BUG:      P2 "Tabs really don't look great" — user feedback (2026-08-30).
+          See bugs.md "Tab bar visual redesign (2026-08-30)".
+CROSS-REF: QA-TAB-001 (qa/21_tabs.txt), tests/renderer.t "Tab caps use
+           the solid full-block glyph, not the old diagonal triangle
+           notches"
+VERIFY    Zoomed screenshot diagnosis confirmed the old ◢/◣ (U+25E2/25E3)
+          cap glyphs each filled only a 1-cell diagonal wedge, nearly
+          invisible at normal viewing size. Renderer.pm::_render_tab_bar
+          now uses a single full-block glyph (█, U+2588) for both edges of
+          every tab, in every state. `qa/scripts/tier1/reg_180_tab_cap_glyph.sh`
+          opens two tabs and asserts the rendered screen contains █ and
+          contains neither ◢ nor ◣.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-181
+NAME:     Tab redesign preserves dirty-dot indicator and mouse
+          click-to-switch on an inactive tab
+PRIORITY: P2
+BUG:      P2 "Tabs really don't look great" — user feedback (2026-08-30).
+          See bugs.md "Tab bar visual redesign (2026-08-30)".
+CROSS-REF: QA-TAB-009 (dirty dot), QA-TAB-002 (tab switch), qa/21_tabs.txt
+VERIFY    The tab bar redesign changed cap glyphs and fill colors only —
+          every functional element it was required to preserve still
+          works. `qa/scripts/tier1/reg_181_tab_redesign_functional.sh`:
+          dirties the active tab and confirms the ● dot renders both while
+          active and after switching away (dirty state isn't hidden by
+          the new fill color); clicks an inactive tab's body (not its
+          close button) and confirms the click switches the active
+          document, proving button hit-testing still maps to the correct
+          screen columns after the cap-glyph swap; closes a tab via ⌃W
+          (same code path a close-button click uses) and confirms exactly
+          that tab disappears from the bar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-182
+NAME:     Tab bar overflow/scroll and the × close button's mouse
+          hit-testing still work correctly with many tabs
+PRIORITY: P2
+BUG:      P2 "Tabs really don't look great" — user feedback (2026-08-30).
+          See bugs.md "Tab bar visual redesign (2026-08-30)".
+CROSS-REF: QA-TAB-014..018 (scroll/overflow, qa/21_tabs.txt)
+VERIFY    The redesign did not change `_calc_tab_pill_width`'s formula
+          (the cap glyph is still exactly 1 column either way), so
+          overflow/scroll and button columns should be unaffected — this
+          is the guard that proves it under a real overflowing tab bar,
+          not just the 1-2-tab case. `qa/scripts/tier1/reg_182_tab_overflow_close_hittest.sh`
+          opens 8 tabs (overflowing the default 80-col bar), confirms the
+          right-scroll arrow appears, jumps to the last tab (⌥8) and
+          confirms the left-scroll arrow appears, then computes the ×
+          close button's actual on-screen column for a currently-visible
+          non-active tab (from the real rendered row, not a hardcoded
+          column) and mouse-clicks it — confirming that exact tab closes
+          and its immediate neighbor (the tab an off-by-one column error
+          would have hit instead) is untouched.

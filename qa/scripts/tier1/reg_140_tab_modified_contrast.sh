@@ -3,6 +3,11 @@
 # Bug: tab_modified_fg (light theme) was a light yellow with ~1.2-1.8:1
 # contrast against the tab bar's backgrounds — nearly invisible. Fixed to
 # a dark amber that clears WCAG 3:1 against all three tab-state surfaces.
+# Updated 2026-08-30 (bugs.md "Tab bar visual redesign"): the redesign
+# darkened tab_inactive_bg/tab_hover_bg further (for the "tabby" fix
+# itself) and re-darkened this color along with it, fg_rgb(95,40,0) ->
+# fg_rgb(85,32,0), to keep clearing WCAG 3:1 against the new backgrounds —
+# re-verified against all three tab-state surfaces before landing.
 # Deterministic contrast math lives in tests/theme_contrast.t; this script
 # verifies the actual rendered ANSI bytes on a live dirty tab.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
@@ -22,10 +27,10 @@ qa_send "z" 0.3
 tmux_sess=$(hangon list 2>/dev/null | awk -v n="$QA_SESSION" '$1==n {print $3}')
 raw=$(tmux capture-pane -t "hangon-${tmux_sess}" -p -e 2>/dev/null | sed -n '1p')
 
-if echo "$raw" | grep -q '38;2;95;40;0'; then
+if echo "$raw" | grep -q '38;2;85;32;0'; then
     qa_pass "tab modified-dot uses the fixed dark-amber color"
 else
-    qa_fail "tab modified-dot uses the fixed dark-amber color" "expected 38;2;95;40;0 in tab bar row"
+    qa_fail "tab modified-dot uses the fixed dark-amber color" "expected 38;2;85;32;0 in tab bar row"
 fi
 
 qa_keys "ctrl-z" 0.2

@@ -895,11 +895,26 @@ sub _render_tab_bar {
 
     my $tab_cols = $cols - $tree_width;  # available width for tabs
 
-    # Geometric triangle edges for tab shape:
-    # ◢ (U+25E2) lower-right triangle: fg fills lower-right → left edge of tab
-    # ◣ (U+25E3) lower-left triangle: fg fills lower-left → right edge of tab
-    my $TAB_LEFT  = "\x{25e2}";  # ◢
-    my $TAB_RIGHT = "\x{25e3}";  # ◣
+    # Tab cap shape (redesigned 2026-08-30, see bugs.md "make tabs more
+    # tabby"). The old ◢/◣ diagonal-corner glyphs (U+25E2/25E3) each filled
+    # only a thin wedge of one cell — confirmed via a zoomed screenshot to
+    # be nearly invisible at normal viewing size, and inactive tabs had no
+    # background fill to compensate. An interim design tried a half-filled
+    # taper cap (▐/▌) for inactive/hover tabs so the active tab's crisp
+    # full-block edge would stand out by comparison — but a side-by-side
+    # screenshot check showed the half-fill was actively counterproductive:
+    # it puts the SURROUNDING bar color into half of the one cell doing the
+    # most work to signal "this is a tab boundary", diluting exactly the
+    # contrast this redesign exists to fix. Settled on a single glyph for
+    # every state: FULL BLOCK (█, U+2588 — the same Unicode block already
+    # used for the VCS gutter's expanded-hunk indicator elsewhere in this
+    # file, so no new font dependency). Every cell of every tab, corners
+    # included, now carries the tab's real fill color at full strength;
+    # active/inactive/hover are told apart by fill-color contrast (see
+    # Theme.pm's tab_active_bg/tab_inactive_bg/tab_hover_bg — the inactive
+    # bump was the primary fix here) and by the underline-baseline break
+    # under the active tab (see $UL_ON/$UL_OFF below), not by cap shape.
+    my $TAB_CAP = "\x{2588}";  # █ full block, both edges, every tab state
     my $close_char = "\x{00d7}";  # × (multiplication sign, reliable single-width)
     my $modified_char = "\x{25cf}";  # ● (filled circle)
 
@@ -1010,8 +1025,10 @@ sub _render_tab_bar {
                     : $is_hover  ? $theme->color('tab_hover_edge')
                     :              $theme->color('tab_inactive_edge');
 
-        # Left triangle edge ◢ — underlined (part of bar territory)
-        push @_out, $bar_bg . $edge_fg . $TAB_LEFT;
+        # Left cap — underlined (part of bar territory). $edge_fg equals
+        # this tab's own bg color (see Theme.pm), and TAB_CAP is a full
+        # block, so the cell renders as a solid extension of the tab's fill.
+        push @_out, $bar_bg . $edge_fg . $TAB_CAP;
         $x++;
 
         # Tab interior
@@ -1071,11 +1088,11 @@ sub _render_tab_bar {
             type  => 'close',
         };
 
-        # Right triangle edge ◣ — re-enable underline (back to bar territory)
+        # Right cap — re-enable underline (back to bar territory)
         if ($is_active) {
             push @_out, $UL_ON;
         }
-        push @_out, $bar_bg . $edge_fg . $TAB_RIGHT;
+        push @_out, $bar_bg . $edge_fg . $TAB_CAP;
         $x++;
 
         push @buttons, {
@@ -1171,10 +1188,11 @@ sub _render_tab_bar {
 }
 
 # Calculate the display width of a tab pill (not counting inter-tab gap)
-# Width = left_tri(1) + " name" + [" ●"(2)] + [" ⌥N"(3)] + " ×"(2) + right_tri(1) + gap(1)
+# Width = left_cap(1) + " name" + [" ●"(2)] + [" ⌥N"(3)] + " ×"(2) + right_cap(1) + gap(1)
+# (cap glyph — TAB_CAP, a full block — is always exactly 1 column)
 sub _calc_tab_pill_width {
     my ($name, $is_dirty, $tab_index) = @_;
-    my $w = 1 + 1 + length($name) + 2 + 1 + 1;  # left_tri + space + name + " ×" + right_tri + gap
+    my $w = 1 + 1 + length($name) + 2 + 1 + 1;  # left_cap + space + name + " ×" + right_cap + gap
     $w += 2 if $is_dirty;            # space + ●
     $w += 3 if $tab_index < 9;       # space + ⌥N (2 chars)
     return $w;

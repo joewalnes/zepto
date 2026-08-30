@@ -15,8 +15,8 @@ qa_keys "enter" 0.3
 qa_keys "ctrl-n"
 qa_send "scratch text, never saved" 0.3
 # Dirty tabs render a "●" marker between the name and the ⌥N shortcut
-# (e.g. "◢ [untitled] ● ⌥2 ×◣"), so allow anything between them.
-qa_assert_screen "◢ \[untitled\].*⌥2" "untitled tab open before quit"
+# (e.g. "█ [untitled] ● ⌥2 ×█"), so allow anything between them.
+qa_assert_screen "█ \[untitled\].*⌥2" "untitled tab open before quit"
 
 qa_keys "ctrl-q"
 # Untitled tab is dirty — expect the save-changes prompt; discard it.
@@ -26,9 +26,9 @@ qa_send "n" 0.3
 qa_assert_exited "editor exits after discarding"
 
 qa_restart
-qa_wait_screen "◢ a\.txt ⌥1" 5
+qa_wait_screen "█ a\.txt ⌥1" 5
 
-qa_assert_screen "◢ a\.txt ⌥1" "saved file (a.txt) restored"
+qa_assert_screen "█ a\.txt ⌥1" "saved file (a.txt) restored"
 qa_assert_not_screen "\[untitled\]" "untitled buffer was not restored"
 
 qa_keys "ctrl-q"
