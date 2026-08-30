@@ -4,6 +4,7 @@
 
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)
 - Added an automated contrast check (`make test`) covering every color pair in both themes, to catch this kind of readability bug before it ships
+- Fixed editing/scrolling large files getting slower the bigger the file gets: reading a single line no longer re-copies the entire document (was happening 40-80x per rendered frame), and most single-character typing/backspacing no longer triggers a full-document rescan of the line index. Typing-and-rendering on a 30,000-line file is now roughly 19x faster; reading a line while scrolling is roughly 34x faster
 
 ## 2026-08-29
 

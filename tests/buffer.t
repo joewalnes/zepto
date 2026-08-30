@@ -295,6 +295,171 @@ subtest 'Unicode handling' => sub {
 };
 
 # ============================================================================
+# Gap-boundary line reads
+# ============================================================================
+# These exercise get_line/get_line_content/get_text when the line being
+# read straddles the pre_gap/post_gap split point -- the case a
+# fast-path (per-segment) get_text() implementation must handle correctly
+# in addition to the "entirely in pre_gap" / "entirely in post_gap" cases.
+subtest 'Line reads at the gap boundary' => sub {
+    my $buf = Zepto::Buffer->new("first\nsecond\nthird\n");
+
+    # Force the gap to sit in the middle of "second", splitting that
+    # line across pre_gap and post_gap.
+    $buf->insert(9, '');   # no-op insert still moves the gap to pos 9
+    # pos 9 is inside "second" (offset 6 is 's', 9 is 'o' in "second")
+    is($buf->get_line_content(1), 'second', 'Line straddling the gap reads correctly (content)');
+    is($buf->get_line(1), "second\n", 'Line straddling the gap reads correctly (with newline)');
+
+    # Lines entirely before the gap and entirely after the gap must
+    # still be correct.
+    is($buf->get_line_content(0), 'first', 'Line entirely before the gap');
+    is($buf->get_line_content(2), 'third', 'Line entirely after the gap');
+
+    # Now push the gap to sit exactly at a line boundary (right after
+    # a newline) and confirm reads on both neighboring lines are correct.
+    $buf->insert(13, '');  # pos 13 == start of "third" (after "second\n")
+    is($buf->get_line_content(1), 'second', 'Line before a boundary-aligned gap');
+    is($buf->get_line_content(2), 'third', 'Line after a boundary-aligned gap');
+
+    # And with the gap at position 0 (all text in post_gap).
+    $buf->insert(0, '');
+    is($buf->get_line_content(0), 'first', 'Line read with gap at position 0');
+    is($buf->get_line_content(2), 'third', 'Line read with gap at position 0 (later line)');
+
+    # And with the gap at the very end (all text in pre_gap).
+    $buf->insert($buf->length(), '');
+    is($buf->get_line_content(0), 'first', 'Line read with gap at end of buffer');
+    is($buf->get_line_content(2), 'third', 'Line read with gap at end of buffer (later line)');
+};
+
+subtest 'get_text spanning the gap boundary explicitly' => sub {
+    my $buf = Zepto::Buffer->new('0123456789');
+    $buf->insert(5, '');  # gap sits at position 5: pre_gap="01234" post_gap="56789"
+
+    is($buf->get_text(0, 5), '01234', 'get_text entirely within pre_gap');
+    is($buf->get_text(5, 10), '56789', 'get_text entirely within post_gap');
+    is($buf->get_text(3, 7), '3456', 'get_text spanning the gap boundary');
+    is($buf->get_text(4, 6), '45', 'get_text spanning gap boundary, one char each side');
+    is($buf->get_text(0, 10), '0123456789', 'get_text spanning gap covering the whole buffer');
+};
+
+# ============================================================================
+# Insert/delete exactly at line boundaries
+# ============================================================================
+subtest 'Insert exactly at line boundaries' => sub {
+    my $buf = Zepto::Buffer->new("aaa\nbbb\nccc");
+
+    # Insert right before a newline (end of line content).
+    $buf->insert(3, 'X');
+    is($buf->text(), "aaaX\nbbb\nccc", 'Insert immediately before newline');
+    is($buf->get_line_content(0), 'aaaX', 'Line content grows correctly');
+
+    # Insert right after a newline (start of next line).
+    $buf = Zepto::Buffer->new("aaa\nbbb\nccc");
+    $buf->insert(4, 'Y');
+    is($buf->text(), "aaa\nYbbb\nccc", 'Insert immediately after newline');
+    is($buf->get_line_content(1), 'Ybbb', 'Following line content grows correctly');
+
+    # Insert a newline itself at a line boundary (splits a line).
+    $buf = Zepto::Buffer->new("aaabbb");
+    $buf->insert(3, "\n");
+    is($buf->text(), "aaa\nbbb", 'Insert newline splits line in two');
+    is($buf->line_count(), 2, 'Line count increases after newline insert');
+    is($buf->get_line_content(0), 'aaa', 'First half after split');
+    is($buf->get_line_content(1), 'bbb', 'Second half after split');
+
+    # Insert at the very end of the buffer (append).
+    $buf = Zepto::Buffer->new("aaa\nbbb");
+    $buf->insert($buf->length(), '!');
+    is($buf->text(), "aaa\nbbb!", 'Insert at end of buffer appends to last line');
+    is($buf->get_line_content(1), 'bbb!', 'Last line updated after append');
+};
+
+subtest 'Delete exactly at line boundaries' => sub {
+    my $buf = Zepto::Buffer->new("aaa\nbbb\nccc");
+
+    # Delete the last character of a line (just before its newline).
+    $buf->delete(2, 1);
+    is($buf->text(), "aa\nbbb\nccc", 'Delete char just before newline');
+    is($buf->get_line_content(0), 'aa', 'Line content shrinks correctly');
+
+    # Delete the first character of a line (just after the newline).
+    $buf = Zepto::Buffer->new("aaa\nbbb\nccc");
+    $buf->delete(4, 1);
+    is($buf->text(), "aaa\nbb\nccc", 'Delete char just after newline');
+    is($buf->get_line_content(1), 'bb', 'Following line content shrinks correctly');
+
+    # Delete the newline itself (merges two lines).
+    $buf = Zepto::Buffer->new("aaa\nbbb");
+    $buf->delete(3, 1);
+    is($buf->text(), 'aaabbb', 'Delete newline merges lines');
+    is($buf->line_count(), 1, 'Line count decreases after newline delete');
+    is($buf->get_line_content(0), 'aaabbb', 'Merged line content correct');
+
+    # Delete a whole line's content (including its newline) in one call.
+    $buf = Zepto::Buffer->new("aaa\nbbb\nccc");
+    $buf->delete(4, 4);   # deletes "bbb\n"
+    is($buf->text(), "aaa\nccc", 'Delete entire middle line including newline');
+    is($buf->line_count(), 2, 'Line count reduced by one');
+    is($buf->get_line_content(1), 'ccc', 'Remaining line correct after whole-line delete');
+};
+
+subtest 'Repeated single-char edits maintain a correct line index' => sub {
+    # Simulates typing/backspacing at a fixed cursor position -- the
+    # common per-keystroke pattern the line index must stay correct
+    # under, whether it is rebuilt or incrementally maintained.
+    my $buf = Zepto::Buffer->new("line1\nline2\nline3\nline4\n");
+    $buf->line_count();  # force the line index to be built/valid
+
+    my $pos = 12;  # inside "line3"
+    for my $ch (qw(a b c d e)) {
+        $buf->insert($pos, $ch);
+        $pos++;
+    }
+    is($buf->get_line_content(2), 'abcdeline3', 'Sequential inserts at fixed pos build up correctly');
+    is($buf->line_count(), 5, 'Line count unaffected by non-newline inserts');
+    is($buf->get_line_content(0), 'line1', 'Earlier line unaffected');
+    is($buf->get_line_content(3), 'line4', 'Later line unaffected');
+    is($buf->get_line_content(4), '', 'Trailing empty line unaffected');
+
+    for (1..5) {
+        $buf->delete($pos - 1, 1);
+        $pos--;
+    }
+    is($buf->get_line_content(2), 'line3', 'Sequential deletes restore original line');
+    is($buf->line_count(), 5, 'Line count still correct after deletes');
+};
+
+# ============================================================================
+# Multi-byte UTF-8 content spanning the gap boundary
+# ============================================================================
+subtest 'Unicode content spanning the gap boundary' => sub {
+    my $buf = Zepto::Buffer->new("日本語のテスト\n二行目です\n三行目");
+
+    # Move the gap into the middle of the first (multi-byte) line.
+    $buf->insert(3, '');  # 3 chars into "日本語のテスト" (a multi-byte line)
+    is($buf->get_line_content(0), '日本語のテスト', 'Multi-byte line straddling the gap reads correctly');
+    is($buf->get_line_content(1), '二行目です', 'Following multi-byte line unaffected');
+
+    # Insert a multi-byte character at the gap-straddled position.
+    $buf->insert(3, '★');
+    is($buf->get_line_content(0), '日本語★のテスト', 'Multi-byte insert at gap position correct');
+    is($buf->line_length(0), 8, 'Line length counts characters, not bytes');
+
+    # Delete a multi-byte character at that position.
+    $buf->delete(3, 1);
+    is($buf->get_line_content(0), '日本語のテスト', 'Multi-byte delete restores original line');
+
+    # Emoji (surrogate-pair-free in Perl's internal representation) at
+    # a line boundary.
+    $buf = Zepto::Buffer->new("start\n🎉party\nend");
+    is($buf->get_line_content(1), '🎉party', 'Emoji at start of line reads correctly');
+    $buf->insert(6, '');  # gap right at start of the emoji line
+    is($buf->get_line_content(1), '🎉party', 'Emoji line correct with gap at its start');
+};
+
+# ============================================================================
 # Performance sanity checks (not real benchmarks, just sanity)
 # ============================================================================
 subtest 'Performance sanity' => sub {

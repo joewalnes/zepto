@@ -131,7 +131,7 @@ sub insert {
 
     $self->_move_gap_to($pos);
     $self->{pre_gap} .= $text;
-    $self->{_line_index_valid} = 0;
+    $self->_update_line_index_on_insert($pos, $text);
 
     return CORE::length($text);
 }
@@ -150,12 +150,23 @@ sub delete {
 
     my $deleted = substr($self->{post_gap}, 0, $actual_len);
     $self->{post_gap} = substr($self->{post_gap}, $actual_len);
-    $self->{_line_index_valid} = 0;
+    $self->_update_line_index_on_delete($pos, $deleted);
 
     return $deleted;
 }
 
-# Get text from byte position `start` to `end`
+# Get text from character position `start` to `end`
+#
+# PERFORMANCE: reads the requested slice directly out of pre_gap/post_gap
+# instead of concatenating the whole document first. Three cases:
+#   - range entirely within pre_gap  -> substr(pre_gap, ...)   (no concat)
+#   - range entirely within post_gap -> substr(post_gap, ...)  (no concat)
+#   - range straddles the gap        -> concat only the two small slices
+#     that fall within [start, end), never the full document.
+# This matters because get_line()/get_line_content() (called ~40-80x per
+# rendered frame, once per visible row) go through this function -- with
+# the old "concat pre_gap+post_gap unconditionally" implementation, every
+# single-line read re-copied the ENTIRE document.
 sub get_text {
     my ($self, $start, $end) = @_;
     $start //= 0;
@@ -163,11 +174,26 @@ sub get_text {
 
     return '' if $start >= $end;
 
-    my $full = $self->{pre_gap} . $self->{post_gap};
-    my $len = $end - $start;
-    $len = CORE::length($full) - $start if $start + $len > CORE::length($full);
+    my $len = $self->length();
+    $end = $len if $end > $len;
+    $start = 0 if $start < 0;
+    return '' if $start >= $end;
 
-    return substr($full, $start, $len);
+    my $pre_len = CORE::length($self->{pre_gap});
+
+    if ($end <= $pre_len) {
+        # Entirely within pre_gap.
+        return substr($self->{pre_gap}, $start, $end - $start);
+    }
+    elsif ($start >= $pre_len) {
+        # Entirely within post_gap.
+        return substr($self->{post_gap}, $start - $pre_len, $end - $start);
+    }
+    else {
+        # Straddles the gap boundary -- concat only the needed slices,
+        # not the whole document.
+        return substr($self->{pre_gap}, $start) . substr($self->{post_gap}, 0, $end - $pre_len);
+    }
 }
 
 # Get the full text content
@@ -231,6 +257,97 @@ sub _ensure_line_index {
 
     $self->{_line_index} = \@lines;
     $self->{_line_index_valid} = 1;
+}
+
+# Binary search the (already-valid) line index for the index of the line
+# containing character offset `$offset`. Assumes $self->{_line_index} is
+# valid and non-empty. Returns the largest line index i such that
+# lines[i].start <= $offset (i.e. the same "which line owns this offset"
+# rule used throughout the file, including the last line for offset ==
+# length()).
+sub _line_index_at_offset {
+    my ($self, $offset) = @_;
+    my $index = $self->{_line_index};
+    my $num_lines = scalar @$index;
+    return -1 unless $num_lines;
+
+    my ($lo, $hi) = (0, $num_lines - 1);
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi + 1) / 2);
+        if ($index->[$mid][0] <= $offset) {
+            $lo = $mid;
+        } else {
+            $hi = $mid - 1;
+        }
+    }
+    return $lo;
+}
+
+# Incrementally update the line index after an insert, if possible.
+#
+# PERFORMANCE: previously every insert() unconditionally invalidated the
+# line index, forcing the NEXT line-related call to rebuild it from
+# scratch -- a full text() concat + full newline rescan of the entire
+# document, once per keystroke on large files.
+#
+# Fast path: if the index is currently valid and the inserted text
+# contains no newline, the edit cannot change which offsets belong to
+# which line -- it only grows the line containing `pos` and shifts the
+# start offset of every later line by length(text). That's an O(1)
+# string-op-free update to the target line plus an O(remaining lines)
+# pass of pure integer increments -- no string scanning, no concat.
+#
+# Slow path (partial win, documented limitation): if the inserted text
+# DOES contain a newline (e.g. pressing Enter, or pasting multi-line
+# text), splitting/renumbering lines correctly is more involved, so we
+# fall back to invalidating the index for a full rebuild on next use.
+# This is still a net win in practice: the overwhelming majority of
+# edits are single-character, non-newline inserts (typing).
+sub _update_line_index_on_insert {
+    my ($self, $pos, $text) = @_;
+
+    if ($self->{_line_index_valid} && index($text, "\n") == -1) {
+        my $i = $self->_line_index_at_offset($pos);
+        if ($i >= 0) {
+            my $index = $self->{_line_index};
+            my $tlen = CORE::length($text);
+            $index->[$i][1] += $tlen;
+            for my $j (($i + 1) .. $#$index) {
+                $index->[$j][0] += $tlen;
+            }
+            return;
+        }
+    }
+
+    $self->{_line_index_valid} = 0;
+}
+
+# Incrementally update the line index after a delete, if possible.
+# Mirror image of _update_line_index_on_insert: if the deleted text
+# contains no newline, it cannot have removed a line boundary, so it
+# must lie entirely within the line containing `pos`. Shrink that
+# line and shift later lines' start offsets by -length(deleted).
+#
+# Slow path (partial win, documented limitation): deletions that remove
+# a newline (merging lines, or spanning multiple lines) fall back to a
+# full rebuild on next use, same reasoning as insert above.
+sub _update_line_index_on_delete {
+    my ($self, $pos, $deleted) = @_;
+
+    if ($self->{_line_index_valid} && CORE::length($deleted) > 0 && index($deleted, "\n") == -1) {
+        my $i = $self->_line_index_at_offset($pos);
+        if ($i >= 0) {
+            my $index = $self->{_line_index};
+            my $dlen = CORE::length($deleted);
+            $index->[$i][1] -= $dlen;
+            for my $j (($i + 1) .. $#$index) {
+                $index->[$j][0] -= $dlen;
+            }
+            return;
+        }
+    }
+
+    $self->{_line_index_valid} = 0 if CORE::length($deleted) > 0;
 }
 
 # Get number of lines in the buffer
@@ -298,17 +415,7 @@ sub offset_to_line_col {
     my $num_lines = scalar @$index;
     return (0, 0) unless $num_lines;
 
-    # Binary search for the line containing offset
-    my ($lo, $hi) = (0, $num_lines - 1);
-    while ($lo < $hi) {
-        my $mid = int(($lo + $hi + 1) / 2);
-        if ($index->[$mid][0] <= $offset) {
-            $lo = $mid;
-        } else {
-            $hi = $mid - 1;
-        }
-    }
-
+    my $lo = $self->_line_index_at_offset($offset);
     my ($start, $line_len) = @{$index->[$lo]};
     return ($lo, $offset - $start);
 }
