@@ -249,3 +249,148 @@ STEPS
 VERIFY
   - Startup reasonable (<1s typical).
   - VCS diff deferred; doesn't block first render.
+
+--------------------------------------------------------------------------------
+
+The 6 entries below (QA-PERF-016 through QA-PERF-021) are the "not vision-
+based" leg of this session's QA coverage expansion: a vision judge looking
+at a single screenshot cannot tell you an operation took 3 seconds — that
+needs real wall-clock timing, not pixel analysis. All 6 use the shared
+`qa/lib/qa-perf-helpers.sh` helper (`qa_assert_perf`/`qa_perf_poll_for`),
+which distinguishes SLOW (the expected result eventually appeared, just
+late) from HUNG/BROKEN (it never appeared at all) in the failure message —
+those need different follow-up. Thresholds are deliberately generous
+(multi-second budgets on multi-thousand-line fixtures): the goal is
+catching gross regressions and hangs, not micro-benchmarking.
+
+ID:       QA-PERF-016
+NAME:     Opening a large file renders within budget
+PRIORITY: P2
+FEATURE:  perf large, hang-detection
+SCRIPT:   tier1/perf_016_open_large_file.sh
+
+SETUP
+  ~50K-line / ~1MB file.
+
+STEPS
+  1. Launch zepto directly on the file (timer starts at process launch).
+
+VERIFY
+  - First line renders within 5s (generous budget).
+  - If it doesn't appear at all within 20s, reported as a likely hang,
+    not just slowness.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-017
+NAME:     Large paste completes within budget
+PRIORITY: P2
+FEATURE:  perf paste, hang-detection
+SCRIPT:   tier1/perf_017_large_paste.sh
+
+SETUP
+  6000-line file; a ~4000-line block copied via selection.
+
+STEPS
+  1. Select and copy ~4000 lines.
+  2. Jump to end of file, open a new line, paste.
+
+VERIFY
+  - The pasted block's unique tail marker renders within 4s.
+
+NOTES
+  Found (and fixed) an off-by-one in this script's own selection setup
+  while validating it: goto-line lands BEFORE the target line's content,
+  so selecting "back to document start" from that position excludes the
+  target line itself. See bugs.md's 2026-08-30 "QA coverage expansion"
+  entry.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-018
+NAME:     Replace All across many matches completes within budget
+PRIORITY: P2
+FEATURE:  perf find, hang-detection
+SCRIPT:   tier1/perf_018_replace_all_many_matches.sh
+
+SETUP
+  3000-line file, one match per line (3000 total matches).
+
+STEPS
+  1. Find/Replace All via the established Replace-All trigger sequence
+     (see QA-FIND-006).
+
+VERIFY
+  - All 3000 replacements land and re-render within 4s.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-019
+NAME:     Rapid sequential typing on a large file keeps up within budget
+PRIORITY: P2
+FEATURE:  perf type, hang-detection
+SCRIPT:   tier1/perf_019_rapid_typing_large_file.sh
+
+SETUP
+  20K-line file; cursor placed deep in the file (line 10000), not at the
+  top.
+
+STEPS
+  1. Send a 23-character burst as individually-sent keystrokes (no
+     batching), simulating adversarial rapid typing.
+
+VERIFY
+  - The full burst lands and renders within 8s (budget intentionally
+    includes real per-character hangon/tmux CLI overhead, not just
+    editor time).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-020
+NAME:     Word wrap toggle on a large wrapped file completes within budget
+PRIORITY: P2
+FEATURE:  perf wrap, hang-detection
+RELATED:  bugs.md's WrapMap Fenwick-tree perf fix (the O(remaining-lines)
+          tail this check exists to catch a regression of)
+SCRIPT:   tier1/perf_020_wrap_toggle_large_file.sh
+
+SETUP
+  5000 lines, each ~190 chars (guarantees wrapping at any reasonable
+  terminal width); terminal explicitly pinned to 80x24.
+
+STEPS
+  1. Toggle word wrap on (⌥Z).
+
+VERIFY
+  - A wrap continuation indicator (↪) renders within 4s.
+
+NOTES
+  Two test-script pitfalls found and fixed while validating this script
+  (not product bugs — see bugs.md's 2026-08-30 entry for both): (1) a
+  `.txt` fixture defaults to wrap ON via `Preferences.pm`'s
+  `WRAP_DEFAULT_EXTENSIONS`, flipping the toggle's expected direction —
+  fixed by using `.dat`; (2) the ambient tmux window size isn't
+  guaranteed, so lines that "should" wrap sometimes didn't on a wide
+  default window — fixed by pinning the terminal size explicitly via
+  `qa_resize_window`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-021
+NAME:     Rapid scrolling through a large file keeps up within budget
+PRIORITY: P2
+FEATURE:  perf scroll, hang-detection
+SCRIPT:   tier1/perf_021_scroll_large_file.sh
+
+SETUP
+  3000-line file.
+
+STEPS
+  1. Send a rapid 12-PageDown burst (no settle delay between presses).
+
+VERIFY
+  - The cursor's numeric line position clears a threshold (200) that's
+    only reachable by real forward scroll progress within 4s — not a
+    fixed on-screen pattern (PageDown's exact per-press line delta
+    depends on terminal height, so a numeric threshold is the robust
+    check here, not a hardcoded expected line).

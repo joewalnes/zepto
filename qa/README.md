@@ -115,6 +115,60 @@ behavioral discovery must add a test case to this plan. See CLAUDE.md
 
 The QA plan is the executable spec of Zepto's visible behavior.
 
+## Tier 2: LLM Vision-Judge Sweeps
+
+Some things are structurally impossible to check with a deterministic
+`grep`/diff assertion — "is this labeled clearly enough for a first-time
+user", "does anything on screen look visually corrupted" — because there's
+no fixed string to look for; you're asking a judgment question about an
+image. `qa/lib/llm-judge.sh` sends a screenshot + a text prompt to a
+vision-capable model and returns `PASS`/`FAIL: <reason>`; `qa_assert_visual`
+(`qa-helpers.sh`) wraps that as a normal assertion that fits the same
+`qa_pass`/`qa_fail` reporting as every other check, and skips gracefully
+(not a hard failure) when no LLM is configured.
+
+**Running it:** `make qa-visual` (tier 1 + 2) or `make qa-full` (+ tier 3).
+Plain `make qa` (tier 1 only, the default and what CI/rule-3 compliance
+requires) never touches any of this — no LLM dependency at all.
+
+**Credentials:** `qa/lib/qa-llm-defaults.sh` (sourced automatically by
+`qa-helpers.sh`) fills in a working `ZEPTO_QA_API_URL`/`_KEY`/`_MODEL`
+default for this repo's current dev machine (a local, unauthenticated
+OpenAI-compatible gateway over Tailscale, model `minimax/minimax-m3` —
+see that file's header for the full rationale and how to override it).
+Export your own `ZEPTO_QA_API_URL`/`ZEPTO_QA_API_KEY`/`ZEPTO_QA_MODEL`
+before running to point at a different gateway/model; set
+`ZEPTO_QA_SKIP_LLM=1` to force every tier2 LLM check to skip regardless
+of what's configured.
+
+**Trust but verify — always.** This class of model reliably produces
+false positives on concrete pixel-level claims (see bugs.md's
+"Calibration note" and the 2026-08-30 "QA coverage expansion" entry — one
+confirmed, reproducible blind spot is misreading Zepto's own cursor-
+position badge or the block text cursor as corruption). Treat every FAIL
+from a tier2 vision-judge script as a lead, not a confirmed bug: re-run
+that exact scenario, open the actual screenshot yourself, and only write
+it into `bugs.md` if you can see the defect with your own eyes.
+
+Four sweep areas exist today:
+
+| Area | Script(s) | What it catches |
+|------|-----------|------------------|
+| Discoverability | `tier2/discoverability_sweep.sh` | Can a first-time user tell how to quit/switch tabs/close a tab/find everything else, across widths and themes? |
+| Rendering glitches | `tier2/rendering_glitch_sweep.sh` | Visual corruption (duplication, misalignment, garbling) captured DURING/right after realistic edits — typing, undo/redo, wrap toggle, rapid tab switch, completion popup, tree toggle, resize, scroll — not resting states, since transient corruption tends to self-correct on the next repaint. |
+| Editor correctness (hybrid) | `tier1/editor_correctness_sweep.sh` (deterministic, no LLM) + `tier2/editor_correctness_visual_sweep.sh` (vision-judge) | Generalizes `QA-REG-165`'s ghost-text bug (document correct, on-screen paint wrong) across word-front/end/mid insertion, multi-cursor, undo/redo, paste — tier1 diffs saved bytes, tier2 checks the live unsaved screen for phantom/duplicated text the save-and-diff half structurally can't see. |
+| Performance / hangs | `qa/lib/qa-perf-helpers.sh` + `tier1/perf_016`-`perf_021` | NOT vision-based — real wall-clock timing via polling `hangon screen`, since a screenshot can't tell you an operation took 3 seconds. Covers large-file open, large paste, many-match Replace All, rapid typing, wrap toggle, and scroll on large files; distinguishes "slow" from "hung" in the failure message. |
+
+The individual test-case entries (`QA-EDIT-023`/`024` in `03_editing_core.txt`,
+`QA-TERM-015` in `39_terminal_rendering.txt`, `QA-PERF-016`-`021` in
+`37_performance.txt`) have the full STEPS/VERIFY detail — this table is
+just the map. None of these are `QA-REG-*` regression entries: nothing
+found by these sweeps in this session's validation runs turned out to be
+a real product bug (see bugs.md's 2026-08-30 entry) — every lead traced
+to a test-script issue (now fixed) or the cursor-badge model-misread
+pattern above. A `QA-REG-###` entry belongs here only once one of these
+sweeps actually catches and this repo fixes a real bug.
+
 ## Writing Good Test Assertions
 
 The most dangerous test is one that passes when the feature is broken.

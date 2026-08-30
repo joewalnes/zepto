@@ -501,6 +501,37 @@ qa_assert_visual() {
 }
 
 # ---------------------------------------------------------------------------
+# Terminal resize (Tier 2 visual sweeps)
+# ---------------------------------------------------------------------------
+
+# Resize the tmux window backing a hangon session. Used by visual sweep
+# scripts that need to test rendering across multiple terminal widths
+# (discoverability_sweep.sh, rendering_glitch_sweep.sh, etc).
+#   qa_resize_window [SESSION] COLS ROWS
+qa_resize_window() {
+    local sess="$QA_SESSION" cols rows
+    if [[ $# -eq 3 ]]; then
+        sess="$1"; cols="$2"; rows="$3"
+    else
+        cols="$1"; rows="$2"
+    fi
+    local tmux_sess
+    tmux_sess=$(hangon list 2>/dev/null | awk -v n="$sess" '$1==n {print $3}')
+    tmux resize-window -t "hangon-${tmux_sess}" -x "$cols" -y "$rows" 2>/dev/null || true
+    sleep 0.3
+}
+
+# ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
+
+# Fill in default vision-judge credentials for this machine, if the caller
+# hasn't already set their own (see qa-llm-defaults.sh header for why this
+# exists and what it does/doesn't cover). Sourced here, not required, so a
+# checkout missing the file for some reason degrades to the pre-existing
+# "skip tier2 LLM checks" behavior rather than erroring.
+_qa_llm_defaults="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qa-llm-defaults.sh"
+[[ -f "$_qa_llm_defaults" ]] && source "$_qa_llm_defaults"
+unset _qa_llm_defaults
+
 qa_setup

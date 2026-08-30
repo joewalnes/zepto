@@ -13,8 +13,22 @@
 #   ZEPTO_QA_API_KEY   — API key (falls back to ANTHROPIC_API_KEY, OPENAI_API_KEY)
 #   ZEPTO_QA_MODEL     — model name (default: claude-haiku-4-5-20251001)
 #
+# qa-helpers.sh sources qa-llm-defaults.sh before any of the above are
+# read, which fills in a working default gateway/model/key for the machine
+# this repo currently lives on (see that file's header) — so scripts that
+# `source qa-helpers.sh` normally never hit the "no API key configured"
+# path below unless ZEPTO_QA_SKIP_LLM=1 is set. Calling this script
+# directly, without going through qa-helpers.sh, still requires one of the
+# three env vars above to be set explicitly.
+#
 # Supports: Anthropic, OpenRouter, OpenAI, any OpenAI-compatible API,
 #           local servers (Ollama, vLLM, llama.cpp)
+#
+# Network calls here are QA tooling only (never shipped in the zepto
+# binary — CLAUDE.md's "never add network calls" rule is about the
+# editor itself, see docs/SECURITY.md). Every curl call below sets
+# --max-time so a misconfigured or unreachable endpoint fails fast as a
+# FAIL rather than hanging the whole QA run.
 # ===========================================================================
 
 set -euo pipefail
@@ -90,9 +104,14 @@ Do not add any other text, explanation, or formatting. Just PASS or FAIL: reason
 # Call API
 # ---------------------------------------------------------------------------
 
+# Generous but bounded — vision + reasoning models can genuinely take
+# 10-30s on a slow/loaded gateway, but an unreachable host (bad
+# ZEPTO_QA_API_URL, VPN down, etc.) must not hang a whole QA run.
+CURL_MAX_TIME="${ZEPTO_QA_CURL_MAX_TIME:-45}"
+
 if [[ "$USE_ANTHROPIC" == "1" ]]; then
     # Anthropic Messages API format
-    RESPONSE=$(curl -sS "$API_URL" \
+    RESPONSE=$(curl -sS --max-time "$CURL_MAX_TIME" "$API_URL" \
         -H "x-api-key: $API_KEY" \
         -H "anthropic-version: 2023-06-01" \
         -H "content-type: application/json" \
@@ -145,7 +164,7 @@ else
         CHAT_URL="${CHAT_URL%/}/chat/completions"
     fi
 
-    RESPONSE=$(curl -sS "$CHAT_URL" \
+    RESPONSE=$(curl -sS --max-time "$CURL_MAX_TIME" "$CHAT_URL" \
         -H "Authorization: Bearer $API_KEY" \
         -H "Content-Type: application/json" \
         -d "$(cat <<ENDJSON

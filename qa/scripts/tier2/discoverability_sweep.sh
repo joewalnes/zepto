@@ -27,21 +27,13 @@ fi
 
 DISC_PROMPT='You are auditing a terminal text editor against this rule: "A user has never read any documentation and never will. Everything must be discoverable by looking at the running application alone." Looking ONLY at this screenshot, answer: can a first-time user tell (a) how to quit, (b) how to switch to the next/previous tab, (c) how to close the current tab, (d) how to move focus between the file tree and the editor (if a tree is visible), and (e) where to go to find every other command if the one they want is not visible? For each of the 5, say YES (a visible on-screen hint exists) or NO (not shown anywhere on this screen). Also flag anything else that looks broken, misaligned, or illegible. Reply PASS only if all 5 are YES and nothing looks visually broken; otherwise reply FAIL: <which of a-e are NO, plus any other issue>.'
 
-resize() {
-    local sess="$1" cols="$2" rows="$3"
-    local tmux_sess
-    tmux_sess=$(hangon list 2>/dev/null | awk -v n="$sess" '$1==n {print $3}')
-    tmux resize-window -t "hangon-${tmux_sess}" -x "$cols" -y "$rows" 2>/dev/null || true
-    sleep 0.3
-}
-
 sweep_one() {
     local label="$1" cols="$2" rows="$3" theme_keys="$4" setup_fn="$5"
     file=$(qa_tmpfile_nl "disc_${label}.txt" "alpha
 beta
 gamma")
     qa_start "$file"
-    resize "$QA_SESSION" "$cols" "$rows"
+    qa_resize_window "$cols" "$rows"
     "$setup_fn"
     for tk in $theme_keys; do
         if [[ "$tk" == "light" ]]; then
