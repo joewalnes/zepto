@@ -10,6 +10,45 @@ These guidelines define the user interface standards for Zepto. They are used to
 - Consistency: use the same language, visuals, and key notation everywhere.
 - Predictability: no surprise states, no hidden modes, clear focus and state feedback.
 
+## Discoverability Contract
+
+This is the load-bearing philosophy of the project — everything else in this
+document exists in service of it. It applies to every screen, every
+terminal width, and every focus state, not just the document-editing view.
+
+- **Zepto assumes the user has never read any documentation, tutorial, or
+  help text, and never will.** Every feature must be discoverable purely by
+  looking at the running application. If a feature requires reading this
+  file, `docs/help/*.md`, or a README to find, that is a bug against this
+  contract, not a documentation gap to backfill later.
+- **Core navigation is not "just another feature."** Switching focus
+  between the file tree and the editor, moving to the next/previous tab,
+  closing the current tab, and quitting are load-bearing actions a user
+  needs within their first few seconds in the app — before they've
+  discovered the command palette exists. They must have a persistent,
+  always-visible on-screen hint in whatever context they're currently in,
+  the same way Save and Find already do — not be palette-only. (As of
+  2026-08-30 this is **not yet true**: `next_tab`, `prev_tab`, `close_tab`,
+  and `quit` are `priority => 0` in `CommandRegistry.pm`, meaning they
+  never appear as a status bar pill in any context — tracked as debt, see
+  `bugs.md`.)
+- **"On screen" means in the CURRENT context**, not "reachable in two
+  keystrokes." A hint that only appears in the DOCUMENT status bar doesn't
+  count while the user is focused on the file tree, in the find bar, or
+  looking at a prompt — each context needs its own answer to "how do I get
+  back to editing, switch tabs, or quit from here."
+- **When something genuinely can't fit, there must always be a visible,
+  unconditional signpost to where the rest lives.** Today that's the `⌃␣
+  Commands` pill — it must never be droppable by width or context, in
+  every screen this contract applies to, not only the DOCUMENT one it was
+  originally built for. A user who can't find a specific shortcut must
+  still be able to find *the place that has all shortcuts* without
+  guessing.
+- **This contract degrades honestly, not silently.** Progressive disclosure
+  under narrow widths is fine — losing a feature's on-screen hint entirely,
+  with no trace that it exists, is not. If a pill has to drop, the
+  signpost above must still be there to say "there's more, here's where."
+
 ## Discoverability And Language
 
 - All features must be exposed in the command palette and/or as interactive pills on the status bar.
