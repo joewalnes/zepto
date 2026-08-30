@@ -14,7 +14,7 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
 | **Shell injection** | Zepto shells out to git and clipboard tools. Any user-controlled path or content passed to the shell must be safely quoted. |
 | **Malicious file content** | Opened files may contain adversarial terminal escape sequences. File content must be sanitized before rendering. |
 | **Privilege escalation** | Zepto must not execute with elevated privileges. Never use setuid or sudo. |
-| **Network** | Zepto makes zero network connections. This must remain true permanently. |
+| **Network** | Zepto makes zero network connections by default. Optional AI completion feature (disabled by default, requires explicit user configuration of API endpoint + key) makes opt-in HTTPS calls to OpenAI-compatible APIs via curl. No network calls are made for any other feature. |
 
 ---
 
@@ -34,33 +34,26 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
 
 ### Shell Execution
 
-Shell commands are limited to three places:
-- **VCS integration**: `git` commands in `lib/Zepto/VCS/Git.pm`
-- **Clipboard tools**: xclip / pbcopy / xsel / wl-copy in `lib/Zepto/Terminal.pm`
-- **File search**: `git grep`, `rg`, `grep` in `lib/Zepto/FileSearchEngine.pm`
+Shell commands are limited to six places, all using safe list-form `exec()` or `system()` with argument arrays (no shell interpolation):
 
-Rules:
-- All user-controlled strings passed to the shell **must** be quoted with `_shell_quote()` or equivalent
-- Prefer targeted git subcommands over generic shell pipelines
-- Do not expand the set of shelled-out programs without security review
+1. **VCS integration** (`lib/Zepto/VCS/Git.pm`): `git` commands via list-form `open(FH, '-|')` + `exec('git', @args)`
+2. **Clipboard tools** (`lib/Zepto/Terminal.pm`): xclip / pbcopy / xsel / wl-copy via list-form pipes and `exec()`
+3. **File search** (`lib/Zepto/FileSearchEngine.pm`): `git grep`, `rg` (ripgrep), `grep` via list-form `open()` and `exec()`. Search pattern passed via `-e` flag as a direct argument, never interpolated into a string. Scope directory validated with `-d` before use. Results are display-only until user explicitly selects one to open.
+4. **Image format conversion** (`lib/Zepto/ImageConverter.pm`): `sips` (macOS) or `convert` (ImageMagick) via `system()` with argument arrays. Command detection uses backtick `which` but only for hardcoded literal commands, never user-supplied.
+5. **Text transformation** (`lib/Zepto/Editor/Commands.pm` `cmd_transform`, Alt+T): User-typed shell command piped to `sh -c`. This is an intentional capability — users consciously choose to run arbitrary shell commands on selected text, similar to a terminal. Not injection; users are explicitly requesting shell execution.
+6. **AI completion** (`lib/Zepto/AIComplete.pm`): `curl` for HTTPS requests to AI APIs via list-form `exec('curl', ...)`. Only enabled when user configures an API endpoint + key (disabled by default).
 
-```perl
-# Correct — safe
-my $cmd = "git diff -- " . _shell_quote($path);
+**Current mitigation strategy:**
+- All shell execution uses list-form pipes and `exec()`, never shell string interpolation
+- This is fundamentally safer than string quoting because it eliminates the shell as an interpreter entirely
+- User-controlled data (file paths, search patterns, etc.) never reaches the shell; they're passed as direct arguments to command invocations
 
-# Wrong — injectable
-my $cmd = "git diff -- $path";
-```
-
-**File search** (`lib/Zepto/FileSearchEngine.pm`):
-- Commands: `git grep`, `rg` (ripgrep), `grep` — for cross-file text search
-- Quoting: list-form `open(my $fh, '-|', @cmd)` — no shell interpolation; search pattern passed via `-e` flag as a direct argument, never interpolated into a string
-- Scope directory validated with `-d` before use
-- Results are display-only until user explicitly selects one to open
-
-If a new shell exec is needed, it must:
-1. Accept only a fixed command with quoted arguments — never a user-supplied command string
-2. Be documented here with its purpose and quoting approach
+**Rules for new shell execution:**
+1. Use list-form `open(my $fh, '-|', @cmd)` + `exec()` or list-form `system(@args)` — never build command strings
+2. Fixed commands only — never user-supplied command names
+3. User-controlled data passed as arguments, not interpolated into command strings
+4. Document the new location here with its purpose and approach
+5. Flag for security review before merging
 
 ### Rendering Safety
 
@@ -86,30 +79,29 @@ If a new shell exec is needed, it must:
 
 Run through this before committing any change that touches file I/O, shell execution, or rendering:
 
-- [ ] All shell-interpolated paths are quoted with `_shell_quote()`
-- [ ] No new shell commands added without review
+- [ ] All shell execution uses list-form pipes/`system()` — never shell string interpolation
+- [ ] No new shell commands added without review and documentation in this file
 - [ ] File permissions preserved on save
-- [ ] No network calls introduced
+- [ ] No network calls introduced (except via AI completion, which must be opt-in with user config)
 - [ ] Control characters from file content are neutralized before rendering
-- [ ] Path operations stay within expected directories
+- [ ] Path operations stay within expected directories (use `Cwd::realpath()` to resolve symlinks)
 - [ ] File size/depth limits respected
 
 ---
 
 ## Open Security Items
 
-| Priority | Item | Location |
-|----------|------|----------|
-| P3 | Review symlink behavior in FileTree and FilePicker — confirm no unintended traversal | `lib/Zepto/FileTree.pm`, `lib/Zepto/FilePicker.pm` |
+(No open items at this time)
 
 ## Resolved Security Items
 
 | Priority | Item | Resolution |
 |----------|------|------------|
+| P3 | Symlink traversal in FileTree and FilePicker | Audited: `Cwd::realpath()` resolves symlinks in root and all discovered paths. Traversal prevention uses `index($real, "$root/") == 0` which correctly requires a slash after root directory (preventing "/root" vs "/rootevil" bypass bug). Both `lib/Zepto/FileTree.pm` (line 112-115) and `lib/Zepto/FilePicker.pm` (line 93-95) implement this pattern correctly. |
 | P2 | Control character stripping in Renderer for file content | Fixed: `next if ord($char) < 0x20` in both render loops in `Renderer.pm` |
 | P2 | Terminal title OSC injection via file names with ESC | Fixed: `$title =~ s/[\x00-\x1f]//g` in `set_title()` in `Terminal.pm` |
 | P2 | Clipboard command construction in Terminal.pm | Audited: clipboard commands are hardcoded constants, never user-supplied; no injection path |
-| P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths go through `_shell_quote()` using correct single-quote escaping; no gaps |
+| P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths use list-form `exec()` without shell interpolation; no quoting-bypass gaps |
 
 When an item above is investigated and resolved, document the finding and remove it from this list (or move to bugs.md if it becomes a tracked bug).
 
