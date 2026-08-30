@@ -227,3 +227,45 @@ STEPS
 VERIFY
   - `supports_kitty_graphics()` returns true.
   - Image displayed inline.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TERM-015
+NAME:     Rendering glitch sweep — no visual corruption mid-operation
+          (vision-judge)
+PRIORITY: P2
+FEATURE:  term rendering, visual sweep
+RELATED:  QA-DISC-001 (discoverability_sweep.sh, the sibling general
+          vision sweep), QA-REG-165
+SCRIPT:   tier2/rendering_glitch_sweep.sh
+
+STEPS
+  Screenshots taken DURING or immediately after (deliberately little/no
+  settle delay) a battery of realistic editing operations: typing into
+  the middle of existing text, an undo/redo burst, toggling word wrap on
+  a wrapped file, rapid tab switching, opening/dismissing the completion
+  popup, opening/closing the file tree, resizing the terminal mid-edit,
+  and rapid scrolling through a large file. A broad "does anything look
+  visually broken, misaligned, duplicated, or corrupted" vision prompt is
+  used for every screenshot — this is intentionally a catch-all, not a
+  specific assertion.
+
+VERIFY
+  - Judge replies PASS for every screenshot.
+  - Requires ZEPTO_QA_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY (skips
+    gracefully without one; qa-llm-defaults.sh provides a working default
+    on this repo's dev machine — see qa/README.md).
+
+NOTES
+  Trust-but-verify is mandatory here, not optional — this vision model
+  has a confirmed, reproducible tendency to misread Zepto's own cursor-
+  position badge (the small highlighted number near the ruler/gutter
+  showing the cursor's line or column) and the solid block text cursor
+  itself as rendering corruption. Every concrete pixel-level FAIL this
+  script has produced so far (across 3 validation runs) traced back to
+  exactly that, confirmed via direct screenshot inspection each time —
+  see bugs.md's "Calibration note" (under the QA-DISC-001 entry) and the
+  2026-08-30 "QA coverage expansion" entry for the full history. Before
+  logging any FAIL from this script as a real bug: re-run just that
+  scenario, open the actual screenshot, and check "is this just the
+  cursor?" first.

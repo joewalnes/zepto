@@ -393,3 +393,75 @@ VERIFY
     batch — not one input event later.
   - Truly incomplete sequences (split across reads) still wait for the
     remaining bytes and decode correctly once complete.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-023
+NAME:     Editor correctness sweep — saved bytes exact across word-front/
+          end/mid insertion, multi-cursor, undo/redo, and paste
+PRIORITY: P1
+FEATURE:  editing correctness, hybrid deterministic+visual
+RELATED:  QA-REG-165, QA-EDIT-024 (tier2 visual companion)
+SCRIPT:   tier1/editor_correctness_sweep.sh
+
+STEPS
+  1. Type at the very FRONT of an existing word; save; diff.
+  2. Type at the END/boundary of an existing word; save; diff.
+  3. Type into the MIDDLE of an existing word; save; diff.
+  4. Select 3 occurrences of a word with Ctrl+D x3, type a replacement;
+     save; diff both affected lines.
+  5. Three separately-timed typed groups, undo twice, redo once; save;
+     diff.
+  6. Copy a whole line, jump to end of file, paste as a new line; save;
+     diff all 4 resulting lines.
+
+VERIFY
+  - Every scenario's SAVED file content matches the expected result via
+    an EXACT line comparison (not substring/grep) — this generalizes the
+    real ghost-text self-match bug (QA-REG-165: document was always
+    correct, only the on-screen paint was wrong) to a broader battery of
+    edit shapes, on the deterministic (saved-bytes) half of the check.
+  - This script needs no LLM and stays in tier1 (fast, always runs).
+
+NOTES
+  Companion QA-EDIT-024 (tier2, vision-judge) runs the SAME 6 scenarios
+  but checks the LIVE unsaved screen instead of saved bytes — the only
+  way to catch a repeat of QA-REG-165's exact failure signature (screen
+  wrong, document fine), which this deterministic half structurally
+  cannot detect on its own.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-EDIT-024
+NAME:     Editor correctness sweep — live unsaved screen matches expected
+          edit result (vision-judge)
+PRIORITY: P2
+FEATURE:  editing correctness, hybrid deterministic+visual
+RELATED:  QA-REG-165, QA-EDIT-023 (tier1 deterministic companion)
+SCRIPT:   tier2/editor_correctness_visual_sweep.sh
+
+STEPS
+  Same 6 edit scenarios as QA-EDIT-023 (word-front/end/mid insertion,
+  multi-cursor, undo/redo, paste), but after each edit: screenshot the
+  LIVE (never saved) screen and ask a vision judge whether the visible
+  line(s) match the edit's expected result, with the prompt specifically
+  describing the historical self-referential-duplication failure shape
+  (typing 'ab' in front of 'row2000text' rendering as
+  'abrow2000textrow2000text').
+
+VERIFY
+  - Judge replies PASS for each of the 6 scenarios (no phantom/duplicated
+    text visible around the edit site).
+  - Requires ZEPTO_QA_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY (skips
+    gracefully without one; qa-llm-defaults.sh provides a working default
+    on this repo's dev machine — see qa/README.md).
+
+NOTES
+  Trust-but-verify applies here exactly as it does for
+  rendering_glitch_sweep.sh (see that script's header and bugs.md's
+  "Calibration note") — before logging a FAIL from this script as a real
+  bug, re-capture that exact scenario and inspect the screenshot directly.
+  In practice this model's most common false-positive on this script is
+  misreading the solid block text cursor as an extra/missing character
+  right where it sits (see bugs.md, 2026-08-30 QA coverage expansion
+  entry) — check for that specifically before concluding anything else.
