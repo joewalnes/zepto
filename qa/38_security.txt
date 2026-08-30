@@ -190,3 +190,38 @@ STEPS
 VERIFY
   - Commands use list-form exec.
   - Pattern is passed as argument, not interpolated into a shell string.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-012
+NAME:     ReDoS protection covers regex MATCH time, not just compilation (REGRESSION)
+PRIORITY: P1
+FEATURE:  sec regex
+RELATED:  bugs.md P1 "FindEngine.pm ReDoS timeout only covers regex
+          compilation, not matching"; QA-SEC-005 (the original, narrower
+          compile-time-only protection)
+
+SETUP
+  A file whose only content is 28 "a" characters (no trailing char that
+  would let the regex bail out early).
+
+STEPS
+  1. ⌃F, ⌃R to enable regex mode.
+  2. Type the pattern `(a?){28}a{28}` — a counted-repetition-of-optional
+     form that causes genuine catastrophic backtracking in Perl's own
+     regex engine (Perl auto-optimizes away the textbook `(a+)+$` demo,
+     so that one does NOT reproduce this bug — this pattern does,
+     verified to take 15+ seconds of pure backtracking unguarded).
+
+VERIFY
+  - Editor does not hang — search returns/aborts within ~1-2 seconds
+    (MATCH_ALARM_SECS), not 15+.
+  - Editor remains fully responsive to further input afterward (Escape,
+    typing, ⌃Q all still work).
+  - No crash; process is still alive throughout.
+  - This is distinct from QA-SEC-005: that test's pattern only ever
+    exercised the compile-time alarm (compilation of `(a+)+$` is
+    instant regardless of catastrophic-backtracking risk at match
+    time) — it did not actually prove match-time protection existed.
+    This test's pattern is chosen specifically because it stays cheap
+    to *compile* but expensive to *match*.

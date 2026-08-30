@@ -1300,3 +1300,28 @@ VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
           3:1 against tab_active_bg/tab_inactive_bg/tab_hover_bg. Verified
           via direct contrast math and the actual emitted ANSI bytes on a
           live dirty tab (38;2;95;40;0).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-141
+NAME:     ReDoS timeout now covers regex match time, not just compilation
+PRIORITY: P1
+BUG:      P1 "FindEngine.pm ReDoS timeout only covers regex compilation,
+          not matching" (2026-08-30)
+CROSS-REF: QA-SEC-012, tests/find_engine_redos.t
+VERIFY    A pattern that is cheap to compile but catastrophically
+          expensive to match (`(a?){28}a{28}` against 28 "a"s — the
+          textbook `(a+)+$` demo does NOT reproduce this, Perl's engine
+          optimizes it away) no longer hangs FindEngine::tick() or
+          _search_range(). Each individual match attempt is now bounded
+          by its own alarm (MATCH_ALARM_SECS = 1s), separate from and in
+          addition to _build_regex's existing compile-time alarm. On
+          timeout the search aborts gracefully (search_timed_out() is
+          set, partial results are kept, no die escapes, no crash) rather
+          than retrying the same doomed match forever. Verified via a
+          forked-child watchdog test (find_engine_redos.t) since Perl's
+          alarm() is a single process-wide timer, which makes an
+          in-process watchdog unreliable for testing this specific bug —
+          and interactively via hangon, confirming the editor stays
+          responsive when the pathological pattern is typed into the
+          find bar.

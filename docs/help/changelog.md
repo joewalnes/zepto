@@ -4,6 +4,7 @@
 
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)
 - Added an automated contrast check (`make test`) covering every color pair in both themes, to catch this kind of readability bug before it ships
+- Improved search robustness: an unusual regex pattern (in regex-find or replace) can no longer make the editor stop responding — matching is now time-bounded the same way regex compilation already was
 
 ## 2026-08-29
 
