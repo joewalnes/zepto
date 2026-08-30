@@ -19,6 +19,7 @@ use warnings;
 use utf8;
 use Carp;
 use File::Spec;
+use File::Temp ();
 use Cwd qw(getcwd);
 use Time::HiRes qw(time);
 
@@ -74,6 +75,23 @@ use constant {
     THEME_POLL_INTERVAL_SEC     => 5.0,   # Minimum gap between "auto" theme re-checks
 };
 
+# Build the StateStore used when no caller supplies one explicitly.
+#
+# Under the test harness ($ENV{HARNESS_ACTIVE}, set automatically by
+# Test::Harness/prove — see tests/state_store.t and bugs.md P1 "defaults to
+# the developer's real ~/.config/zepto StateStore" for the incident this
+# guards against), fall back to a fresh, per-call temp directory instead of
+# the real $XDG_CONFIG_HOME/$HOME. This is per-call (not one shared dir for
+# the whole test run) so tests stay isolated from each other, not just from
+# the real machine. Outside the harness, behavior is unchanged: real end
+# users always get the real Zepto::StateStore->new() default.
+sub _default_state_store {
+    if ($ENV{HARNESS_ACTIVE}) {
+        return Zepto::StateStore->new(base_dir => File::Temp::tempdir(CLEANUP => 1));
+    }
+    return Zepto::StateStore->new();
+}
+
 sub new {
     my ($class, %opts) = @_;
 
@@ -84,7 +102,7 @@ sub new {
             $opts{no_system_clipboard} ? (no_system_clipboard => 1) : ()
         ),
         parser       => Zepto::InputParser->new(),
-        state_store  => $opts{state_store} // Zepto::StateStore->new(),
+        state_store  => $opts{state_store} // _default_state_store(),
         prefs        => undef,  # initialized below (needs state_store)
         theme        => undef,
 
