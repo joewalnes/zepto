@@ -110,6 +110,9 @@ Mixing `"\xe2\x94\x82"` (bytes) with `"\x{2502}"` (character) in the same string
 **7. WrapMap invalidation**
 Any edit that changes line count invalidates WrapMap from the edited line onwards. Movement calculations before invalidation will produce wrong visual line positions.
 
+**8. WrapMap's per-line visual-row offsets are a Fenwick tree, not a plain cache**
+`WrapMap.pm`'s `invalidate_line()` (same-line-count incremental update path) does NOT maintain an eagerly-correct "doc_line => absolute visual row offset" hash anymore — that was replaced by a Fenwick tree (`_vrow_fenwick`) over per-line segment counts, queried via the private `_vrow_offset()` method (O(log n) prefix sum) and updated via `_fenwick_update()` (O(log n) point update) instead of walking every subsequent line. This fixed a real O(remaining-lines) perf tail (bugs.md, fixed 2026-08-30) without changing the public API (`doc_line_to_visual_row`, `doc_to_visual`, `visual_to_doc`, `segment_at_visual_row`, `total_visual_rows` are unchanged). If you touch this mechanism again: the `_segments` hash and `_visual_rows` flat array are NOT the bottleneck (Perl array splice is a fast pointer memmove, confirmed by direct profiling) — only the offset-lookup structure was. `tests/wrapmap.t` has a property-based brute-force cross-check (re-derives every line's offset from `segments_for_line()` after randomized boundary-crossing edits) that is the primary safety net for this code; it caught two independently-injected mutations during development. Extend that test first if you change the offset-tracking logic.
+
 ---
 
 ## Testing Standards

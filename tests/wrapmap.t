@@ -405,4 +405,108 @@ subtest 'doc_to_visual correct after invalidate_line' => sub {
     ok($vrow1 > 1, 'Line 1 visual row shifted down due to line 0 wrapping');
 };
 
+# =============================================================================
+# Additional invalidate_line coverage for wrap-boundary-crossing edits
+# (added ahead of QA-REG-153 / bugs.md P3 WrapMap invalidate_line() perf
+# investigation, to pin down CURRENT correct behavior before any change to
+# the _doc_to_vrow offset-tracking mechanism)
+# =============================================================================
+
+# Helper: brute-force recompute every doc_line's expected first visual row
+# directly from segments_for_line(), independent of however offsets are
+# internally cached/tracked. Used to cross-check doc_line_to_visual_row()
+# without relying on hand-computed expected numbers.
+sub brute_force_offsets {
+    my ($wm, $doc) = @_;
+    my @offsets;
+    my $vrow = 0;
+    for my $l (0 .. $doc->line_count() - 1) {
+        push @offsets, $vrow;
+        $vrow += scalar @{ $wm->segments_for_line($l) };
+    }
+    return @offsets;
+}
+
+subtest 'invalidate_line at first line (line 0) shifts every following line' => sub {
+    my ($wm, $doc) = make_wm(10, "short", "x" x 25, "y" x 15, "end");
+    # Line 0: 1 seg, Line 1: 3 segs ("x"x25 @ width10), Line 2: 2 segs ("y"x15), Line 3: 1 seg, trailing: 1 seg
+    my @before = brute_force_offsets($wm, $doc);
+    is_deeply([map { $wm->doc_line_to_visual_row($_) } 0 .. $#before], \@before,
+        'Offsets match brute force before edit');
+
+    # Grow line 0 so it now wraps into 2 segments (delta = +1)
+    $doc->insert($doc->line_col_to_offset(0, 5), " plus extra words here");
+    $wm->invalidate_line(0);
+
+    my @after = brute_force_offsets($wm, $doc);
+    for my $l (0 .. $#after) {
+        is($wm->doc_line_to_visual_row($l), $after[$l], "Line $l offset correct after editing line 0");
+    }
+    ok($after[1] > $before[1], 'Line 1 offset shifted down after line 0 grew');
+};
+
+subtest 'invalidate_line at last content line shifts only the trailing line' => sub {
+    my ($wm, $doc) = make_wm(10, "short", "middle", "x" x 15);
+    # Last content line is doc line 2 ("x"x15 -> 2 segs); trailing empty line is doc line 3.
+    my $last_content_line = $doc->line_count() - 2;
+    is($doc->get_line_content($last_content_line), "x" x 15, 'Identified last content line');
+
+    my $trailing_line = $doc->line_count() - 1;
+    my $before_trailing = $wm->doc_line_to_visual_row($trailing_line);
+
+    # Shrink the last content line so it now fits in 1 segment (delta = -1)
+    $doc->delete($doc->line_col_to_offset($last_content_line, 5), 10);
+    $wm->invalidate_line($last_content_line);
+
+    my @after = brute_force_offsets($wm, $doc);
+    for my $l (0 .. $#after) {
+        is($wm->doc_line_to_visual_row($l), $after[$l], "Line $l offset correct after editing last content line");
+    }
+    is($wm->doc_line_to_visual_row($trailing_line), $before_trailing - 1,
+        'Trailing line offset shifted up by exactly the delta');
+};
+
+subtest 'multiple sequential invalidate_line calls at different lines accumulate correctly' => sub {
+    my ($wm, $doc) = make_wm(10, "aaa", "bbb", "ccc", "ddd", "eee");
+    # All 5 lines start as single-segment (short). Grow lines 0, 2, and 4 one at a
+    # time (each followed immediately by invalidate_line, mirroring the real
+    # per-keystroke call pattern), verifying full consistency after each step.
+    for my $line_idx (0, 2, 4) {
+        $doc->insert($doc->line_col_to_offset($line_idx, 3), " plus enough extra text to wrap this line");
+        $wm->invalidate_line($line_idx);
+
+        my @after = brute_force_offsets($wm, $doc);
+        for my $l (0 .. $#after) {
+            is($wm->doc_line_to_visual_row($l), $after[$l],
+                "Line $l offset correct after sequential edit of line $line_idx");
+        }
+    }
+};
+
+subtest 'doc_line_to_visual_row matches brute force after randomized boundary-crossing edits' => sub {
+    my @lines = map { "line$_ content here" } (0 .. 19);
+    my ($wm, $doc) = make_wm(12, @lines);
+
+    srand(1234);  # deterministic
+    for my $step (1 .. 25) {
+        my $line_idx = int(rand($doc->line_count() - 1));  # avoid trailing empty line
+        my $len = $doc->line_length($line_idx);
+        if ($len > 3 && rand() < 0.5) {
+            # Shrink — may cross a wrap boundary downward
+            my $cut = 1 + int(rand($len - 1));
+            $doc->delete($doc->line_col_to_offset($line_idx, 0), $cut);
+        } else {
+            # Grow — may cross a wrap boundary upward
+            $doc->insert($doc->line_col_to_offset($line_idx, 0), "extra " x (1 + int(rand(3))));
+        }
+        $wm->invalidate_line($line_idx);
+
+        my @after = brute_force_offsets($wm, $doc);
+        for my $l (0 .. $#after) {
+            is($wm->doc_line_to_visual_row($l), $after[$l],
+                "step $step: line $l offset correct after editing line $line_idx");
+        }
+    }
+};
+
 done_testing();

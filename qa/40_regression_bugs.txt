@@ -1300,3 +1300,28 @@ VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
           3:1 against tab_active_bg/tab_inactive_bg/tab_hover_bg. Verified
           via direct contrast math and the actual emitted ANSI bytes on a
           live dirty tab (38;2;95;40;0).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-153
+NAME:     WrapMap stays correct far from a wrap-boundary-crossing edit
+PRIORITY: P3
+BUG:      P3 "WrapMap::invalidate_line() has an O(remaining-lines) tail on
+          wrap-boundary changes" (2026-08-30)
+CROSS-REF: QA-WRAP-*, tests/wrapmap.t
+VERIFY    In a large word-wrapped file, an edit near the top of the file
+          that changes a line's wrapped-segment count (grows or shrinks
+          across a wrap boundary) does not corrupt document navigation
+          hundreds of lines away. invalidate_line()'s O(remaining-lines)
+          walk over _doc_to_vrow was replaced with a Fenwick tree
+          (O(log n) point update / prefix-sum query) — the public API
+          (doc_line_to_visual_row, doc_to_visual, visual_to_doc,
+          segment_at_visual_row, total_visual_rows) is unchanged, only the
+          internal offset-tracking data structure changed. Script:
+          qa/scripts/tier1/reg_153_wrapmap_boundary_edit_correctness.sh.
+          Primary correctness safety net is at the unit level:
+          tests/wrapmap.t gained a property-based brute-force cross-check
+          (every line's offset re-derived from segments_for_line() after
+          each of 25 randomized boundary-crossing edits) plus first-line/
+          last-line/sequential-multi-edit cases; mutation-tested by
+          deliberately breaking the fix two different ways, both caught.

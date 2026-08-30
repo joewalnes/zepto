@@ -4,6 +4,7 @@
 
 - Fixed the light-theme "unsaved changes" tab icon being nearly invisible (was ~1.2:1 contrast, now clears WCAG 3:1)
 - Added an automated contrast check (`make test`) covering every color pair in both themes, to catch this kind of readability bug before it ships
+- Fixed a periodic per-edit slowdown in word wrap: editing a line that gains or loses a wrapped visual row, near the top of a large wrapped file, used to briefly re-scan every line below it. Wrapped display is unaffected — this is a speed-only fix, verified with the full existing word-wrap test/QA coverage plus new correctness checks
 
 ## 2026-08-29
 

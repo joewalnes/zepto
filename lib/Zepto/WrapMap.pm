@@ -38,10 +38,21 @@ sub new {
         # Cached data (rebuilt lazily)
         _segments    => {},    # doc_line => [segment, ...]
         _visual_rows => [],    # [segment, ...] indexed by visual row
-        _doc_to_vrow => {},    # doc_line => first visual row index
         _total       => 0,     # total visual row count
         _dirty       => 1,
         _last_content_version => -1,  # Track document changes
+
+        # Fenwick tree (Binary Indexed Tree) over per-line segment counts.
+        # Gives doc_line_to_visual_row() in O(log n) with an O(log n) point
+        # update on invalidate_line(), instead of the O(remaining-lines)
+        # walk a plain "absolute offset per line" cache would need whenever
+        # a single line's segment count changes. See _fenwick_build /
+        # _fenwick_update / _vrow_offset below.
+        # 1-indexed internally: tree position p holds partial sums for
+        # document line (p-1). Size is fixed at the line_count as of the
+        # last full rebuild — invalidate_line() never changes line count.
+        _vrow_fenwick   => [],
+        _vrow_fenwick_n => 0,
 
         # Content-keyed wrap cache: content_string => [segment_templates]
         # Survives full rebuilds so unchanged lines skip wrap_line()
@@ -93,24 +104,87 @@ sub invalidate_line {
     # Replace in _segments hash
     $self->{_segments}{$line_idx} = $new_segs;
 
-    # Splice _visual_rows: remove old segments, insert new ones
-    my $vrow_start = $self->{_doc_to_vrow}{$line_idx} // 0;
+    # Splice _visual_rows: remove old segments, insert new ones.
+    # (This is a plain array splice — Perl arrays store SV pointers, so
+    # shifting the tail is a fast memmove even for large documents; it is
+    # NOT the O(remaining-lines) cost this method used to have. That cost
+    # came from the _doc_to_vrow offset walk below, replaced by a Fenwick
+    # tree point-update.)
+    my $vrow_start = $self->_vrow_offset($line_idx);
     splice(@{$self->{_visual_rows}}, $vrow_start, $old_count, @$new_segs);
 
     # Update total visual row count
     $self->{_total} += $delta;
 
-    # Adjust _doc_to_vrow for all subsequent lines
-    if ($delta != 0) {
-        my $line_count = $doc->line_count();
-        for my $l ($line_idx + 1 .. $line_count - 1) {
-            $self->{_doc_to_vrow}{$l} += $delta
-                if exists $self->{_doc_to_vrow}{$l};
-        }
-    }
+    # Point-update the Fenwick tree with this line's segment-count delta.
+    # This alone keeps every OTHER line's offset query (_vrow_offset)
+    # correct — no walk over subsequent lines needed, O(log n) instead of
+    # O(remaining-lines).
+    $self->_fenwick_update($line_idx, $delta) if $delta != 0;
 
     # Sync version so _ensure_built() won't trigger a full rebuild
     $self->{_last_content_version} = $current_version;
+}
+
+# =============================================================================
+# Fenwick tree (Binary Indexed Tree) over per-line segment counts
+# =============================================================================
+# See the _vrow_fenwick field comment in new() for the design rationale.
+# Standard BIT: 1-indexed, tree position p aggregates a range of segment
+# counts ending at document line (p-1). Verified against a brute-force
+# reference implementation across randomized update sequences and boundary
+# cases (line 0, last line, empty doc) before being wired in here.
+
+# Build the Fenwick tree from scratch given per-line segment counts.
+# $counts->[$i] = number of segments for document line $i. O(n).
+sub _fenwick_build {
+    my ($self, $counts) = @_;
+    my $n = scalar @$counts;
+    my @tree = (0) x ($n + 1);
+    for my $i (1 .. $n) {
+        $tree[$i] += $counts->[$i - 1];
+        my $parent = $i + ($i & -$i);
+        $tree[$parent] += $tree[$i] if $parent <= $n;
+    }
+    $self->{_vrow_fenwick}   = \@tree;
+    $self->{_vrow_fenwick_n} = $n;
+}
+
+# Point update: document line $line_idx's segment count changed by $delta.
+# O(log n). No-op (silently) if $line_idx is out of the tree's current range
+# — this should not happen in practice since invalidate_line() only runs on
+# a stale-but-same-line-count map, but this guards against an inconsistent
+# call rather than corrupting the tree or dying.
+sub _fenwick_update {
+    my ($self, $line_idx, $delta) = @_;
+    return unless $delta;
+    my $tree = $self->{_vrow_fenwick};
+    my $n    = $self->{_vrow_fenwick_n};
+    my $i = $line_idx + 1;
+    return if $i < 1 || $i > $n;
+    while ($i <= $n) {
+        $tree->[$i] += $delta;
+        $i += $i & (-$i);
+    }
+}
+
+# First visual row of document line $line_idx: sum of segment counts for
+# document lines [0, $line_idx - 1]. O(log n). This replaces the old
+# "_doc_to_vrow hash of eagerly-maintained absolute offsets" cache.
+sub _vrow_offset {
+    my ($self, $line_idx) = @_;
+    my $tree = $self->{_vrow_fenwick};
+    my $n    = $self->{_vrow_fenwick_n};
+    return 0 unless $n;
+    my $i = $line_idx;
+    $i = $n if $i > $n;
+    return 0 if $i <= 0;
+    my $sum = 0;
+    while ($i > 0) {
+        $sum += $tree->[$i];
+        $i -= $i & (-$i);
+    }
+    return $sum;
 }
 
 # Rebuild the full map if dirty or document content has changed.
@@ -138,11 +212,11 @@ sub _ensure_built {
 
     $self->{_segments} = {};
     $self->{_visual_rows} = [];
-    $self->{_doc_to_vrow} = {};
 
     my $line_count = $doc ? $doc->line_count() : 0;
     my $vrow = 0;
     my %new_cache;
+    my @seg_counts;  # per-line segment count, used to (re)build the Fenwick tree below
 
     for my $line_idx (0 .. $line_count - 1) {
         my $content = $doc->get_line_content($line_idx);
@@ -163,13 +237,15 @@ sub _ensure_built {
         $new_cache{$content} //= $segs;
 
         $self->{_segments}{$line_idx} = $segs;
-        $self->{_doc_to_vrow}{$line_idx} = $vrow;
+        $seg_counts[$line_idx] = scalar @$segs;
 
         for my $seg (@$segs) {
             push @{$self->{_visual_rows}}, $seg;
             $vrow++;
         }
     }
+
+    $self->_fenwick_build(\@seg_counts);
 
     $self->{_wrap_cache} = \%new_cache;
     $self->{_cached_width} = $width;
@@ -313,7 +389,7 @@ sub visual_rows_for_line {
 sub doc_line_to_visual_row {
     my ($self, $doc_line) = @_;
     $self->_ensure_built();
-    return $self->{_doc_to_vrow}{$doc_line} // 0;
+    return $self->_vrow_offset($doc_line);
 }
 
 sub segment_at_visual_row {
@@ -344,11 +420,11 @@ sub doc_to_visual {
     my $segs = $self->{_segments}{$doc_line};
     unless ($segs && @$segs) {
         # Line not in map (shouldn't happen if built correctly)
-        my $vrow = $self->{_doc_to_vrow}{$doc_line} // 0;
+        my $vrow = $self->_vrow_offset($doc_line);
         return ($vrow, 0);
     }
 
-    my $base_vrow = $self->{_doc_to_vrow}{$doc_line} // 0;
+    my $base_vrow = $self->_vrow_offset($doc_line);
 
     # Find which segment contains doc_col
     for my $i (0 .. $#$segs) {
