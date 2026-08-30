@@ -300,3 +300,49 @@ STEPS
 VERIFY
   - Spans from top of text area to bottom.
   - No gaps.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-020
+NAME:     Minimap auto-hides below MINIMAP_MIN_COLS, independent of the
+          manual toggle (REGRESSION)
+PRIORITY: P1
+FEATURE:  minimap layout narrow-width
+RELATED:  bugs.md 2026-08-30 "Minimap eats scarce width at narrow
+          terminal sizes" — QA-REG-177
+
+STEPS
+  1. Open a file long enough to trigger the minimap (more lines than fit
+     the viewport) with the Minimap preference ON (default).
+  2. At a wide terminal (80 cols or more), confirm the minimap column
+     (Braille density pattern) is visible on the right edge.
+  3. Resize/relaunch at exactly 60 cols. Confirm the minimap is still
+     visible.
+  4. Resize/relaunch at 59 cols. Confirm the minimap has disappeared —
+     the reclaimed column goes to document text, not dead space.
+  5. Resize/relaunch at 40 cols (with a realistic ~15-20 char filename,
+     file tree closed). Confirm no minimap and the status bar renders
+     cleanly with no glitch or layout jump.
+  6. At 80 cols, toggle Minimap off via the command palette or ⌥M.
+     Confirm it hides. Toggle back on. Confirm it reappears. (The manual
+     toggle is unrelated to this auto-hide behavior and must keep
+     working normally above the threshold.)
+
+VERIFY
+  - Minimap present at cols >= 60 (MINIMAP_MIN_COLS), given otherwise
+    sufficient room and preference ON.
+  - Minimap absent at cols < 60, even though the older per-frame
+    MIN_TEXT_WIDTH check alone would have left it enough room to render
+    (e.g. at 40 cols, tentative_text ~= 27 >= MIN_TEXT_WIDTH — the bug
+    was that this dynamic check was the ONLY gate; there was no hard
+    floor for a "is a minimap even worth it here" threshold).
+  - No visual glitch or layout jump exactly at the threshold — the
+    reclaimed column width goes straight to document text.
+  - Manual Minimap toggle (⌥M / command palette) still works normally
+    at widths at/above the threshold — this fix does not touch that
+    preference or turn it into a new user-facing toggle.
+  - See tests/renderer.t "get_minimap_width returns 0 below
+    MINIMAP_MIN_COLS even with plenty of room", "Minimap auto-hides via
+    full render at narrow widths (QA-REG-177)", "Manual minimap
+    preference still works normally above MINIMAP_MIN_COLS
+    (QA-REG-177)" for the automated regression coverage.

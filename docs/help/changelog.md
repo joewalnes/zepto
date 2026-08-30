@@ -16,6 +16,8 @@
 - Fixed typing at the front of an existing word (e.g. jumping to a line and typing a prefix) sometimes showing a stale, duplicated copy of that word's own trailing text on screen — was never a data-correctness issue (saved files were always correct), just a confused word-completion suggestion offering to "complete" text that was already there
 - Fixed ⌃Space (open command palette) sometimes doing nothing at all when the cursor sat right after a single typed character — it now always opens the palette (or the completion menu, when a real completion is actually available)
 - Fixed typing a space right after pressing Escape (e.g. to dismiss ghost-text suggestions) occasionally dropping that space, gluing the new text onto the previous word with no separator
+- The minimap now automatically hides itself below 60 columns wide — at 40 columns it was barely legible anyway and was crowding out document content and status bar space that matters more. The manual Minimap toggle (⌥M) is unaffected above that width
+- Fixed a real screen-corruption bug: with multi-cursor mode or column-select mode active at a narrow terminal width, the status bar could overflow past the terminal's column count, causing the terminal itself to scroll and lose the tab bar/ruler from view. The status bar's supplementary indicators (cursor count, column-selection size) now drop gracefully instead of overflowing — the cursor position and "Commands" pills always stay visible
 
 ## 2026-08-29
 

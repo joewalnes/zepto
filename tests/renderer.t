@@ -1137,13 +1137,91 @@ subtest 'get_minimap_width returns 0 for narrow terminal' => sub {
 
 subtest 'get_minimap_width accounts for tree_width' => sub {
     my $prefs = Zepto::Preferences->new(show_minimap => 1);
-    # cols=40, gutter=5, tree=20, minimap=8 => text=40-20-5-8=7 < MIN_TEXT_WIDTH
-    my $width = Zepto::Renderer->get_minimap_width(100, 20, 40, 5, $prefs, 20);
+    # cols=70 (>= MINIMAP_MIN_COLS), gutter=5, tree=55, minimap=8 => text=70-55-5-8=2 < MIN_TEXT_WIDTH
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 70, 5, $prefs, 55);
     is($width, 0, 'Minimap drops off when tree takes space');
 
-    # Without tree: cols=40, gutter=5, minimap=8 => text=27 >= MIN_TEXT_WIDTH
-    my $width2 = Zepto::Renderer->get_minimap_width(100, 20, 40, 5, $prefs, 0);
+    # Without tree: cols=70, gutter=5, minimap=8 => text=57 >= MIN_TEXT_WIDTH
+    my $width2 = Zepto::Renderer->get_minimap_width(100, 20, 70, 5, $prefs, 0);
     is($width2, 8, 'Minimap shows when tree is not present');
+};
+
+# ============================================================================
+# QA-REG-177: minimap must auto-hide below MINIMAP_MIN_COLS, regardless of
+# whether the dynamic MIN_TEXT_WIDTH check would otherwise leave it room.
+# At 40 cols a minimap eats scarce width for little value (barely legible
+# at that zoom) and crowds out content/status bar pills that matter more.
+# See bugs.md and docs/UI_GUIDELINES.md "surviving down to ~40 cols".
+# ============================================================================
+subtest 'get_minimap_width returns 0 below MINIMAP_MIN_COLS even with plenty of room' => sub {
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+    # cols=40, gutter=5, minimap=8 => dynamic text=27 >= MIN_TEXT_WIDTH, so the
+    # OLD logic (pre-QA-REG-177) would have shown it. It must not now.
+    my $width = Zepto::Renderer->get_minimap_width(100, 20, 40, 5, $prefs, 0);
+    is($width, 0, 'Minimap hidden at 40 cols even though dynamic room check would pass');
+
+    # One column below the threshold: still hidden.
+    my $width_below = Zepto::Renderer->get_minimap_width(
+        100, 20, Zepto::Renderer::MINIMAP_MIN_COLS - 1, 5, $prefs, 0
+    );
+    is($width_below, 0, 'Minimap hidden at MINIMAP_MIN_COLS - 1');
+
+    # At the threshold and above: shown (given otherwise-sufficient room).
+    my $width_at = Zepto::Renderer->get_minimap_width(
+        100, 20, Zepto::Renderer::MINIMAP_MIN_COLS, 5, $prefs, 0
+    );
+    is($width_at, Zepto::Renderer::MINIMAP_WIDTH, 'Minimap shown at MINIMAP_MIN_COLS');
+
+    my $width_above = Zepto::Renderer->get_minimap_width(
+        100, 20, Zepto::Renderer::MINIMAP_MIN_COLS + 20, 5, $prefs, 0
+    );
+    is($width_above, Zepto::Renderer::MINIMAP_WIDTH, 'Minimap shown comfortably above MINIMAP_MIN_COLS');
+};
+
+subtest 'Minimap auto-hides via full render at narrow widths (QA-REG-177)' => sub {
+    my $content = join('', map { "Line number $_ with some content here\n" } (1..50));
+    my ($doc, $view) = create_test_state($content);
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    for my $cols (40, 50, 59) {
+        my $output = Zepto::Renderer->render_string(
+            document => $doc, view => $view, theme => $theme, prefs => $prefs,
+            rows => 20, cols => $cols,
+        );
+        unlike($output, qr/[\x{2800}-\x{28FF}]/, "No minimap braille chars at cols=$cols (below threshold)");
+    }
+
+    for my $cols (60, 80, 120) {
+        my $output = Zepto::Renderer->render_string(
+            document => $doc, view => $view, theme => $theme, prefs => $prefs,
+            rows => 20, cols => $cols,
+        );
+        like($output, qr/[\x{2800}-\x{28FF}]/, "Minimap braille chars present at cols=$cols (at/above threshold)");
+    }
+};
+
+subtest 'Manual minimap preference still works normally above MINIMAP_MIN_COLS (QA-REG-177)' => sub {
+    my $content = join('', map { "Line number $_ with some content here\n" } (1..50));
+    my ($doc, $view) = create_test_state($content);
+    my $theme = Zepto::Theme->dark_theme();
+
+    # Preference OFF: no minimap even at a comfortably wide terminal.
+    my $prefs_off = Zepto::Preferences->new(show_minimap => 0);
+    my $output_off = Zepto::Renderer->render_string(
+        document => $doc, view => $view, theme => $theme, prefs => $prefs_off,
+        rows => 20, cols => 100,
+    );
+    unlike($output_off, qr/[\x{2800}-\x{28FF}]/, 'Minimap preference OFF hides minimap at 100 cols');
+
+    # Preference ON above the threshold: minimap still shows (existing
+    # manual toggle behavior — this fix must not touch it).
+    my $prefs_on = Zepto::Preferences->new(show_minimap => 1);
+    my $output_on = Zepto::Renderer->render_string(
+        document => $doc, view => $view, theme => $theme, prefs => $prefs_on,
+        rows => 20, cols => 100,
+    );
+    like($output_on, qr/[\x{2800}-\x{28FF}]/, 'Minimap preference ON shows minimap at 100 cols');
 };
 
 # =============================================================================
@@ -1307,6 +1385,146 @@ subtest 'Long status message is truncated in context status bar too' => sub {
     like($plain, qr/\Q$tail\E/, 'truncated message preserves the tail (filename)');
     unlike($plain, qr/y{150}/, 'the full untruncated 150-char run is not printed verbatim');
 };
+
+# ============================================================================
+# QA-REG-179: the persistent (non-message) document status bar must never
+# emit more printable-width content than the terminal's actual column
+# count, at any width. Confirmed via direct screenshot: with multi-cursor
+# mode active (⌃D "select next occurrence" a handful of times) or column
+# select mode active, the cursor-position pill + supplementary indicator
+# (COL rect / "N cursors") + fixed palette pill together could exceed
+# $cols with nothing to shrink them — the terminal then soft-wrapped the
+# overflow onto a phantom row, scrolling and corrupting the whole screen
+# (tab bar and ruler disappeared). Root cause: the COL / multi-cursor
+# segments were emitted unconditionally into the output buffer before the
+# ⌃/⌥ pill-group budget was computed, so by the time that budget clamped
+# to 0 the damage (an already-too-wide left segment) was already done.
+# Fix: those supplementary segments are now gated behind the same fixed
+# budget (cursor pill + round cap + palette pill + gaps) the rest of the
+# bar already respects, and even the cursor pill itself is ellipsized as
+# a last-resort backstop for pathological cases (huge line/col numbers).
+# See bugs.md, docs/help/changelog.md 2026-08-30, qa/40_regression_bugs.txt.
+# ============================================================================
+subtest 'Context status bar never exceeds terminal width: multi-cursor / column-select property sweep (QA-REG-179)' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $checks = 0;
+    my $failures = 0;
+    my @first_failures;
+
+    for my $nerd_font (0, 1) {
+        Zepto::Chars->set_enabled($nerd_font);
+        for my $cols (25, 30, 35, 40, 45, 50, 60, 80, 120) {
+            for my $mc (0, 1, 2, 5, 9, 15, 25, 60) {
+                for my $colsel (0, 1) {
+                    $view->clear_multi_cursors();
+                    for my $n (1 .. $mc) {
+                        $view->add_multi_cursor(line => 0, col => $n);
+                    }
+                    if ($colsel) {
+                        $view->enter_column_mode();
+                        $view->start_column_selection();
+                        $view->set_cursor(2, 5, 1);
+                    } else {
+                        $view->exit_column_mode();
+                    }
+
+                    my $bar = Zepto::Renderer->_render_context_status_bar(
+                        $doc, $view, $theme, $cols, '', 0, { editor => $editor }, 0
+                    );
+                    my $plain = strip_escapes($bar);
+                    $plain =~ s/\x1b\[K//g;
+
+                    $checks++;
+                    if (length($plain) > $cols) {
+                        $failures++;
+                        push @first_failures,
+                            "nerd_font=$nerd_font cols=$cols mc=$mc colsel=$colsel len=" . length($plain)
+                            if @first_failures < 10;
+                    }
+                }
+            }
+        }
+    }
+    Zepto::Chars->set_enabled(1);  # restore default for subsequent tests
+
+    is($failures, 0, "status bar never exceeds \$cols across $checks combinations")
+        or diag(join("\n", @first_failures));
+};
+
+# Below MINIMAP_MIN_COLS-style structural floors (roughly < 25 cols), the
+# palette pill ("Commands ⌃␣") alone — which UI_GUIDELINES.md requires stay
+# "never droppable by width or context" — cannot fit alongside anything
+# else. That is a pre-existing, out-of-scope structural limit (Zepto's
+# documented floor for essential chrome is "~40 cols", see
+# docs/UI_GUIDELINES.md), not a regression introduced or claimed fixed
+# here. The sweep above intentionally starts at 25 cols.
+subtest 'Context status bar stays exactly bounded (no slack lost) for plain single-cursor state' => sub {
+    my ($editor, $doc, $view) = create_test_editor();
+    my $theme = Zepto::Theme->dark_theme();
+
+    for my $cols (25, 30, 40, 50, 60, 80, 120) {
+        my $bar = Zepto::Renderer->_render_context_status_bar(
+            $doc, $view, $theme, $cols, '', 0, { editor => $editor }, 0
+        );
+        my $plain = strip_escapes($bar);
+        $plain =~ s/\x1b\[K//g;
+        ok(length($plain) <= $cols, "plain status bar fits within cols=$cols")
+            or diag("length=" . length($plain) . " cols=$cols");
+    }
+};
+
+# Full end-to-end sweep: varying filenames (short and realistic lengths,
+# per the original bug report's repro) crossed with a range of terminal
+# widths, asserting EVERY row of a complete rendered frame — not just the
+# status bar — stays within $cols. This is the general property the task
+# calls for: it must hold for any combination, not just the one repro.
+subtest 'No row of a full rendered frame ever exceeds terminal width, across filenames and widths (QA-REG-179)' => sub {
+    use File::Temp qw(tempdir);
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my @filenames = ('a.txt', 'x', 'zdisc_check.demo.txt', 'a-fairly-long-realistic-filename.pm');
+    my $theme = Zepto::Theme->dark_theme();
+    my $prefs = Zepto::Preferences->new(show_minimap => 1);
+
+    my $checks = 0;
+    my $failures = 0;
+    my @first_failures;
+
+    for my $filename (@filenames) {
+        my $content = join('', map { "line $_ of content\n" } (1..30));
+        my $path = "$tmpdir/$filename";
+        open(my $fh, '>', $path) or die "cannot write $path: $!";
+        print $fh $content;
+        close $fh;
+        my $doc = Zepto::Document->load($path);
+        my $view = Zepto::View->new(document => $doc);
+
+        for my $cols (30, 40, 50, 60, 80) {
+            for my $rows (15, 18, 20, 24) {
+                my $frame = Zepto::Renderer->render(
+                    document => $doc, view => $view, theme => $theme, prefs => $prefs,
+                    rows => $rows, cols => $cols,
+                );
+                for my $i (0 .. $#{ $frame->{rows} }) {
+                    my $plain = strip_escapes($frame->{rows}[$i]);
+                    $plain =~ s/\x1b\[K//g;
+                    $checks++;
+                    if (length($plain) > $cols) {
+                        $failures++;
+                        push @first_failures,
+                            "filename=$filename cols=$cols rows=$rows row_idx=$i len=" . length($plain)
+                            if @first_failures < 10;
+                    }
+                }
+            }
+        }
+    }
+
+    is($failures, 0, "no rendered row exceeds \$cols across $checks (filename, width, height) combinations")
+        or diag(join("\n", @first_failures));
+};
+
 # ============================================================================
 # Inline Markdown image detection
 # ============================================================================
