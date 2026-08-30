@@ -151,7 +151,7 @@ else
         -d "$(cat <<ENDJSON
 {
     "model": "$MODEL",
-    "max_tokens": 100,
+    "max_tokens": ${ZEPTO_QA_MAX_TOKENS:-2000},
     "messages": [
         {
             "role": "system",
@@ -177,13 +177,35 @@ else
 ENDJSON
 )" 2>/dev/null)
 
-    # Extract text from OpenAI-compatible response
+    # Extract text from OpenAI-compatible response. Some models (reasoning
+    # models, e.g. minimax-m3) put their actual analysis in a "reasoning"
+    # field and leave "content" null until reasoning concludes — if the
+    # token budget runs out first (finish_reason "length"), content stays
+    # null forever. Fall back to "reasoning"/"reasoning_details" in that
+    # case rather than crashing on a None.strip() — a real (if unlabeled)
+    # judgment is more useful than a parse error.
     RESULT=$(echo "$RESPONSE" | python3 -c '
 import sys, json
 try:
     r = json.load(sys.stdin)
     if "choices" in r and len(r["choices"]) > 0:
-        print(r["choices"][0]["message"]["content"].strip())
+        msg = r["choices"][0]["message"]
+        content = msg.get("content")
+        if content:
+            print(content.strip())
+        else:
+            reasoning = msg.get("reasoning") or ""
+            if not reasoning and msg.get("reasoning_details"):
+                reasoning = "".join(
+                    d.get("text", "") for d in msg["reasoning_details"]
+                    if isinstance(d, dict)
+                )
+            finish = r["choices"][0].get("finish_reason", "")
+            if reasoning:
+                note = " [truncated: hit max_tokens before a final answer]" if finish == "length" else ""
+                print(f"FAIL: model only produced reasoning, no final verdict{note}: " + reasoning.strip()[-500:])
+            else:
+                print("FAIL: empty response (content and reasoning both blank)")
     elif "error" in r:
         print("FAIL: API error: " + r["error"].get("message", str(r["error"])))
     else:
