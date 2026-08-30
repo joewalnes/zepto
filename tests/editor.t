@@ -48,6 +48,14 @@ sub setup_editor_doc {
     return ($doc, $view);
 }
 
+# Minimal stand-in for Completion::Controller used by the 'Autocomplete
+# toggle' subtest to verify dismiss() is called exactly when the toggle
+# turns auto-complete OFF.
+package Test::FakeCompletion;
+sub new { return bless { dismiss_count => 0 }, shift; }
+sub dismiss { my $self = shift; $self->{dismiss_count}++; }
+package main;
+
 
 # ============================================================================
 # Construction
@@ -488,6 +496,102 @@ subtest 'Markdown table rendering toggle' => sub {
     ok(!$editor->{prefs}->render_markdown_tables(), 'Markdown tables toggled off');
     $editor->cmd_toggle_markdown_tables();
     is($editor->{prefs}->render_markdown_tables(), 1, 'Markdown tables toggled back on');
+};
+
+subtest 'Auto pairs toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->auto_pairs(), 1, 'Default auto_pairs is on');
+    $editor->cmd_toggle_auto_pairs();
+    ok(!$editor->{prefs}->auto_pairs(), 'Auto pairs toggled off');
+    is($editor->{message}, 'Auto Pairs: OFF', 'Toggle-off status message');
+    $editor->cmd_toggle_auto_pairs();
+    is($editor->{prefs}->auto_pairs(), 1, 'Auto pairs toggled back on');
+    is($editor->{message}, 'Auto Pairs: ON', 'Toggle-on status message');
+};
+
+subtest 'Restore session toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    is($editor->{prefs}->restore_session(), 1, 'Default restore_session is on');
+    $editor->cmd_toggle_restore_session();
+    ok(!$editor->{prefs}->restore_session(), 'Restore session toggled off');
+    is($editor->{message}, 'Restore Session on Startup: OFF', 'Toggle-off status message');
+    $editor->cmd_toggle_restore_session();
+    is($editor->{prefs}->restore_session(), 1, 'Restore session toggled back on');
+    is($editor->{message}, 'Restore Session on Startup: ON', 'Toggle-on status message');
+};
+
+subtest 'Autocomplete toggle' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    # Substitute a fake completion controller so we can observe dismiss()
+    # being called (only) when the toggle turns auto-complete OFF.
+    $editor->{_completion} = Test::FakeCompletion->new();
+
+    is($editor->{prefs}->auto_complete(), 1, 'Default auto_complete is on');
+    $editor->cmd_toggle_autocomplete();
+    ok(!$editor->{prefs}->auto_complete(), 'Autocomplete toggled off');
+    is($editor->{message}, 'Auto Complete: OFF', 'Toggle-off status message');
+    is($editor->{_completion}->{dismiss_count}, 1, 'Completion dismissed when turned off');
+
+    $editor->cmd_toggle_autocomplete();
+    is($editor->{prefs}->auto_complete(), 1, 'Autocomplete toggled back on');
+    is($editor->{message}, 'Auto Complete: ON', 'Toggle-on status message');
+    is($editor->{_completion}->{dismiss_count}, 1, 'Completion not dismissed again when turned on');
+};
+
+subtest 'Cursor clamp after external reload' => sub {
+    my $term = mock_terminal();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    my $filename = create_temp_file("line0\nline1\nline2\nline3\nline4\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    # Cursor sits past where a shrunk file will still have content.
+    $view->set_cursor(4, 3);
+
+    # Shrink the file on disk (fewer lines, shorter last line) and reload —
+    # this is what _check_external_file_changes does before restoring the
+    # cursor via the shared _restore_clamped_cursor helper.
+    open my $fh, '>', $filename or die "Cannot write $filename: $!";
+    print $fh "ab\ncd\n";
+    close $fh;
+    $doc->reload_from_disk();
+
+    $editor->_restore_clamped_cursor($view, $doc, 4, 3);
+
+    is($view->cursor_line(), 1, 'Cursor line clamped to new last line');
+    is($view->cursor_col(), 2, 'Cursor col clamped to new (shorter) line length');
+
+    # A position still within the shrunk document's bounds is left as-is.
+    open my $fh2, '>', $filename or die "Cannot write $filename: $!";
+    print $fh2 "abcdef\nghijkl\n";
+    close $fh2;
+    $doc->reload_from_disk();
+
+    $editor->_restore_clamped_cursor($view, $doc, 0, 3);
+    is($view->cursor_line(), 0, 'In-bounds line left unchanged');
+    is($view->cursor_col(), 3, 'In-bounds col left unchanged');
 };
 
 subtest 'New preference toggles persist across StateStore-backed instances' => sub {

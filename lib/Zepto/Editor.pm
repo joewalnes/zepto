@@ -5144,14 +5144,7 @@ sub _check_external_file_changes {
                         $self->show_error_message(_user_error("Reload failed", $@));
                         return;
                     }
-                    # Restore cursor (clamped to valid range)
-                    my $max_line = $doc->line_count() - 1;
-                    $max_line = 0 if $max_line < 0;
-                    my $new_line = $old_line > $max_line ? $max_line : $old_line;
-                    my $max_col = $doc->line_length($new_line);
-                    my $new_col = $old_col > $max_col ? $max_col : $old_col;
-                    $view->set_cursor($new_line, $new_col);
-                    $view->invalidate_wrap_map();
+                    $self->_restore_clamped_cursor($view, $doc, $old_line, $old_col);
                     $self->show_message("Reloaded: $name");
                 }
                 elsif ($choice eq 'k') {
@@ -5172,15 +5165,27 @@ sub _check_external_file_changes {
             $self->show_error_message(_user_error("Reload failed", $@));
             return;
         }
-        # Restore cursor (clamped to valid range)
-        my $max_line = $doc->line_count() - 1;
-        $max_line = 0 if $max_line < 0;
-        my $new_line = $old_line > $max_line ? $max_line : $old_line;
-        my $max_col = $doc->line_length($new_line);
-        my $new_col = $old_col > $max_col ? $max_col : $old_col;
-        $view->set_cursor($new_line, $new_col);
-        $view->invalidate_wrap_map();
+        $self->_restore_clamped_cursor($view, $doc, $old_line, $old_col);
     }
+}
+
+# Clamp a cursor position captured before doc->reload_from_disk() to the
+# document's (possibly changed) bounds, then apply it to the view. Shared
+# by both call sites in _check_external_file_changes (the dirty-buffer
+# confirm-reload path and the silent-reload path) — reload_from_disk() can
+# shrink the document out from under a cursor position captured before the
+# reload, so both need the same safety clamp.
+sub _restore_clamped_cursor {
+    my ($self, $view, $doc, $old_line, $old_col) = @_;
+
+    my $max_line = $doc->line_count() - 1;
+    $max_line = 0 if $max_line < 0;
+    my $new_line = $old_line > $max_line ? $max_line : $old_line;
+    my $max_col = $doc->line_length($new_line);
+    my $new_col = $old_col > $max_col ? $max_col : $old_col;
+
+    $view->set_cursor($new_line, $new_col);
+    $view->invalidate_wrap_map();
 }
 
 # =============================================================================

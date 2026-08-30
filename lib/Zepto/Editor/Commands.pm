@@ -1270,68 +1270,103 @@ sub cmd_toggle_minimap {
     $self->{prefs}->set_show_minimap($current ? 0 : 1);
 }
 
+# Flip a boolean preference and set the standard "Label: ON/OFF" status
+# message. Shared by the toggle-preference commands below, which all
+# previously copy-pasted the same get/flip/set/message-format shape.
+# Returns the new (post-flip) value so callers needing an additional side
+# effect keyed off it (e.g. cmd_toggle_mouse enabling/disabling the
+# terminal) can run it after the preference is persisted.
+sub _toggle_pref {
+    my ($self, $getter, $setter, $label, %opts) = @_;
+    my $on_label  = $opts{on_label}  // 'ON';
+    my $off_label = $opts{off_label} // 'OFF';
+
+    my $new = !$getter->();
+    $setter->($new);
+    $self->{message} = "$label: " . ($new ? $on_label : $off_label);
+    return $new;
+}
+
 sub cmd_toggle_autocomplete {
     my ($self) = @_;
-    my $new = !$self->{prefs}->auto_complete();
-    $self->{prefs}->set_auto_complete($new);
+    my $new = $self->_toggle_pref(
+        sub { $self->{prefs}->auto_complete() },
+        sub { $self->{prefs}->set_auto_complete($_[0]) },
+        'Auto Complete',
+    );
     if (!$new && $self->{_completion}) {
         $self->{_completion}->dismiss();
     }
-    $self->{message} = "Auto Complete: " . ($new ? "ON" : "OFF");
 }
 
 sub cmd_toggle_auto_pairs {
     my ($self) = @_;
-    my $new = !$self->{prefs}->auto_pairs();
-    $self->{prefs}->set_auto_pairs($new);
-    $self->{message} = "Auto Pairs: " . ($new ? "ON" : "OFF");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->auto_pairs() },
+        sub { $self->{prefs}->set_auto_pairs($_[0]) },
+        'Auto Pairs',
+    );
 }
 
 sub cmd_toggle_restore_session {
     my ($self) = @_;
-    my $new = !$self->{prefs}->restore_session();
-    $self->{prefs}->set_restore_session($new);
-    $self->{message} = "Restore Session on Startup: " . ($new ? "ON" : "OFF");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->restore_session() },
+        sub { $self->{prefs}->set_restore_session($_[0]) },
+        'Restore Session on Startup',
+    );
 }
 
 sub cmd_toggle_mouse {
     my ($self) = @_;
-    my $new = !$self->{prefs}->mouse_enabled();
-    $self->{prefs}->set_mouse_enabled($new);
+    my $new = $self->_toggle_pref(
+        sub { $self->{prefs}->mouse_enabled() },
+        sub { $self->{prefs}->set_mouse_enabled($_[0]) },
+        'Mouse',
+    );
 
     my $term = $self->{terminal};
     if ($term) {
         $new ? $term->enable_mouse() : $term->disable_mouse();
     }
-    $self->{message} = "Mouse: " . ($new ? "ON" : "OFF");
 }
 
 sub cmd_toggle_search_wrap {
     my ($self) = @_;
-    my $new = !$self->{prefs}->search_wrap();
-    $self->{prefs}->set_search_wrap($new);
-    $self->{message} = "Search Wrap Around: " . ($new ? "ON" : "OFF");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->search_wrap() },
+        sub { $self->{prefs}->set_search_wrap($_[0]) },
+        'Search Wrap Around',
+    );
 }
 
 sub cmd_toggle_markdown_tables {
     my ($self) = @_;
-    my $new = !$self->{prefs}->render_markdown_tables();
-    $self->{prefs}->set_render_markdown_tables($new);
-    $self->{message} = "Markdown Table Rendering: " . ($new ? "ON" : "OFF");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->render_markdown_tables() },
+        sub { $self->{prefs}->set_render_markdown_tables($_[0]) },
+        'Markdown Table Rendering',
+    );
 }
 
 sub cmd_toggle_soft_tabs {
     my ($self) = @_;
-    my $new = !$self->{prefs}->soft_tabs();
-    $self->{prefs}->set_soft_tabs($new);
-    $self->{message} = "Soft Tabs: " . ($new ? "ON (spaces)" : "OFF (tabs)");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->soft_tabs() },
+        sub { $self->{prefs}->set_soft_tabs($_[0]) },
+        'Soft Tabs',
+        on_label  => 'ON (spaces)',
+        off_label => 'OFF (tabs)',
+    );
 }
 
 sub cmd_toggle_auto_indent {
     my ($self) = @_;
-    my $new = !$self->{prefs}->auto_indent();
-    $self->{prefs}->set_auto_indent($new);
-    $self->{message} = "Auto Indent: " . ($new ? "ON" : "OFF");
+    $self->_toggle_pref(
+        sub { $self->{prefs}->auto_indent() },
+        sub { $self->{prefs}->set_auto_indent($_[0]) },
+        'Auto Indent',
+    );
 }
 
 sub cmd_set_tab_width {
