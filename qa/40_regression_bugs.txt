@@ -1497,3 +1497,42 @@ VERIFY    tab_close_fg (light theme) is fg_rgb(66,67,74) (was 156,160,176)
           (active/inactive/hover). Verified via direct contrast math and
           the actual emitted ANSI bytes on a live active tab
           (38;2;66;67;74).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-150
+NAME:     Buffer line reads stay correct at/around the gap boundary on
+          large files
+PRIORITY: P2
+BUG:      P2 "Buffer::get_text() re-concatenates the whole document on
+          every line read" (2026-08-30)
+CROSS-REF: tests/buffer.t
+VERIFY    get_text()/get_line_content() read directly from pre_gap/post_gap
+          instead of concatenating the full document first — a range
+          entirely within one gap segment is a single substr, only a
+          range straddling the gap boundary (the cursor's own line) reads
+          both segments. Verified with a 5000-line file: content at file
+          start, after jumping the gap to the middle, and at file end is
+          all correct after a save+read-back round trip. Benchmarked
+          ~34x faster line reads on a 30,000-line file (34.48us -> 1.00us
+          per call).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-151
+NAME:     Buffer line index stays correct across incremental edits on
+          large files
+PRIORITY: P2
+BUG:      P2 "Buffer::_ensure_line_index() does a full O(n) rescan on
+          every edit" (2026-08-30)
+CROSS-REF: tests/buffer.t
+VERIFY    Single-character inserts/deletes (no newline in the edited
+          text) now shift only the affected line's length and later
+          lines' start offsets in O(remaining lines) integer arithmetic,
+          instead of rebuilding the entire newline index via a full-buffer
+          rescan. Edits whose text contains a newline (Enter, multi-line
+          paste/delete) still fall back to a full rebuild — verified this
+          path stays correct too. Confirmed via save+read-back on a large
+          file after a mixed sequence of single-char and newline-crossing
+          edits. Benchmarked ~19x faster on a realistic
+          interleaved-typing-and-render workload.
