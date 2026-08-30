@@ -1303,7 +1303,6 @@ VERIFY    tab_modified_fg (light theme) is fg_rgb(95,40,0), clearing WCAG
 
 --------------------------------------------------------------------------------
 
-<<<<<<< HEAD
 ID:       QA-REG-154
 NAME:     File-tree preview failure surfaces an error message, not silence
 PRIORITY: P3
