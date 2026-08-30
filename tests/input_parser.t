@@ -476,6 +476,28 @@ subtest 'Unknown CSI does not stall following events' => sub {
     is($events[1]->{key}, 'down', 'Down arrow parsed');
 };
 
+subtest 'Basic-format (non-SGR) mouse report is not decoded — treated as unknown CSI' => sub {
+    # QA-REG-145: Zepto only ever enables SGR mouse mode (Terminal.pm sends
+    # "\x1b[?1003h\x1b[?1006h" — no bare "?1000h"), so a real terminal never
+    # emits the legacy 3-byte "ESC [ M Cb Cx Cy" report. There used to be an
+    # empty, tautological ("length >= 0") if-block here that looked like an
+    # abandoned attempt to handle that format. This test proves it was
+    # already fully inert *before* removal: "ESC [ M" terminates as its own
+    # CSI sequence (M is a valid CSI final byte), decodes as an unknown CSI
+    # (EVT_NONE, discarded), and the three legacy data bytes that would
+    # follow are parsed independently as plain characters — exactly as they
+    # are now that the dead branch is gone.
+    my $parser = Zepto::InputParser->new();
+    # Cb=32 (button 0, no modifiers), Cx=33 (col 1), Cy=34 (row 2)
+    my @events = $parser->parse("\x1b[M" . chr(32) . chr(33) . chr(34));
+    is(scalar @events, 3, 'Unknown CSI (discarded) plus three literal char events');
+    is($events[0]->{type}, 'char', 'First data byte parsed as a char, not a mouse event');
+    is($events[0]->{char}, chr(32), 'First data byte value');
+    is($events[1]->{char}, chr(33), 'Second data byte value');
+    is($events[2]->{char}, chr(34), 'Third data byte value');
+    is(length($parser->{buffer}), 0, 'No bytes left stuck in buffer');
+};
+
 subtest 'Unknown SS3 does not stall following events' => sub {
     my $parser = Zepto::InputParser->new();
     my @events = $parser->parse("\x1bOZ" . "q");

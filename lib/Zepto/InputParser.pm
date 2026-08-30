@@ -247,12 +247,6 @@ sub _decode_csi {
         return $self->_decode_sgr_mouse($1, $2, $3, $final);
     }
 
-    # Mouse events (basic format)
-    if ($final eq 'M' && length($params) == 0 && length($self->{buffer}) >= 0) {
-        # Need 3 more bytes for basic mouse
-        # Actually buffer was already consumed... handle differently
-    }
-
     # Arrow keys
     if ($final eq 'A') { return $self->_make_key_event(KEY_UP, $modifiers); }
     if ($final eq 'B') { return $self->_make_key_event(KEY_DOWN, $modifiers); }
