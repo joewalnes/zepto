@@ -93,7 +93,7 @@ Test cases are written to be runnable by a human. When running
 interactively (via `hangon` or tmux), always:
 
 1. Run `make build` first.
-2. Run `hangon stopall` to clear stale sessions.
+2. Run `hangon gc` to reap dead/orphaned sessions (safe — never touches live sessions, including other agents' concurrent ones; avoid `hangon stopall`, which requires `--force` and kills everything sharing the state dir).
 3. Use `hangon start process --name zepto -- ./zepto <file>` to launch.
 4. Use `hangon screen zepto` to capture what's on screen.
 5. Use `hangon keys` / `hangon send` for input.

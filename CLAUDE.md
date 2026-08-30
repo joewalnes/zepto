@@ -176,8 +176,11 @@ Or see https://github.com/joewalnes/hangon for other installation methods (binar
 ```bash
 make build
 
-# Clean up any stale sessions first
-hangon stopall
+# Check for stale/orphaned sessions and reap only the dead ones — do NOT
+# use `hangon stopall` as routine housekeeping. It kills every session in
+# the shared state dir, including ones started by other concurrent agents
+# or processes on the same machine, and has caused real incidents this way.
+hangon gc
 
 # Start zepto in a session — always pass --state-dir pointing at a scratch
 # directory. Without it, zepto reads/writes your real ~/.config/zepto
@@ -213,12 +216,15 @@ hangon stop zepto
 | `hangon expect NAME "pattern"` | Wait for regex to appear in output |
 | `hangon screenshot NAME file.png` | Capture screen as SVG/PNG image |
 | `hangon alive NAME` | Check if process is running (exit 0=yes, 1=no) |
-| `hangon stop NAME` | Stop a session |
-| `hangon stopall` | Stop all sessions |
+| `hangon list` | List all tracked sessions (name, type, holder PID, alive) |
+| `hangon gc [--dry-run]` | Reap dead/orphaned sessions only — safe to run anytime, touches nothing live |
+| `hangon stop NAME` | Stop a session by name |
+| `hangon stopall --force` | Stop **every** session in the shared state dir, including other agents'/processes' — see warning below |
 
 #### Tips
 
-- Always `hangon stopall` before starting a new test session to avoid stale sessions
+- **Never use `hangon stopall` as routine cleanup.** It requires `--force` specifically because it's a machine-wide "kill everything sharing this state dir" — it has repeatedly killed unrelated sessions started by other concurrent agents on the same machine. Use `hangon gc` to reap only dead/orphaned sessions, and `hangon stop NAME` to stop a specific session you started. Only reach for `hangon stopall --force` when you are certain nothing else is using hangon on this machine — check `hangon list` first if in doubt.
+- Give every session a unique, descriptive `--name` (not a generic name like `zepto`) so it can't collide with another concurrent agent's session, and clean up your own by name (`hangon stop NAME`) when done rather than relying on a blanket stop.
 - Use `sleep 0.3` or `sleep 0.5` after send/keys before `screen` to let the editor render
 - Chain independent sends with `&&` for efficiency
 - Use `--name` to run multiple sessions in parallel (e.g., testing cross-tab features)
