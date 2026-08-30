@@ -6,7 +6,7 @@ qa_header "QA-REG-021: New saved file appears in tree"
 mkdir -p "$QA_TMPDIR/treedir"
 echo "existing" > "$QA_TMPDIR/treedir/existing.txt"
 
-QA_ZEPTO=$(cd /Users/joe/src/zepto && pwd)/zepto
+QA_ZEPTO="$(cd "$(dirname "$0")/../../.." && pwd)/zepto"
 qa_start "$QA_TMPDIR/treedir/existing.txt"
 
 # Make sure tree is visible

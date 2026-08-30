@@ -9,7 +9,7 @@ echo "a" > "$QA_TMPDIR/sortdir/file2.txt"
 echo "b" > "$QA_TMPDIR/sortdir/file7.txt"
 echo "c" > "$QA_TMPDIR/sortdir/file10.txt"
 
-QA_ZEPTO=$(cd /Users/joe/src/zepto && pwd)/zepto
+QA_ZEPTO="$(cd "$(dirname "$0")/../../.." && pwd)/zepto"
 qa_start "$QA_TMPDIR/sortdir/file2.txt"
 
 # Open file tree

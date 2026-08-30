@@ -1097,8 +1097,10 @@ The SIGALRM(1) timeout (`FindEngine.pm:455-462`) wraps `qr//` compilation only, 
 - References a `_shell_quote()` helper that no longer exists — the codebase moved entirely to list-form exec (stronger), but the doc wasn't updated.
 - The FileTree/FilePicker symlink-traversal item is marked open but is actually resolved (`Cwd::realpath` + correct prefix-with-slash check) — should move to "Resolved."
 
-### P3: Two hardcoded /Users/joe paths in QA scripts (repeats a documented past mistake)
-`qa/scripts/tier1/reg_019_natural_sort.sh:12` and `qa/scripts/tier1/reg_021_new_file_tree.sh:9` both do `QA_ZEPTO=$(pwd)/zepto` — the exact pattern `CLAUDE.md:150` itself cites as a past CI-breaking incident ("cd /Users/joe/src/zepto hardcoded in 5 test scripts — broke on Ubuntu"). Will break on any other machine or CI.
+### ~~P3: Two hardcoded /Users/joe paths in QA scripts (repeats a documented past mistake)~~ FIXED
+`qa/scripts/tier1/reg_019_natural_sort.sh:12` and `qa/scripts/tier1/reg_021_new_file_tree.sh:9` both hardcoded `QA_ZEPTO=$(cd /Users/joe/src/zepto && pwd)/zepto` — the exact pattern `CLAUDE.md:150` itself cites as a past CI-breaking incident ("cd /Users/joe/src/zepto hardcoded in 5 test scripts — broke on Ubuntu"). Will break on any other machine or CI.
+
+**Fix:** Replaced both with the portable pattern `QA_ZEPTO="$(cd "$(dirname "$0")/../../.." && pwd)/zepto"` that resolves the zepto binary path relative to the script's own location using `$0`, not hardcoded paths. This pattern was already in use by several other working tier1 QA scripts (`fif_015_esc_closes.sh`, `file_014_save_vcs_gutter.sh`). Both scripts tested individually with `bash` after the fix: `reg_019_natural_sort.sh` passes (0 FAILED, 1 skipped), `reg_021_new_file_tree.sh` passes (1 PASSED, 0 FAILED).
 
 ### P3: Dead code — _in_modal_state and an empty tautological InputParser branch
 - `Editor/Commands.pm:18-22` `_in_modal_state` is defined but has zero call sites anywhere in `lib/` or `tests/`. `bugs.md`'s own changelog claims it replaced guard blocks in `cmd_open_file`/`cmd_recent_files`/`cmd_find_in_files` — those functions contain no call to it; the claim appears to be incorrect, not just the code being later-orphaned.
