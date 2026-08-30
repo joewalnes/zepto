@@ -60,6 +60,7 @@ sub search {
     $self->{case_sensitive} = $opts{case_sensitive} // 0;
     $self->{use_regex} = $opts{use_regex} // 0;
     $self->{search_id}++;
+    $self->{_search_timed_out} = 0;
 
     # Abort any background search
     $self->{_bg_active} = 0;
@@ -123,11 +124,28 @@ sub tick {
     # accessing @- and @+ inside a regex loop is ~100x slower in Perl
     pos($text) = $self->{_bg_pos};
 
-    while ($text =~ /($re)/g) {
+    my $match_timed_out = 0;
+    while (1) {
+        # Guard the MATCH itself, not just compilation (see
+        # _match_with_alarm). Catastrophic backtracking happens here,
+        # inside a single m//g attempt -- the time() deadline check below
+        # only runs *between* completed matches, so it can never catch a
+        # single pathological attempt that doesn't return on its own.
+        # $1 is read INSIDE the coderef (see _match_with_alarm docs on why).
+        my ($timed_out, $matched, $match_len) = $self->_match_with_alarm(sub {
+            my $m = ($text =~ /($re)/g);
+            return $m ? (1, length($1)) : (0);
+        });
+        if ($timed_out) {
+            $match_timed_out = 1;
+            $self->{_search_timed_out} = 1;
+            last;
+        }
+        last unless $matched;
+
         # Check if search was aborted
         last if $self->{search_id} != $search_id;
 
-        my $match_len = length($1);
         my $match_start = pos($text) - $match_len;
 
         # Convert offset to line/col using binary search
@@ -145,6 +163,28 @@ sub tick {
         # Save position and check deadline periodically
         $self->{_bg_pos} = pos($text);
         last if time() >= $deadline;
+    }
+
+    # A match-time timeout means the pattern is pathological -- retrying
+    # from the same position next tick() would just hang again. Treat it
+    # as search completion (with whatever matches were found so far)
+    # rather than leaving _bg_active set, which would otherwise wedge the
+    # UI's tick loop into calling us forever with the same doomed input.
+    if ($match_timed_out) {
+        $self->{_bg_active} = 0;
+        $self->{_bg_text} = '';  # Free memory
+        $self->{all_matches} = $self->_merge_matches(
+            $self->{viewport_matches},
+            $matches
+        );
+        $self->{on_complete}->($self->{all_matches}) if $self->{on_complete};
+        return {
+            done      => 1,
+            matches   => scalar(@$matches) + scalar(@{$self->{viewport_matches}}),
+            searched  => $self->{_bg_pos},
+            total     => $text_len,
+            timed_out => 1,
+        };
     }
 
     # Check completion
@@ -187,6 +227,16 @@ sub abort {
 sub is_searching {
     my ($self) = @_;
     return $self->{_bg_active};
+}
+
+# True if the most recent search() hit a match-time regex timeout
+# (catastrophic backtracking on a pathological pattern) and had to abort
+# early. Results up to that point are still valid/available via matches()
+# -- this just tells the caller the pattern is too expensive to trust for
+# a complete result. Reset at the start of every search().
+sub search_timed_out {
+    my ($self) = @_;
+    return $self->{_search_timed_out} ? 1 : 0;
 }
 
 # Get current matches (viewport if bg not done, all if done)
@@ -463,6 +513,64 @@ sub _build_regex {
     return $re;
 }
 
+# Wall-clock ceiling (seconds) for a single regex MATCH attempt, as
+# opposed to _build_regex's ceiling for compilation. These are two
+# separate failure modes: qr// compilation can be slow on its own (regex
+# engine overflow CVEs), but catastrophic backtracking specifically
+# happens while walking the input during a match/g attempt -- compiling
+# `(a?){28}a{28}` is instant even though *matching* it against 28 a's
+# takes 15+ seconds of pure backtracking (verified empirically; Perl's
+# engine auto-optimizes away some classic ReDoS demos like `(a+)+$` but
+# not counted-repetition-of-optional forms like this one). A 1-second
+# ceiling here mirrors the existing compile-time budget and is generous
+# for any legitimate match: even multi-megabyte single-line input matches
+# in low single-digit milliseconds for any non-catastrophic pattern, so
+# this should never trip on real content, only on adversarial patterns.
+use constant MATCH_ALARM_SECS => 1;
+
+# Run a regex match attempt (passed as a coderef, so this can guard
+# `while (... =~ //g)` loops as well as single `=~` checks) under a
+# match-time alarm. Returns ($timed_out, @result), where @result is
+# exactly whatever $coderef->() returned (empty/omitted if timed out).
+#
+# This exists because _build_regex's alarm only covers qr// compilation
+# and is explicitly cancelled (alarm(0)) before the caller ever attempts
+# a match -- catastrophic backtracking happens at MATCH time, so that
+# alarm provides zero protection against it (bugs.md P1 "FindEngine.pm
+# ReDoS timeout only covers regex compilation, not matching"). Follows
+# the same cleanup discipline as _build_regex: $SIG{ALRM} is localized to
+# the eval, and alarm(0) is called both on the success path and
+# unconditionally after the eval to guarantee no alarm is left armed.
+#
+# IMPORTANT: $coderef MUST read $1/@-/@+ (or whatever match variables it
+# needs) and return already-extracted plain values -- NOT rely on the
+# caller reading match variables after this sub returns. Perl's numbered
+# match variables are dynamically scoped per-block and do not reliably
+# survive being read from outside a multi-statement eval{} block (they
+# come back undef even though the match inside succeeded); pos() on the
+# subject string is unaffected and safe to read normally after return.
+# This tripped up an earlier version of this fix (silently returned
+# $matched=1 with $1 undef) -- verified empirically, see bugs.md /
+# QA-REG-141 writeup.
+sub _match_with_alarm {
+    my ($self, $coderef) = @_;
+
+    my @result = eval {
+        local $SIG{ALRM} = sub { die "regex_match_timeout\n" };
+        alarm(MATCH_ALARM_SECS);
+        my @r = $coderef->();
+        alarm(0);
+        @r;
+    };
+    alarm(0);  # Ensure alarm is cancelled even on exception
+
+    if ($@) {
+        die $@ unless $@ eq "regex_match_timeout\n";
+        return (1);  # timed_out, no result
+    }
+    return (0, @result);
+}
+
 # Count capturing groups in a regex pattern string
 sub _count_capture_groups {
     my ($self, $pattern) = @_;
@@ -528,14 +636,19 @@ sub _count_capture_groups {
 sub _extract_captures {
     my ($self, $matched_text, $re) = @_;
 
-    my @captures;
-    if ($matched_text =~ /$re/) {
+    # $1.. are read INSIDE the coderef (see _match_with_alarm docs on why:
+    # they don't reliably survive being read after this call returns).
+    my ($timed_out, @captures) = $self->_match_with_alarm(sub {
+        return () unless $matched_text =~ /$re/;
         no strict 'refs';
+        my @c;
         for my $i (1 .. 20) {
             last unless defined ${ $i };
-            push @captures, ${ $i };
+            push @c, ${ $i };
         }
-    }
+        return @c;
+    });
+    $self->{_search_timed_out} = 1 if $timed_out;
 
     return \@captures;
 }
@@ -545,18 +658,22 @@ sub _extract_captures {
 sub _extract_capture_positions {
     my ($self, $matched_text, $re) = @_;
 
-    my @positions;
-    if ($matched_text =~ /$re/) {
+    # @-/@+ are read INSIDE the coderef (see _match_with_alarm docs on why).
+    my ($timed_out, @positions) = $self->_match_with_alarm(sub {
+        return () unless $matched_text =~ /$re/;
+        my @p;
         for my $i (1 .. $#+) {
             if (defined $-[$i]) {
-                push @positions, {
+                push @p, {
                     start  => $-[$i],
                     length => $+[$i] - $-[$i],
                     group  => $i,
                 };
             }
         }
-    }
+        return @p;
+    });
+    $self->{_search_timed_out} = 1 if $timed_out;
 
     return \@positions;
 }
@@ -643,8 +760,22 @@ sub _search_range {
     my $range_text = substr($text, $start_pos, $end_pos - $start_pos);
     pos($range_text) = 0;
 
-    while ($range_text =~ /($re)/g) {
-        my $match_len = length($1);
+    # This is the synchronous viewport search called directly from
+    # search() -- unlike tick(), it has no incremental deadline of its
+    # own, so a match-time alarm here is the ONLY thing standing between
+    # a pathological pattern and a fully blocked UI on every keystroke.
+    while (1) {
+        # $1 is read INSIDE the coderef (see _match_with_alarm docs on why).
+        my ($timed_out, $matched, $match_len) = $self->_match_with_alarm(sub {
+            my $m = ($range_text =~ /($re)/g);
+            return $m ? (1, length($1)) : (0);
+        });
+        if ($timed_out) {
+            $self->{_search_timed_out} = 1;
+            last;
+        }
+        last unless $matched;
+
         my $match_offset = $start_pos + pos($range_text) - $match_len;
         my ($line, $col) = $self->_offset_to_line_col($match_offset);
 

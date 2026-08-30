@@ -1358,3 +1358,28 @@ VERIFY    Real "Invalid tab width" error renders with error_fg (red,
           actual race is covered by the unit test cross-referenced above,
           which calls show_error_message() then a toggle command directly
           to model the same-batch scenario deterministically.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-141
+NAME:     ReDoS timeout now covers regex match time, not just compilation
+PRIORITY: P1
+BUG:      P1 "FindEngine.pm ReDoS timeout only covers regex compilation,
+          not matching" (2026-08-30)
+CROSS-REF: QA-SEC-012, tests/find_engine_redos.t
+VERIFY    A pattern that is cheap to compile but catastrophically
+          expensive to match (`(a?){28}a{28}` against 28 "a"s — the
+          textbook `(a+)+$` demo does NOT reproduce this, Perl's engine
+          optimizes it away) no longer hangs FindEngine::tick() or
+          _search_range(). Each individual match attempt is now bounded
+          by its own alarm (MATCH_ALARM_SECS = 1s), separate from and in
+          addition to _build_regex's existing compile-time alarm. On
+          timeout the search aborts gracefully (search_timed_out() is
+          set, partial results are kept, no die escapes, no crash) rather
+          than retrying the same doomed match forever. Verified via a
+          forked-child watchdog test (find_engine_redos.t) since Perl's
+          alarm() is a single process-wide timer, which makes an
+          in-process watchdog unreliable for testing this specific bug —
+          and interactively via hangon, confirming the editor stays
+          responsive when the pathological pattern is typed into the
+          find bar.
