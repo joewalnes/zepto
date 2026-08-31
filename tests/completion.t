@@ -402,26 +402,28 @@ subtest 'Controller accept with snippets' => sub {
     my $hl = Zepto::Highlighter->new();
     $hl->set_file('test.py');
 
+    # "fo" is a 2-char prefix -- meets Controller's minimum auto-trigger
+    # length (length($prefix) < 2 is rejected) -- and uniquely prefix-
+    # matches the Python "for" snippet trigger (SnippetProvider.pm's
+    # %SNIPPETS Python list: if/for/def/class/while/try/with -- "for" is
+    # the only one starting with "fo"). SnippetProvider is the only
+    # provider registered here, so this deterministically triggers and
+    # accept() can only ever return the snippet hashref -- not order- or
+    # scoring-dependent. Verified via direct invocation and 3x `prove`
+    # runs before removing the old is_active()-gated fallback.
     my $doc = make_doc("fo\n");
     my $view = Zepto::View->new(document => $doc);
     $view->set_cursor(0, 2);
 
     $ctrl->trigger($doc, $view, $hl);
+    ok($ctrl->is_active(), 'completion triggers for "fo" against Python snippets');
 
-    if ($ctrl->is_active()) {
-        my $result = $ctrl->accept();
-        if (ref($result) eq 'HASH') {
-            is($result->{kind}, 'snippet', 'accept returns snippet hashref');
-            ok(defined $result->{body}, 'snippet result has body');
-            ok(defined $result->{prefix}, 'snippet result has prefix');
-        } else {
-            # May return plain suffix if non-snippet result was ranked higher
-            ok(length($result) > 0, 'accept returns non-empty result');
-        }
-        ok(!$ctrl->is_active(), 'idle after accept');
-    } else {
-        pass('no completion active (acceptable)');
-    }
+    my $result = $ctrl->accept();
+    is(ref($result), 'HASH', 'accept returns a hashref (snippet result)');
+    is($result->{kind}, 'snippet', 'accept returns snippet hashref');
+    ok(defined $result->{body}, 'snippet result has body');
+    ok(defined $result->{prefix}, 'snippet result has prefix');
+    ok(!$ctrl->is_active(), 'idle after accept');
 };
 
 # =============================================================================
@@ -435,23 +437,26 @@ subtest 'Controller records accepted to RecentProvider' => sub {
     $ctrl->add_provider($recent);
     $ctrl->set_recent_provider($recent);
 
+    # "hel" (3 chars, well past the 2-char minimum) prefix-matches
+    # "hello_world" which CrossBufferWordProvider finds by scanning the
+    # rest of the buffer -- deterministic (the word only needs to exist
+    # anywhere else in the document, no scoring race). RecentProvider is
+    # empty at trigger time so it contributes nothing yet. Verified via
+    # 3x `prove` runs before removing the old is_active()-gated fallback.
     my $doc = make_doc("function hello_world() {}\nhel\n");
     my $view = Zepto::View->new(document => $doc);
     $view->set_cursor(1, 3);
 
     $ctrl->trigger($doc, $view, undef);
+    ok($ctrl->is_active(), 'completion triggers for "hel" against buffer word hello_world');
 
-    if ($ctrl->is_active()) {
-        $ctrl->accept();
+    $ctrl->accept();
 
-        # Check that recent provider now has a recorded entry
-        my $recent_results = $recent->complete({ prefix => 'hel', line => 'hel', col => 3 });
-        ok(@$recent_results > 0, 'recent provider has entry after accept');
-        my @hw = grep { $_->{text} eq 'hello_world' } @$recent_results;
-        ok(@hw > 0, 'hello_world was recorded in recent provider');
-    } else {
-        pass('no completion active (acceptable)');
-    }
+    # Check that recent provider now has a recorded entry
+    my $recent_results = $recent->complete({ prefix => 'hel', line => 'hel', col => 3 });
+    ok(@$recent_results > 0, 'recent provider has entry after accept');
+    my @hw = grep { $_->{text} eq 'hello_world' } @$recent_results;
+    ok(@hw > 0, 'hello_world was recorded in recent provider');
 };
 
 # =============================================================================
