@@ -2100,3 +2100,31 @@ VERIFY    The redesign did not change `_calc_tab_pill_width`'s formula
           column) and mouse-clicks it — confirming that exact tab closes
           and its immediate neighbor (the tab an off-by-one column error
           would have hit instead) is untouched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-202
+NAME:     Kitty/fixterms CSI-u modified special keys (Ctrl+Enter, etc.)
+          are not silently dropped
+PRIORITY: P3
+BUG:      P3 "Kitty/fixterms CSI-u modified special keys (Ctrl+Enter,
+          etc.) are silently and permanently dropped" — bugs.md.
+CROSS-REF: tests/input_parser.t "CSI-u modified special keys
+           (Enter/Tab/Backspace/Escape) are not dropped"
+VERIFY    `InputParser.pm`'s CSI-u handler (`ESC [ codepoint ; modifiers
+          u`, the Kitty keyboard protocol) only mapped codepoints 32-126
+          to events; Enter (13), Tab (9), Backspace (8/127), and Escape
+          (27) sent with a modifier fell through to "Unknown CSI
+          sequence" and were discarded — e.g. Ctrl+Enter did nothing at
+          all. `qa/scripts/tier1/reg_202_csiu_special_keys.sh` injects
+          the raw CSI-u byte sequences for all four keys directly into a
+          running zepto session's pty via `hangon send --stdin` (no real
+          Kitty-protocol terminal needed — the parser only cares about
+          the bytes it receives) and confirms each one now produces the
+          correct editor behavior: Ctrl+Backspace deletes a character
+          (status bar 1:4 -> 1:3), Ctrl+Enter splits the line (-> 2:1),
+          Ctrl+Tab advances the cursor past column 1, and Ctrl+Escape
+          closes an open command palette (its `╭` dialog border
+          disappears). Verified failing (5/10 assertions, exactly the
+          four CSI-u-mapped keys) against the pre-fix binary and passing
+          (10/10) against the fix.
