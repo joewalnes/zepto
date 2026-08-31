@@ -3576,4 +3576,61 @@ subtest 'cmd_toggle_nerd_font flips the nerd_font preference' => sub {
     is($editor->{prefs}->nerd_font(), $initial, 'nerd_font flipped back');
 };
 
+# ============================================================================
+# AI Completion setup — HTTPS scheme enforcement (bugs.md "AI API URL has
+# no scheme enforcement, allowing silent plaintext transmission of the API
+# key" / QA-REG-210). cmd_ai_setup's step-1 "API URL:" footer input must
+# reject any URL that doesn't start with https:// — the AI request sends
+# the user's API key as an Authorization header on every completion
+# request, so a plaintext-scheme endpoint would leak that key on the wire.
+# ============================================================================
+subtest 'cmd_ai_setup rejects a non-https API URL' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    my $orig_url = $editor->{prefs}->get('ai_api_url');
+    my $orig_ai_url = $editor->{_ai_complete}{api_url};
+
+    $editor->cmd_ai_setup();
+    is($editor->{footer_input}{prompt}, 'API URL:', 'Step 1 footer input opened');
+
+    # Submit an http:// URL (the exact plaintext-scheme mistake this bug
+    # guards against).
+    $editor->{footer_input}{on_submit}->('http://example.com/v1');
+
+    ok($editor->{message_is_error}, 'Non-https URL is flagged as an error');
+    like($editor->{message}, qr/https/i, 'Error message mentions https');
+    is($editor->{prefs}->get('ai_api_url'), $orig_url,
+        'Preference not overwritten with the rejected http:// URL');
+    is($editor->{_ai_complete}{api_url}, $orig_ai_url,
+        'In-memory AIComplete api_url not overwritten with the rejected http:// URL');
+
+    # The setup flow must not have silently advanced to step 2 either — a
+    # no-op implementation that merely skipped saving but still opened the
+    # "Model:" prompt would still leave the wizard in a state implying the
+    # (invalid) URL was accepted.
+    ok(!defined $editor->{footer_input} || $editor->{footer_input}{prompt} ne 'Model:',
+        'Setup wizard does not silently continue to step 2 after a rejected URL');
+};
+
+subtest 'cmd_ai_setup accepts a well-formed https API URL and proceeds to step 2' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    $editor->cmd_ai_setup();
+    $editor->{footer_input}{on_submit}->('https://api.example.com/v1');
+
+    ok(!$editor->{message_is_error}, 'No error for a valid https:// URL');
+    is($editor->{prefs}->get('ai_api_url'), 'https://api.example.com/v1',
+        'https:// URL is saved to preferences');
+    is($editor->{_ai_complete}{api_url}, 'https://api.example.com/v1',
+        'https:// URL is applied to the live AIComplete object');
+    is($editor->{footer_input}{prompt}, 'Model:', 'Wizard advanced to step 2 (Model)');
+};
+
 done_testing();

@@ -2569,3 +2569,80 @@ VERIFY    A pattern that is cheap to compile but catastrophically
           new keystrokes afterward — not just alive-but-wedged. Verified
           non-tautological by reverting the fix and confirming the
           script fails (2 of 3 checks) before restoring it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-209
+NAME:     AI completion API key never appears in `ps` output during a
+          real curl request
+PRIORITY: P2
+BUG:      P2 "AI API key passed as a curl command-line argument, visible
+          to other local users via ps" — see bugs.md "Scorecard audit
+          round 3". `AIComplete.pm::_child_http_request()` used to build
+          curl's Authorization header directly into argv
+          (`-H "Authorization: Bearer $api_key"`), readable by any local
+          user via `ps aux` / `/proc/<pid>/cmdline` for the whole
+          lifetime of the curl child process — which fires on every AI
+          completion request while typing. Fixed by writing the header
+          to a short-lived, mode-0600 `File::Temp` file and passing it
+          to curl via `-K`/`--config` instead, deleted immediately after
+          the request completes or is cancelled (including via the
+          `SIGTERM` the editor sends on the very next keystroke to
+          cancel an in-flight request).
+CROSS-REF: QA-SEC-013 (qa/38_security.txt — primary feature test case);
+           tests/ai_complete.t (unit-level fork/exec/argv-construction
+           coverage via a stub `curl`). AI Completion had zero QA/unit
+           coverage before this fix.
+VERIFY    `qa/scripts/tier1/reg_209_ai_apikey_not_in_ps.sh` drives the
+          real, running editor end-to-end through the actual command
+          palette, configured against a local Perl-stdlib mock HTTP
+          server (no `nc`/CPAN dependency, OS-assigned free port —
+          collision-safe under parallel QA runs) standing in for the AI
+          endpoint. The mock deliberately delays its response so the
+          real curl child stays alive for a multi-second window; the
+          script polls the live `ps` table during that window and
+          asserts BOTH that curl was actually observed invoked with
+          `-K <temp-file>` (positive proof the fixed code path ran —
+          not just "nothing bad happened because nothing happened at
+          all") and that the raw key / "Authorization" text never
+          appears anywhere in `ps aux`. A final check confirms the mock
+          server still received the correct `Authorization: Bearer`
+          header, proving the fix doesn't silently break the feature.
+          Verified non-tautological: run against the pre-fix code (`git
+          checkout` of the vulnerable version), 3 of 6 assertions failed
+          exactly as expected — the raw key showed up in `ps aux` on the
+          very first poll iteration — then re-verified all 6 pass after
+          restoring the fix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-210
+NAME:     "AI Completion: Setup" rejects a non-https API URL
+PRIORITY: P3
+BUG:      P3 "AI API URL has no scheme enforcement, allowing silent
+          plaintext transmission of the API key" — see bugs.md
+          "Scorecard audit round 3". `cmd_ai_setup`'s step-1 "API URL:"
+          footer input used to accept any non-empty string with no
+          scheme check, then later steps save the API key to that URL
+          via an Authorization header — a mistyped/pasted `http://` URL
+          would silently transmit the key in plaintext. Fixed by
+          rejecting any URL that doesn't match `^https://` (case
+          insensitive) before saving anything, via the same
+          `show_error_message()` pattern used elsewhere in
+          `Editor/Commands.pm`.
+CROSS-REF: QA-SEC-014 (qa/38_security.txt — primary feature test case);
+           tests/editor.t ('cmd_ai_setup rejects a non-https API URL',
+           'cmd_ai_setup accepts a well-formed https API URL and
+           proceeds to step 2'); QA-REG-194 (same wizard flow, secrets
+           file permissions side)
+VERIFY    `qa/scripts/tier1/reg_210_ai_url_https_required.sh` drives the
+          real editor via the command palette end-to-end: submitting
+          `http://insecure.example.com/v1` and a bare schemeless URL
+          (`example.com/v1`) both show an error mentioning https, don't
+          advance the wizard to the "Model:" step, and are never written
+          to `preferences.json`; a subsequent valid `https://` URL
+          completes the full 3-step wizard (URL → Model → API Key) and
+          is saved. Verified non-tautological: run against the pre-fix
+          code, 5 of 17 assertions failed exactly as expected (error
+          never shown, wizard silently advanced, invalid URL landed in
+          preferences.json); restoring the fix made all 17 pass again.

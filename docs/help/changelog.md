@@ -27,6 +27,8 @@
 - Fixed Ctrl+Enter, Ctrl+Tab, Ctrl+Backspace, and Ctrl+Escape being silently dropped on terminals that use the Kitty keyboard protocol (e.g. Kitty, WezTerm, Ghostty) — these modified special keys previously did nothing at all; they now register correctly
 - Fixed "Tab Width" only affecting newly-typed indentation — it now also affects how a file's existing tab characters are displayed and wrapped. Changing it in the palette re-renders any already-open tab-indented file immediately
 - Paste (⌃V) no longer freezes the editor indefinitely if the system clipboard command hangs — it now times out after a few seconds and shows an error message instead
+- Hardened AI Completion's request handling: the API key is no longer passed on the command line to the underlying `curl` process, where it could briefly be visible to other users on a shared machine (via `ps`) for the duration of each completion request — it's now delivered through a short-lived, restricted-permission file instead
+- "AI Completion: Setup" now requires the API URL to start with `https://` and shows a clear error if it doesn't, instead of silently accepting a plaintext `http://` URL that would send your API key unencrypted
 
 ## 2026-08-29
 

@@ -4,7 +4,8 @@
 
 Covers: shell injection (VCS/Git.pm, Terminal.pm), symlink traversal,
 ReDoS protection (length + timeout), atomic save (File::Temp), terminal
-escape sanitization in filenames, no network calls.
+escape sanitization in filenames, no network calls, AI completion
+(API key never in curl argv, HTTPS-only endpoint enforcement).
 
 --------------------------------------------------------------------------------
 
@@ -225,3 +226,64 @@ VERIFY
     time) — it did not actually prove match-time protection existed.
     This test's pattern is chosen specifically because it stays cheap
     to *compile* but expensive to *match*.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-013
+NAME:     AI completion API key never appears in curl argv (REGRESSION)
+PRIORITY: P2
+FEATURE:  sec ai-completion
+RELATED:  bugs.md P2 "AI API key passed as a curl command-line argument,
+          visible to other local users via ps"; QA-REG-209
+
+SETUP
+  AI Completion configured (via "AI Completion: Setup") against a local
+  test HTTP endpoint that deliberately delays its response, so the real
+  curl child process stays alive long enough to observe.
+
+STEPS
+  1. Type in the editor to trigger a real AI completion request.
+  2. While the request is in flight, inspect `ps aux` (or
+     `/proc/<pid>/cmdline` on Linux) for the curl child process.
+
+VERIFY
+  - curl is invoked with `-K <temp-file>` (a config file), never with
+    `-H "Authorization: Bearer ..."` in argv.
+  - The raw API key does not appear anywhere in `ps aux` output at any
+    point during the request.
+  - The word "Authorization" does not appear anywhere in `ps aux`
+    output either (confirms the header text itself isn't in argv, not
+    just that the specific key string happens not to match).
+  - The temp config file is mode 0600 and is deleted after the request
+    completes (or is cancelled — AI requests are routinely cancelled by
+    the very next keystroke).
+  - The request still succeeds: the configured endpoint receives the
+    correct `Authorization: Bearer <key>` header (via the config file,
+    not argv), proving this isn't just "the feature stopped working".
+  - Automated via `qa/scripts/tier1/reg_209_ai_apikey_not_in_ps.sh`.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SEC-014
+NAME:     AI Completion setup rejects a non-https API URL (REGRESSION)
+PRIORITY: P3
+FEATURE:  sec ai-completion
+RELATED:  bugs.md P3 "AI API URL has no scheme enforcement, allowing
+          silent plaintext transmission of the API key"; QA-REG-210
+
+SETUP
+  None — fresh "AI Completion: Setup" flow from the command palette.
+
+STEPS
+  1. ⌃Space, run "AI Completion: Setup".
+  2. At the "API URL:" prompt, enter an `http://` URL (or any URL with
+     no `https://` prefix) and press Enter.
+
+VERIFY
+  - A clear error message is shown (mentions https / plaintext risk),
+    not silent acceptance.
+  - The wizard does NOT advance to the "Model:" step.
+  - The rejected URL is never written to preferences.json.
+  - Re-running setup with a well-formed `https://` URL proceeds through
+    all three steps (URL, Model, API Key) normally and is saved.
+  - Automated via `qa/scripts/tier1/reg_210_ai_url_https_required.sh`.

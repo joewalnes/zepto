@@ -1383,6 +1383,21 @@ sub cmd_ai_setup {
         on_submit => sub {
             my ($url) = @_;
             return unless length($url);
+
+            # Reject non-https URLs: the AI completion request sends the
+            # user's API key as an Authorization header on every request
+            # (AIComplete.pm), so a non-https endpoint (mistyped/pasted
+            # "http://...") would silently transmit that key in plaintext.
+            # See bugs.md "AI API URL has no scheme enforcement".
+            unless ($url =~ m{^https://}i) {
+                $self->show_error_message(
+                    "API URL must start with https:// (got: $url). "
+                    . "The API key is sent as a request header, so a "
+                    . "non-https URL would transmit it in plaintext."
+                );
+                return;
+            }
+
             $prefs->set('ai_api_url', $url);
             $ai->{api_url} = $url;
 
