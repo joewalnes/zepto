@@ -1854,11 +1854,56 @@ The 4-way `is_cursor_line && is_hunk_line` → `diff_new_cursor_bg` / `cursor_li
 
 ### Test coverage (P2)
 
-### P2: New tautological-fallback tests in `tests/completion.t` — same anti-pattern round 2 fixed elsewhere in this file
+### ~~P2: New tautological-fallback tests in `tests/completion.t` — same anti-pattern round 2 fixed elsewhere in this file~~ FIXED
 `tests/completion.t:518-538` ("Controller accept") and `:543-574` ("Menu navigation") both gate their real assertions behind `if ($ctrl->is_active())` and fall through to `pass('no completion active (acceptable in minimal test)')` otherwise. Distinct subtests from the two round 2 already fixed (differently named, no longer containing this pattern). Their inputs (`"hel"` matching `hello_world` in-buffer; `"fo"` matching `foo`/`foobar`/`foobaz`) look just as deterministic as the round-2-confirmed-always-triggering ones — the `else` branch is very likely permanently dead, silently masking a broken `Controller::trigger()`/`accept()`. Fix: same as round 2's completion.t fix — confirm the inputs deterministically trigger completion and remove the fallback pass.
 
-### P2: 19 of 56 `cmd_*` command-dispatch wrappers in `Editor/Commands.pm` have zero test coverage, including one with data-loss-adjacent logic
+**Root cause**: same as round 2's original finding — both subtests were written defensively ("what if this provider doesn't trigger") without verifying that, given the fixed inputs and the single provider registered in each subtest, the trigger is in fact unconditional. It is: `Controller::trigger()` (`Controller.pm:55-168`) dismisses only when the prefix is `< 2` chars or when literally zero providers return a match after dedup/self-referential filtering — neither applies to either subtest's setup.
+
+**Fix** (`tests/completion.t`): removed the `if ($ctrl->is_active()) {...} else { pass(...) }` wrapper from both subtests, following the exact pattern round 2 already used two subtests up in the same file ("Controller accept with snippets" and "Controller records accepted to RecentProvider" — see their doc comments at `completion.t:405-413` and `:440-445`):
+- "Controller accept" (now `:518-541`): "hel" (3 chars) against `CrossBufferWordProvider`, matching in-buffer `hello_world` — the identical setup already proven deterministic in "Controller records accepted to RecentProvider". Added a doc comment explaining why, and an unconditional `ok($ctrl->is_active(), ...)` before the real assertions.
+- "Menu navigation" (now `:543-573`): "fo" (2 chars) against `CrossBufferWordProvider`, matching three in-buffer words (`foo`/`foobar`/`foobaz`) — 3 matches also guarantees a non-trivial menu for `menu_down`/`menu_up` to navigate. Same treatment.
+
+**Verification (Rule 5)**:
+- Confirmed both subtests currently pass and are deterministic: ran `prove tests/completion.t` 3x clean before touching anything.
+- Confirmed the tautology: broke `Controller::trigger()` (forced an early `return $self->dismiss()`) and observed the *old* code's `else` branch swallowing the failure via `pass('no completion active...')` — the full suite still reported all-green even with `trigger()` completely dead for these two subtests, proving the anti-pattern.
+- Rewrote per the fix above, then re-broke the underlying logic (this time via `CrossBufferWordProvider::complete()` forced to always return `[]`, since breaking `trigger()` itself now crashes an *earlier*, already-fixed subtest — the fresh break isolates the two rewritten subtests) and confirmed both now fail explicitly and correctly:
+  ```
+  not ok 11 - Controller accept
+  not ok 12 - Menu navigation
+  ```
+  (6 individual assertions failed across the two subtests, including the very first "completion triggers" check in each — no silent pass.)
+- Restored both source files, reran `prove -v tests/completion.t` 3x: `All tests successful. Files=1, Tests=16` every time, no noise.
+
+No production code changed — test-only fix. Rule 2 (interactive UI verification) does not apply.
+
+### ~~P2: 19 of 56 `cmd_*` command-dispatch wrappers in `Editor/Commands.pm` have zero test coverage, including one with data-loss-adjacent logic~~ FIXED (partial — see writeup for what's covered)
 `cmd_close_tab` (`Commands.pm:142` — "Save if dirty, then close... Only close if save succeeded", meaningful conditional logic, completely unverified), `cmd_quit` (`:188`, saves cursor position per tab before exit), `cmd_next_tab`/`cmd_prev_tab`/`cmd_switch_to_tab`/`cmd_move_tab_left`/`cmd_move_tab_right`, `cmd_select_all`, `cmd_find_in_files`/`cmd_find_replace`, `cmd_toggle_minimap`/`cmd_toggle_word_wrap`/`cmd_toggle_nerd_font`, `cmd_ai_setup`/`cmd_toggle_ai` — 19 total, zero references in `tests/*.t`. `tests/tab_manager.t` covers the underlying `TabManager` model (`remove_tab`, `move_tab`) but never the `Editor::Commands` glue that decides *when* to save-before-close or *which* tab index to target — a regression in that glue (e.g. closing without checking `is_dirty`) would pass the whole suite. Highest-value target: `cmd_close_tab`'s save-before-close logic, since a regression there is a real data-loss risk, not just a coverage gap.
+
+**Scope of this fix — 9 of the 19 got new coverage, 10 remain untested.** Prioritized by risk per the original finding: `cmd_close_tab` (the data-loss-adjacent one) first and most thoroughly, then `cmd_quit` and tab-navigation, then the simple toggles.
+
+**Traced the save-failure path first (Rule 5, step 2)**, before writing any test: `cmd_close_tab` (`Commands.pm:142-154`) calls `cmd_save()` (`:37-64`) when the doc is dirty, which wraps `$doc->save()` in `eval` and calls `show_error_message()` on `$@` — critically, on failure it does **not** clear `$doc->{dirty}`. `Document::save()` (`Document.pm:166-218`) does its atomic write via `File::Temp::tempfile(..., DIR => dirname($path), ...)` — so it's the **target directory's** write permission that gates success, not the file's own mode; `$self->{dirty} = 0` only executes after the `eval` block succeeds, so a failed save leaves `is_dirty()` true. `cmd_close_tab` then checks exactly that: `return if $self->active_doc()->is_dirty();` — realistic failure injection is therefore `chmod` on the containing directory (not the file), matching `Document::save()`'s actual mechanism rather than a guessed one.
+
+**New tests added to `tests/editor.t`** (all in the existing `mock_terminal()`/`setup_editor_doc()`/`create_temp_file()` harness already used throughout the file; each uses an isolated `Zepto::StateStore->new(base_dir => tempdir())` per the file's existing StateStore-isolation convention):
+- `cmd_close_tab: closing a clean tab just closes it, no save` — clean doc closes immediately, no save happens (mtime unchanged, no "Saved:" message), remaining tab becomes active.
+- `cmd_close_tab: closing a dirty tab saves first, then closes, when save succeeds` — dirty doc's edits land on disk and the tab closes.
+- `cmd_close_tab: closing a dirty tab does NOT close when save FAILS (data-loss prevention)` — **the critical case**. Revokes write permission on the containing directory (`chmod 0500`), with the same root-safety sanity probe pattern already used elsewhere in this file (`editor.t`'s "Tree preview of unreadable file" subtest) so the test doesn't silently pass-through when run as root. Asserts the tab is *not* closed, stays active, doc stays dirty, and an error message is shown.
+- `cmd_close_tab: closing the last remaining tab quits instead of leaving a blank tab` — traced `_do_close_tab` (`:156-186`) to confirm the actual behavior first: closing the last tab does **not** open a fresh blank tab, it sets `state = 'quit'` and returns before ever calling `remove_tab`. Test asserts exactly that (plus that the pre-quit cursor-position save still ran).
+- `cmd_quit saves cursor position for every open tab before exiting` — two tabs, distinct cursor positions, asserts both land in `StateStore`'s `history.cursor_positions` keyed by absolute path.
+- `cmd_next_tab / cmd_prev_tab wrap around the tab list` — 3-tab wraparound in both directions.
+- `cmd_next_tab / cmd_prev_tab are no-ops with only one tab`.
+- `cmd_switch_to_tab jumps directly to a valid index and ignores invalid ones` — valid index, same-index no-op, negative and out-of-range indices ignored.
+- `cmd_select_all selects the entire active document`.
+- `cmd_toggle_minimap flips the show_minimap preference`.
+- `cmd_toggle_word_wrap flips the wrap override on the active view`.
+- `cmd_toggle_nerd_font flips the nerd_font preference`.
+
+**Still untested (10 of the original 19) — left for a future pass**: `cmd_move_tab_left`/`cmd_move_tab_right` (lower risk than close/switch, simple `TabManager::move_tab` delegation, not reached this round), `cmd_find_in_files`/`cmd_find_replace` (explicitly deprioritized — need more elaborate setup, lower urgency than tab-management), `cmd_ai_setup`/`cmd_toggle_ai` (out of scope for this pass; not covered by the concurrent AI-completion security work either as of this writing — still open), and `cmd_doc_about`/`cmd_doc_changelog`/`cmd_doc_license`/`cmd_doc_tutorial` (not part of the original 19 list's named examples but confirmed via the same grep-based audit to also have zero test references — tracked separately by the existing P3 `HelpDocs.pm` finding below).
+
+**Verification (Rule 5)**: for `cmd_close_tab` specifically, deliberately commented out the `# Only close if save succeeded` guard (`return if $self->active_doc()->is_dirty();`) and reran the new save-failure subtest — it correctly failed on 3 of its assertions (tab not closed, tab still active, doc still dirty all went red) confirming the test actually catches this exact data-loss regression, not just a coverage-shaped no-op. Restored the guard and reconfirmed a clean pass. No bug was found in the actual implementation — `cmd_close_tab`, `cmd_quit`, and the tab-navigation commands all behave as documented.
+
+**Test results**: `tests/editor.t` grew from 144 to 156 subtests (12 new), full file green (`Files=1, Tests=156`). Full suite: `make test` → `Files=44, Tests=1198` (up from the previously-documented 1186), all green, no stdout/stderr noise.
+
+No production code was changed for this fix (test-only additions; the one assumption-check failure hit during development — an incorrect expected string in the `cmd_select_all` test around the document's trailing-newline handling — was a test bug, corrected before commit). Rule 2 (interactive UI verification) does not apply. No new QA script per the task's own guidance (unit-test-only change, no behavior change, no bug found).
 
 ### P3: AI-completion command-layer wiring is untested, compounding the already-open round-2 finding that `AIComplete.pm` itself has zero tests
 `cmd_ai_setup` (`Commands.pm:1371`, multi-step footer-input flow writing `ai_api_url`/`ai_model`/prefs) and `cmd_toggle_ai` (`:1354`, guards on missing API key, calls `$ai->cancel()`) are entirely untested — none of the command layer around the one network-calling module has coverage either. Consider fixing together with the already-tracked `AIComplete.pm` gap.

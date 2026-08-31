@@ -3266,4 +3266,314 @@ subtest 'Editor->new() with no state_store never touches the real config dir und
         "Real $real_prefs_file was not created or modified by this test");
 };
 
+# ============================================================================
+# cmd_close_tab (bugs.md Scorecard round 3: "19 of 56 cmd_* command-dispatch
+# wrappers have zero test coverage, including one with data-loss-adjacent
+# logic" — cmd_close_tab is the highest-value target: "Save if dirty, then
+# close... Only close if save succeeded".)
+# ============================================================================
+subtest 'cmd_close_tab: closing a clean tab just closes it, no save' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("file a\n");
+    my $file_b = create_temp_file("file b\n");
+
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor, $file_a);
+    setup_editor_doc($editor, $file_b);  # becomes active (index 1)
+
+    is($editor->{tab_manager}->tab_count(), 2, 'Two tabs open');
+    is($editor->{tab_manager}->active_index(), 1, 'File B tab is active');
+    ok(!$editor->active_doc()->is_dirty(), 'Active document (B) is clean');
+
+    my $mtime_before = (stat($file_b))[9];
+    $editor->{message} = '';
+    $editor->{message_is_error} = 0;
+
+    $editor->cmd_close_tab();
+
+    is($editor->{tab_manager}->tab_count(), 1, 'Tab B was closed');
+    is($editor->{state}, 'editing', 'Editor stays in editing state (not quit)');
+    is($editor->{tab_manager}->active_index(), 0, 'File A tab is now active');
+    is($editor->active_file_path(), File::Spec->rel2abs($file_a),
+        'Remaining active tab is file A');
+    is((stat($file_b))[9], $mtime_before, 'File B was never written (no save happened)');
+    unlike($editor->{message} // '', qr/^Saved:/, 'No "Saved" message was shown for a clean close');
+};
+
+subtest 'cmd_close_tab: closing a dirty tab saves first, then closes, when save succeeds' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("file a\n");
+    my $file_b = create_temp_file("original b\n");
+
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor, $file_a);
+    setup_editor_doc($editor, $file_b);  # becomes active (index 1)
+
+    $editor->active_doc()->insert(0, "edited ");
+    ok($editor->active_doc()->is_dirty(), 'Active document (B) is dirty before close');
+
+    $editor->cmd_close_tab();
+
+    is($editor->{tab_manager}->tab_count(), 1, 'Tab B was closed after successful save');
+    is($editor->{tab_manager}->active_index(), 0, 'File A tab is now active');
+
+    open(my $fh, '<', $file_b) or die "can't read $file_b: $!";
+    local $/;
+    my $on_disk = <$fh>;
+    close $fh;
+    like($on_disk, qr/^edited original b/, 'File B on disk reflects the edit made before close');
+};
+
+subtest 'cmd_close_tab: closing a dirty tab does NOT close when save FAILS (data-loss prevention)' => sub {
+    my $orig_cwd = Cwd::getcwd();
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $locked_dir = "$tmpdir/locked";
+    mkdir $locked_dir or die "mkdir failed: $!";
+    my $locked_file = "$locked_dir/b.txt";
+    open(my $fh, '>', $locked_file) or die "can't create $locked_file: $!";
+    print $fh "original locked\n";
+    close $fh;
+
+    my $file_a = create_temp_file("file a\n");
+
+    my $ok = eval {
+        my $store = Zepto::StateStore->new(base_dir => "$tmpdir/state");
+        my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+        setup_editor_doc($editor, $file_a);
+        setup_editor_doc($editor, $locked_file);  # becomes active (index 1)
+
+        # Document::save() writes its atomic temp file via File::Temp::tempfile
+        # with DIR => dirname($path) — so it's the *directory's* write
+        # permission that gates save, not the target file's own mode.
+        # Revoke write permission on the directory to force save() to die.
+        chmod 0500, $locked_dir or die "chmod failed: $!";
+
+        # Sanity check: confirm the environment actually enforces this,
+        # otherwise (e.g. running as root) this test proves nothing.
+        my $probe_ok = eval {
+            open(my $pfh, '>', "$locked_dir/probe.txt") or die $!;
+            close $pfh;
+            unlink "$locked_dir/probe.txt";
+            1;
+        };
+        ok(!$probe_ok, 'Sanity check: locked directory actually rejects writes in this test environment')
+            or diag("Test environment can write to a chmod 0500 directory (e.g. running as "
+                  . "root) — this test cannot exercise the failure path here.");
+
+        $editor->active_doc()->insert(0, "edited ");
+        ok($editor->active_doc()->is_dirty(), 'Active document (locked b) is dirty before close');
+
+        $editor->{message} = '';
+        $editor->{message_is_error} = 0;
+
+        $editor->cmd_close_tab();
+
+        is($editor->{tab_manager}->tab_count(), 2, 'Tab was NOT closed after a failed save');
+        is($editor->{tab_manager}->active_index(), 1, 'The dirty tab is still active');
+        ok($editor->active_doc()->is_dirty(), 'Document is still marked dirty after the failed close attempt');
+        ok($editor->{message_is_error}, 'An error message is surfaced for the failed save')
+            or diag("message=" . ($editor->{message} // '(undef)'));
+        like($editor->{message}, qr/save failed/i, 'Error message mentions the save failure');
+
+        1;
+    };
+    my $err = $@;
+
+    chmod 0700, $locked_dir;  # restore so tempdir cleanup can remove it
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+subtest 'cmd_close_tab: closing the last remaining tab quits instead of leaving a blank tab' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("only file\n");
+
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    setup_editor_doc($editor, $file_a);
+
+    is($editor->{tab_manager}->tab_count(), 1, 'Only one tab open');
+
+    $editor->cmd_close_tab();
+
+    is($editor->{state}, 'quit', 'Closing the last tab quits the editor');
+    is($editor->{tab_manager}->tab_count(), 1,
+        'The tab itself is left in place (quit short-circuits before remove_tab) — '
+        . 'confirms this is a real quit, not "close then silently open a new blank tab"');
+
+    # _do_close_tab saves the cursor position before checking tab_count,
+    # even on the quit-the-last-tab path.
+    my $abs_path = File::Spec->rel2abs($file_a);
+    my $history = $store->get('history');
+    ok(exists $history->{cursor_positions}{$abs_path},
+        'Cursor position was recorded before quitting on the last tab');
+};
+
+# ============================================================================
+# cmd_quit (bugs.md Scorecard round 3, same finding as above: "saves cursor
+# position per tab before exit")
+# ============================================================================
+subtest 'cmd_quit saves cursor position for every open tab before exiting' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+    my $file_a = create_temp_file("line a0\nline a1\nline a2\n");
+    my $file_b = create_temp_file("line b0\nline b1\nline b2\n");
+
+    my $editor = Zepto::Editor->new(terminal => mock_terminal(), state_store => $store);
+    my (undef, $view_a) = setup_editor_doc($editor, $file_a);
+    my (undef, $view_b) = setup_editor_doc($editor, $file_b);  # active
+
+    $view_a->set_cursor(1, 3);
+    $view_b->set_cursor(2, 1);
+
+    is($editor->{tab_manager}->tab_count(), 2, 'Two clean tabs open');
+
+    $editor->cmd_quit();
+
+    is($editor->{state}, 'quit', 'cmd_quit transitions to quit state (no dirty tabs to confirm)');
+
+    my $history = $store->get('history');
+    my $positions = $history->{cursor_positions};
+
+    my $abs_a = File::Spec->rel2abs($file_a);
+    my $abs_b = File::Spec->rel2abs($file_b);
+
+    is($positions->{$abs_a}{line}, 1, 'File A cursor line saved');
+    is($positions->{$abs_a}{col}, 3, 'File A cursor col saved');
+    is($positions->{$abs_b}{line}, 2, 'File B cursor line saved');
+    is($positions->{$abs_b}{col}, 1, 'File B cursor col saved');
+};
+
+# ============================================================================
+# cmd_next_tab / cmd_prev_tab / cmd_switch_to_tab
+# ============================================================================
+subtest 'cmd_next_tab / cmd_prev_tab wrap around the tab list' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    my $file_b = create_temp_file("b\n");
+    my $file_c = create_temp_file("c\n");
+    setup_editor_doc($editor, $file_a);
+    setup_editor_doc($editor, $file_b);
+    setup_editor_doc($editor, $file_c);  # active index 2
+
+    $editor->{tab_manager}->set_active(0);
+    is($editor->{tab_manager}->active_index(), 0, 'Starts on tab 0');
+
+    $editor->cmd_next_tab();
+    is($editor->{tab_manager}->active_index(), 1, 'cmd_next_tab moves to tab 1');
+
+    $editor->cmd_next_tab();
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_next_tab moves to tab 2');
+
+    $editor->cmd_next_tab();
+    is($editor->{tab_manager}->active_index(), 0, 'cmd_next_tab wraps from last tab back to tab 0');
+
+    $editor->cmd_prev_tab();
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_prev_tab wraps from tab 0 back to the last tab');
+
+    $editor->cmd_prev_tab();
+    is($editor->{tab_manager}->active_index(), 1, 'cmd_prev_tab moves back to tab 1');
+};
+
+subtest 'cmd_next_tab / cmd_prev_tab are no-ops with only one tab' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    setup_editor_doc($editor, $file_a);
+
+    $editor->cmd_next_tab();
+    is($editor->{tab_manager}->active_index(), 0, 'cmd_next_tab does nothing with a single tab');
+
+    $editor->cmd_prev_tab();
+    is($editor->{tab_manager}->active_index(), 0, 'cmd_prev_tab does nothing with a single tab');
+};
+
+subtest 'cmd_switch_to_tab jumps directly to a valid index and ignores invalid ones' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    my $file_b = create_temp_file("b\n");
+    my $file_c = create_temp_file("c\n");
+    setup_editor_doc($editor, $file_a);
+    setup_editor_doc($editor, $file_b);
+    setup_editor_doc($editor, $file_c);  # active index 2
+
+    $editor->{tab_manager}->set_active(0);
+
+    $editor->cmd_switch_to_tab(2);
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_switch_to_tab(2) jumps straight to tab 2');
+
+    $editor->cmd_switch_to_tab(2);
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_switch_to_tab with the already-active index is a no-op');
+
+    $editor->cmd_switch_to_tab(-1);
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_switch_to_tab(-1) is ignored (out of range)');
+
+    $editor->cmd_switch_to_tab(99);
+    is($editor->{tab_manager}->active_index(), 2, 'cmd_switch_to_tab(99) is ignored (out of range)');
+
+    $editor->cmd_switch_to_tab(0);
+    is($editor->{tab_manager}->active_index(), 0, 'cmd_switch_to_tab(0) jumps to tab 0');
+};
+
+# ============================================================================
+# Simple toggle commands (lowest priority per bugs.md — included for
+# completeness now that the higher-risk tab commands above are covered)
+# ============================================================================
+subtest 'cmd_select_all selects the entire active document' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("line one\nline two\nline three\n");
+    setup_editor_doc($editor, $file_a);
+
+    my $view = $editor->active_view();
+    ok(!$view->has_selection(), 'No selection before cmd_select_all');
+
+    $editor->cmd_select_all();
+
+    ok($view->has_selection(), 'Selection exists after cmd_select_all');
+    # Document does not keep a synthetic trailing empty line for a
+    # newline-terminated file (line_count() is 3, not 4) — the trailing
+    # newline is only re-added at save time (Document::save()).
+    is($view->selected_text(), "line one\nline two\nline three",
+        'Selected text covers the entire document');
+};
+
+subtest 'cmd_toggle_minimap flips the show_minimap preference' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    setup_editor_doc($editor, $file_a);
+
+    my $initial = $editor->{prefs}->show_minimap();
+    $editor->cmd_toggle_minimap();
+    is($editor->{prefs}->show_minimap(), $initial ? 0 : 1, 'show_minimap flipped once');
+    $editor->cmd_toggle_minimap();
+    is($editor->{prefs}->show_minimap(), $initial, 'show_minimap flipped back');
+};
+
+subtest 'cmd_toggle_word_wrap flips the wrap override on the active view' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    setup_editor_doc($editor, $file_a);
+
+    my $view = $editor->active_view();
+    my $before = $editor->_effective_word_wrap();
+
+    $editor->cmd_toggle_word_wrap();
+    isnt($editor->_effective_word_wrap(), $before, 'Effective word wrap flipped once');
+
+    $editor->cmd_toggle_word_wrap();
+    is($editor->_effective_word_wrap(), $before, 'Effective word wrap flipped back');
+};
+
+subtest 'cmd_toggle_nerd_font flips the nerd_font preference' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    my $file_a = create_temp_file("a\n");
+    setup_editor_doc($editor, $file_a);
+
+    my $initial = $editor->{prefs}->nerd_font();
+    $editor->cmd_toggle_nerd_font();
+    is($editor->{prefs}->nerd_font(), $initial ? 0 : 1, 'nerd_font flipped once');
+    $editor->cmd_toggle_nerd_font();
+    is($editor->{prefs}->nerd_font(), $initial, 'nerd_font flipped back');
+};
+
 done_testing();
