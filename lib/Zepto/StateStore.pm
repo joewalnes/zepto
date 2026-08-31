@@ -19,7 +19,7 @@ package Zepto::StateStore;
 
 use strict;
 use warnings;
-use Fcntl qw(:flock);
+use Fcntl qw(:flock O_WRONLY O_CREAT O_EXCL);
 use File::Spec;
 use JSON::PP ();
 
@@ -100,13 +100,26 @@ sub put {
     # Atomic write
     my $tmp_path = "$path.tmp.$$";
     my $ok = eval {
-        open my $fh, '>', $tmp_path or die "open: $!";
-        print $fh $JSON->encode(\%merged);
-        close $fh or die "close: $!";
-
-        # Secrets get restricted permissions
         if ($category eq 'secrets') {
-            chmod 0600, $tmp_path;
+            # Secrets: create with mode 0600 atomically via sysopen, so the
+            # file is never briefly world/group-readable at default umask
+            # permissions the way a plain open + later chmod would leave it
+            # (a real window where e.g. an AI API key was readable by other
+            # local users until the chmod caught up). O_EXCL also refuses to
+            # follow a pre-existing file/symlink at this predictable
+            # "$path.tmp.$$" path, closing the same symlink-follow risk
+            # fixed in ImageConverter.pm.
+            sysopen(my $fh, $tmp_path, O_WRONLY | O_CREAT | O_EXCL, 0600)
+                or die "sysopen: $!";
+            print $fh $JSON->encode(\%merged);
+            close $fh or die "close: $!";
+        } else {
+            # Other categories (preferences, history, ...) intentionally
+            # stay at default umask permissions — they hold no secrets and
+            # may be synced/managed by the user like any other dotfile.
+            open my $fh, '>', $tmp_path or die "open: $!";
+            print $fh $JSON->encode(\%merged);
+            close $fh or die "close: $!";
         }
 
         rename($tmp_path, $path) or die "rename: $!";
