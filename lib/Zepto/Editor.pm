@@ -65,7 +65,6 @@ use constant {
 
 # Load command and menu modules (they add methods to this package)
 use Zepto::Editor::Commands;
-use Zepto::Editor::Palette;
 use Zepto::Editor::PaletteController;
 
 # Timing and UI settings
@@ -174,20 +173,8 @@ sub new {
         # Title cache — avoids redundant terminal writes
         _last_title => '',
 
-        # Command palette state
-        palette_widget       => undef,  # InputWidget for filter query
-        palette_cursor       => 0,
-        palette_scroll       => 0,
-        palette_filtered     => [],
-        palette_visible_rows => 15,  # updated during render
-        palette_mode         => 'commands',  # 'commands' or 'recent_files'
-
-        # File search state (Find in Files)
-        _file_search_engine      => undef,
-        _file_search_scope       => undef,
-        _file_search_scope_label => 'project',
-        _file_search_case        => 0,
-        _file_search_regex       => 0,
+        # Command palette state lives on the palette controller (see below,
+        # after bless — it needs an `editor` back-reference to $self).
 
         # Recent files tracking
         _recent_files        => [],  # Ordered list of recent file paths (most recent first)
@@ -215,6 +202,11 @@ sub new {
     $self->{prefs} = $opts{prefs} // Zepto::Preferences->new(
         state_store => $self->{state_store},
     );
+
+    # Command palette controller (needs a back-reference to $self, so
+    # constructed after bless — mirrors $self->{tab_manager} above, except
+    # TabManager doesn't need an editor back-reference and Palette does).
+    $self->{palette} = Zepto::Editor::PaletteController->new(editor => $self);
 
     # Per-window state, initialized from global default (or explicit override)
     $self->{_show_tree} = defined $opts{show_tree} ? $opts{show_tree} : $self->{prefs}->show_tree();
@@ -259,6 +251,15 @@ sub active_find_engine { $_[0]->{tab_manager}->active_find_engine() }
 sub active_highlighter { $_[0]->{tab_manager}->active_highlighter() }
 sub active_file_path  { $_[0]->{tab_manager}->active_file_path() }
 sub active_tab        { $_[0]->{tab_manager}->active_tab() }
+
+# --- Palette convenience delegators ---
+# Thin call-ins kept on Zepto::Editor so external call sites (key handling,
+# mouse handling, _close_any_modal) don't need to know PaletteController
+# exists. See Editor/PaletteController.pm.
+sub cmd_open_palette       { $_[0]->{palette}->open_commands() }
+sub close_palette          { $_[0]->{palette}->close() }
+sub handle_palette_event   { $_[0]->{palette}->handle_event($_[1]) }
+sub handle_status_bar_click { $_[0]->{palette}->handle_status_bar_click($_[1]) }
 
 # Resolve effective word wrap state for active view:
 # explicit per-view toggle > filetype default > global preference
@@ -943,7 +944,7 @@ sub run {
         while ($self->{state} ne STATE_QUIT) {
             # Use shorter timeout when background search or completion debounce is active
             my $searching = ($self->active_find_engine() && $self->active_find_engine()->is_searching)
-                         || ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching());
+                         || ($self->{palette}{_file_search_engine} && $self->{palette}{_file_search_engine}->is_searching());
             my $completion_pending = $self->{_completion_pending_at} && $self->{_completion_pending_at} > 0;
             my $ai_active = $self->{_ai_complete} && ($self->{_ai_complete}->is_pending() || $self->{_ai_complete}->is_debouncing());
             my $timeout = ($searching || $completion_pending || $ai_active) ? 0.01 : INPUT_TIMEOUT_SEC;
@@ -1063,9 +1064,9 @@ sub run {
             }
 
             # Continue background file search if active
-            if ($self->{_file_search_engine} && $self->{_file_search_engine}->is_searching()) {
+            if ($self->{palette}{_file_search_engine} && $self->{palette}{_file_search_engine}->is_searching()) {
                 my $term = $self->{terminal};
-                my $fs_engine = $self->{_file_search_engine};
+                my $fs_engine = $self->{palette}{_file_search_engine};
 
                 my $batch_start = time();
                 while ($fs_engine->is_searching()) {
@@ -1082,8 +1083,8 @@ sub run {
                 }
 
                 # Update palette items when new results arrive or search completes
-                if (($self->{palette_mode} // '') eq 'find_in_files') {
-                    $self->_palette_update_filtered();
+                if (($self->{palette}{palette_mode} // '') eq 'find_in_files') {
+                    $self->{palette}->_palette_update_filtered();
                     if (!$fs_engine->is_searching()) {
                         $needs_render = 1;
                     }
@@ -4931,16 +4932,8 @@ sub render {
         ui          => {
             editor => $self,
             dialog => $self->{dialog},
-            palette => ($self->{state} eq STATE_PALETTE && $self->{palette_widget}) ? {
-                query          => $self->{palette_widget}->value(),
-                query_cursor   => $self->{palette_widget}->cursor(),
-                palette_widget => $self->{palette_widget},
-                cursor         => $self->{palette_cursor},
-                scroll         => $self->{palette_scroll},
-                filtered       => $self->{palette_filtered},
-                editor         => $self,
-                mode           => $self->{palette_mode} // 'commands',
-            } : undef,
+            palette => ($self->{state} eq STATE_PALETTE && $self->{palette}{palette_widget})
+                ? $self->{palette}->render_snapshot() : undef,
             prompt => $self->{prompt},
             footer_input => $self->{footer_input},
             tabs => $self->{tab_manager}->tabs_for_render(),
