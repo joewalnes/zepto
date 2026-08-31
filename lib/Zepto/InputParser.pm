@@ -339,6 +339,17 @@ sub _decode_csi {
         if ($codepoint >= 32 && $codepoint < 127) {
             return $self->_make_char_event(chr($codepoint), $modifiers);
         }
+        # Special keys sent through the CSI-u path (e.g. Ctrl+Enter,
+        # Alt+Backspace) carry the same control-character codepoints as
+        # their unmodified forms in _parse_control (below) — map them to
+        # the same named key events instead of falling through to "unknown
+        # CSI" and silently dropping the keystroke. 127 (DEL) is treated
+        # as backspace alongside 8 to match _parse_control's existing
+        # equivalence of the two.
+        if ($codepoint == 13) { return $self->_make_key_event(KEY_ENTER, $modifiers); }
+        if ($codepoint == 9)  { return $self->_make_key_event(KEY_TAB, $modifiers); }
+        if ($codepoint == 8 || $codepoint == 127) { return $self->_make_key_event(KEY_BACKSPACE, $modifiers); }
+        if ($codepoint == 27) { return $self->_make_key_event(KEY_ESCAPE, $modifiers); }
     }
 
     # Unknown CSI sequence

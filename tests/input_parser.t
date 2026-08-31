@@ -571,11 +571,67 @@ subtest 'Unknown SS3 does not stall following events' => sub {
 };
 
 subtest 'Out-of-range CSI-u does not stall following events' => sub {
-    # CSI u with codepoint outside 32..126 (e.g. Enter = 13) is unhandled
+    # CSI u with a codepoint that has no special-key mapping (e.g. Ctrl+C's
+    # ETX = 3) is still genuinely unhandled and must fall through to
+    # EVT_NONE without eating the keystroke that follows it.
     my $parser = Zepto::InputParser->new();
-    my @events = $parser->parse("\x1b[13;5u" . "a");
+    my @events = $parser->parse("\x1b[3;5u" . "a");
     is(scalar @events, 1, 'One event from CSI-u + char batch');
     is($events[0]->{char}, 'a', 'Char survived the unhandled CSI-u');
+};
+
+subtest 'CSI-u modified special keys (Enter/Tab/Backspace/Escape) are not dropped' => sub {
+    # bugs.md P3: Kitty/fixterms CSI-u encodes special keys as their normal
+    # control-character codepoint plus a modifier param (ESC [ cp ; mod u).
+    # Enter (13), Tab (9), Backspace (8), and Escape (27) used to fall
+    # through the printable-only (32-126) check straight to "Unknown CSI
+    # sequence" -> EVT_NONE, silently dropping e.g. Ctrl+Enter forever.
+
+    my $parser = Zepto::InputParser->new();
+    my @events = $parser->parse("\x1b[13;5u");  # Ctrl+Enter (mod 5 = ctrl)
+    is(scalar @events, 1, 'Ctrl+Enter produces an event');
+    is($events[0]->{type}, 'key', 'Ctrl+Enter type is key');
+    is($events[0]->{key}, 'enter', 'Ctrl+Enter key is enter');
+    is_deeply($events[0]->{modifiers}, ['ctrl'], 'Ctrl+Enter carries ctrl modifier');
+
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[9;5u");  # Ctrl+Tab
+    is(scalar @events, 1, 'Ctrl+Tab produces an event');
+    is($events[0]->{type}, 'key', 'Ctrl+Tab type is key');
+    is($events[0]->{key}, 'tab', 'Ctrl+Tab key is tab');
+    is_deeply($events[0]->{modifiers}, ['ctrl'], 'Ctrl+Tab carries ctrl modifier');
+
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[8;5u");  # Ctrl+Backspace
+    is(scalar @events, 1, 'Ctrl+Backspace produces an event');
+    is($events[0]->{type}, 'key', 'Ctrl+Backspace type is key');
+    is($events[0]->{key}, 'backspace', 'Ctrl+Backspace key is backspace');
+    is_deeply($events[0]->{modifiers}, ['ctrl'], 'Ctrl+Backspace carries ctrl modifier');
+
+    # 127 (DEL) is the alternate backspace codepoint some terminals send;
+    # _parse_control already treats it as backspace too (line ~186), so the
+    # CSI-u path must match.
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[127;5u");  # Ctrl+Backspace (DEL form)
+    is(scalar @events, 1, 'Ctrl+Backspace (DEL codepoint) produces an event');
+    is($events[0]->{type}, 'key', 'Ctrl+Backspace (DEL) type is key');
+    is($events[0]->{key}, 'backspace', 'Ctrl+Backspace (DEL) key is backspace');
+    is_deeply($events[0]->{modifiers}, ['ctrl'], 'Ctrl+Backspace (DEL) carries ctrl modifier');
+
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[27;5u");  # Ctrl+Escape
+    is(scalar @events, 1, 'Ctrl+Escape produces an event');
+    is($events[0]->{type}, 'key', 'Ctrl+Escape type is key');
+    is($events[0]->{key}, 'escape', 'Ctrl+Escape key is escape');
+    is_deeply($events[0]->{modifiers}, ['ctrl'], 'Ctrl+Escape carries ctrl modifier');
+
+    # And these don't stall the keystroke that follows, same guarantee as
+    # the out-of-range case above.
+    $parser = Zepto::InputParser->new();
+    @events = $parser->parse("\x1b[13;5u" . "a");
+    is(scalar @events, 2, 'Two events from CSI-u Enter + char batch');
+    is($events[0]->{key}, 'enter', 'First event is the mapped Enter key');
+    is($events[1]->{char}, 'a', 'Char after it still arrives');
 };
 
 subtest 'Incomplete sequences still wait for more bytes' => sub {
