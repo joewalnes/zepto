@@ -2,6 +2,8 @@
 
 ## 2026-08-30
 
+- Fixed syntax highlighting re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Highlighting itself is unaffected (multi-line comments/strings still re-highlight correctly the moment an earlier line changes what they should look like) — this is a speed-only fix, most noticeable when typing in large files with syntax highlighting on
+
 - The file tree's status bar now shows a "⌃B back" hint for switching focus back to the editor (the tree stays open — this is different from Esc, which closes it) — previously there was no on-screen hint for this anywhere while the tree was focused. When there's enough room, the tree's status bar also shows the same close-tab/switch-tabs/quit hint the editor's tab bar shows
 - Fixed the file tree's status bar overflowing and corrupting the screen at narrow terminal widths when the selected file/folder's path was more than a few characters long — the path now shortens with an ellipsis instead of pushing the row off-screen
 - Improved the tab bar's readability: inactive tabs previously had no background fill at all (just underlined text blending into the toolbar) — active, inactive, and hover states now each have their own clearly distinguishable background color in both themes, so every tab reads as a distinct, bounded element

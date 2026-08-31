@@ -426,6 +426,15 @@ my %SHEBANG_MAP = (
     Rscript  => 'Zepto::Syntax::R',
 );
 
+# Bound on the token memo cache (see tokenize_line() below). Cleared
+# wholesale once exceeded, mirroring Renderer.pm's `_table_cache` "evict by
+# clearing" pattern rather than a full LRU -- simplicity over marginal
+# hit-rate for the pathological case of a huge file with mostly-unique
+# line content. 8000 keeps memory bounded (each entry is a small tokens
+# arrayref) while comfortably covering many screenfuls of scrolling/typing
+# through a large real-world file without thrashing.
+use constant MAX_TOKEN_CACHE_ENTRIES => 8000;
+
 sub new {
     my ($class, %args) = @_;
     return bless {
@@ -433,6 +442,13 @@ sub new {
         grammar_class=> undef,   # Grammar class name (for reloading)
         line_states  => [],      # End state for each line
         filename     => undef,   # Current filename
+
+        # Token memo cache: { start_state => { line_content => [tokens, end_state] } }.
+        # See tokenize_line() for why keying on both start_state and content
+        # makes this cache self-invalidating -- no explicit invalidation
+        # logic is needed beyond clearing it wholesale on set_file().
+        _token_cache       => {},
+        _token_cache_count => 0,   # entries currently cached (for the size cap)
     }, $class;
 }
 
@@ -443,6 +459,12 @@ sub set_file {
 
     $self->{filename} = $filename;
     $self->{line_states} = [];
+    # Grammar may be changing (e.g. Save As with a new extension) -- cached
+    # tokens are only valid for the grammar that produced them, so clear
+    # unconditionally rather than trying to detect whether the grammar
+    # actually changed.
+    $self->{_token_cache} = {};
+    $self->{_token_cache_count} = 0;
 
     my $grammar_class = $self->_detect_grammar($filename);
 
@@ -527,19 +549,27 @@ sub detect_from_shebang {
             if ($grammar_class ne ($self->{grammar_class} // '')) {
                 $self->{grammar_class} = $grammar_class;
                 $self->{grammar} = $self->_load_grammar($grammar_class);
-                $self->{line_states} = [] if $self->{grammar};
+                if ($self->{grammar}) {
+                    $self->{line_states} = [];
+                    # Cached tokens were produced by the old grammar; drop them.
+                    $self->{_token_cache} = {};
+                    $self->{_token_cache_count} = 0;
+                }
             }
             return;
         }
     }
 }
 
-# Tokenize a single line, using cached state if available
+# Tokenize a single line, using cached state and a content+state token memo
+# if available.
 # Returns: (\@tokens, $end_state)
 sub tokenize_line {
     my ($self, $line_content, $line_num) = @_;
 
     return ([], undef) unless $self->{grammar};
+
+    $line_content //= '';
 
     # Get start state for this line
     my $start_state;
@@ -556,10 +586,45 @@ sub tokenize_line {
         }
     }
 
-    my ($tokens, $end_state) = $self->{grammar}->tokenize($line_content // '', $start_state);
+    # Token memo cache, keyed on (start_state, line_content). grammar
+    # tokenize() implementations are pure functions of exactly these two
+    # inputs (verified across all grammars in Syntax/*.pm: no instance or
+    # module-level mutable state read during tokenize()), so this key
+    # fully captures everything that can affect the result -- which makes
+    # the cache self-invalidating with no separate bookkeeping needed:
+    #   - Editing this line's own content changes $line_content -> new key.
+    #   - Editing an EARLIER line in a way that changes what state a later,
+    #     otherwise-untouched line starts in (e.g. opening/closing a
+    #     multi-line comment upstream) changes $start_state -> new key.
+    # Either way it's a natural cache miss, not stale data served from a
+    # miss-classified "unchanged" line. A hit only ever happens when both
+    # inputs are byte-identical to a previous call, in which case the pure
+    # function is guaranteed to return the same tokens and end_state.
+    #
+    # Returned token arrayrefs are shared with the cache (not cloned) --
+    # safe because every caller (Renderer.pm) only reads token fields to
+    # build its own visual-position copies; nothing mutates them in place.
+    my $state_bucket = $self->{_token_cache}{$start_state} //= {};
+    if (my $cached = $state_bucket->{$line_content}) {
+        my ($tokens, $end_state) = @$cached;
+        $self->{line_states}[$line_num] = $end_state;
+        return ($tokens, $end_state);
+    }
+
+    my ($tokens, $end_state) = $self->{grammar}->tokenize($line_content, $start_state);
 
     # Cache end state
     $self->{line_states}[$line_num] = $end_state;
+
+    # Bound the memo cache: clear wholesale once it grows past the cap,
+    # mirroring Renderer.pm's _table_cache "evict by clearing" pattern.
+    if ($self->{_token_cache_count} >= MAX_TOKEN_CACHE_ENTRIES) {
+        $self->{_token_cache} = {};
+        $self->{_token_cache_count} = 0;
+        $state_bucket = $self->{_token_cache}{$start_state} = {};
+    }
+    $state_bucket->{$line_content} = [$tokens, $end_state];
+    $self->{_token_cache_count}++;
 
     return ($tokens, $end_state);
 }

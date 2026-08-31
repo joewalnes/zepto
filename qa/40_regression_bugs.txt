@@ -2392,3 +2392,84 @@ VERIFY    `_git('ls-files', '--error-unmatch', $rel_path)` had no `--`
           globbing, which would otherwise treat the leading '-' as a
           flag), mirroring the interactive scripts' spirit as closely as
           this constraint allows.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-199
+NAME:     Syntax highlighter token cache correctly re-highlights a line
+          after an upstream edit changes its incoming state
+PRIORITY: P2
+BUG:      P2 "Syntax highlighter re-tokenizes every visible line on
+          every render — no token cache" — see bugs.md Performance
+          section (Scorecard audit round 2, 2026-08-30).
+CROSS-REF: QA-SYN-023 (qa/32_syntax_highlighting.txt), tests/highlighter.t
+           "Token cache - upstream edit that changes start_state is NOT
+           served stale tokens"
+VERIFY    Highlighter.pm::tokenize_line() now memoizes tokens keyed on
+          (start_state, line_content), not content alone — the risk this
+          guards against is a naive content-only key silently reusing a
+          downstream line's stale tokens after an earlier line's edit
+          changes what state it starts in (e.g. opening a multi-line
+          comment upstream), even though the downstream line's own text
+          never changed. `qa/scripts/tier1/reg_199_highlighter_cache_upstream_edit.sh`
+          opens a small JS file, captures the raw ANSI color codes (via
+          `tmux capture-pane -e`, the same technique QA-REG-160 uses,
+          since `hangon screen` strips color) around a line that starts
+          as plain code, confirms it renders with the keyword color, then
+          edits an EARLIER line to open an unclosed block comment and
+          re-captures: the downstream line must now render in the
+          comment color with the keyword color gone. Deliberately
+          reverting the fix to a content-only cache key was confirmed to
+          make this script fail (both assertions) before being fixed
+          back — see bugs.md's writeup for the full mutation-test
+          methodology.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-200
+NAME:     Syntax highlighter token cache: undo after a state-changing
+          edit restores original highlighting, not a stale mid-edit
+          version
+PRIORITY: P2
+BUG:      P2 "Syntax highlighter re-tokenizes every visible line on
+          every render — no token cache" — see bugs.md Performance
+          section (Scorecard audit round 2, 2026-08-30).
+CROSS-REF: QA-REG-199 (companion script, same fix), tests/highlighter.t
+           "Token cache - undo restores exact original tokens, not a
+           stale mid-edit version"
+VERIFY    Companion to QA-REG-199: after opening a block comment on an
+          earlier line (confirmed via raw ANSI color, as in QA-REG-199)
+          and then undoing that edit, a downstream unchanged line must
+          revert to its ORIGINAL coloring, not remain stuck showing the
+          mid-edit "inside a comment" color. `qa/scripts/tier1/reg_200_highlighter_cache_undo_restores_tokens.sh`
+          does the edit, confirms the mid-edit comment coloring
+          (sanity check), presses undo until the original line text
+          reappears, then re-captures raw ANSI and confirms the keyword
+          color is back and the comment color is gone. Also confirmed via
+          mutation testing (deliberately broken cache key made this
+          script fail before the real fix was restored).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-201
+NAME:     Typing in a large syntax-highlighted file stays responsive
+          (token cache regression guard)
+PRIORITY: P2
+BUG:      P2 "Syntax highlighter re-tokenizes every visible line on
+          every render — no token cache" — see bugs.md Performance
+          section (Scorecard audit round 2, 2026-08-30).
+CROSS-REF: QA-REG-199, QA-REG-200 (same fix, correctness side);
+           qa/scripts/tier1/perf_020_wrap_toggle_large_file.sh (same
+           timing-based approach for the analogous WrapMap fix)
+VERIFY    Timing-based, not vision-based (see qa/lib/qa-perf-helpers.sh)
+          — catches gross regressions/hangs, not a micro-benchmark of the
+          fix's own improvement (that's measured directly with an
+          isolated Perl benchmark; see bugs.md for the real before/after
+          numbers). `qa/scripts/tier1/reg_201_highlighter_cache_large_file_typing_perf.sh`
+          opens a 3000-line JS file with real syntax (keywords, strings,
+          comments, multi-line block comments), jumps to the middle, and
+          asserts a typing burst renders within a generous budget — a
+          future regression that reintroduces full-viewport
+          re-tokenization on every keystroke (or a worse regression on
+          top of it) has room to show up here without the test flaking
+          on ordinary variance.

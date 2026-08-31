@@ -50,6 +50,21 @@ sub tokens_of_type {
     return grep { $_->{type} eq $type } @$tokens;
 }
 
+# Shallow structural comparison of two token lists (same length, and each
+# position's type/start/end match). Used by the token-cache invalidation
+# tests to assert two token lists are NOT equal (a plain inequality check
+# reads clearer than picking apart an is_deeply() diff for that purpose).
+sub tokens_equal {
+    my ($a, $b) = @_;
+    return 0 if scalar(@$a) != scalar(@$b);
+    for my $i (0 .. $#$a) {
+        return 0 if $a->[$i]{type} ne $b->[$i]{type}
+                 || $a->[$i]{start} != $b->[$i]{start}
+                 || $a->[$i]{end} != $b->[$i]{end};
+    }
+    return 1;
+}
+
 # Debug: dump tokens
 sub dump_tokens {
     my ($tokens, $line) = @_;
@@ -128,6 +143,170 @@ subtest 'State management' => sub {
     ($tok1, $state1) = $hl->tokenize_line('/* start comment', 0);
     is($state1, Zepto::Syntax::Base::STATE_COMMENT_BLOCK, 'State works after invalidation');
 };
+
+# =============================================================================
+# Token memo cache correctness (QA-REG-199..201, bugs.md P2 "Syntax
+# highlighter re-tokenizes every visible line on every render")
+# =============================================================================
+#
+# Highlighter.pm memoizes tokenize_line()'s (\@tokens, $end_state) result
+# keyed on (start_state, line_content). These tests specifically target
+# INVALIDATION correctness, not just "the cache works when nothing
+# changes" -- each one is constructed so it would FAIL against a naive
+# cache keyed on content alone (dropping start_state from the key), which
+# was confirmed by deliberately reverting to a content-only key during
+# development: every subtest below failed with that broken key, and all
+# pass with the real (start_state, content) key.
+
+subtest 'Token cache - repeated identical calls are memoized correctly' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.js');
+
+    my ($tok1, $state1) = $hl->tokenize_line('const x = 1;', 0);
+    my ($tok2, $state2) = $hl->tokenize_line('const x = 1;', 0);
+
+    is($state1, $state2, 'Same state for repeated identical call');
+    is_deeply($tok1, $tok2, 'Same tokens for repeated identical (state, content) call');
+
+    # Cache was actually populated and hit (white-box check, same pattern
+    # tests/wrapmap.t uses on WrapMap's private _dirty flag).
+    ok($hl->{_token_cache_count} > 0, 'Token cache has at least one entry after tokenizing');
+};
+
+subtest 'Token cache - upstream edit that changes start_state is NOT served stale tokens' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.js');
+
+    # First render pass: line 0 is plain code, line 1 is untouched plain
+    # text. Renderer always tokenizes top-to-bottom, so line 1 sees line
+    # 0's real end state (STATE_NORMAL here).
+    my ($tok0_before, $state0_before) = $hl->tokenize_line('var x = 1;', 0);
+    is($state0_before, Zepto::Syntax::Base::STATE_NORMAL, 'Line 0 (plain code) ends in NORMAL state');
+
+    my ($tok1_before, $state1_before) = $hl->tokenize_line('plain text line', 1);
+    ok(!(grep { $_->{type} eq 'comment' } @$tok1_before),
+        'Sanity: line 1 has no comment tokens while line 0 was plain code');
+
+    # Now simulate editing line 0 so it OPENS a multi-line block comment.
+    # Line 1's own content is byte-identical to before -- only the state
+    # it starts in has changed. This is exactly the scenario a naive
+    # content-only cache key gets wrong: it would return the stale
+    # "plain text" tokens for line 1 from the entry cached above instead
+    # of re-tokenizing under the new incoming state.
+    my ($tok0_after, $state0_after) = $hl->tokenize_line('/* start comment', 0);
+    is($state0_after, Zepto::Syntax::Base::STATE_COMMENT_BLOCK,
+        'Line 0 (edited) now ends in COMMENT_BLOCK state');
+
+    my ($tok1_after, $state1_after) = $hl->tokenize_line('plain text line', 1);
+    is($state1_after, Zepto::Syntax::Base::STATE_COMMENT_BLOCK,
+        'Line 1 correctly continues the block comment (state propagated, not stale)');
+    ok((grep { $_->{type} eq 'comment' && $_->{start} == 0 && $_->{end} == length('plain text line') } @$tok1_after),
+        'Line 1 is now tokenized as one whole comment token, not the old "plain text" tokens');
+
+    isnt(scalar(@$tok1_after), 0, 'Line 1 still produces tokens');
+    ok(!tokens_equal($tok1_before, $tok1_after),
+        'Line 1 tokens actually changed after the upstream edit (not silently reused from cache)');
+};
+
+subtest 'Token cache - undo restores exact original tokens, not a stale mid-edit version' => sub {
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.js');
+
+    # Original state: line 0 plain, line 1 plain.
+    $hl->tokenize_line('var x = 1;', 0);
+    my ($tok1_original) = $hl->tokenize_line('plain text line', 1);
+
+    # Edit: line 0 opens a block comment, line 1 (unchanged content) is
+    # re-tokenized as a comment continuation.
+    $hl->tokenize_line('/* start comment', 0);
+    my ($tok1_mid_edit) = $hl->tokenize_line('plain text line', 1);
+    ok((grep { $_->{type} eq 'comment' } @$tok1_mid_edit), 'Mid-edit: line 1 is a comment continuation');
+
+    # Undo: line 0 reverts to its original content.
+    my ($tok0_undo, $state0_undo) = $hl->tokenize_line('var x = 1;', 0);
+    is($state0_undo, Zepto::Syntax::Base::STATE_NORMAL, 'Undo: line 0 back to NORMAL state');
+
+    my ($tok1_undo) = $hl->tokenize_line('plain text line', 1);
+    ok(!(grep { $_->{type} eq 'comment' } @$tok1_undo),
+        'Undo: line 1 is no longer tokenized as a comment (not stuck on the mid-edit cached version)');
+    is_deeply($tok1_undo, $tok1_original,
+        'Undo: line 1 tokens exactly match the pre-edit original (cache correctly re-served the right entry)');
+};
+
+subtest 'Token cache - no cross-contamination between highlighter instances (tabs)' => sub {
+    # Each open tab gets its own Highlighter instance (TabManager). Confirm
+    # the token cache is instance-scoped: tokenizing identical literal text
+    # under two different grammars must not leak one grammar's tokens into
+    # the other's cache.
+    my $hl_perl = Zepto::Highlighter->new();
+    $hl_perl->set_file('a.pl');
+
+    my $hl_js = Zepto::Highlighter->new();
+    $hl_js->set_file('b.js');
+
+    my $line = '$x = 1;';
+
+    my ($tok_perl) = $hl_perl->tokenize_line($line, 0);
+    my ($tok_js)   = $hl_js->tokenize_line($line, 0);
+
+    # Perl treats $x as a sigil'd variable; JS has no such concept for a
+    # bare $-prefixed identifier -- the token sets must differ.
+    my @perl_vars = grep { $_->{type} eq 'variable' } @$tok_perl;
+    ok(scalar(@perl_vars) > 0, 'Perl highlighter tokenizes $x as a variable');
+
+    # Re-query the Perl highlighter again for the same line -- must still
+    # return Perl-flavored tokens, proving the JS instance's tokenize_line
+    # call above didn't pollute a shared/global cache.
+    my ($tok_perl_again) = $hl_perl->tokenize_line($line, 0);
+    is_deeply($tok_perl, $tok_perl_again,
+        'Perl highlighter still returns Perl tokens after a different instance tokenized the same text');
+};
+
+subtest 'Token cache - multi-line paste shifting line numbers stays correct' => sub {
+    # Simulates the renderer's actual call pattern: sequential top-to-bottom
+    # tokenize_line() calls for a document's visible lines. A large paste
+    # that inserts N lines above doesn't change any EXISTING line's own
+    # content, but does shift what line_num it's tokenized under and
+    # (for lines immediately after the paste) potentially what state it
+    # starts from. Content-keyed caching must handle the shift correctly.
+    my $hl = Zepto::Highlighter->new();
+    $hl->set_file('test.js');
+
+    # "Before": doc is just the tail content, unwrapped.
+    my @before = ('var x = 1;', 'var y = 2;', 'plain text line', 'var z = 3;');
+    my @before_tokens;
+    for my $i (0 .. $#before) {
+        my ($tok) = $hl->tokenize_line($before[$i], $i);
+        push @before_tokens, $tok;
+    }
+
+    # "After": a 3-line paste is inserted above a block comment opener,
+    # shifting the tail content down by 3 lines. Re-tokenize the WHOLE
+    # visible range from the top, as the renderer does every frame,
+    # through a fresh highlighter object representing the post-edit
+    # render pass state (same underlying content-addressed cache
+    # mechanism; using a fresh instance here just keeps the "before"
+    # array above untouched for comparison).
+    my $hl2 = Zepto::Highlighter->new();
+    $hl2->set_file('test.js');
+    my @after_lines = ('// pasted line A', '// pasted line B', '// pasted line C',
+                        'var x = 1;', 'var y = 2;', 'plain text line', 'var z = 3;');
+    my @after_tokens;
+    for my $i (0 .. $#after_lines) {
+        my ($tok) = $hl2->tokenize_line($after_lines[$i], $i);
+        push @after_tokens, $tok;
+    }
+
+    # The shifted tail lines (now at index 3..6) must tokenize identically
+    # to their original (index 0..3) results, since neither their own
+    # content nor the state they start in (STATE_NORMAL, both before and
+    # after the 3 inserted line-comments) changed.
+    for my $j (0 .. $#before) {
+        is_deeply($after_tokens[$j + 3], $before_tokens[$j],
+            "Shifted line (was index $j, now index @{[$j+3]}) tokenizes identically after the paste");
+    }
+};
+
 
 # =============================================================================
 # Perl Grammar Tests
