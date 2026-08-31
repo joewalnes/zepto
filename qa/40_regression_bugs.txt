@@ -2100,3 +2100,131 @@ VERIFY    The redesign did not change `_calc_tab_pill_width`'s formula
           column) and mouse-clicks it — confirming that exact tab closes
           and its immediate neighbor (the tab an off-by-one column error
           would have hit instead) is untouched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-187
+NAME:     Transform via Shell no longer deadlocks on a large stderr write
+PRIORITY: P1
+BUG:      P1 "cmd_transform (⌥T, 'Transform via Shell') can deadlock the
+          whole editor" — bugs.md "Scorecard audit round 2 (2026-08-30)".
+CROSS-REF: QA-XFM-001, QA-XFM-011 (qa/16_transform_shell.txt),
+           tests/transform_deadlock.t
+VERIFY    Editor/Commands.pm::cmd_transform read the IPC::Open3 child's
+          stdout to EOF *before* touching stderr at all. If the shell
+          command wrote more than the OS pipe buffer (~64KB) to stderr
+          while also writing to stdout, the child blocked writing to a
+          full stderr pipe nobody was reading yet while the parent
+          blocked reading stdout waiting for the child to close it --
+          the classic IPC::Open3 synchronous-read deadlock. Raw mode
+          disables ISIG, so the user could not even Ctrl-C out. Fixed by
+          reading both handles concurrently via IO::Select instead of
+          sequential blocking reads.
+          `qa/scripts/tier1/reg_187_transform_shell_deadlock.sh` runs a
+          real ⌥T transform with `perl -e 'print STDOUT ...; print
+          STDERR "e"x100000; print STDOUT ...'` and asserts the result
+          renders within a bounded poll (proven to reproduce an 8s block
+          against the pre-fix code before this was fixed; see
+          tests/transform_deadlock.t for the unit-level real-elapsed-time
+          proof of the same scenario).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-188
+NAME:     Clipboard paste recovers from a hung clipboard command instead
+          of freezing the editor
+PRIORITY: P1
+BUG:      P1 "Clipboard paste has no timeout — a hung paste command
+          freezes the UI indefinitely" — bugs.md "Scorecard audit round 2
+          (2026-08-30)".
+CROSS-REF: QA-CLIP-001, QA-CLIP-012 (qa/05_clipboard.txt),
+           tests/terminal.t "paste_from_clipboard times out on a hung
+           clipboard command"
+VERIFY    Terminal.pm::paste_from_clipboard did a bare blocking `<$fh>`
+          slurp with no alarm()/timeout guard, unlike FindEngine.pm's
+          MATCH_ALARM_SECS pattern. A wedged clipboard command (e.g.
+          wl-paste with no reachable Wayland compositor over SSH, or a
+          hung powershell.exe under WSL) would freeze the whole editor
+          forever with no recovery path. Fixed by guarding the blocking
+          read with the same alarm()-guard idiom
+          (CLIPBOARD_PASTE_ALARM_SECS = 3s); on timeout the child is
+          killed and reaped, and paste_from_clipboard returns undef
+          (distinct from "" for an empty clipboard) so cmd_paste surfaces
+          a real "Paste failed: clipboard read timed out" message instead
+          of silently falling back.
+          `qa/scripts/tier1/reg_188_clipboard_paste_timeout.sh` shadows
+          the platform clipboard paste command (whichever one
+          Terminal.pm would detect, on whatever platform the runner has)
+          with a fake that sleeps 30s, presses ⌃V in the real binary, and
+          asserts the timeout message appears within 8s and the editor
+          remains responsive afterward.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-189
+NAME:     Tab Width preference actually re-renders existing tab
+          characters, not just new indentation
+PRIORITY: P1
+BUG:      P1 "'Tab Width' preference has no effect on rendering existing
+          tab characters" — bugs.md "Scorecard audit round 2
+          (2026-08-30)".
+CROSS-REF: QA-PREF-007 (qa/36_preferences.txt, tab width on insertion),
+           tests/renderer.t "tab expansion honors an explicit width
+           argument" / "set_tab_width() changes the default width" /
+           "render() syncs the effective tab width from prefs",
+           tests/wrapmap.t
+VERIFY    Renderer.pm hardcoded `TAB_WIDTH => 4`, and all three
+          tab-expansion functions (_expand_tabs, _char_to_visual_col,
+          visual_to_char_col) used that constant unconditionally, never
+          the user's tab_width preference. WrapMap.pm stored
+          $self->{tab_width} but never read it. Net effect: changing "Tab
+          Width" in the palette had zero visible effect on a file's
+          existing literal \t characters -- they kept
+          rendering/wrapping at 4 columns regardless. Fixed by having the
+          tab-expansion helpers accept an optional width (defaulting to a
+          package-level effective width that render() syncs from
+          $prefs->tab_width() every render pass, mirroring how
+          Zepto::Chars is synced from prefs for nerd_font), WrapMap now
+          explicitly passes its own stored tab_width through, and
+          Editor.pm's WrapMap-rebuild condition now also triggers on a
+          tab_width preference change (previously only a viewport-width
+          change rebuilt the map, so the preference change had no effect
+          until the next unrelated rebuild).
+          `qa/scripts/tier1/reg_189_tab_width_rerender.sh` opens a file
+          with a tab-indented marker line, sets Tab Width to 2 then 8 via
+          the real palette, and asserts the marker's on-screen column
+          shifts by exactly 6 (8-2) between the two -- confirmed to fail
+          (delta 0, marker column unchanged) against the pre-fix code.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-190
+NAME:     A hand-edited tab_width: 0 in preferences.json is clamped, not
+          fatal
+PRIORITY: P3
+BUG:      P3 "Preferences::visual_width divides by zero on tab_width ==
+          0" — bugs.md "Scorecard audit round 2 (2026-08-30)".
+CROSS-REF: QA-PREF-007 (qa/36_preferences.txt), tests/preferences.t
+           "set() rejects/clamps non-positive tab_width instead of
+           persisting it silently" and "a hand-edited tab_width=0 on disk
+           is clamped on load, not just on set()"
+VERIFY    Preferences::set() performed zero validation on any preference
+          value. preferences.json is intentionally hand-editable (per
+          this project's docs), and a hand-edited tab_width: 0 would
+          persist/load silently; the one place that divides by
+          tab_width (Preferences::visual_width()) would then hit an
+          uncaught "Illegal modulus zero" fatal the moment anything
+          called it. Fixed with a shared _validate_value() helper used by
+          set() (programmatic/UI writes), _load_from_store() (startup
+          load from disk -- the actual scenario the bug describes, and
+          which set()-only validation would NOT have caught, since that
+          path writes directly into $self->{prefs} bypassing set()
+          entirely), and _apply_external_changes() (cross-instance sync):
+          non-positive tab_width is clamped to 1 on every path.
+          visual_width() itself also gained a second-layer <1 guard as
+          defense in depth.
+          `qa/scripts/tier1/reg_190_tab_width_zero_clamp.sh` pre-seeds
+          `{"tab_width": 0}` directly into $state_dir/preferences.json
+          (simulating a hand edit, not a set() call), launches the real
+          binary, confirms it starts up without crashing, and confirms
+          the Tab Width palette command shows the clamped value (1).

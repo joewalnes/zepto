@@ -93,8 +93,40 @@ use constant {
 };
 
 
-# Tab width for visual rendering
+# Tab width for visual rendering. TAB_WIDTH is the back-compat fallback
+# for callers that don't have the user's preference handy (e.g. direct
+# unit-test calls). The *effective* width actually used by
+# _expand_tabs/_char_to_visual_col/visual_to_char_col is $_tab_width
+# below, which render() syncs from $prefs->tab_width() once per render
+# pass -- mirrors how $_nerd_font_enabled is synced from prefs in
+# Zepto::Chars (see "Sync Chars module with prefs" in render() below).
+# Callers that already have the width in hand (WrapMap.pm) can also pass
+# it explicitly as the trailing argument to bypass the package state.
 use constant TAB_WIDTH => 4;
+
+# Effective tab width for the current render pass. Set via set_tab_width()
+# (called from render() below); read as the default by the tab-expansion
+# helpers when no explicit width is passed. NEVER assign 0 or negative
+# here -- set_tab_width() guards against that so a corrupt preference
+# can't wedge every subsequent tab calculation.
+my $_tab_width = TAB_WIDTH;
+
+# Set the effective tab width used by tab-expansion helpers below when no
+# explicit width argument is given. Call once per render pass. Falls back
+# to TAB_WIDTH for any invalid (<1) value so a bad preference can never
+# divide-by-zero or produce a negative expansion.
+sub set_tab_width {
+    my ($class, $width) = @_;
+    # Handle both class-method (Zepto::Renderer->set_tab_width(4)) and
+    # direct-call (Zepto::Renderer::set_tab_width(4)) styles, matching
+    # Zepto::Chars::set_enabled's convention.
+    if (ref($class) || $class !~ /::/) {
+        $width = $class;
+    }
+    $width = TAB_WIDTH unless defined $width && $width =~ /^\d+$/ && $width >= 1;
+    $_tab_width = $width;
+    return $_tab_width;
+}
 
 # Command palette sizing: width tiers (adapts to terminal width/mode) and
 # visible-item-count bounds. Used by both _render_command_palette and the
@@ -244,9 +276,12 @@ sub _ellipsis {
 # Also returns a mapping from original char positions to visual positions
 # Returns: ($expanded_string, \@char_to_visual)
 # @char_to_visual[i] = visual column where character i starts
+# $tab_width is optional; defaults to the current render pass's effective
+# width (see set_tab_width() above).
 sub _expand_tabs {
-    my ($text) = @_;
+    my ($text, $tab_width) = @_;
     return ('', []) unless defined $text && length($text) > 0;
+    $tab_width = $_tab_width unless defined $tab_width && $tab_width >= 1;
 
     my $expanded = '';
     my @char_to_visual;
@@ -258,7 +293,7 @@ sub _expand_tabs {
 
         if ($char eq "\t") {
             # Expand to next tab stop
-            my $spaces = TAB_WIDTH - ($visual_col % TAB_WIDTH);
+            my $spaces = $tab_width - ($visual_col % $tab_width);
             $expanded .= ' ' x $spaces;
             $visual_col += $spaces;
         } else {
@@ -271,9 +306,12 @@ sub _expand_tabs {
 }
 
 # Convert a character position to visual column
+# $tab_width is optional; defaults to the current render pass's effective
+# width (see set_tab_width() above).
 sub _char_to_visual_col {
-    my ($text, $char_pos) = @_;
+    my ($text, $char_pos, $tab_width) = @_;
     return 0 unless defined $text && $char_pos > 0;
+    $tab_width = $_tab_width unless defined $tab_width && $tab_width >= 1;
 
     my $visual_col = 0;
     my $len = length($text);
@@ -283,7 +321,7 @@ sub _char_to_visual_col {
     for my $i (0 .. $walk - 1) {
         my $char = substr($text, $i, 1);
         if ($char eq "\t") {
-            $visual_col += TAB_WIDTH - ($visual_col % TAB_WIDTH);
+            $visual_col += $tab_width - ($visual_col % $tab_width);
         } else {
             $visual_col += _char_display_width($char);
         }
@@ -300,10 +338,13 @@ sub _char_to_visual_col {
 # Convert a visual/display column to character position in text
 # Returns the character index where the visual column falls
 # If visual_col falls within a tab's expanded space, returns the tab's position
+# $tab_width is optional; defaults to the current render pass's effective
+# width (see set_tab_width() above).
 sub visual_to_char_col {
-    my ($text, $visual_col) = @_;
+    my ($text, $visual_col, $tab_width) = @_;
     return 0 unless defined $text && length($text) > 0;
     return 0 if $visual_col <= 0;
+    $tab_width = $_tab_width unless defined $tab_width && $tab_width >= 1;
 
     my $current_visual = 0;
     my $len = length($text);
@@ -313,7 +354,7 @@ sub visual_to_char_col {
         my $char_width;
 
         if ($char eq "\t") {
-            $char_width = TAB_WIDTH - ($current_visual % TAB_WIDTH);
+            $char_width = $tab_width - ($current_visual % $tab_width);
         } else {
             $char_width = _char_display_width($char);
         }
@@ -413,6 +454,13 @@ sub render {
     if ($prefs) {
         Zepto::Chars->set_enabled($prefs->nerd_font());
     }
+
+    # Sync effective tab width with prefs (bugs.md P1 "Tab Width
+    # preference has no effect on rendering existing tab characters") --
+    # without this, _expand_tabs/_char_to_visual_col/visual_to_char_col
+    # always fell back to the hardcoded TAB_WIDTH=4 constant regardless
+    # of what the user set in the palette.
+    $class->set_tab_width($prefs ? $prefs->tab_width() : undef);
 
     # Build per-row buffer for differential rendering
     my @row_buf = ('') x $rows;

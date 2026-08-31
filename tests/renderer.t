@@ -1362,6 +1362,84 @@ subtest 'visual_to_char_col handles wide characters' => sub {
     is(Zepto::Renderer::visual_to_char_col($mixed, 4), 3, 'Mixed: visual 4 = char 3 (start of c)');
 };
 
+# ============================================================================
+# Tab width threading (bugs.md P1 "Tab Width preference has no effect on
+# rendering existing tab characters" / QA-REG-189)
+#
+# Before the fix, _expand_tabs/_char_to_visual_col/visual_to_char_col
+# always used the hardcoded `TAB_WIDTH => 4` constant -- there was no way
+# to pass a different width in at all, so these assertions would fail
+# against the pre-fix code (there was no third argument to pass, and no
+# set_tab_width() to call).
+# ============================================================================
+subtest 'tab expansion honors an explicit width argument, not just TAB_WIDTH=4' => sub {
+    my ($expanded4, undef) = Zepto::Renderer::_expand_tabs("\tx", 4);
+    is($expanded4, (' ' x 4) . 'x', '_expand_tabs: explicit width 4');
+
+    my ($expanded8, undef) = Zepto::Renderer::_expand_tabs("\tx", 8);
+    is($expanded8, (' ' x 8) . 'x',
+        '_expand_tabs: explicit width 8 -- would be 4 spaces under the old hardcoded constant');
+
+    is(Zepto::Renderer::_char_to_visual_col("\tx", 2, 8), 9,
+        '_char_to_visual_col: width 8 -- tab expands to 8, "x" lands at visual col 9');
+    is(Zepto::Renderer::_char_to_visual_col("\tx", 2, 4), 5,
+        '_char_to_visual_col: width 4 -- tab expands to 4, "x" lands at visual col 5');
+
+    is(Zepto::Renderer::visual_to_char_col("\tx", 8, 8), 1,
+        'visual_to_char_col: width 8 -- visual col 8 (start of "x") is char index 1');
+    is(Zepto::Renderer::visual_to_char_col("\tx", 4, 4), 1,
+        'visual_to_char_col: width 4 -- visual col 4 (start of "x") is char index 1');
+};
+
+subtest 'set_tab_width() changes the default width used when no explicit arg is passed' => sub {
+    Zepto::Renderer->set_tab_width(2);
+    my ($expanded, undef) = Zepto::Renderer::_expand_tabs("\tx");
+    is($expanded, '  x', 'set_tab_width(2): _expand_tabs defaults to a 2-col tab with no explicit arg');
+    is(Zepto::Renderer::_char_to_visual_col("\tx", 2), 3,
+        'set_tab_width(2): _char_to_visual_col picks up the synced default width');
+
+    Zepto::Renderer->set_tab_width(8);
+    ($expanded, undef) = Zepto::Renderer::_expand_tabs("\tx");
+    is($expanded, (' ' x 8) . 'x', 'set_tab_width(8): _expand_tabs picks up the new default width');
+
+    # Invalid preference values must not wedge rendering with a
+    # divide-by-zero or a negative expansion -- fall back to TAB_WIDTH.
+    Zepto::Renderer->set_tab_width(0);
+    ($expanded, undef) = Zepto::Renderer::_expand_tabs("\tx");
+    is($expanded, (' ' x Zepto::Renderer::TAB_WIDTH) . 'x',
+        'set_tab_width(0) falls back to TAB_WIDTH instead of dividing by zero');
+
+    # Restore the module-level default so later subtests in this process
+    # (renderer.t runs many subtests against a shared package) aren't
+    # affected by this subtest's state.
+    Zepto::Renderer->set_tab_width(Zepto::Renderer::TAB_WIDTH);
+};
+
+subtest 'render() syncs the effective tab width from prefs on every render pass' => sub {
+    my $content = "\tindented";
+    my $filename = create_temp_file($content);
+    my $doc = Zepto::Document->load($filename);
+    my $view = Zepto::View->new(document => $doc);
+    my $theme = Zepto::Theme->dark_theme();
+
+    for my $width (2, 8) {
+        my $prefs = Zepto::Preferences->new(tab_width => $width);
+        Zepto::Renderer->render(
+            document => $doc,
+            view     => $view,
+            theme    => $theme,
+            prefs    => $prefs,
+            rows     => 10,
+            cols     => 40,
+        );
+        my ($expanded, undef) = Zepto::Renderer::_expand_tabs("\tx");
+        is($expanded, (' ' x $width) . 'x',
+            "after render() with prefs->tab_width=$width, tab-expansion helpers default to that width");
+    }
+
+    Zepto::Renderer->set_tab_width(Zepto::Renderer::TAB_WIDTH);
+};
+
 subtest 'Status bar shows READ ONLY for binary files' => sub {
     my $doc = Zepto::Document->new();
     $doc->{_is_binary} = 1;

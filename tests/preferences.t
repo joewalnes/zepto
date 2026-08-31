@@ -61,6 +61,49 @@ subtest 'Get and set' => sub {
     is($prefs->get('soft_tabs'), 0, 'Boolean value');
 };
 
+# Regression test for bugs.md P3 "Preferences::visual_width divides by
+# zero on tab_width == 0" / QA-REG-190. preferences.json is intentionally
+# hand-editable (per docs), and a hand-edited `tab_width: 0` (or negative)
+# used to persist silently via set() with zero validation -- the next
+# call to visual_width() would then hit an uncaught "Illegal modulus
+# zero" fatal. set() now clamps non-positive tab_width values to 1
+# instead of persisting them as-is.
+subtest 'set() rejects/clamps non-positive tab_width instead of persisting it silently' => sub {
+    my $prefs = Zepto::Preferences->new();
+
+    $prefs->set('tab_width', 0);
+    is($prefs->get('tab_width'), 1, 'tab_width=0 is clamped to 1, not persisted as 0');
+
+    $prefs->set('tab_width', -5);
+    is($prefs->get('tab_width'), 1, 'Negative tab_width is clamped to 1');
+
+    $prefs->set('tab_width', 'not_a_number');
+    is($prefs->get('tab_width'), 1, 'Non-numeric tab_width is clamped to 1');
+
+    $prefs->set('tab_width', 8);
+    is($prefs->get('tab_width'), 8, 'A valid positive tab_width still sets normally');
+
+    # The whole point: a clamped-to-1 tab_width must never divide by zero.
+    my $result = eval { $prefs->set('tab_width', 0); $prefs->visual_width("a\tb"); };
+    is($@, '', 'visual_width() after set(tab_width, 0) does not die (no divide-by-zero)');
+    ok(defined $result, 'visual_width() returns a defined value using the clamped width');
+};
+
+subtest 'visual_width() itself also guards against a non-positive width override' => sub {
+    my $prefs = Zepto::Preferences->new();
+
+    # Second layer of defense: even if visual_width() is called with an
+    # explicit tab_width override that bypassed set()'s validation, it
+    # must not divide by zero.
+    my $result = eval { $prefs->visual_width("a\tb", 0) };
+    is($@, '', 'visual_width($text, 0) does not die');
+    ok(defined $result, 'visual_width($text, 0) returns a defined value');
+
+    $result = eval { $prefs->visual_width("a\tb", -3) };
+    is($@, '', 'visual_width($text, -3) does not die');
+    ok(defined $result, 'visual_width($text, -3) returns a defined value');
+};
+
 subtest 'Get unknown key' => sub {
     my $prefs = Zepto::Preferences->new();
     is($prefs->get('nonexistent'), undef, 'Unknown key returns undef');
@@ -315,6 +358,31 @@ subtest 'Persistence: prefs load from StateStore on init' => sub {
     is($prefs->get('tab_width'), 2, 'Tab width loaded from store');
     # Non-persisted should still be default
     is($prefs->get('scroll_margin'), 3, 'Non-persisted pref is default');
+};
+
+# Regression test for the load-path gap found while writing QA-REG-190:
+# _load_from_store() writes directly to $self->{prefs}{$key}, bypassing
+# set() entirely -- so validating only inside set() would NOT protect the
+# actual scenario the bug describes (a hand-edited tab_width: 0 sitting
+# in preferences.json, loaded at startup). _validate_value() is now
+# shared by set(), _load_from_store(), and _apply_external_changes() so
+# all three paths that can populate $self->{prefs}{tab_width} clamp it.
+subtest 'Persistence: a hand-edited tab_width=0 on disk is clamped on load, not just on set()' => sub {
+    my $tmpdir = File::Temp::tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $tmpdir);
+
+    # Simulate a hand-edited preferences.json with a poisoned tab_width,
+    # written directly via the store (not via Preferences::set()) so this
+    # genuinely exercises the load path, not the set() path already
+    # covered above.
+    $store->put('preferences', { theme => 'light', tab_width => 0 });
+
+    my $prefs = Zepto::Preferences->new(state_store => $store);
+    is($prefs->get('tab_width'), 1, 'tab_width=0 loaded from disk is clamped to 1, not left as 0');
+
+    my $result = eval { $prefs->visual_width("a\tb") };
+    is($@, '', 'visual_width() after loading a poisoned tab_width=0 does not die');
+    ok(defined $result, 'visual_width() returns a defined value using the clamped loaded width');
 };
 
 subtest 'Persistence: soft_tabs, auto_indent, mouse_enabled are global prefs' => sub {

@@ -13,6 +13,7 @@ use warnings;
 # Define methods in Zepto::Editor's namespace
 package Zepto::Editor;
 use IPC::Open3;
+use IO::Select;
 
 use Symbol 'gensym';
 
@@ -474,9 +475,15 @@ sub cmd_copy {
 sub cmd_paste {
     my ($self) = @_;
 
-    # Try system clipboard first, fall back to internal clipboard
+    # Try system clipboard first, fall back to internal clipboard.
+    # paste_from_clipboard() returns undef specifically when the platform
+    # clipboard command hung past its timeout (bugs.md P1 "Clipboard
+    # paste has no timeout") -- distinct from '' (no content), so we can
+    # surface a real error instead of silently falling back.
     my $text = $self->{terminal}->paste_from_clipboard();
-    if (length $text) {
+    if (!defined $text) {
+        $self->show_error_message(_user_error("Paste failed", "clipboard read timed out"));
+    } elsif (length $text) {
         $self->{clipboard} = $text;
         $self->{clipboard_columnar} = 0;  # System clipboard is always linear
     }
@@ -1056,18 +1063,47 @@ sub cmd_transform {
                 $added_newline = 1;
             }
 
-            # Pipe through shell command, capturing both stdout and stderr
-            my ($output, $stderr_text);
+            # Pipe through shell command, capturing both stdout and stderr.
+            #
+            # IMPORTANT: stdout and stderr must be read concurrently, not
+            # sequentially. If the child writes enough to stderr (>~64KB,
+            # the typical OS pipe buffer size) while also writing to
+            # stdout, reading stdout to EOF first blocks the parent
+            # forever while the child blocks writing to a full stderr
+            # pipe nobody is reading yet -- the classic IPC::Open3
+            # synchronous-read deadlock (perldoc IPC::Open3 warns about
+            # this explicitly). Since raw mode disables ISIG, the user
+            # can't even Ctrl-C out. Use IO::Select to drain whichever
+            # handle has data ready, in any order. See bugs.md P1
+            # "cmd_transform can deadlock the whole editor" / QA-REG-187.
+            my ($output, $stderr_text) = ('', '');
             eval {
                 my $err_fh = gensym;
                 my $pid = open3(my $in_fh, my $out_fh, $err_fh, 'sh', '-c', $cmd);
                 print $in_fh $input;
                 close $in_fh;
-                local $/;
-                $output = <$out_fh>;
-                $stderr_text = <$err_fh>;
-                close $out_fh;
-                close $err_fh;
+
+                binmode($out_fh, ':raw');
+                binmode($err_fh, ':raw');
+
+                my $sel = IO::Select->new($out_fh, $err_fh);
+                while ($sel->count) {
+                    for my $fh ($sel->can_read) {
+                        my $buf;
+                        my $n = sysread($fh, $buf, 65536);
+                        if (!defined $n || $n == 0) {
+                            # EOF or read error -- stop watching this handle
+                            $sel->remove($fh);
+                            close $fh;
+                            next;
+                        }
+                        if (fileno($fh) == fileno($out_fh)) {
+                            $output .= $buf;
+                        } else {
+                            $stderr_text .= $buf;
+                        }
+                    }
+                }
                 waitpid($pid, 0);
             };
 
