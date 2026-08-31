@@ -320,6 +320,17 @@ sub handle_status_bar_click {
 
 # Build the hash shape Zepto::Renderer expects for ui->{palette}. Must stay
 # byte-identical to what Editor.pm's render() used to build inline.
+#
+# Two different objects are exposed here, for two different reasons:
+#   - `editor` is the real Zepto::Editor. Renderer.pm needs it for generic
+#     command-toggle-state queries (Zepto::CommandRegistry->get_toggle_state/
+#     get_toggle_display, which call arbitrary editor methods like
+#     active_view()) — this must stay the real editor, not this controller.
+#   - `controller` is this PaletteController itself. Renderer.pm reads/writes
+#     palette-private fields through it (_file_search_case/regex/
+#     scope_label/engine, palette_visible_rows) — fields that live on the
+#     controller, not the editor, since the extraction in bugs.md's "Editor
+#     god-object extraction".
 sub render_snapshot {
     my ($self) = @_;
     return {
@@ -329,8 +340,8 @@ sub render_snapshot {
         cursor         => $self->{palette_cursor},
         scroll         => $self->{palette_scroll},
         filtered       => $self->{palette_filtered},
-        editor         => $self,  # Renderer reads/writes palette-private fields
-                                   # (_file_search_*, palette_visible_rows) here.
+        editor         => $self->{editor},
+        controller     => $self,
         mode           => $self->{palette_mode} // 'commands',
     };
 }
