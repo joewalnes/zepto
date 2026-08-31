@@ -100,7 +100,10 @@ sub is_tracked {
     return 0 unless defined $file_path && -e $file_path;
 
     my $rel_path = $self->_relative_path($file_path);
-    my ($output, $status) = $self->_git('ls-files', '--error-unmatch', $rel_path);
+    # '--' separates options from the pathspec so a relative path that
+    # happens to start with '-' (e.g. "-x/foo.txt") can't be parsed by git
+    # as a flag instead of a path.
+    my ($output, $status) = $self->_git('ls-files', '--error-unmatch', '--', $rel_path);
 
     return $status == 0;
 }

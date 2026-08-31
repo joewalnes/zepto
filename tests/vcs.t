@@ -45,7 +45,7 @@ my $git_available = do {
 };
 
 SKIP: {
-    skip "git not available", 8 unless $git_available;
+    skip "git not available", 11 unless $git_available;
 
     subtest 'Git detection finds .git directory' => sub {
         my $tempdir = tempdir(CLEANUP => 1);
@@ -115,6 +115,46 @@ SKIP: {
 
         my $provider = Zepto::VCS::Git->detect($file);
         ok(!$provider->is_tracked($file), 'Untracked file is detected as untracked');
+    };
+
+    # QA-REG-195 / bugs.md P2 "VCS/Git.pm::is_tracked() has a git
+    # argument-injection edge case". A file whose relative path starts with
+    # '-' (e.g. "-weird.txt") must not be parsed by git as an option — this
+    # only reproduces when the *repo root itself* is the file's directory,
+    # so the relative path really is "-weird.txt" and not "sub/-weird.txt".
+    # Created via open() with an explicit path rather than any shell
+    # command/glob, which would otherwise treat a leading '-' as a flag.
+    subtest 'Git is_tracked for filename starting with dash (tracked)' => sub {
+        my $tempdir = tempdir(CLEANUP => 1);
+
+        system("cd $tempdir && git init --quiet 2>/dev/null");
+        system("cd $tempdir && git config user.email 'test\@test.com' && git config user.name 'Test' && git config commit.gpgsign false");
+
+        my $file = "$tempdir/-weird.txt";
+        open my $fh, '>', $file or die "Cannot create $file: $!";
+        print $fh "dash-prefixed tracked content\n";
+        close $fh;
+
+        system("cd $tempdir && git add -- -weird.txt && git commit -m 'Add dash file' --quiet 2>/dev/null");
+
+        my $provider = Zepto::VCS::Git->detect($file);
+        ok($provider->is_tracked($file),
+            'Dash-prefixed tracked file correctly reported as tracked (not misparsed as a git option)');
+    };
+
+    subtest 'Git is_tracked for filename starting with dash (untracked)' => sub {
+        my $tempdir = tempdir(CLEANUP => 1);
+
+        system("cd $tempdir && git init --quiet 2>/dev/null");
+
+        my $file = "$tempdir/-weird.txt";
+        open my $fh, '>', $file or die "Cannot create $file: $!";
+        print $fh "dash-prefixed untracked content\n";
+        close $fh;
+
+        my $provider = Zepto::VCS::Git->detect($file);
+        ok(!$provider->is_tracked($file),
+            'Dash-prefixed untracked file correctly reported as untracked (not misparsed as a git option)');
     };
 
     subtest 'Git get_head_content' => sub {

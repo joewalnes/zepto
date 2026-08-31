@@ -16,6 +16,7 @@ package Zepto::ImageConverter;
 
 use strict;
 use warnings;
+use File::Temp ();
 
 {
     my $_image_converter;   # undef = not checked, '' = none found, or cmd path
@@ -68,12 +69,24 @@ use warnings;
         my $converter = $class->detect_converter();
         return '' unless $converter;
 
-        # Build output path in system temp directory
-        require File::Basename;
-        my $basename = File::Basename::basename($path);
-        $basename =~ s/\.[^.]+$/.png/;
+        # Build output path in system temp directory.
+        # Use File::Temp for secure creation (unpredictable name, exclusive
+        # open) — matches Document.pm's atomic-save precedent. A predictable
+        # "$tmpdir/zepto-img-$$-$basename" name with no O_EXCL would let a
+        # local attacker who can observe our PID pre-plant a symlink at that
+        # path, which sips/convert would then follow and write through.
+        # SUFFIX => '.png' keeps sips from warning on stderr about a
+        # mismatched output suffix (verified: both sips and convert honor
+        # the explicit format flag / "PNG:" prefix regardless of the actual
+        # filename extension, so this is cosmetic, not functional).
         my $tmpdir = $ENV{TMPDIR} // '/tmp';
-        my $out = "$tmpdir/zepto-img-$$-$basename";
+        my ($out_fh, $out) = File::Temp::tempfile(
+            'zepto-img-XXXXXXXX',
+            DIR    => $tmpdir,
+            SUFFIX => '.png',
+            UNLINK => 0,
+        );
+        close $out_fh;
 
         my $ok;
         # Redirect stdout/stderr to suppress tool output

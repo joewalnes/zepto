@@ -2100,3 +2100,139 @@ VERIFY    The redesign did not change `_calc_tab_pill_width`'s formula
           column) and mouse-clicks it — confirming that exact tab closes
           and its immediate neighbor (the tab an off-by-one column error
           would have hit instead) is untouched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-193
+NAME:     ImageConverter uses File::Temp for secure, unpredictable temp
+          file creation instead of a predictable PID-based path
+PRIORITY: P2
+BUG:      P2 "ImageConverter.pm uses a predictable temp filename with no
+          exclusive creation - symlink-follow risk" — bugs.md "Scorecard
+          audit round 2 (2026-08-30)".
+CROSS-REF: QA-BIN-006/007/008 (Kitty image rendering, qa/20_binary_and_images.txt),
+           tests/image_converter.t
+VERIFY    `ImageConverter.pm::ensure_png()` built its conversion output
+          path as `"$tmpdir/zepto-img-$$-$basename"` via plain string
+          concatenation — predictable from just the PID (visible via
+          `ps`) and the image's basename, with no O_EXCL/exclusive
+          creation. A local attacker on a shared host could pre-plant a
+          symlink at that exact path pointing at a file the victim can
+          write (e.g. their shell rc file); sips/convert would follow it
+          and overwrite the target when the victim merely previewed an
+          image in zepto. Confirmed the vulnerability is real: manually
+          reproduced the symlink being followed and the victim file
+          overwritten with PNG bytes on macOS `sips`. Fixed to use
+          `File::Temp::tempfile()` (unpredictable name, exclusive
+          O_EXCL-backed creation), matching `Document.pm`'s existing
+          atomic-save precedent — `SUFFIX => '.png'` avoids a cosmetic
+          sips stderr warning about output suffix (verified both sips
+          and ImageMagick `convert` honor the explicit format flag /
+          "PNG:" prefix regardless of actual filename extension, so this
+          doesn't affect correctness either way). Confirmed
+          test-before/fix/test-after: reverted the fix and re-ran both
+          `tests/image_converter.t` and
+          `qa/scripts/tier1/reg_193_image_converter_tempfile.sh` — the
+          unit test's symlink-follow subtest correctly failed (using a
+          *fresh* source file per subtest, since ensure_png()'s own
+          "$path\0$mtime" result cache was found to mask the bug on
+          reused source files — a false pass discovered and fixed while
+          writing this test); restored the fix and re-ran — both pass.
+          The QA script opens a real JPEG requiring conversion on a
+          Kitty-graphics-capable terminal (`TERM_PROGRAM=ghostty`) and
+          confirms the full pipeline end-to-end via `hangon readall`
+          (the raw output stream, unlike `hangon screen`'s rendered text
+          grid — headless hangon/tmux sessions can't decode/rasterize
+          transmitted Kitty graphics pixels, confirmed empirically even
+          via `hangon screenshot`): the Kitty APC image-transmission
+          sequence is present with the correct format/id, and its
+          base64 payload decodes to a real PNG.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-194
+NAME:     AI API key secrets file is created at mode 0600 atomically,
+          never briefly world-readable
+PRIORITY: P2
+BUG:      P2 "AI API key briefly written world-readable before chmod
+          0600 catches up" — bugs.md "Scorecard audit round 2
+          (2026-08-30)".
+CROSS-REF: tests/state_store_secrets_race.t (primary coverage),
+           tests/state_store.t "Secrets file gets mode 0600"
+VERIFY    `StateStore.pm::put()` opened the secrets temp file with a
+          plain `open my $fh, '>', $tmp_path` (default umask permissions,
+          often 0644 world-readable), wrote the API key, closed it, and
+          only *then* `chmod 0600`'d it before the atomic rename — a
+          real window where the key was world-readable. Checking only
+          the FINAL file's permissions would not catch this (both buggy
+          and fixed code converge on 0600 by the time put() returns), so
+          `tests/state_store_secrets_race.t` instead intercepts the
+          file-creation syscall itself: it overrides
+          `CORE::GLOBAL::open`/`CORE::GLOBAL::sysopen` in a `BEGIN` block
+          *before* `Zepto::StateStore` is compiled (all of StateStore's
+          transitive dependencies — File::Spec/Cwd/JSON::PP/File::Temp —
+          must be preloaded first, since a global builtin override
+          changes how bareword-filehandle `open` calls PARSE for
+          everything compiled afterward, and broke Cwd.pm's internal
+          bareword-FH usage the first time this was tried without
+          preloading), and records the file's mode on disk immediately
+          after creation — before any write/close/chmod/rename can run.
+          Deterministic, no timing/polling/flakiness. Fixed to
+          `sysopen($fh, $tmp_path, O_WRONLY|O_CREAT|O_EXCL, 0600)` for
+          the `secrets` category specifically — other categories
+          (preferences, history) intentionally keep default umask
+          permissions per this file's own category-docs comment, since
+          they hold no secrets and may be synced/managed like any other
+          dotfile. O_EXCL also closes the same symlink-follow class of
+          risk fixed in QA-REG-193 (ImageConverter), since the temp path
+          is still PID-based/predictable. Confirmed
+          test-before/fix-test-after: reverted the fix, re-ran the race
+          test — failed exactly as expected (observed the temp file at
+          mode 0644 under a forced permissive umask, at the moment of
+          `open()`, before any chmod ran); restored the fix, re-ran —
+          passes. `qa/scripts/tier1/reg_194_secrets_file_mode.sh`
+          exercises the real user-facing flow (Command Palette → "AI
+          Completion: Setup", the only caller that writes the `secrets`
+          category) end-to-end and confirms the resulting `secrets.json`
+          is mode 0600.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-195
+NAME:     VCS::Git::is_tracked() no longer misparses a dash-prefixed
+          relative path as a git option
+PRIORITY: P2
+BUG:      P2 "VCS/Git.pm::is_tracked() has a git argument-injection edge
+          case" — bugs.md "Scorecard audit round 2 (2026-08-30)".
+CROSS-REF: tests/vcs.t "Git is_tracked for filename starting with dash
+           (tracked/untracked)"
+VERIFY    `_git('ls-files', '--error-unmatch', $rel_path)` had no `--`
+          separator before the pathspec, so a relative path starting
+          with '-' (e.g. "-weird.txt", which `_relative_path()` produces
+          verbatim for a file at the repo root with that name) could be
+          parsed by git as an option rather than a path, causing
+          `is_tracked()` to misreport. Audited every other `_git(...)`
+          call site in this file: the two `git show` calls
+          (`HEAD:$rel_path`, `:$rel_path`) remain safe since those
+          prefixed forms can never start with '-'; `git status
+          --porcelain` and `git ls-files` in FileTree.pm take no
+          user-controlled pathspec argument at all. No other gaps found.
+          Fixed by adding `'--'` before `$rel_path`. Confirmed
+          test-before/fix/test-after in two independent ways: (1)
+          `tests/vcs.t` — reverted the fix, ran the new dash-prefixed
+          subtests, confirmed the tracked-file case failed exactly as
+          expected (misreported as untracked); restored the fix, re-ran
+          — passes. (2) `qa/scripts/tier1/reg_195_git_dash_filename.sh`
+          — same revert/restore cycle, same result. This QA script is
+          intentionally non-interactive (no hangon/zepto session),
+          unlike other scripts in this directory: `is_tracked()` has
+          ZERO callers anywhere in the editor's runtime code today (only
+          exercised by unit tests) — there is no command, keybinding, or
+          UI element to drive interactively, so Rule 2 (UI
+          discoverability) does not apply to this fix. The script
+          instead calls the real `Zepto::VCS::Git` library code directly
+          against a real git repository with a dash-prefixed file
+          (created via Perl `open()` with an explicit path, never shell
+          globbing, which would otherwise treat the leading '-' as a
+          flag), mirroring the interactive scripts' spirit as closely as
+          this constraint allows.

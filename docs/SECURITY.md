@@ -30,6 +30,7 @@ Zepto runs on users' desktops with read/write access to all their files. Users t
   ```
 - Do not follow symlinks outside the working directory without deliberate user action
 - Validate that resolved paths stay within expected roots — no `../../../etc/passwd` traversal
+- Temp files: never build a predictable path by string concatenation (e.g. `"$tmpdir/prefix-$$-$name"`) and open it with a plain `open`/`>`. Use `File::Temp::tempfile()` (unpredictable name, exclusive `O_EXCL` creation) — the established pattern, first used in `Document.pm`'s atomic save and now also `ImageConverter.pm`'s conversion output. A predictable name with no exclusive creation lets a local attacker who can guess the path (e.g. from a visible PID) pre-plant a symlink that gets followed and written through. If a temp file needs specific permissions tighter than the process default (e.g. secrets), set them atomically at creation with `sysopen(..., O_CREAT|O_EXCL|O_WRONLY, $mode)` rather than `open` followed by a later `chmod` — the gap between the two is a real window where the file exists at the wrong (more permissive) mode.
 - Enforce discovery limits (Config.pm): **10,000 files max**, **15 directory levels deep**
 
 ### Shell Execution
@@ -39,7 +40,7 @@ Shell commands are limited to six places, all using safe list-form `exec()` or `
 1. **VCS integration** (`lib/Zepto/VCS/Git.pm`): `git` commands via list-form `open(FH, '-|')` + `exec('git', @args)`
 2. **Clipboard tools** (`lib/Zepto/Terminal.pm`): xclip / pbcopy / xsel / wl-copy via list-form pipes and `exec()`
 3. **File search** (`lib/Zepto/FileSearchEngine.pm`): `git grep`, `rg` (ripgrep), `grep` via list-form `open()` and `exec()`. Search pattern passed via `-e` flag as a direct argument, never interpolated into a string. Scope directory validated with `-d` before use. Results are display-only until user explicitly selects one to open.
-4. **Image format conversion** (`lib/Zepto/ImageConverter.pm`): `sips` (macOS) or `convert` (ImageMagick) via `system()` with argument arrays. Command detection uses backtick `which` but only for hardcoded literal commands, never user-supplied.
+4. **Image format conversion** (`lib/Zepto/ImageConverter.pm`): `sips` (macOS) or `convert` (ImageMagick) via `system()` with argument arrays. Command detection uses backtick `which` but only for hardcoded literal commands, never user-supplied. The conversion output path is created via `File::Temp::tempfile()` (unpredictable name, exclusive `O_EXCL`-backed creation) — matching `Document.pm`'s atomic-save pattern — so `sips`/`convert` can never be pointed at a pre-planted symlink.
 5. **Text transformation** (`lib/Zepto/Editor/Commands.pm` `cmd_transform`, Alt+T): User-typed shell command piped to `sh -c`. This is an intentional capability — users consciously choose to run arbitrary shell commands on selected text, similar to a terminal. Not injection; users are explicitly requesting shell execution.
 6. **AI completion** (`lib/Zepto/AIComplete.pm`): `curl` for HTTPS requests to AI APIs via list-form `exec('curl', ...)`. Only enabled when user configures an API endpoint + key (disabled by default).
 
@@ -102,6 +103,9 @@ Run through this before committing any change that touches file I/O, shell execu
 | P2 | Terminal title OSC injection via file names with ESC | Fixed: `$title =~ s/[\x00-\x1f]//g` in `set_title()` in `Terminal.pm` |
 | P2 | Clipboard command construction in Terminal.pm | Audited: clipboard commands are hardcoded constants, never user-supplied; no injection path |
 | P3 | Git path quoting completeness in VCS/Git.pm | Audited: all user-controlled paths use list-form `exec()` without shell interpolation; no quoting-bypass gaps |
+| P2 | Predictable temp filename with no exclusive creation in `ImageConverter.pm` (symlink-follow risk) | Fixed: conversion output path now created via `File::Temp::tempfile()` (unpredictable name, exclusive `O_EXCL` creation) instead of `"$tmpdir/zepto-img-$$-$basename"` string concatenation. See bugs.md and `qa/40_regression_bugs.txt` QA-REG-193. |
+| P2 | AI API key briefly world-readable before `chmod 0600` catches up in `StateStore.pm` | Fixed: the `secrets` category now uses `sysopen(..., O_WRONLY\|O_CREAT\|O_EXCL, 0600)` — mode set atomically at creation, no window. Other categories intentionally keep default umask permissions (no secrets). See bugs.md and `qa/40_regression_bugs.txt` QA-REG-194. |
+| P2 | `VCS/Git.pm::is_tracked()` git argument-injection edge case (dash-prefixed filename) | Fixed: added `'--'` separator before the pathspec in the `ls-files` call. Audited every other `_git(...)` call site in the file; no other gaps found. See bugs.md and `qa/40_regression_bugs.txt` QA-REG-195. |
 
 When an item above is investigated and resolved, document the finding and remove it from this list (or move to bugs.md if it becomes a tracked bug).
 
