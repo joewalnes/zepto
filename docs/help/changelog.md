@@ -2,6 +2,7 @@
 
 ## 2026-08-30
 
+- Improved Find in Files robustness: an unusual regex pattern can no longer make a project-wide search hang indefinitely — matching is now time-bounded the same way in-buffer regex find/replace already was. A pathological pattern now just skips the one line it couldn't finish checking in time and the search continues normally, instead of freezing
 - Fixed syntax highlighting re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Highlighting itself is unaffected (multi-line comments/strings still re-highlight correctly the moment an earlier line changes what they should look like) — this is a speed-only fix, most noticeable when typing in large files with syntax highlighting on
 
 - The file tree's status bar now shows a "⌃B back" hint for switching focus back to the editor (the tree stays open — this is different from Esc, which closes it) — previously there was no on-screen hint for this anywhere while the tree was focused. When there's enough room, the tree's status bar also shows the same close-tab/switch-tabs/quit hint the editor's tab bar shows

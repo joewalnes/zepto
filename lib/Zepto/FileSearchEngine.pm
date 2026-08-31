@@ -25,6 +25,18 @@ use Zepto::Config;
 
 use constant MAX_RESULTS => 1000;
 
+# Wall-clock ceiling (seconds) for a single regex MATCH attempt, as opposed
+# to _start_perl_search's ceiling for qr// compilation (see comment there).
+# Mirrors FindEngine.pm's MATCH_ALARM_SECS / _match_with_alarm: compiling a
+# pattern like `(a?){28}a{28}` is instant, but *matching* it against a run
+# of 28 a's takes 15+ seconds of pure catastrophic backtracking (verified
+# empirically). The compile-time alarm in _start_perl_search is cancelled
+# before any match is ever attempted, so it provides zero protection here
+# — this is a separate failure mode that needs its own guard around every
+# match attempt (bugs.md P1 "FileSearchEngine.pm's 'Find in Files' regex
+# search has no match-time ReDoS timeout, only compile-time").
+use constant MATCH_ALARM_SECS => 1;
+
 sub new {
     my ($class, %opts) = @_;
     return bless {
@@ -57,6 +69,12 @@ sub new {
         _perl_path    => undef,   # Current file path
         _perl_line_no => 0,       # Current line number
         _perl_query   => '',      # Query for matching (lowercased unless case_sensitive)
+
+        # True if a match-time regex timeout (catastrophic backtracking)
+        # occurred anywhere during the most recent search. Reset at the
+        # start of every search(). Mirrors FindEngine.pm's
+        # search_timed_out() flag/accessor.
+        _search_timed_out => 0,
     }, $class;
 }
 
@@ -149,6 +167,7 @@ sub search {
     # Store search options
     $self->{case_sensitive} = $opts{case_sensitive} // 0;
     $self->{use_regex}      = $opts{use_regex} // 0;
+    $self->{_search_timed_out} = 0;
 
     # Reset results
     $self->{results}      = [];
@@ -489,9 +508,24 @@ sub _find_match_in_content {
 
     if ($self->{use_regex}) {
         my $re = $self->{_perl_regex};
-        if ($re && $content =~ $re) {
-            $match_col = $-[0];
-            $match_len = $+[0] - $-[0];
+        if ($re) {
+            # Guard the MATCH itself, not just compilation — see
+            # MATCH_ALARM_SECS / _match_with_alarm above. $-[0]/$+[0] are
+            # read INSIDE the coderef since they don't reliably survive
+            # being read after eval{} returns.
+            my ($timed_out, $matched, $m_start, $m_end) = $self->_match_with_alarm(sub {
+                my $ok = ($content =~ $re);
+                return $ok ? (1, $-[0], $+[0]) : (0);
+            });
+            if ($timed_out) {
+                # Pathological pattern on this one piece of display text —
+                # skip highlighting for it and keep going; don't abort the
+                # whole search over a single unhighlightable result.
+                $self->{_search_timed_out} = 1;
+            } elsif ($matched) {
+                $match_col = $m_start;
+                $match_len = $m_end - $m_start;
+            }
         }
     } else {
         my $content_cmp = $self->{case_sensitive} ? $content : lc($content);
@@ -547,10 +581,32 @@ sub _tick_perl {
             my $match_col = -1;
             my $match_len = 0;
             if ($use_regex && $perl_regex) {
-                if ($line =~ $perl_regex) {
+                # Guard the MATCH itself, not just compilation — see
+                # MATCH_ALARM_SECS / _match_with_alarm above. The
+                # deadline check at the bottom of this loop only runs
+                # *between* completed line matches, so it can never
+                # catch a single pathological match attempt that
+                # doesn't return on its own (e.g. `(a?){28}a{28}`
+                # against a long run of a's — verified to hang for
+                # 15+ seconds with no per-match guard). $-[0]/$+[0]
+                # are read INSIDE the coderef since they don't
+                # reliably survive being read after eval{} returns.
+                my ($timed_out, $re_matched, $m_start, $m_end) = $self->_match_with_alarm(sub {
+                    my $ok = ($line =~ $perl_regex);
+                    return $ok ? (1, $-[0], $+[0]) : (0);
+                });
+                if ($timed_out) {
+                    # Pathological pattern against this one line — treat
+                    # as no-match-on-this-line and keep scanning. Each
+                    # line is different input, so (unlike a single /g
+                    # loop re-attempting the same position) skipping
+                    # forward makes progress rather than looping forever
+                    # on the same doomed match.
+                    $self->{_search_timed_out} = 1;
+                } elsif ($re_matched) {
                     $matched = 1;
-                    $match_col = $-[0];
-                    $match_len = $+[0] - $-[0];
+                    $match_col = $m_start;
+                    $match_len = $m_end - $m_start;
                 }
             } else {
                 my $line_cmp = $case_sensitive ? $line : lc($line);
@@ -672,6 +728,49 @@ sub _reap_stale {
 sub is_searching {
     my ($self) = @_;
     return !$self->{done};
+}
+
+# True if a match-time regex timeout (catastrophic backtracking) occurred
+# during the most recent search — some lines/files may have been skipped
+# rather than fully matched. Mirrors FindEngine.pm's search_timed_out().
+sub search_timed_out {
+    my ($self) = @_;
+    return $self->{_search_timed_out} ? 1 : 0;
+}
+
+# Run a regex match attempt (passed as a coderef so this can guard both
+# plain `=~` checks and more elaborate match/capture logic) under a
+# match-time alarm. Returns ($timed_out, @result), where @result is
+# exactly whatever $coderef->() returned (empty/omitted if timed out).
+#
+# This exists because the compile-time alarm in _start_perl_search only
+# covers qr// compilation and is explicitly cancelled (alarm(0)) before
+# any match is ever attempted — catastrophic backtracking happens at
+# MATCH time, so that alarm provides zero protection against it. Mirrors
+# FindEngine.pm's _match_with_alarm exactly (see FindEngine.pm:555-572
+# for the full rationale and the $1/@-/@+ scoping pitfall it documents).
+#
+# IMPORTANT: $coderef MUST read $1/@-/@+ (or whatever match variables it
+# needs) and return already-extracted plain values — NOT rely on the
+# caller reading match variables after this sub returns. See
+# FindEngine.pm's _match_with_alarm doc comment for why.
+sub _match_with_alarm {
+    my ($self, $coderef) = @_;
+
+    my @result = eval {
+        local $SIG{ALRM} = sub { die "regex_match_timeout\n" };
+        alarm(MATCH_ALARM_SECS);
+        my @r = $coderef->();
+        alarm(0);
+        @r;
+    };
+    alarm(0);  # Ensure alarm is cancelled even on exception
+
+    if ($@) {
+        die $@ unless $@ eq "regex_match_timeout\n";
+        return (1);  # timed_out, no result
+    }
+    return (0, @result);
 }
 
 1;

@@ -2516,3 +2516,56 @@ VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
           discoverable via the command palette. Verified non-tautological
           by temporarily neutering cmd_find_next and confirming the
           script fails (2 of 6 checks) before restoring it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-207
+NAME:     Find in Files ReDoS timeout now covers regex match time, not
+          just compilation
+PRIORITY: P1
+BUG:      P1 "FileSearchEngine.pm's 'Find in Files' regex search has no
+          match-time ReDoS timeout, only compile-time" — bugs.md
+          "Scorecard audit round 3" (2026-08-30). Sibling gap to
+          QA-REG-141/QA-SEC-012 (FindEngine.pm, in-buffer find/replace):
+          FileSearchEngine.pm's own alarm(1) also wrapped qr//
+          compilation only and was cancelled before any match was ever
+          attempted, so a pathological pattern could hang the async
+          project-wide "Find in Files" scan (both the pure-Perl
+          _tick_perl() line-scan loop and _find_match_in_content()'s
+          highlight-position recompute) indefinitely.
+CROSS-REF: QA-REG-141, QA-SEC-012, tests/file_search_engine_redos.t
+VERIFY    A pattern that is cheap to compile but catastrophically
+          expensive to match (`(a?){28}a{28}` against 28 "a"s — same
+          pattern as QA-REG-141, verified separately to take 15+ seconds
+          of pure backtracking unguarded) no longer hangs
+          FileSearchEngine's tick()/_tick_perl() scan loop. Each match
+          attempt is now bounded by its own alarm (MATCH_ALARM_SECS =
+          1s in FileSearchEngine.pm, mirroring FindEngine.pm's constant
+          of the same name), independent of and in addition to
+          _start_perl_search's existing compile-time alarm. On timeout,
+          only the one offending line is skipped (treated as no match)
+          — the scan continues to the next line/file rather than
+          aborting the whole search, and a new search_timed_out()
+          accessor lets callers know a pattern was too expensive to
+          fully evaluate. Verified at the unit level via a forked-child
+          + parent-watchdog test (file_search_engine_redos.t — same
+          alarm-clobbering reason as find_engine_redos.t: Perl's
+          alarm() is a single process-wide timer, so an in-process
+          watchdog can't reliably distinguish "fixed" from "broken"
+          here), including a "timeout on one line doesn't abort the
+          whole file" case (an alternation pattern with the
+          catastrophic branch plus an ordinary marker-word branch on a
+          separate line — the marker match is still found). Verified
+          interactively via hangon (`reg_207_filesearch_redos_timeout.sh`):
+          opens Find in Files, switches to regex mode, types the same
+          alternation pattern against a project scanned with the pure-
+          Perl backend (git/rg/grep shadowed with always-fail stubs on
+          PATH so detect_backend() actually falls through to 'perl' —
+          otherwise an external tool's own regex engine would silently
+          make the test not exercise the fixed code path at all).
+          Confirms the marker match is still found (proving graceful
+          skip-and-continue, not just "eventually returned"), the editor
+          process stays alive, and it remains genuinely responsive to
+          new keystrokes afterward — not just alive-but-wedged. Verified
+          non-tautological by reverting the fix and confirming the
+          script fails (2 of 3 checks) before restoring it.
