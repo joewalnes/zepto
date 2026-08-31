@@ -728,84 +728,6 @@ sub cmd_find_prev {
     }
 }
 
-sub do_find_next {
-    my ($self) = @_;
-
-    my $doc = $self->active_doc();
-    my $view = $self->active_view();
-    my $term = $self->{search_term};
-
-    return unless $term;
-
-    my $text = $doc->text();
-    my $start = $doc->line_col_to_offset(
-        $view->cursor_line(),
-        $view->cursor_col()
-    ) + 1;
-
-    my $pos = index($text, $term, $start);
-
-    # Wrap around
-    if ($pos == -1 && $self->{prefs}->search_wrap()) {
-        $pos = index($text, $term, 0);
-    }
-
-    if ($pos >= 0) {
-        my ($line, $col) = $doc->offset_to_line_col($pos);
-        $view->set_cursor($line, $col);
-        # Select the match
-        $view->set_cursor($line, $col + length($term), 1);
-        $self->show_message("Found");
-    }
-    else {
-        $self->show_message("Not found: $term");
-    }
-}
-
-sub do_find_prev {
-    my ($self) = @_;
-
-    my $doc = $self->active_doc();
-    my $view = $self->active_view();
-    my $term = $self->{search_term};
-
-    return unless $term;
-
-    my $text = $doc->text();
-
-    # When there's a selection, search from BEFORE the selection start
-    # Otherwise we'd be stuck finding the same match over and over
-    my $end;
-    if ($view->has_selection()) {
-        my ($start_offset, $end_offset) = $view->selection_offsets();
-        $end = $start_offset - 1;
-    }
-    else {
-        $end = $doc->line_col_to_offset(
-            $view->cursor_line(),
-            $view->cursor_col()
-        ) - 1;
-    }
-
-    my $pos = rindex($text, $term, $end);
-
-    # Wrap around
-    if ($pos == -1 && $self->{prefs}->search_wrap()) {
-        $pos = rindex($text, $term);
-    }
-
-    if ($pos >= 0) {
-        my ($line, $col) = $doc->offset_to_line_col($pos);
-        $view->set_cursor($line, $col);
-        # Select the match
-        $view->set_cursor($line, $col + length($term), 1);
-        $self->show_message("Found");
-    }
-    else {
-        $self->show_message("Not found: $term");
-    }
-}
-
 sub cmd_find_in_files {
     my ($self) = @_;
 
@@ -1260,10 +1182,7 @@ sub _apply_theme_pref {
 
     # Re-apply cursor color for new theme
     my $cursor_color = $self->{theme}->color('cursor_color');
-    if ($cursor_color) {
-        print STDOUT "\x1b]12;${cursor_color}\x1b\\";
-        STDOUT->flush();
-    }
+    $self->{terminal}->set_cursor_color($cursor_color) if $cursor_color;
 }
 
 # ⌃T: toggle between the explicit opposite of whatever theme is currently
@@ -1399,6 +1318,12 @@ sub cmd_toggle_auto_indent {
     );
 }
 
+# Valid range for the "Tab Width" preference (cmd_set_tab_width below).
+use constant {
+    TAB_WIDTH_MIN => 1,
+    TAB_WIDTH_MAX => 16,
+};
+
 sub cmd_set_tab_width {
     my ($self) = @_;
     my $prefs = $self->{prefs};
@@ -1407,14 +1332,16 @@ sub cmd_set_tab_width {
         prompt => 'Tab Width:',
         value  => $prefs->tab_width(),
         select_all => 1,
-        hint   => '1-16',
+        hint   => TAB_WIDTH_MIN . '-' . TAB_WIDTH_MAX,
         id     => 'set_tab_width',
         on_submit => sub {
             my ($input) = @_;
             return unless defined $input && $input =~ /\S/;
 
-            unless ($input =~ /^\d+$/ && $input >= 1 && $input <= 16) {
-                $self->show_error_message("Invalid tab width. Use a number 1-16.");
+            unless ($input =~ /^\d+$/ && $input >= TAB_WIDTH_MIN && $input <= TAB_WIDTH_MAX) {
+                $self->show_error_message(
+                    "Invalid tab width. Use a number " . TAB_WIDTH_MIN . '-' . TAB_WIDTH_MAX . "."
+                );
                 return;
             }
 

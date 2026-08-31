@@ -440,16 +440,4 @@ sub line_col_to_offset {
     return $start + $col;
 }
 
-# -----------------------------------------------------------------------------
-# Debugging
-# -----------------------------------------------------------------------------
-
-# Dump buffer state for debugging
-sub _debug_state {
-    my ($self) = @_;
-    return sprintf("pre_gap[%d]='%s' | post_gap[%d]='%s'",
-        CORE::length($self->{pre_gap}), $self->{pre_gap},
-        CORE::length($self->{post_gap}), $self->{post_gap});
-}
-
 1;

@@ -180,6 +180,13 @@ sub disable_raw_mode {
     return unless $self->{_is_raw};
 
     if ($self->{_orig_termios}) {
+        # Deliberately silent on failure, unlike enable_raw_mode's warn:
+        # this runs from cleanup() during shutdown, where in_fh may
+        # already be closed/torn down (see docs/CODE_QUALITY.md's
+        # "Global destruction order" pitfall) — warning here would risk
+        # spraying stderr noise on ordinary exit paths (e.g. Ctrl+Q,
+        # signal handling), which is worse than a best-effort restore
+        # that silently no-ops when there's nothing left to restore.
         eval {
             $self->{_orig_termios}->setattr(fileno($self->{in_fh}), TCSANOW);
         };
@@ -366,28 +373,6 @@ sub refresh_size {
 # =============================================================================
 # Input
 # =============================================================================
-
-# Read available input (non-blocking)
-# Returns bytes read, or empty string if nothing available
-sub read_available {
-    my ($self, $timeout) = @_;
-    $timeout //= 0;
-
-    my $in_fh = $self->{in_fh};
-    my $select = IO::Select->new($in_fh);
-
-    my $input = '';
-
-    while ($select->can_read($timeout)) {
-        my $buf;
-        my $n = sysread($in_fh, $buf, READ_BUFFER_SIZE);
-        last unless defined $n && $n > 0;
-        $input .= $buf;
-        $timeout = 0;  # Don't wait on subsequent reads
-    }
-
-    return $input;
-}
 
 # Blocking read of at least one byte
 sub read_blocking {
