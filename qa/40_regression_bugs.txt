@@ -2519,7 +2519,7 @@ VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-203
+ID:       QA-REG-211
 NAME:     Find & Replace preview never mutates the document or corrupts
           on-screen rendering
 PRIORITY: P0
@@ -2577,7 +2577,7 @@ VERIFY    Root-cause investigation found symptoms (1) and (2) to be two
           full interactive `hangon` testing showed the undo stack
           unchanged (`0 -> 0` depth) and document content byte-identical
           throughout the exact repro. `qa/scripts/tier1/
-          reg_203_find_replace_preview_no_mutation.sh` still asserts the
+          reg_211_find_replace_preview_no_mutation.sh` still asserts the
           no-mutation guarantee directly (undo stack shows "Nothing to
           undo" after Escape) as a permanent regression guard. Verified
           non-tautological: 8 of 18 QA-script assertions fail against the

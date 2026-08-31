@@ -468,8 +468,8 @@ NAME:     Replace preview: correct in-place text, no screen corruption,
           no document mutation (REGRESSION)
 PRIORITY: P0
 FEATURE:  replace preview
-RELATED:  QA-FIND-005, QA-FIND-006, QA-REG-203
-SCRIPT:   tier1/reg_203_find_replace_preview_no_mutation.sh
+RELATED:  QA-FIND-005, QA-FIND-006, QA-REG-211
+SCRIPT:   tier1/reg_211_find_replace_preview_no_mutation.sh
 
 STEPS
   1. File contains `foo bar`, `foo baz`, `qux foo`, `hello world`.

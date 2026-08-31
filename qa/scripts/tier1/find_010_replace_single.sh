@@ -41,7 +41,7 @@ sleep 0.3
 # `|| true` guards each grep -o against its own "no match" exit 1, which
 # would otherwise abort the script under qa-helpers.sh's `set -e
 # -o pipefail` before any PASS/FAIL is ever printed (this exact silent
-# crash is what QA-REG-203's investigation found happening here after the
+# crash is what QA-REG-211's investigation found happening here after the
 # preview/pre-select fix stopped an unrelated bug from accidentally
 # leaving both substrings present).
 content=$(cat "$file")

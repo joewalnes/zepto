@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# QA-REG-203: Find & Replace preview never mutates the document or corrupts
+# QA-REG-211: Find & Replace preview never mutates the document or corrupts
 # on-screen rendering
 #
 # bugs.md P0 "Find & Replace's 'preview' mutates the real document and
@@ -38,7 +38,7 @@
 # regression guard, per bugs.md's convention of asserting the property
 # even where the specific claimed bug didn't reproduce.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
-qa_header "QA-REG-203: Find & Replace preview — no mutation, no corruption, correct text"
+qa_header "QA-REG-211: Find & Replace preview — no mutation, no corruption, correct text"
 
 file=$(qa_tmpfile_nl "reg203.txt" "foo bar
 foo baz
