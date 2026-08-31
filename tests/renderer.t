@@ -1546,6 +1546,131 @@ subtest 'render() syncs the effective tab width from prefs on every render pass'
     Zepto::Renderer->set_tab_width(Zepto::Renderer::TAB_WIDTH);
 };
 
+# ============================================================================
+# _expand_tabs() memo cache (bugs.md "Scorecard audit round 3" P2:
+# "Renderer.pm's _expand_tabs() has no cache -- same missed pattern the
+# Highlighter token cache (round 2) just fixed")
+#
+# Mirrors round 2's Highlighter cache test philosophy: prove correctness
+# UNDER INVALIDATION (content change, tab-width change), not just "cache
+# works when nothing changes" -- that's the anti-pattern round 2's own
+# writeup calls out. Uses the test-only _reset_expand_tabs_cache_for_tests()
+# / _expand_tabs_cache_size_for_tests() introspection hooks so these tests
+# don't depend on execution order against the rest of this file.
+# ============================================================================
+subtest 'expand_tabs cache: identical repeated calls are memoized, not recomputed' => sub {
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), 0, 'Cache starts empty');
+
+    my ($e1, $c1) = Zepto::Renderer::_expand_tabs("\tfoo", 4);
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), 1, 'First call populates one cache entry');
+
+    my ($e2, $c2) = Zepto::Renderer::_expand_tabs("\tfoo", 4);
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), 1, 'Repeated identical call is a cache hit -- no new entry');
+    is($e2, $e1, 'Cache hit returns the same expanded string');
+    is_deeply($c2, $c1, 'Cache hit returns the same char_to_visual mapping');
+    # Proves the SAME arrayref is served (memoized), not a freshly-built
+    # equal-but-different one -- the strongest evidence the cache path
+    # actually ran rather than recomputation coincidentally matching.
+    is($c2, $c1, 'Cache hit returns the identical (===) arrayref, not a fresh copy');
+};
+
+subtest 'expand_tabs cache: changed content is a cache miss and never returns stale data' => sub {
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+
+    my ($e1) = Zepto::Renderer::_expand_tabs("\tfoo", 4);
+    is($e1, (' ' x 4) . 'foo', 'Initial expansion of "\tfoo" at width 4');
+
+    my ($e2) = Zepto::Renderer::_expand_tabs("\tbar", 4);
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), 2, 'Different content is a second, distinct cache entry');
+    is($e2, (' ' x 4) . 'bar', 'Different content recomputes correctly, not served "\tfoo"\'s stale expansion');
+    isnt($e2, $e1, 'Sanity: the two results actually differ');
+
+    # Editing the line back to its original content must be a fresh cache
+    # HIT on the original key, not a miss that silently recomputes wrong.
+    my ($e3) = Zepto::Renderer::_expand_tabs("\tfoo", 4);
+    is($e3, $e1, 'Reverting content to a previously-seen value hits the original cache entry correctly');
+};
+
+subtest 'expand_tabs cache: changed tab_width is a cache miss and never returns stale data' => sub {
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+
+    my ($e4) = Zepto::Renderer::_expand_tabs("\tx", 4);
+    is($e4, (' ' x 4) . 'x', 'Width 4 expansion cached');
+
+    my ($e8) = Zepto::Renderer::_expand_tabs("\tx", 8);
+    is($e8, (' ' x 8) . 'x',
+        'Same text, different width -- correctly recomputed to 8 spaces, not served the width-4 cached result');
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), 2, 'Width 4 and width 8 are tracked as distinct cache entries');
+
+    # Going through set_tab_width() (the real render() code path) must also
+    # correctly separate cache entries by the *effective* width, not
+    # collapse them because no explicit width argument was passed.
+    Zepto::Renderer->set_tab_width(4);
+    my ($ed) = Zepto::Renderer::_expand_tabs("\tx");
+    is($ed, $e4, 'Default width (synced to 4) hits the same entry as explicit width=4');
+
+    Zepto::Renderer->set_tab_width(8);
+    my ($ed2) = Zepto::Renderer::_expand_tabs("\tx");
+    is($ed2, $e8, 'Default width (synced to 8) hits the same entry as explicit width=8, not stale width-4 data');
+
+    Zepto::Renderer->set_tab_width(Zepto::Renderer::TAB_WIDTH);
+};
+
+subtest 'expand_tabs cache: keyed on (text, tab_width) -- distinct keys never collide' => sub {
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+
+    # Directly poison one specific (text, width) cache slot via the public
+    # behavior (impossible to do without the cache existing at all), then
+    # confirm a DIFFERENT key is unaffected -- this is the regression a
+    # too-coarse cache key (e.g. content-only, ignoring width) would fail:
+    # it would incorrectly serve one width's expansion for another.
+    my ($narrow) = Zepto::Renderer::_expand_tabs("\tabc", 2);
+    my ($wide)   = Zepto::Renderer::_expand_tabs("\tabc", 6);
+    isnt($narrow, $wide, 'Same text at two different widths must never produce identical output here');
+    is($narrow, (' ' x 2) . 'abc', 'Width 2 entry is correct');
+    is($wide, (' ' x 6) . 'abc', 'Width 6 entry is unaffected by the width-2 entry existing');
+};
+
+subtest 'expand_tabs cache: bounded size, evicts wholesale past the cap' => sub {
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+
+    my $cap = Zepto::Renderer::MAX_EXPAND_TABS_CACHE_ENTRIES;
+    for my $i (1 .. $cap) {
+        Zepto::Renderer::_expand_tabs("line_$i", 4);
+    }
+    is(Zepto::Renderer::_expand_tabs_cache_size_for_tests(), $cap, "Cache holds exactly $cap entries at the cap");
+
+    # One more distinct entry pushes past the cap -- must evict wholesale
+    # (drop back to a small count) rather than growing unbounded.
+    Zepto::Renderer::_expand_tabs("one_more_line", 4);
+    my $size_after = Zepto::Renderer::_expand_tabs_cache_size_for_tests();
+    ok($size_after < $cap, "Cache size ($size_after) drops well below the cap after eviction, not unbounded growth");
+
+    # Post-eviction correctness: a fresh call still computes the right
+    # answer, it's just no longer memoized against the evicted entries.
+    my ($e) = Zepto::Renderer::_expand_tabs("\tpost-eviction", 4);
+    is($e, (' ' x 4) . 'post-eviction', 'Cache still computes correctly after eviction, not corrupted');
+
+    Zepto::Renderer::_reset_expand_tabs_cache_for_tests();
+};
+
+subtest 'Public expand_tabs()/char_to_visual_col() wrappers match the private functions exactly' => sub {
+    # bugs.md "Scorecard audit round 3" P3: WrapMap.pm previously reached
+    # into these via full package-qualified underscore-prefixed (private)
+    # names. These public wrappers are the fix -- confirm they are pure
+    # pass-throughs with identical behavior, not a second implementation
+    # that could drift from the private one.
+    my ($e_priv, $c_priv) = Zepto::Renderer::_expand_tabs("\tabc\tdef", 4);
+    my ($e_pub, $c_pub)   = Zepto::Renderer::expand_tabs("\tabc\tdef", 4);
+    is($e_pub, $e_priv, 'expand_tabs() matches _expand_tabs() output');
+    is_deeply($c_pub, $c_priv, 'expand_tabs() matches _expand_tabs() char_to_visual mapping');
+
+    my $priv_col = Zepto::Renderer::_char_to_visual_col("\tabc", 3, 4);
+    my $pub_col  = Zepto::Renderer::char_to_visual_col("\tabc", 3, 4);
+    is($pub_col, $priv_col, 'char_to_visual_col() matches _char_to_visual_col() output');
+};
+
 subtest 'Status bar shows READ ONLY for binary files' => sub {
     my $doc = Zepto::Document->new();
     $doc->{_is_binary} = 1;

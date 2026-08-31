@@ -22,8 +22,15 @@ use warnings;
 use Fcntl qw(:flock O_WRONLY O_CREAT O_EXCL);
 use File::Spec;
 use JSON::PP ();
+use Time::HiRes qw(time);
 
 my $JSON = JSON::PP->new->utf8->canonical->pretty;
+
+# Minimum gap between real check_for_changes() passes -- see that method
+# below. Matches this module's own doc comment ("Call from event loop
+# (~1/sec)") and Editor.pm's EXTERNAL_CHECK_INTERVAL_SEC, which debounces
+# the sibling _check_external_file_changes() poll at the same cadence.
+use constant CHECK_INTERVAL_SEC => 1.0;
 
 sub new {
     my ($class, %opts) = @_;
@@ -41,6 +48,7 @@ sub new {
         _cache     => {},   # category => { data => hashref, mtime => number }
         _listeners => {},   # category => [ sub, ... ]
         _write_mtime => {}, # category => mtime we last wrote (to ignore our own writes)
+        _last_check  => 0,  # time() of the last real check_for_changes() pass (debounce)
     }, $class;
 
     return $self;
@@ -156,6 +164,17 @@ sub on_change {
 # Fires on_change callbacks for categories modified by other processes.
 sub check_for_changes {
     my ($self) = @_;
+
+    # Debounce -- stat() on every render is wasteful. Editor.pm's render()
+    # calls this unconditionally on every render() pass (essentially every
+    # keystroke while editing), which is exactly the "~1/sec" cadence this
+    # method's own doc comment above promises but never enforced itself --
+    # relying on every caller to self-throttle. Enforce it here instead,
+    # mirroring the identical guard in Editor::_check_external_file_changes
+    # (same "stat() on every render is wasteful" rationale, same idiom).
+    my $now = time();
+    return if ($now - $self->{_last_check}) < CHECK_INTERVAL_SEC;
+    $self->{_last_check} = $now;
 
     for my $category (keys %{$self->{_cache}}) {
         my $path = $self->_file_path($category);
