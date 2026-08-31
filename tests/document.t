@@ -204,6 +204,67 @@ subtest 'Undo grouping broken by cursor move' => sub {
     is($doc->text(), '', 'First group undone');
 };
 
+subtest 'Nested begin/end_undo_group is reentrancy-safe' => sub {
+    # Reproduces the latent bug from bugs.md "Scorecard audit round 3":
+    # begin_undo_group() used to no-op whenever a group was already open,
+    # and end_undo_group() unconditionally cleared _undo_group regardless
+    # of nesting depth. So an inner begin/end pair nested inside an outer
+    # one would flush and clear the *shared* group array as soon as the
+    # inner end_undo_group() ran, and the outer end_undo_group() would
+    # then find _undo_group already undef and silently do nothing —
+    # splitting what should be one atomic undo group into two, and
+    # dropping the outer group's "closing" bookkeeping (redo/dirty/
+    # last_edit_type) entirely.
+    my $doc = Zepto::Document->new();
+
+    $doc->begin_undo_group();      # outer group opens
+    $doc->insert(0, 'A');
+    $doc->begin_undo_group();      # nested (inner) group
+    $doc->insert(1, 'B');
+    $doc->end_undo_group();        # inner end — must NOT flush the outer group
+    $doc->insert(2, 'C');          # still part of the still-open outer group
+    $doc->end_undo_group();        # outer end — flushes A+B+C as ONE group
+
+    is($doc->text(), 'ABC', 'All three edits applied');
+    is(scalar(@{$doc->{undo_stack}}), 1,
+        'A, B, and C were flushed as a single grouped undo entry, not split by the inner end');
+
+    $doc->undo();
+    is($doc->text(), '', 'A single undo() reverts the entire nested group atomically');
+    ok(!$doc->can_undo(), 'Nothing left to undo after one undo() call');
+
+    $doc->redo();
+    is($doc->text(), 'ABC', 'A single redo() restores the entire nested group atomically');
+};
+
+subtest 'Doubly-nested begin/end_undo_group (depth 3) is reentrancy-safe' => sub {
+    my $doc = Zepto::Document->new();
+
+    $doc->begin_undo_group();
+    $doc->insert(0, 'X');
+    $doc->begin_undo_group();
+    $doc->insert(1, 'Y');
+    $doc->begin_undo_group();
+    $doc->insert(2, 'Z');
+    $doc->end_undo_group();   # depth 3->2, no flush
+    $doc->end_undo_group();   # depth 2->1, no flush
+    $doc->end_undo_group();   # depth 1->0, flush
+
+    is($doc->text(), 'XYZ', 'All three edits applied');
+    is(scalar(@{$doc->{undo_stack}}), 1, 'Triple-nested group flushed as a single undo entry');
+
+    $doc->undo();
+    is($doc->text(), '', 'Single undo reverts the whole triple-nested group');
+};
+
+subtest 'Unbalanced end_undo_group without begin is a safe no-op' => sub {
+    my $doc = Zepto::Document->new();
+    $doc->insert(0, 'z');
+    $doc->end_undo_group();  # no matching begin — must not throw or corrupt state
+    is($doc->text(), 'z', 'Stray end_undo_group did not affect document state');
+    ok($doc->can_undo(), 'Normal undo history still intact after stray end_undo_group');
+};
+
 # ============================================================================
 # Dirty tracking tests
 # ============================================================================

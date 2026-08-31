@@ -269,13 +269,35 @@ sub _truncate_to_display_width {
 # Truncate a string with ellipsis if it exceeds $max_width characters.
 # mode 'end' (default): truncate end, append ellipsis
 # mode 'start': truncate start, prepend ellipsis
+# In list context, also returns $trim_offset: the number of characters
+# removed from the FRONT of the original string (0 if untruncated, and
+# always 0 in 'end' mode since that mode never trims the front). Callers
+# that need to remap positions in the original string to columns in the
+# truncated display string (e.g. search-match highlight columns) use
+# this instead of re-deriving the same arithmetic themselves.
 sub _ellipsis {
     my ($str, $max_width, $mode) = @_;
-    return $str if length($str) <= $max_width;
+    return wantarray ? ($str, 0) : $str if length($str) <= $max_width;
     if (($mode // 'end') eq 'start') {
-        return "\x{2026}" . substr($str, length($str) - $max_width + 1);
+        my $trim_offset = length($str) - $max_width + 1;
+        my $result = "\x{2026}" . substr($str, $trim_offset);
+        return wantarray ? ($result, $trim_offset) : $result;
     }
-    return substr($str, 0, $max_width - 1) . "\x{2026}";
+    my $result = substr($str, 0, $max_width - 1) . "\x{2026}";
+    return wantarray ? ($result, 0) : $result;
+}
+
+# Resolve a line's background color from cursor/diff-hunk state, in
+# priority order: cursor+hunk > cursor-only > hunk-only > normal.
+# Shared by gutter rendering and content rendering so the four states
+# can't drift out of sync between call sites (see bugs.md "Scorecard
+# audit round 3" — DRY finding).
+sub _resolve_line_bg {
+    my ($theme, $is_cursor_line, $is_hunk_line) = @_;
+    return $theme->color('diff_new_cursor_bg') if $is_cursor_line && $is_hunk_line;
+    return $theme->color('cursor_line_bg')     if $is_cursor_line;
+    return $theme->color('diff_new_bg')        if $is_hunk_line;
+    return $theme->color('bg');
 }
 
 # Expand tabs in a string to spaces, respecting tab stops
@@ -2395,9 +2417,7 @@ sub _render_text_area {
                 push @_out, $gutter_bg . $theme->color('ruler_cursor_edge') . $rl;
                 push @_out, $theme->color('ruler_cursor_bg') . $theme->color('ruler_cursor_fg') . $padded_num;
                 # Arrow right: badge color as fg, next area color as bg
-                my $next_bg = $is_hunk_line
-                    ? $theme->color('diff_new_cursor_bg')
-                    : $theme->color('cursor_line_bg');
+                my $next_bg = _resolve_line_bg($theme, 1, $is_hunk_line);
                 push @_out, $next_bg . $theme->color('ruler_cursor_edge') . $ar;
             } else {
                 # Normal line: [vcs][space][right-aligned digits][space]
@@ -2416,16 +2436,7 @@ sub _render_text_area {
         }
 
         # Background: cursor+hunk > cursor > hunk > normal
-        my $line_bg;
-        if ($is_cursor_line && $is_hunk_line) {
-            $line_bg = $theme->color('diff_new_cursor_bg');
-        } elsif ($is_cursor_line) {
-            $line_bg = $theme->color('cursor_line_bg');
-        } elsif ($is_hunk_line) {
-            $line_bg = $theme->color('diff_new_bg');
-        } else {
-            $line_bg = $theme->color('bg');
-        }
+        my $line_bg = _resolve_line_bg($theme, $is_cursor_line, $is_hunk_line);
         push @_out, $line_bg . $theme->color('fg');
 
         # Text content
@@ -2961,12 +2972,14 @@ sub _render_tree_node_content {
         my $name_space = $width - $used;
 
         # Truncate from the LEFT so filename stays visible: …eep/path/file.pm
+        # _ellipsis() also returns the trim offset so match-highlight
+        # positions (computed against the original $path) can be remapped
+        # onto the truncated $display_path below.
         my $display_path = $path;
         my $trim_offset = 0;  # how many chars trimmed from the left
-        if ($name_space > 0 && length($path) > $name_space) {
-            $trim_offset = length($path) - ($name_space - 1);  # 1 for ellipsis
-            $display_path = "\x{2026}" . substr($path, $trim_offset);
-        } elsif ($name_space <= 0) {
+        if ($name_space > 0) {
+            ($display_path, $trim_offset) = _ellipsis($path, $name_space, 'start');
+        } else {
             $display_path = '';
         }
 
@@ -3478,9 +3491,8 @@ sub _render_line_with_highlights {
     my $len = length($content);
 
     # Background colors — use diff background when in expanded hunk
-    my $bg = ($diff_mode && $diff_mode eq 'new')
-        ? $theme->color('diff_new_bg')
-        : $theme->color('bg');
+    my $is_hunk_line = ($diff_mode && $diff_mode eq 'new') ? 1 : 0;
+    my $bg = _resolve_line_bg($theme, 0, $is_hunk_line);
 
     # Char-level highlight range for stronger green background on changed chars
     my $diff_hl_bg;
@@ -3490,9 +3502,7 @@ sub _render_line_with_highlights {
         $vis_hl_start = $char_highlight->[0] - $scroll_col;
         $vis_hl_end = $char_highlight->[1] - $scroll_col;
     }
-    my $line_bg = ($diff_mode && $diff_mode eq 'new')
-        ? $theme->color('diff_new_cursor_bg')
-        : $theme->color('cursor_line_bg');
+    my $line_bg = _resolve_line_bg($theme, 1, $is_hunk_line);
     my $fg = $theme->color('fg');
     my $match_bg = $theme->color('match_bg');
     my $match_fg = $theme->color('match_fg');

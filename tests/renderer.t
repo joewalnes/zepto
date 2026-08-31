@@ -1323,6 +1323,111 @@ subtest 'truncate to display width' => sub {
     is($w, 5, 'width = 5 (3 + 2)');
 };
 
+subtest '_ellipsis in scalar context (existing callers)' => sub {
+    is(Zepto::Renderer::_ellipsis('hello', 10), 'hello', 'no truncation when it fits');
+    is(Zepto::Renderer::_ellipsis('hello world', 5), "hell\x{2026}", "'end' mode truncates tail");
+    is(Zepto::Renderer::_ellipsis('hello world', 5, 'start'), "\x{2026}orld",
+        "'start' mode truncates front");
+};
+
+subtest '_ellipsis in list context returns trim offset (bugs.md DRY finding)' => sub {
+    # Extended so the file-tree flat-filter renderer can reuse this instead
+    # of hand-rolling start-truncation with its own offset arithmetic.
+    my ($str, $offset);
+
+    # No truncation: offset is always 0
+    ($str, $offset) = Zepto::Renderer::_ellipsis('short.txt', 20, 'start');
+    is($str, 'short.txt', 'untruncated string returned as-is');
+    is($offset, 0, 'trim offset is 0 when nothing was trimmed');
+
+    # Exactly at the boundary: still no truncation
+    ($str, $offset) = Zepto::Renderer::_ellipsis('short.txt', 9, 'start');
+    is($str, 'short.txt', 'string exactly max_width long is not truncated');
+    is($offset, 0, 'trim offset is 0 at the exact boundary');
+
+    # One character over the boundary
+    ($str, $offset) = Zepto::Renderer::_ellipsis('short.txt', 8, 'start');
+    is($str, "\x{2026}ort.txt", 'one char over triggers minimal truncation');
+    is($offset, 2, 'trim offset accounts for the dropped char plus ellipsis slot');
+
+    # Deep path, small budget
+    ($str, $offset) = Zepto::Renderer::_ellipsis('a/very/deep/path/to/some/file.pm', 5, 'start');
+    is($str, "\x{2026}e.pm", 'heavily truncated path keeps the tail');
+    is($offset, 28, 'trim offset matches number of chars dropped from the front');
+
+    # Empty string
+    ($str, $offset) = Zepto::Renderer::_ellipsis('', 5, 'start');
+    is($str, '', 'empty string stays empty');
+    is($offset, 0, 'trim offset is 0 for empty string');
+
+    # Unicode / wide characters — length() is codepoint-based here, matching
+    # the file-tree renderer's own use of length() for match-position math.
+    my $unicode_path = "a/b/c/\x{6587}\x{4EF6}\x{5939}/\x{4E2D}\x{6587}\x{6587}\x{4EF6}\x{540D}.txt";
+    ($str, $offset) = Zepto::Renderer::_ellipsis($unicode_path, 10, 'start');
+    is(CORE::length($str), 10, 'unicode: truncated string is exactly max_width chars long');
+    like($str, qr/^\x{2026}/, 'unicode: truncated string is prefixed with ellipsis');
+    is(substr($unicode_path, $offset), substr($str, 1),
+        'unicode: substr($original, $offset) reproduces the kept tail exactly');
+
+    # 'end' mode: trim offset is always 0 (no callers currently need it,
+    # but the contract should hold so future callers can rely on it)
+    ($str, $offset) = Zepto::Renderer::_ellipsis('hello world', 5, 'end');
+    is($str, "hell\x{2026}", "'end' mode still truncates the tail correctly");
+    is($offset, 0, "'end' mode never trims the front, so offset is 0");
+};
+
+subtest 'File-tree flat-filter rendering truncates via _ellipsis and remaps match highlight' => sub {
+    # Integration test for the consumer of _ellipsis()'s new trim-offset
+    # return value: _render_tree_node_content()'s flat filter-search mode
+    # (bugs.md "Scorecard audit round 3" DRY finding — this used to
+    # hand-roll the same truncation arithmetic inline).
+    my $theme = Zepto::Theme->dark_theme();
+    my $path = 'a/very/deep/path/to/some/file.pm';  # length 32
+
+    # Match positions: 5 ('y' in "very", gets trimmed off) and 28
+    # ('e', the last char of "file", survives truncation).
+    my $node = {
+        name => $path,
+        is_dir => 0,
+        depth => 0,
+        _filter_match_positions => [5, 28],
+    };
+
+    # width=8: 1 (leading space) + 2 (icon+space) used, leaving name_space=5
+    # -> _ellipsis($path, 5, 'start') truncates to "…e.pm" (matches the
+    # manually-verified trim_offset=28 from the _ellipsis list-context test above)
+    my @out = Zepto::Renderer->_render_tree_node_content(
+        $node, 8, $theme,
+        0,      # is_cursor
+        0,      # is_sticky
+        1,      # focused
+        0,      # has_scrollbar
+        0,      # row_idx
+        undef,  # sb
+        1,      # is_last
+        [],     # guides
+        1,      # filter_active
+        0,      # is_current
+        0,      # is_hover
+    );
+    my $output = join('', @out);
+
+    (my $visible = $output) =~ s/\x1b\[[0-9;]*m//g;
+    my $icon = Zepto::Chars->file_icon('file.pm') // ' ';
+    is($visible, " $icon \x{2026}e.pm",
+        'display path is truncated to "…e.pm" with icon/leading-space prefix');
+
+    my $match_fg = $theme->color('tree_match_fg');
+    my $match_count = () = $output =~ /\Q$match_fg\E/g;
+    is($match_count, 1, 'exactly one character is highlighted as a match — ' .
+        'proves the trimmed-off match position (5, in "very") produced no highlight');
+
+    like($output, qr/\Q$match_fg\E(?:\x1b\[[0-9;]*m)*e/,
+        'the surviving match position (28, the "e" in "file") is highlighted — ' .
+        'proves the trim offset correctly remapped the original-string match position ' .
+        'onto the truncated display string');
+};
+
 # ============================================================================
 # _char_to_visual_col and visual_to_char_col with wide characters
 # ============================================================================

@@ -39,6 +39,7 @@ sub new {
         _last_edit_type => '',
         _last_edit_pos  => -1,
         _undo_group     => undef,
+        _undo_group_depth => 0,  # reentrancy depth for begin/end_undo_group
         # VCS integration
         _vcs_provider   => undef,
         _vcs_base       => undef,  # Cached HEAD content
@@ -512,15 +513,25 @@ sub break_undo_group {
     $self->{_last_edit_type} = '';
 }
 
+# begin/end_undo_group are reentrant: nested begin/end pairs (e.g. a helper
+# that opens its own group while called from within an already-open outer
+# group) only open the group at depth 0->1 and only close/flush it at
+# depth 1->0. This makes nesting safe by construction — an inner
+# begin/end pair never prematurely flushes/drops the outer group.
 sub begin_undo_group {
     my ($self) = @_;
-    return if $self->{_undo_group};
+    $self->{_undo_group_depth}++;
+    return if $self->{_undo_group_depth} > 1;
     $self->{_undo_group} = [];
     $self->{_last_edit_type} = '';
 }
 
 sub end_undo_group {
     my ($self) = @_;
+    return unless $self->{_undo_group_depth};
+    $self->{_undo_group_depth}--;
+    return if $self->{_undo_group_depth} > 0;
+
     my $group = $self->{_undo_group};
     $self->{_undo_group} = undef;
     return unless $group && @$group;
