@@ -1,34 +1,77 @@
-package Zepto::Editor::Palette;
+package Zepto::Editor::PaletteController;
 # =============================================================================
-# Editor Palette Handling - Command palette overlay
+# PaletteController: Manages the command palette overlay
 # =============================================================================
 #
-# This module defines palette-related methods for the Zepto::Editor class.
-# Handles opening/closing the command palette, type-to-filter, navigation,
-# and executing commands.
+# Owns all command-palette state and behavior: opening/closing the palette,
+# type-to-filter, keyboard/mouse navigation, executing commands, recent
+# files, the "Open File" file picker, and "Find in Files".
+#
+# This is a real, separately-namespaced object (unlike Editor/Commands.pm
+# and Editor/Palette.pm, which both still declare `package Zepto::Editor;`
+# for editing convenience only — see bugs.md "Editor god-object
+# extraction"). It follows the same composition pattern as
+# Editor/TabManager.pm: constructed once in Zepto::Editor::new() and stored
+# as $self->{palette}, with an `editor` back-reference for the handful of
+# things it needs to reach into the owning Editor for (state transitions,
+# clipboard, terminal size, file tree, recent-files list, and a few
+# cross-cutting methods like _load_file/_record_location/_jump_to_location).
+#
+# Zepto::Editor keeps thin delegator methods (cmd_open_palette, close_palette,
+# handle_palette_event, handle_status_bar_click — see Editor.pm) so external
+# call sites (key handling, mouse handling, render()) don't need to know
+# this object exists.
 # =============================================================================
 
 use strict;
 use warnings;
 use utf8;
 
-# Define methods in Zepto::Editor's namespace
-package Zepto::Editor;
-
 use Cwd qw(getcwd);
 use File::Basename ();
 use File::Spec;
 use Zepto::CommandRegistry;
 use Zepto::InputWidget;
+use Zepto::FileSearchEngine;
+
+sub new {
+    my ($class, %opts) = @_;
+    return bless {
+        editor => $opts{editor},  # back-reference to the owning Zepto::Editor
+
+        # Command palette state
+        palette_widget       => undef,  # InputWidget for filter query
+        palette_cursor       => 0,
+        palette_scroll       => 0,
+        palette_filtered     => [],
+        palette_visible_rows => 15,  # updated during render
+        palette_mode         => 'commands',  # 'commands' | 'recent_files' | 'files' | 'find_in_files'
+
+        # File search state (Find in Files)
+        _file_search_engine       => undef,
+        _file_search_scope        => undef,
+        _file_search_scope_label  => 'project',
+        _file_search_case         => 0,
+        _file_search_regex        => 0,
+        _file_search_saved_widget => undef,  # Preserved query/cursor/scroll across close/reopen
+        _file_search_saved_cursor => undef,
+        _file_search_saved_scroll => undef,
+
+        # Incremental-filter cache for the "Open File" file picker
+        _file_filter_prev_query   => undef,
+        _file_filter_prev_indices => undef,
+    }, $class;
+}
 
 # =============================================================================
-# Palette State
+# Opening the palette
 # =============================================================================
 
-sub cmd_open_palette {
+sub open_commands {
     my ($self) = @_;
+    my $editor = $self->{editor};
 
-    $self->{state} = 'palette';
+    $editor->{state} = 'palette';
     $self->{palette_mode} = 'commands';
     $self->{palette_widget} = Zepto::InputWidget->new();
     $self->{palette_cursor} = 0;
@@ -36,8 +79,78 @@ sub cmd_open_palette {
     $self->_palette_update_filtered();
 }
 
-sub close_palette {
+sub open_files {
     my ($self) = @_;
+    my $editor = $self->{editor};
+
+    $editor->{state} = 'palette';
+    $self->{palette_mode} = 'files';
+    $self->{palette_widget} = Zepto::InputWidget->new();
+    $self->{palette_cursor} = 0;
+    $self->{palette_scroll} = 0;
+    $self->_palette_update_filtered();
+}
+
+sub open_recent_files {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+
+    my @recent = @{$editor->{_recent_files} || []};
+    unless (@recent) {
+        $editor->show_message("No recent files");
+        return;
+    }
+
+    $editor->{state} = 'palette';
+    $self->{palette_mode} = 'recent_files';
+    $self->{palette_widget} = Zepto::InputWidget->new();
+    $self->{palette_cursor} = 0;
+    $self->{palette_scroll} = 0;
+    $self->_palette_update_filtered();
+}
+
+sub open_find_in_files {
+    my ($self) = @_;
+    my $editor = $self->{editor};
+
+    # Lazily init FileSearchEngine
+    if (!$self->{_file_search_engine}) {
+        $self->{_file_search_engine} = Zepto::FileSearchEngine->new();
+    }
+    $self->{_file_search_engine}->detect_backend(Cwd::getcwd());
+
+    # Set default scope to project root (only on first open)
+    if (!defined $self->{_file_search_scope}) {
+        $self->{_file_search_scope} = Cwd::getcwd();
+        $self->{_file_search_scope_label} = 'project';
+    }
+
+    # Open palette in find_in_files mode
+    $editor->{state} = 'palette';
+    $self->{palette_mode} = 'find_in_files';
+
+    # Restore previous widget if available, with text selected for easy replacement
+    if ($self->{_file_search_saved_widget} && length($self->{_file_search_saved_widget}->value())) {
+        $self->{palette_widget} = $self->{_file_search_saved_widget};
+        # Select all text so typing replaces it immediately
+        $self->{palette_widget}->{sel_start} = 0;
+        $self->{palette_widget}->{sel_end} = length($self->{palette_widget}->value());
+        $self->{palette_widget}->{cursor} = length($self->{palette_widget}->value());
+        # Restore cursor position in results list
+        $self->{palette_cursor} = $self->{_file_search_saved_cursor} // 0;
+        $self->{palette_scroll} = $self->{_file_search_saved_scroll} // 0;
+    } else {
+        $self->{palette_widget} = Zepto::InputWidget->new();
+        $self->{palette_cursor} = 0;
+        $self->{palette_scroll} = 0;
+    }
+
+    $self->_palette_update_filtered();
+}
+
+sub close {
+    my ($self) = @_;
+    my $editor = $self->{editor};
 
     # Persist find_in_files state for re-opening
     if (($self->{palette_mode} // '') eq 'find_in_files' && $self->{palette_widget}) {
@@ -51,7 +164,7 @@ sub close_palette {
         $self->{_file_search_engine}->abort();
     }
 
-    $self->{state} = 'editing';
+    $editor->{state} = 'editing';
     $self->{palette_mode} = 'commands';
     $self->{palette_widget} = undef;
     $self->{palette_cursor} = 0;
@@ -63,8 +176,9 @@ sub close_palette {
 # Palette Event Handling
 # =============================================================================
 
-sub handle_palette_event {
+sub handle_event {
     my ($self, $event) = @_;
+    my $editor = $self->{editor};
 
     my $type   = $event->{type};
     my $widget = $self->{palette_widget};
@@ -73,7 +187,7 @@ sub handle_palette_event {
         my $key = $event->{key};
 
         if ($key eq 'escape') {
-            $self->close_palette();
+            $self->close();
         }
         elsif ($key eq 'enter') {
             $self->_palette_execute_selected();
@@ -112,7 +226,7 @@ sub handle_palette_event {
         else {
             # Delegate cursor/editing keys to widget
             my $old_query = $widget->value();
-            $widget->handle_event($event, \$self->{clipboard});
+            $widget->handle_event($event, \$editor->{clipboard});
             if ($widget->value() ne $old_query) {
                 $self->{palette_cursor} = 0;
                 $self->{palette_scroll} = 0;
@@ -144,7 +258,7 @@ sub handle_palette_event {
 
             # Ctrl+Space while palette is open closes it
             if ($char eq ' ') {
-                $self->close_palette();
+                $self->close();
                 return;
             }
 
@@ -176,6 +290,60 @@ sub handle_palette_event {
     elsif ($type eq 'mouse') {
         $self->_handle_palette_mouse($event);
     }
+}
+
+# =============================================================================
+# Status Bar Click Handling
+# =============================================================================
+
+sub handle_status_bar_click {
+    my ($self, $x) = @_;
+    my $editor = $self->{editor};
+
+    my @buttons = Zepto::Renderer::get_status_buttons();
+    for my $btn (@buttons) {
+        if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
+            my $cmd_id = $btn->{command_id};
+            if ($cmd_id eq 'open_palette') {
+                $self->open_commands();
+            } else {
+                Zepto::CommandRegistry->execute($editor, $cmd_id);
+            }
+            return;
+        }
+    }
+}
+
+# =============================================================================
+# Render snapshot
+# =============================================================================
+
+# Build the hash shape Zepto::Renderer expects for ui->{palette}. Must stay
+# byte-identical to what Editor.pm's render() used to build inline.
+#
+# Two different objects are exposed here, for two different reasons:
+#   - `editor` is the real Zepto::Editor. Renderer.pm needs it for generic
+#     command-toggle-state queries (Zepto::CommandRegistry->get_toggle_state/
+#     get_toggle_display, which call arbitrary editor methods like
+#     active_view()) — this must stay the real editor, not this controller.
+#   - `controller` is this PaletteController itself. Renderer.pm reads/writes
+#     palette-private fields through it (_file_search_case/regex/
+#     scope_label/engine, palette_visible_rows) — fields that live on the
+#     controller, not the editor, since the extraction in bugs.md's "Editor
+#     god-object extraction".
+sub render_snapshot {
+    my ($self) = @_;
+    return {
+        query          => $self->{palette_widget}->value(),
+        query_cursor   => $self->{palette_widget}->cursor(),
+        palette_widget => $self->{palette_widget},
+        cursor         => $self->{palette_cursor},
+        scroll         => $self->{palette_scroll},
+        filtered       => $self->{palette_filtered},
+        editor         => $self->{editor},
+        controller     => $self,
+        mode           => $self->{palette_mode} // 'commands',
+    };
 }
 
 # =============================================================================
@@ -225,7 +393,7 @@ sub _palette_update_filtered {
 
 sub _filter_recent_files {
     my ($self, $query) = @_;
-    my @recent = @{$self->{_recent_files} || []};
+    my @recent = @{$self->{editor}{_recent_files} || []};
     my $cwd = Cwd::getcwd();
 
     my @items;
@@ -284,12 +452,13 @@ sub _fuzzy_rank_file_items {
 
 sub _filter_all_files {
     my ($self, $query) = @_;
+    my $editor = $self->{editor};
 
     # Ensure file tree exists and has built its file list
-    if (!$self->{file_tree}) {
-        $self->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    if (!$editor->{file_tree}) {
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
     }
-    my $tree = $self->{file_tree};
+    my $tree = $editor->{file_tree};
     $tree->_build_all_files_list();
 
     my $all_files = $tree->{_all_files};
@@ -378,7 +547,7 @@ sub _filter_all_files {
 
 sub _palette_page_size {
     my ($self) = @_;
-    my ($rows) = $self->{terminal}->get_size();
+    my ($rows) = $self->{editor}{terminal}->get_size();
     my $has_footer = (($self->{palette_mode} // '') eq 'find_in_files') ? 1 : 0;
     my $max_items = $rows - 6 - $has_footer;
     $max_items = 5 if $max_items < 5;
@@ -450,6 +619,7 @@ sub _palette_ensure_visible {
 
 sub _palette_execute_selected {
     my ($self) = @_;
+    my $editor = $self->{editor};
 
     my $filtered = $self->{palette_filtered};
     return unless @$filtered;
@@ -464,9 +634,9 @@ sub _palette_execute_selected {
         my $line = $cmd->{_line};
         # Normalize to absolute path for reliable tab matching
         $path = File::Spec->rel2abs($path) if defined $path && $path ne '';
-        $self->close_palette();
-        $self->_record_location();
-        $self->_jump_to_location({
+        $self->close();
+        $editor->_record_location();
+        $editor->_jump_to_location({
             file => $path,
             line => ($line > 0 ? $line - 1 : 0),  # Convert 1-indexed to 0-indexed
             col  => 0,
@@ -477,26 +647,27 @@ sub _palette_execute_selected {
     # Recent file entry: open the file
     if ($cmd->{_is_file}) {
         my $path = $cmd->{_path};
-        $self->close_palette();
-        $self->_load_file($path);
+        $self->close();
+        $editor->_load_file($path);
         return;
     }
 
     if ($cmd->{type} eq 'toggle') {
         # Toggle commands: execute and stay open (update state live)
-        Zepto::CommandRegistry->execute($self, $cmd->{id});
+        Zepto::CommandRegistry->execute($editor, $cmd->{id});
         # Re-filter to update toggle state display
         $self->_palette_update_filtered();
     }
     else {
         # Action commands: execute and close
-        $self->close_palette();
-        Zepto::CommandRegistry->execute($self, $cmd->{id});
+        $self->close();
+        Zepto::CommandRegistry->execute($editor, $cmd->{id});
     }
 }
 
 sub _palette_try_shortcut {
     my ($self, $modifier, $char) = @_;
+    my $editor = $self->{editor};
     $char = lc($char);
 
     my @all = Zepto::CommandRegistry->all_commands();
@@ -530,16 +701,16 @@ sub _palette_try_shortcut {
         );
         my $target_mode = $cmd_to_mode{$cmd->{id}};
         if ($target_mode && ($self->{palette_mode} // 'commands') eq $target_mode) {
-            $self->close_palette();
+            $self->close();
             return 1;
         }
 
         if ($cmd->{type} eq 'toggle') {
-            Zepto::CommandRegistry->execute($self, $cmd->{id});
+            Zepto::CommandRegistry->execute($editor, $cmd->{id});
             $self->_palette_update_filtered();
         } else {
-            $self->close_palette();
-            Zepto::CommandRegistry->execute($self, $cmd->{id});
+            $self->close();
+            Zepto::CommandRegistry->execute($editor, $cmd->{id});
         }
         return 1;
     }
@@ -589,34 +760,13 @@ sub _handle_palette_mouse {
         }
 
         # Click outside palette → close
-        $self->close_palette();
+        $self->close();
     }
     elsif ($action eq 'scroll_up') {
         $self->_palette_move_cursor(-3);
     }
     elsif ($action eq 'scroll_down') {
         $self->_palette_move_cursor(3);
-    }
-}
-
-# =============================================================================
-# Status Bar Click Handling
-# =============================================================================
-
-sub handle_status_bar_click {
-    my ($self, $x) = @_;
-
-    my @buttons = Zepto::Renderer::get_status_buttons();
-    for my $btn (@buttons) {
-        if ($x >= $btn->{x_start} && $x <= $btn->{x_end}) {
-            my $cmd_id = $btn->{command_id};
-            if ($cmd_id eq 'open_palette') {
-                $self->cmd_open_palette();
-            } else {
-                Zepto::CommandRegistry->execute($self, $cmd_id);
-            }
-            return;
-        }
     }
 }
 
@@ -736,13 +886,14 @@ sub _build_file_search_items {
 
 sub _file_search_cycle_scope {
     my ($self, $direction) = @_;  # $direction: 1 = forward (Tab), -1 = backward (Shift+Tab)
+    my $editor = $self->{editor};
 
     my $cwd = Cwd::getcwd();
     my $current_label = $self->{_file_search_scope_label} // 'project';
 
     if ($current_label eq 'project') {
         # Switch to current file's directory
-        my $file_path = $self->active_file_path();
+        my $file_path = $editor->active_file_path();
         if ($file_path) {
             my $dir = File::Basename::dirname($file_path);
             if (-d $dir) {

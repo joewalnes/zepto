@@ -5371,7 +5371,11 @@ sub _render_command_palette {
     my $cursor   = $palette->{cursor} // 0;
     my $scroll   = $palette->{scroll} // 0;
     my $filtered = $palette->{filtered} // [];
-    my $editor   = $palette->{editor};
+    my $editor   = $palette->{editor};      # real Zepto::Editor — for generic
+                                             # command-toggle-state queries
+    my $ctrl     = $palette->{controller};  # PaletteController — for
+                                             # palette-private fields
+                                             # (_file_search_*, palette_visible_rows)
 
     # Palette dimensions — adapts to terminal width and mode
     my $mode = $palette->{mode} // 'commands';
@@ -5403,9 +5407,10 @@ sub _render_command_palette {
     $x = 1 if $x < 1;
     $y = 2 if $y < 2;
 
-    # Update visible rows for scroll management (write back to editor via palette hash)
-    if ($editor) {
-        $editor->{palette_visible_rows} = $visible_items;
+    # Update visible rows for scroll management (write back to the palette
+    # controller for scroll bookkeeping)
+    if ($ctrl) {
+        $ctrl->{palette_visible_rows} = $visible_items;
     }
 
     # Get box drawing characters
@@ -5440,7 +5445,7 @@ sub _render_command_palette {
     } elsif ($mode eq 'files') {
         $title = " " . CTRL_GLYPH . "O Open File ";
     } elsif ($mode eq 'find_in_files') {
-        my $scope = $editor->{_file_search_scope_label} // 'project';
+        my $scope = $ctrl->{_file_search_scope_label} // 'project';
         $title = " " . CTRL_GLYPH . "\x{21E7}F Find in Files ($scope) ";
     } else {
         $title = " " . CTRL_GLYPH . "\x{2423} Commands ";
@@ -5747,9 +5752,9 @@ sub _render_command_palette {
         # Render pills inside the footer row using find bar style
         my $rl = Zepto::Chars->get('round_left');
         my $rr = Zepto::Chars->get('round_right');
-        my $regex_on = $editor ? ($editor->{_file_search_regex} // 0) : 0;
-        my $case_on  = $editor ? ($editor->{_file_search_case} // 0) : 0;
-        my $scope_label = $editor ? ($editor->{_file_search_scope_label} // 'project') : 'project';
+        my $regex_on = $ctrl ? ($ctrl->{_file_search_regex} // 0) : 0;
+        my $case_on  = $ctrl ? ($ctrl->{_file_search_case} // 0) : 0;
+        my $scope_label = $ctrl ? ($ctrl->{_file_search_scope_label} // 'project') : 'project';
         my $sym_ctrl = Zepto::CommandRegistry::SYM_CTRL();
 
         my $pill_content = '';
@@ -5816,14 +5821,14 @@ sub _render_command_palette {
         $pill_vis_len += $scope_pill_width + 1;  # +1 for trailing space in pill
 
         # Result count on the right (use actual match count, not item count)
-        my $actual_count = ($editor && $editor->{_file_search_engine})
-            ? $editor->{_file_search_engine}->{result_count} : 0;
+        my $actual_count = ($ctrl && $ctrl->{_file_search_engine})
+            ? $ctrl->{_file_search_engine}->{result_count} : 0;
         my $result_count_text;
-        if ($editor && $editor->{_file_search_engine}
-            && $editor->{_file_search_engine}->is_searching()) {
+        if ($ctrl && $ctrl->{_file_search_engine}
+            && $ctrl->{_file_search_engine}->is_searching()) {
             $result_count_text = "searching\x{2026} ($actual_count)";
-        } elsif ($editor && $editor->{_file_search_engine}
-            && $actual_count >= $editor->{_file_search_engine}->{_max_results}) {
+        } elsif ($ctrl && $ctrl->{_file_search_engine}
+            && $actual_count >= $ctrl->{_file_search_engine}->{_max_results}) {
             $result_count_text = "$actual_count results (capped)";
         } else {
             my $result_word = $actual_count == 1 ? 'result' : 'results';

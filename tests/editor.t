@@ -108,8 +108,8 @@ subtest 'Open command palette' => sub {
 
     $editor->cmd_open_palette();
     is($editor->{state}, 'palette', 'State is palette');
-    is($editor->{palette_widget}->value(), '', 'Query starts empty');
-    is($editor->{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
+    is($editor->{palette}{palette_widget}->value(), '', 'Query starts empty');
+    is($editor->{palette}{palette_cursor}, 1, 'Cursor starts at 1 (after section header)');
 };
 
 subtest 'Close command palette' => sub {
@@ -119,7 +119,7 @@ subtest 'Close command palette' => sub {
     $editor->cmd_open_palette();
     $editor->close_palette();
     is($editor->{state}, 'editing', 'State is editing');
-    ok(!defined $editor->{palette_widget}, 'Widget cleared (palette closed)');
+    ok(!defined $editor->{palette}{palette_widget}, 'Widget cleared (palette closed)');
 };
 
 subtest 'Palette escape closes' => sub {
@@ -1677,9 +1677,9 @@ subtest 'Open file on clean document shows picker' => sub {
     $editor->cmd_open_file();
 
     is($editor->{state}, 'palette', 'State is palette');
-    is($editor->{palette_mode}, 'files', 'Palette mode is files');
-    ok($editor->{palette_widget}, 'Palette widget created');
-    ok(scalar @{$editor->{palette_filtered}} > 0, 'Palette has filtered items');
+    is($editor->{palette}{palette_mode}, 'files', 'Palette mode is files');
+    ok($editor->{palette}{palette_widget}, 'Palette widget created');
+    ok(scalar @{$editor->{palette}{palette_filtered}} > 0, 'Palette has filtered items');
 };
 
 subtest 'Open file on dirty document opens palette picker' => sub {
@@ -1699,7 +1699,7 @@ subtest 'Open file on dirty document opens palette picker' => sub {
 
     # With tabs, open file opens palette in files mode (dirty doc stays in its tab)
     is($editor->{state}, 'palette', 'State is palette');
-    is($editor->{palette_mode}, 'files', 'Palette mode is files');
+    is($editor->{palette}{palette_mode}, 'files', 'Palette mode is files');
 };
 
 # ============================================================================
@@ -1775,17 +1775,17 @@ subtest 'File picker navigation' => sub {
 
     $editor->cmd_open_file();
     is($editor->{state}, 'palette', 'Palette open');
-    is($editor->{palette_mode}, 'files', 'Files mode');
+    is($editor->{palette}{palette_mode}, 'files', 'Files mode');
 
-    my $initial = $editor->{palette_cursor};
+    my $initial = $editor->{palette}{palette_cursor};
 
     # Arrow down
     $editor->handle_input("\e[B");  # Down arrow
-    is($editor->{palette_cursor}, $initial + 1, 'Down arrow moves cursor');
+    is($editor->{palette}{palette_cursor}, $initial + 1, 'Down arrow moves cursor');
 
     # Arrow up
     $editor->handle_input("\e[A");  # Up arrow
-    is($editor->{palette_cursor}, $initial, 'Up arrow moves cursor back');
+    is($editor->{palette}{palette_cursor}, $initial, 'Up arrow moves cursor back');
 };
 
 subtest 'File picker typing filters' => sub {
@@ -1799,14 +1799,14 @@ subtest 'File picker typing filters' => sub {
     setup_editor_doc($editor, $filename);
 
     $editor->cmd_open_file();
-    my $initial_count = scalar @{$editor->{palette_filtered}};
+    my $initial_count = scalar @{$editor->{palette}{palette_filtered}};
 
     # Type to filter — unlikely to match much
     $editor->handle_input('xyznonexistent');
 
-    my $new_count = scalar @{$editor->{palette_filtered}};
+    my $new_count = scalar @{$editor->{palette}{palette_filtered}};
     ok($new_count <= $initial_count, 'Typing filters results');
-    is($editor->{palette_widget}->value(), 'xyznonexistent', 'Query updated');
+    is($editor->{palette}{palette_widget}->value(), 'xyznonexistent', 'Query updated');
 };
 
 subtest 'File picker escape closes palette' => sub {
@@ -1831,7 +1831,7 @@ subtest 'File picker escape closes palette' => sub {
     $editor->cmd_open_file();
     is($editor->{state}, 'palette', 'Palette re-opened');
     $editor->handle_input('t');
-    ok(length($editor->{palette_widget}->value()) > 0, 'Query has content');
+    ok(length($editor->{palette}{palette_widget}->value()) > 0, 'Query has content');
     $editor->handle_input("\e");
     $editor->flush_pending_input();
     is($editor->{state}, 'editing', 'Back to editing after typed query');
@@ -1928,16 +1928,16 @@ subtest 'Palette type-to-filter' => sub {
     my $editor = Zepto::Editor->new(terminal => $term);
 
     $editor->cmd_open_palette();
-    my $initial_count = scalar @{$editor->{palette_filtered}};
+    my $initial_count = scalar @{$editor->{palette}{palette_filtered}};
     ok($initial_count > 0, 'Palette has commands when opened');
 
     # Type a filter query
     $editor->handle_palette_event({ type => 'char', char => 's', modifiers => [] });
     $editor->handle_palette_event({ type => 'char', char => 'a', modifiers => [] });
     $editor->handle_palette_event({ type => 'char', char => 'v', modifiers => [] });
-    is($editor->{palette_widget}->value(), 'sav', 'Query is "sav"');
+    is($editor->{palette}{palette_widget}->value(), 'sav', 'Query is "sav"');
 
-    my $filtered_count = scalar @{$editor->{palette_filtered}};
+    my $filtered_count = scalar @{$editor->{palette}{palette_filtered}};
     ok($filtered_count <= $initial_count, 'Filtered list is smaller or equal');
     ok($filtered_count > 0, 'At least one match for "sav"');
 };
