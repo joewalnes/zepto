@@ -2,6 +2,7 @@
 
 ## 2026-08-30
 
+- Fixed a real data-corruption bug in multi-cursor and column-select editing: backspacing across a line-join, or deleting a multi-line selection, while a second cursor was active could leave that other cursor pointing at the wrong place in the document (or at a line number that no longer existed) — the very next keystroke would then silently insert or delete in the wrong spot. Multi-cursor and column-select editing that stays within a single line was never affected
 - Improved Find in Files robustness: an unusual regex pattern can no longer make a project-wide search hang indefinitely — matching is now time-bounded the same way in-buffer regex find/replace already was. A pathological pattern now just skips the one line it couldn't finish checking in time and the search continues normally, instead of freezing
 - Fixed syntax highlighting re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Highlighting itself is unaffected (multi-line comments/strings still re-highlight correctly the moment an earlier line changes what they should look like) — this is a speed-only fix, most noticeable when typing in large files with syntax highlighting on
 
