@@ -14,7 +14,7 @@ Zepto provides a live, interactive find/replace experience similar to modern edi
 - Press Escape to cancel and return to editing
 - Press Tab to switch to Replace mode
 
-### Replace Mode (Ctrl+R or Tab from Find)
+### Replace Mode (Tab from Find)
 - Opens find bar with both query and replacement fields
 - Tab switches focus between query and replacement fields
 - As user types replacement, document shows live preview of what text will look like after replacement (green highlighting)
@@ -41,14 +41,13 @@ Find:[query    ]→[replace   ] [.*]^R[Aa]^I 1/17 ↑↓ Enter:all Esc
 | Key | Action |
 |-----|--------|
 | Ctrl+F | Open find mode |
-| Ctrl+R | Open replace mode |
 | Escape | Close find/replace, return to editing |
 | Enter | Find mode: exit with match selected. Replace mode: replace all |
-| Tab | Toggle between find and replace fields |
+| Tab | From Find (no replace field yet): open Replace mode. Otherwise: toggle focus between find and replace fields |
 | Up Arrow | Navigate to previous match |
 | Down Arrow | Navigate to next match |
-| Alt+R (or ^R) | Toggle regex mode |
-| Alt+I (or ^I) | Toggle case sensitivity |
+| Ctrl+R | Toggle regex mode |
+| Ctrl+C | Toggle case sensitivity |
 | Backspace | Delete character in active field |
 | Any character | Add to active field (query or replace) |
 
@@ -61,7 +60,7 @@ Find:[query    ]→[replace   ] [.*]^R[Aa]^I 1/17 ↑↓ Enter:all Esc
 ### Regex Toggle [.*]
 - When ON (highlighted): Query is treated as PCRE regex
 - When OFF: Query is literal text (special chars escaped)
-- Default: ON
+- Default: OFF
 
 ### Case Sensitivity Toggle [Aa]
 - When highlighted (case sensitive): Matches exact case
@@ -186,7 +185,6 @@ Find:[query    ]→[replace   ] [.*]^R[Aa]^I 1/17 ↑↓ Enter:all Esc
 3. Replace with confirmation not implemented
 4. Find in selection not implemented
 5. Whole word matching option not implemented
-6. Search history not implemented
 
 ## Implementation Files
 

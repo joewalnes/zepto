@@ -190,7 +190,7 @@ category-ordered list with the modifier repeated on every pill:
 - `Ctrl+letter` is reserved for primary commands and toggles.
 - `Ctrl+Space` is reserved for the command palette.
 - `Alt` modifies navigation or selection semantics (word movement, column selection, tab navigation).
-- Do not depend on `Shift+letter` or `Ctrl+Shift+letter`; terminals cannot distinguish these reliably.
+- Treat `Shift+letter` or `Ctrl+Shift+letter` as risky, not off-limits: whether the terminal can distinguish them depends on the terminal supporting an extended keyboard protocol (CSI-u/"fixterms", the Kitty keyboard protocol, or xterm `modifyOtherKeys`) that encodes modifier bits explicitly. `InputParser.pm`'s CSI-u path (`ESC [ codepoint ; modifiers u`) decodes these correctly when present. Without it, a terminal sends the same plain control byte for `Ctrl+F` and `Ctrl+Shift+F` (shift is not encoded in a bare control byte, `InputParser.pm::_parse_control`), and the two become indistinguishable — Zepto's own `find_in_files` (bound to `Ctrl+Shift+F`) silently degrades to plain `Find` on such terminals rather than erroring. Only reach for a `Ctrl+Shift+letter` binding when: (a) the feature is important enough to justify graceful degradation to a different, still-reasonable action on older terminals, and (b) that degraded behavior is itself acceptable (not a silent no-op or something surprising). Prefer an unambiguous binding when one is available.
 - Avoid `Ctrl+M` (collides with `Enter`) and other terminal control collisions.
 
 ## Shortcut Labels

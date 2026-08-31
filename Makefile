@@ -85,10 +85,13 @@ qa: build
 qa-visual: build
 	@perl qa/runner.pl --tier 1,2
 
-# All automated tiers
+# All automated tiers (tier 3 is reserved for future use — no scripts
+# exist under qa/scripts/tier3/ yet, so this currently runs identically
+# to qa-visual; see qa/README.md)
 qa-full: build
 	@perl qa/runner.pl --tier 1,2,3
 
-# List available QA scripts without running
+# List available QA scripts without running (tier 3 included for
+# forward-compatibility; see qa-full comment above)
 qa-list:
 	@perl qa/runner.pl --list --tier 1,2,3

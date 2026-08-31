@@ -48,7 +48,7 @@
 
 ## Syntax Highlighting -- 52 Languages
 
-C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, Groovy, HTML, INI, Java, JavaScript/JSX, JSON, Kotlin, LaTeX, Logfile, Lua, Makefile, Markdown, Nginx, Nix, Objective-C, Perl, PHP, Properties, Protobuf, Python, R, ReStructuredText, Ruby, Rust, Scala, SCSS, Shell, SQL, SSHConfig, Swift, Systemd, Terraform/HCL, Thrift, TOML, TypeScript/TSX, XML, YAML, Zig
+AsciiDoc, C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, GraphQL, Groovy, HTML, INI, Java, JavaScript/JSX, JSON, KDL, Kotlin, LaTeX, Logfile, Lua, Makefile, Markdown, Nginx, Nix, Objective-C, Perl, PHP, Properties, Protobuf, Python, R, ReStructuredText, Ruby, Rust, Scala, SCSS, Shell, SQL, SSHConfig, Swift, Systemd, Terraform/HCL, Thrift, TOML, TypeScript/TSX, XML, YAML, Zig
 
 - Handles multi-line constructs (strings, comments, heredocs)
 - Incremental re-highlighting from the edited line forward
