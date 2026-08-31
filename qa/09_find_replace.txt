@@ -460,3 +460,37 @@ VERIFY
     NOT treated as a regex wildcard by default.
   - The regex pill (`.* ⌃R`) shows OFF state.
   - Pressing ⌃R switches to regex matching (all 3 lines match).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-028
+NAME:     Replace preview: correct in-place text, no screen corruption,
+          no document mutation (REGRESSION)
+PRIORITY: P0
+FEATURE:  replace preview
+RELATED:  QA-FIND-005, QA-FIND-006, QA-REG-211
+SCRIPT:   tier1/reg_211_find_replace_preview_no_mutation.sh
+
+STEPS
+  1. File contains `foo bar`, `foo baz`, `qux foo`, `hello world`.
+  2. ⌃F, type `foo` (3 matches), Tab to replace field, type `X`, `Y`, `Z`
+     one keystroke at a time.
+  3. Escape (cancel), wait briefly, then ⌃Z.
+  4. Reopen ⌃F, type `foo`, Tab, type `REPL`, Enter (real Replace-All).
+
+VERIFY
+  - After each replace-field keystroke, the preview shows the replacement
+    substituted IN PLACE with the rest of the line intact — e.g. typing
+    "XYZ" against `foo bar` shows `XYZ bar`, never `fooXYZ` (the seed
+    "foo" left over from Tab-prepopulation concatenated with the typed
+    text instead of being replaced by it).
+  - Exactly one find-bar row and one copy of the current preview text are
+    on screen at a time — no stacked duplicate rows accumulating from
+    earlier keystrokes (this occurred on terminals narrower than ~90
+    columns, including the common 80-column default, before the fix).
+  - After Escape, the original file content is restored exactly and ⌃Z
+    reports "Nothing to undo" — the preview never pushes real edits onto
+    the undo stack, matching FindEngine.pm's "Virtual - doesn't modify
+    document" contract.
+  - A real Replace-All (Enter, not just preview) still works correctly
+    and is fully undoable back to the original content.

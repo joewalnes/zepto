@@ -680,4 +680,117 @@ subtest 'find_current clamped when matches shrink' => sub {
        'find_current clamped within new match count (no "3 of 1")');
 };
 
+# ============================================================================
+# Replace preview must never mutate the document or undo stack (bugs.md P0
+# "Find & Replace's 'preview' mutates the real document and corrupts
+# on-screen rendering") -- FindEngine.pm:399 documents the preview path as
+# "Virtual - doesn't modify document." These tests exercise the exact
+# reported repro (⌃F, type find term, Tab to replace, type replacement,
+# against multiple matches each followed by trailing text on the line) via
+# the real Editor event path (handle_find_event), not just the FindEngine
+# API directly, so they'd catch a regression introduced anywhere in the
+# Editor.pm glue code too.
+# ============================================================================
+
+subtest 'Replace preview never mutates document content or undo stack' => sub {
+    my $content = "foo bar\nfoo baz\nqux foo\nhello world\n";
+    my $editor = create_editor_with_content($content);
+    my $doc = $editor->active_doc();
+
+    my $content_before    = $doc->text();
+    my $undo_depth_before = scalar @{$doc->{undo_stack} // []};
+    # NOTE: the test fixture's own setup (inserting the initial content via
+    # $doc->insert()) already marks the document dirty, so we compare
+    # against dirty-state-before rather than asserting non-dirty outright.
+    my $dirty_before = $doc->is_dirty() ? 1 : 0;
+
+    $editor->enter_find_mode();  # mimics ⌃F
+    for my $ch (split //, 'foo') {
+        $editor->handle_find_event({ type => 'char', char => $ch });
+    }
+    is(scalar @{$editor->{find_matches}}, 3, 'Sanity: "foo" has 3 matches in fixture content');
+
+    $editor->handle_find_event({ type => 'key', key => 'tab' });  # focus replace field
+
+    for my $ch (split //, 'XYZ') {
+        $editor->handle_find_event({ type => 'char', char => $ch });
+        is($doc->text(), $content_before,
+           "Document content unchanged after typing '$ch' into replace field");
+        is(scalar(@{$doc->{undo_stack} // []}), $undo_depth_before,
+           "Undo stack depth unchanged after typing '$ch' into replace field");
+    }
+
+    # Escaping (cancel) must not leave any mutation behind either.
+    $editor->handle_find_event({ type => 'key', key => 'escape' });
+    is($doc->text(), $content_before, 'Document content unchanged after Escape (cancel)');
+    is(scalar(@{$doc->{undo_stack} // []}), $undo_depth_before,
+       'Undo stack depth unchanged after Escape (cancel)');
+    is($doc->is_dirty() ? 1 : 0, $dirty_before,
+       'Dirty flag unchanged by the preview interaction');
+};
+
+subtest 'Replace preview text is correct in-place substitution, not concatenation' => sub {
+    # Direct repro of bugs.md's "wrong preview text" symptom: previewing a
+    # replacement for "foo" in "foo bar" must show "XYZ bar", not "fooXYZ"
+    # (which is what you get if match text and replacement get concatenated
+    # instead of replacing the match, or if a stale seed value gets
+    # appended to instead of replaced).
+    my $content = "foo bar\nfoo baz\nqux foo\nhello world\n";
+    my $editor = create_editor_with_content($content);
+
+    $editor->enter_find_mode();
+    for my $ch (split //, 'foo') {
+        $editor->handle_find_event({ type => 'char', char => $ch });
+    }
+    $editor->handle_find_event({ type => 'key', key => 'tab' });
+    for my $ch (split //, 'XYZ') {
+        $editor->handle_find_event({ type => 'char', char => $ch });
+    }
+
+    ok(defined $editor->{find_replace_preview}, 'Preview data was computed');
+    is($editor->{find_replace_preview}{0}{text}, 'XYZ bar',
+       'Line 0 preview is "XYZ bar", not "fooXYZ" or "fooXYZ bar"');
+    is($editor->{find_replace_preview}{1}{text}, 'XYZ baz',
+       'Line 1 preview is "XYZ baz"');
+    is($editor->{find_replace_preview}{2}{text}, 'qux XYZ',
+       'Line 2 preview is "qux XYZ" (trailing/leading context preserved)');
+};
+
+subtest 'Tab-prepopulated replace field is pre-selected (typing replaces, not appends)' => sub {
+    # Before this fix, Tab prepopulated the replace field with the find
+    # term via set_value() (no selection), so the first keystroke appended
+    # instead of replacing -- e.g. typing "XYZ" produced "fooXYZ" instead
+    # of "XYZ". The find field already pre-selects its own seeded value
+    # (see 'Enter find mode with previous search term' above); the replace
+    # field must behave the same way.
+    my $editor = create_editor_with_content("foo bar\n");
+    $editor->enter_find_mode();
+    $editor->{find_widget}->set_value('foo');
+
+    $editor->handle_find_event({ type => 'key', key => 'tab' });
+    is($editor->{find_replace_widget}->value(), 'foo', 'Replace field prepopulated with find term');
+    ok($editor->{find_replace_widget}->has_selection(), 'Prepopulated replace text is selected');
+
+    $editor->handle_find_event({ type => 'char', char => 'X' });
+    is($editor->{find_replace_widget}->value(), 'X',
+       'Typing after Tab replaces the seed text instead of appending to it');
+};
+
+subtest 'preview_line: replacement substituted in place, remaining line text preserved' => sub {
+    # Direct FindEngine-level check complementing the Editor-level ones
+    # above, and the existing 'Preview line with capture expansion' test
+    # (which only covers the regex/capture-group path) -- this covers the
+    # plain literal-mode path with trailing text after the match.
+    my $editor = create_editor_with_content("foo bar\n");
+    my $engine = $editor->active_find_engine();
+
+    $engine->search('foo', 0, 1);
+    while ($engine->is_searching()) { $engine->tick(100); }
+
+    my $preview = $engine->preview_line(0, 'XYZ');
+    is($preview->{text}, 'XYZ bar', 'preview_line substitutes in place: "XYZ bar", not "fooXYZ"');
+    is_deeply($preview->{highlights}, [{ start => 0, end => 3 }],
+       'Highlight spans exactly the replacement text');
+};
+
 done_testing();
