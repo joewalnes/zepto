@@ -2100,3 +2100,46 @@ VERIFY    The redesign did not change `_calc_tab_pill_width`'s formula
           column) and mouse-clicks it — confirming that exact tab closes
           and its immediate neighbor (the tab an off-by-one column error
           would have hit instead) is untouched.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-196
+NAME:     Find Next/Find Prev (Ctrl+J/Ctrl+K) — the real, palette- and
+          key-bound commands — actually navigate between matches
+PRIORITY: P3
+BUG:      P3 "do_find_next/do_find_prev are 77 lines of dead production
+          code, confusingly named next to the real commands" — see
+          bugs.md "Scorecard audit round 2" dead-code findings. An old,
+          unreachable implementation (Editor::do_find_next/do_find_prev,
+          text/index-based, `$doc->text()` + index()/rindex()) was
+          deleted; it was called only from tests/editor.t and never
+          wired to any key or palette entry. The real commands
+          (cmd_find_next/cmd_find_prev, bound to Ctrl+J/Ctrl+K and the
+          "Find Next"/"Find Prev" palette entries) delegate to
+          enter_find_mode()+_find_navigate(), which had unit coverage
+          only at the _find_navigate() level (tests/find.t) — never
+          through the actual Ctrl+J/Ctrl+K entry points, and never
+          interactively. Deleting the dead code was a pure no-op for
+          shipped behavior, but it removed the only place
+          cmd_find_next/cmd_find_prev were exercised (indirectly, by
+          name confusion) at all.
+CROSS-REF: tests/find.t ('Navigate to next match', 'Navigate wraps at
+           end', 'Navigate wraps at start', 'Navigate with no matches'),
+           tests/editor.t ('Find next', 'Find not found', 'Find prev
+           selects a match', 'Find next falls back to cmd_find...')
+VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
+          search term via the normal find bar, dismisses it, then
+          exercises Ctrl+J and Ctrl+K from known cursor positions (reset
+          via Ctrl+G before each check — see the script's own comment on
+          why: cmd_find_next/cmd_find_prev re-anchor to the match nearest
+          the CURRENT cursor via enter_find_mode() before stepping, so
+          chaining checks off a previous find action's landing spot can
+          land back where you started; that's a real, separately
+          noteworthy quirk of the "always re-enter find mode" design, not
+          a reason to write a flaky test). Confirms Ctrl+J from the top
+          of the doc and Ctrl+K from the bottom both land on the correct
+          match (verified via both the "N of 3" match-count indicator and
+          the cursor-position pill), and confirms both commands are
+          discoverable via the command palette. Verified non-tautological
+          by temporarily neutering cmd_find_next and confirming the
+          script fails (2 of 6 checks) before restoring it.

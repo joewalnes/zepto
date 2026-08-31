@@ -1167,6 +1167,25 @@ subtest 'Cut without selection cuts current line' => sub {
 
 # ============================================================================
 # Find functionality
+#
+# These subtests exercise cmd_find_next/cmd_find_prev — the real,
+# reachable commands wired to keys and the command palette. They used to
+# call now-deleted do_find_next/do_find_prev, an old, unreachable
+# text/index-based implementation that scanned $doc->text() directly with
+# index()/rindex() and set a status message on every call (see bugs.md
+# "do_find_next/do_find_prev are 77 lines of dead production code"). The
+# real cmd_find_next/cmd_find_prev instead call enter_find_mode() (which
+# re-anchors to the match nearest the cursor via FindEngine on every
+# single call, and does NOT set a "Found"/"Not found" status message) and
+# then _find_navigate() to step from there — a meaningfully different
+# match-selection algorithm from the deleted dead code, so the assertions
+# below were re-derived against the real command path rather than
+# transplanted unchanged. Multi-match stepping and wrap-around are
+# covered in more depth directly against _find_navigate() in tests/find.t
+# ('Navigate to next match', 'Navigate wraps at end', 'Navigate wraps at
+# start', 'Navigate with no matches') — these editor.t subtests instead
+# confirm the cmd_find_next/cmd_find_prev entry points themselves
+# actually invoke that machinery and land on a real match.
 # ============================================================================
 subtest 'Find next' => sub {
     my $term = mock_terminal();
@@ -1179,11 +1198,15 @@ subtest 'Find next' => sub {
     setup_editor_doc($editor, $filename);
     $editor->{search_term} = 'foo';
 
-    $editor->do_find_next();
+    $editor->cmd_find_next();
 
-    # Cursor should be at end of first "foo" (with selection)
+    # Cursor starts at 0,0 (on the first "foo"); enter_find_mode() anchors
+    # to the match at-or-after the cursor (the first "foo", col 0) and
+    # _find_navigate(1) then steps one match forward, landing on the
+    # second "foo" (cols 8-11).
     ok($editor->active_view()->has_selection(), 'Match selected');
-    like($editor->{message}, qr/Found/, 'Found message');
+    my ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
+    is($sc, 8, 'Selected the next match after the cursor');
 };
 
 subtest 'Find not found' => sub {
@@ -1194,54 +1217,54 @@ subtest 'Find not found' => sub {
         file => $filename,
     );
 
-    setup_editor_doc($editor, $filename);
+    my (undef, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 3);
     $editor->{search_term} = 'xyz';
 
-    $editor->do_find_next();
-    like($editor->{message}, qr/Not found/, 'Not found message');
+    $editor->cmd_find_next();
+
+    # No match exists, so no selection is made and the cursor is left
+    # exactly where it was (unlike the deleted dead code, the real
+    # command path doesn't set a "Not found" status message).
+    ok(!$view->has_selection(), 'No selection when term is not found');
+    is($view->cursor_line(), 0, 'Cursor line unchanged');
+    is($view->cursor_col(), 3, 'Cursor col unchanged');
 };
 
-subtest 'Find prev with selection finds previous match' => sub {
+subtest 'Find prev selects a match' => sub {
     my $term = mock_terminal();
-    # Content: "foo bar foo baz foo"
-    # Positions: col 0, col 8, col 16
+    # Content: "foo bar foo baz foo" — matches at col 0, col 8, col 16
     my $filename = create_temp_file("foo bar foo baz foo\n");
     my $editor = Zepto::Editor->new(
         terminal => $term,
         file => $filename,
     );
 
-    setup_editor_doc($editor, $filename);
+    my (undef, $view) = setup_editor_doc($editor, $filename);
+    $view->set_cursor(0, 19);  # near the end of the line
     $editor->{search_term} = 'foo';
 
-    # Start at 0,0 - find_next searches from cursor+1
-    # 1st find_next: search from 1, finds "foo" at 8
-    # 2nd find_next: search from 12, finds "foo" at 16
-    # 3rd find_next: search from 20 (end), wraps to find "foo" at 0
-    $editor->do_find_next();  # Finds foo at col 8
-    $editor->do_find_next();  # Finds foo at col 16
-    $editor->do_find_next();  # Wraps around, finds foo at col 0
+    $editor->cmd_find_prev();
 
-    # Now we have "foo" at position 0 selected (wrapped around)
-    ok($editor->active_view()->has_selection(), 'Foo is selected');
-    my ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
-    is($sc, 0, 'Selection at column 0 after wrap');
+    ok($view->has_selection(), 'A match is selected');
+    my ($sl, $sc, $el, $ec) = $view->selection();
+    is($sc, 8, 'cmd_find_prev selected the "foo" at column 8');
+};
 
-    # Find prev should find the "foo" at position 16 (searching backwards from -1, wraps)
-    $editor->do_find_prev();
-    ok($editor->active_view()->has_selection(), 'Previous foo is selected');
-    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
-    is($sc, 16, 'Find prev wrapped to foo at column 16');
+subtest 'Find next falls back to cmd_find when no search term is set' => sub {
+    my $term = mock_terminal();
+    my $filename = create_temp_file("foo bar foo baz\n");
+    my $editor = Zepto::Editor->new(
+        terminal => $term,
+        file => $filename,
+    );
 
-    # Find prev again should find the "foo" at position 8
-    $editor->do_find_prev();
-    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
-    is($sc, 8, 'Find prev found foo at column 8');
+    setup_editor_doc($editor, $filename);
+    $editor->{search_term} = '';
 
-    # Find prev again should find the "foo" at position 0
-    $editor->do_find_prev();
-    ($sl, $sc, $el, $ec) = $editor->active_view()->selection();
-    is($sc, 0, 'Find prev found foo at column 0');
+    $editor->cmd_find_next();
+
+    is($editor->{state}, 'find', 'Opens the find bar instead of navigating');
 };
 
 # ============================================================================

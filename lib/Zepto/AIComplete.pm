@@ -400,21 +400,6 @@ sub _kill_child {
 # Utilities
 # =============================================================================
 
-sub _parse_url {
-    my ($url) = @_;
-    my ($scheme, $rest) = $url =~ m{^(https?)://(.+)$};
-    $scheme //= 'https';
-    $rest //= $url;
-
-    my ($hostport, $path) = split(m{/}, $rest, 2);
-    $path = '/' . ($path // '');
-
-    my ($host, $port) = split(/:/, $hostport, 2);
-    $port //= ($scheme eq 'https' ? 443 : 80);
-
-    return ($scheme, $host, $port, $path);
-}
-
 sub _json_escape {
     my ($s) = @_;
     $s =~ s/\\/\\\\/g;

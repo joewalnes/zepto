@@ -169,6 +169,7 @@ sub check_for_changes {
         my $listeners = $self->{_listeners}{$category} || [];
         for my $cb (@$listeners) {
             eval { $cb->($data) };
+            # Ignore callback errors
         }
     }
 }

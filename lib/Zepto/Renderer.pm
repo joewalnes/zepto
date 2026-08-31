@@ -69,6 +69,12 @@ use constant {
     BOX_CROSS           => "\x{253C}", # ┼
 };
 
+# Modifier-key glyph used in shortcut hints (status bar pills, palette,
+# dialog titles). Plain Unicode, not a Nerd Font glyph — used unconditionally
+# regardless of Zepto::Chars->enabled(), so it lives here rather than in
+# Zepto::Chars (which is specifically for Nerd Font/ASCII fallback pairs).
+use constant CTRL_GLYPH => "\x{2303}";  # ⌃
+
 # UI dimensions
 use constant {
     DEFAULT_ROWS       => 24,
@@ -3845,36 +3851,6 @@ sub get_status_buttons { return @{$_status_buttons}; }
 # Context-Aware Status Bar with Pills
 # =============================================================================
 
-# Render a single pill and return (output_string, display_width)
-sub _render_pill {
-    my ($class, $theme, $icon, $label, $shortcut, $fg_key, $bg_key, $edge_key, $prev_bg_key) = @_;
-
-    my @_out;
-    my $rl = Zepto::Chars->get('round_left');
-    my $rr = Zepto::Chars->get('round_right');
-    my $nerd_font = Zepto::Chars->enabled();
-
-    my $text = '';
-    $text .= "$icon " if $icon;
-    $text .= $label if $label;
-    $text .= " $shortcut" if $shortcut;
-
-    my $width;
-
-    if ($nerd_font) {
-        # Nerd font pill: edge_bg + round_left(fg=pill_bg) + pill_content + round_right(fg=pill_bg) + edge_bg
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;  # spaces
-    } else {
-        push @_out, $theme->color($bg_key) . $theme->color($fg_key);
-        push @_out, " $text ";
-        $width = length($text) + 2;
-    }
-
-    return (join('', @_out), $width);
-}
-
 # =============================================================================
 # Modifier-Grouped Pill Columns (⌃ left / ⌥ right — see UI_GUIDELINES.md)
 # =============================================================================
@@ -3903,14 +3879,14 @@ sub _render_pill {
 sub _core_nav_hint_text {
     my ($available) = @_;
 
-    my $hint_close_lbl = "\x{2303}W close";                         # ⌃W close
+    my $hint_close_lbl = CTRL_GLYPH . "W close";                    # ⌃W close
     my $hint_nav_lbl   = "\x{2325}\x{2190}/\x{2192} tabs";           # ⌥←/→ tabs
-    my $hint_quit_lbl  = "\x{2303}Q quit";                           # ⌃Q quit
+    my $hint_quit_lbl  = CTRL_GLYPH . "Q quit";                     # ⌃Q quit
     my $hint_labeled   = "$hint_close_lbl   $hint_nav_lbl   $hint_quit_lbl";
 
-    my $hint_close_compact = "\x{2303}W \x{00d7}";                          # ⌃W ×
+    my $hint_close_compact = CTRL_GLYPH . "W \x{00d7}";                    # ⌃W ×
     my $hint_nav_compact   = "\x{2325}, \x{2190} \x{2325}. \x{2192}";       # ⌥, ← ⌥. →
-    my $hint_quit_compact  = "\x{2303}Q";                                   # ⌃Q
+    my $hint_quit_compact  = CTRL_GLYPH . "Q";                              # ⌃Q
     my $hint_compact = "$hint_close_compact $hint_nav_compact $hint_quit_compact";
 
     my $labeled_width = length($hint_labeled) + 2;  # +2 for surrounding spaces
@@ -4055,11 +4031,11 @@ sub _render_context_status_bar {
         # pushed the whole row past $cols and the terminal soft-wrapped the
         # overflow, scrolling the tab bar/ruler out of view).
         my $open_icon = Zepto::Chars->get('folder_open');
-        my $open_text = " $open_icon Open \x{2303}O ";
+        my $open_text = " $open_icon Open " . CTRL_GLYPH . "O ";
         my $open_width = length($open_text) + ($nerd_font ? 2 : 0);
 
         my $palette_icon = Zepto::Chars->get('palette');
-        my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";  # ⌃␣
+        my $palette_text = " $palette_icon Commands " . CTRL_GLYPH . "\x{2423} ";  # ⌃␣
         my $palette_width = length($palette_text) + ($nerd_font ? 2 : 0);
 
         my $right_width = $open_width + 1 + $palette_width;  # +1 for gap
@@ -4118,7 +4094,7 @@ sub _render_context_status_bar {
         # full label didn't quite fit.
         my $nav_icon = Zepto::Chars->get('cursor_pos');
         my @tree_pill_candidates = (
-            { full_text => "\x{2303}B back",  compact_text => "\x{2303}B",
+            { full_text => CTRL_GLYPH . "B back",  compact_text => CTRL_GLYPH . "B",
               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { full_text => "\x{21B5} open",   compact_text => "\x{21B5}",
               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
@@ -4239,7 +4215,7 @@ sub _render_context_status_bar {
     # the whole screen. Computing the reservation up front lets the left
     # segment (below) check its own budget before emitting anything.
     my $palette_icon = Zepto::Chars->get('palette');
-    my $palette_text = " $palette_icon Commands \x{2303}\x{2423} ";
+    my $palette_text = " $palette_icon Commands " . CTRL_GLYPH . "\x{2423} ";
     my $palette_text_width = length($palette_text);
     # Total palette width includes the round caps (left + right)
     my $palette_total_width = $palette_text_width + ($nerd_font ? 2 : 0);
@@ -4247,7 +4223,7 @@ sub _render_context_status_bar {
 
     # 1. LEFT: Cursor position pill with ⌃G shortcut (always visible, fixed width)
     my $cursor_icon = Zepto::Chars->get('cursor_pos');
-    my $goto_shortcut = "\x{2303}G";
+    my $goto_shortcut = CTRL_GLYPH . "G";
     my $cursor_text;
     if ($doc && $view) {
         my $line = $view->cursor_line() + 1;
@@ -5360,14 +5336,14 @@ sub _render_command_palette {
     # === Top border with title ===
     my $title;
     if ($mode eq 'recent_files') {
-        $title = " \x{2303}E Recent Files ";
+        $title = " " . CTRL_GLYPH . "E Recent Files ";
     } elsif ($mode eq 'files') {
-        $title = " \x{2303}O Open File ";
+        $title = " " . CTRL_GLYPH . "O Open File ";
     } elsif ($mode eq 'find_in_files') {
         my $scope = $editor->{_file_search_scope_label} // 'project';
-        $title = " \x{2303}\x{21E7}F Find in Files ($scope) ";
+        $title = " " . CTRL_GLYPH . "\x{21E7}F Find in Files ($scope) ";
     } else {
-        $title = " \x{2303}\x{2423} Commands ";
+        $title = " " . CTRL_GLYPH . "\x{2423} Commands ";
     }
     my $title_len = length($title);
     my $border_left = int(($pal_width - 2 - $title_len) / 2);
