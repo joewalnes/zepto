@@ -2,6 +2,7 @@
 
 ## 2026-08-30
 
+- Fixed a real data-corruption bug in multi-cursor and column-select editing: backspacing across a line-join, or deleting a multi-line selection, while a second cursor was active could leave that other cursor pointing at the wrong place in the document (or at a line number that no longer existed) — the very next keystroke would then silently insert or delete in the wrong spot. Multi-cursor and column-select editing that stays within a single line was never affected
 - Fixed syntax highlighting re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Highlighting itself is unaffected (multi-line comments/strings still re-highlight correctly the moment an earlier line changes what they should look like) — this is a speed-only fix, most noticeable when typing in large files with syntax highlighting on
 
 - The file tree's status bar now shows a "⌃B back" hint for switching focus back to the editor (the tree stays open — this is different from Esc, which closes it) — previously there was no on-screen hint for this anywhere while the tree was focused. When there's enough room, the tree's status bar also shows the same close-tab/switch-tabs/quit hint the editor's tab bar shows

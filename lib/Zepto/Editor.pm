@@ -4010,6 +4010,109 @@ sub delete_selection {
 }
 
 # =============================================================================
+# Shared multi-position edit/fixup helper
+# =============================================================================
+#
+# _column_insert_char/_column_backspace/_column_delete (rectangular column
+# editing) and _multi_cursor_insert_char/_multi_cursor_backspace (real
+# multi-cursor editing) all follow the same shape: apply an edit at each of
+# several tracked positions in turn, and after each individual edit, make
+# sure every OTHER tracked position (whether already processed or not yet
+# processed - see below) still points at the same logical spot in the
+# document. Getting that fixup right requires handling three cases: a
+# same-line column shift, an edit that joins two lines together, and an
+# edit that deletes/replaces a range spanning multiple lines. Previously
+# each function reimplemented this independently and 4 of the 5 copies
+# only handled the same-line case, silently corrupting cursor positions
+# across line-joins and multi-line-selection deletes (see bugs.md P1).
+#
+# _adjust_pos_for_edit() below is the single place that implements all
+# three cases correctly; _apply_edit_and_fixup_positions() is the shared
+# driver every one of the 5 callers now uses.
+
+# Given an edit that already happened - delete the document range
+# [($start_line,$start_col), ($end_line,$end_col)) and then insert
+# $ins_len characters (assumed newline-free; true for every call site
+# here: single-character inserts and pure deletions) at
+# ($start_line,$start_col) - compute where a position elsewhere in the
+# document should now point, in terms of that same edit.
+#
+# Positions strictly before the edit are unaffected. Positions inside (or
+# exactly on the boundary of) the deleted range collapse to the edit's
+# start point. Positions strictly after the deleted range have their line
+# shifted by however many lines the deletion removed, and if they were on
+# the deleted range's end line, their column is re-based onto the far
+# edge of whatever got inserted in its place.
+sub _adjust_pos_for_edit {
+    my ($edit, $line, $col) = @_;
+    my ($sl, $sc, $el, $ec, $ins_len) =
+        @{$edit}{qw(start_line start_col end_line end_col ins_len)};
+
+    # Before the edit entirely: unaffected.
+    return ($line, $col) if $line < $sl || ($line == $sl && $col < $sc);
+
+    # Inside (or on the boundary of) the deleted range: collapses to the
+    # edit's start point.
+    return ($sl, $sc) if $line < $el || ($line == $el && $col <= $ec);
+
+    # After the deleted range: shift the line by however many lines were
+    # removed, and re-base the column if this position was on the range's
+    # end line (i.e. shares a line with the tail end of the edit).
+    my $lines_removed = $el - $sl;
+    if ($line == $el) {
+        return ($sl, $sc + $ins_len + ($col - $ec));
+    }
+    return ($line - $lines_removed, $col);
+}
+
+# Apply an edit to every tracked position in @$positions except the one at
+# $skip_idx, which just performed the edit itself and already knows its
+# own new position. Each position is a hashref with at least {line, col};
+# if it also has a defined {anchor_line}, the anchor is fixed up the same
+# way (so in-flight selections on not-yet-processed cursors stay geometrically
+# correct too).
+sub _fixup_other_positions {
+    my ($positions, $skip_idx, $edit) = @_;
+    for my $i (0 .. $#$positions) {
+        next if $i == $skip_idx;
+        my $p = $positions->[$i];
+        @{$p}{qw(line col)} = _adjust_pos_for_edit($edit, $p->{line}, $p->{col});
+        if (defined $p->{anchor_line}) {
+            @{$p}{qw(anchor_line anchor_col)} =
+                _adjust_pos_for_edit($edit, $p->{anchor_line}, $p->{anchor_col});
+        }
+    }
+}
+
+# Shared driver: wrap the whole batch in one undo group, call $edit_cb for
+# each position in turn (in whatever order the caller already sorted
+# @$positions - conventionally reverse document order), and after each
+# call that returns an edit descriptor, fix up every other position.
+#
+# $edit_cb->($positions, $idx) must perform the actual document
+# mutation(s) for $positions->[$idx], update that position's own {line,
+# col} (and clear its {anchor_line,anchor_col} if it consumed a
+# selection) in place, and return either an edit descriptor hashref
+# ({start_line, start_col, end_line, end_col, ins_len}, see
+# _adjust_pos_for_edit) describing the net document change so other
+# positions can be fixed up against it, or undef if nothing was changed
+# at all (no document mutation, so nothing to fix up).
+sub _apply_edit_and_fixup_positions {
+    my ($self, $positions, $edit_cb) = @_;
+    my $doc = $self->active_doc();
+
+    $doc->begin_undo_group();
+
+    for my $idx (0 .. $#$positions) {
+        my $edit = $edit_cb->($positions, $idx);
+        next unless $edit;
+        _fixup_other_positions($positions, $idx, $edit);
+    }
+
+    $doc->end_undo_group();
+}
+
+# =============================================================================
 # Column (rectangular) editing helpers
 # =============================================================================
 
@@ -4022,19 +4125,20 @@ sub _column_delete_selection {
     my ($top, $left, $bottom, $right) = $view->column_selection();
     return unless defined $top;
 
-    $doc->begin_undo_group();
+    my @rows = map { { line => $_, col => $left } } reverse $top .. $bottom;
 
-    for my $ln (reverse $top .. $bottom) {
+    $self->_apply_edit_and_fixup_positions(\@rows, sub {
+        my ($positions, $idx) = @_;
+        my $ln = $positions->[$idx]{line};
         my $line_len = $doc->line_length($ln);
-        next if $line_len <= $left;
+        return undef if $line_len <= $left;
         my $del_end = $right < $line_len ? $right : $line_len;
         my $del_len = $del_end - $left;
-        next if $del_len <= 0;
+        return undef if $del_len <= 0;
         my $offset = $doc->line_col_to_offset($ln, $left);
         $doc->delete($offset, $del_len);
-    }
-
-    $doc->end_undo_group();
+        return { start_line => $ln, start_col => $left, end_line => $ln, end_col => $del_end, ins_len => 0 };
+    });
 
     # Collapse to zero-width column cursor at left edge
     $view->clear_selection();
@@ -4062,44 +4166,31 @@ sub _multi_cursor_insert_char {
     my @cursors = reverse $view->all_cursors_sorted();
     my $char_len = length($char);
 
-    $doc->begin_undo_group();
-
-    for my $idx (0 .. $#cursors) {
-        my $c = $cursors[$idx];
-        my $delta = 0;  # Net column shift from this edit
+    $self->_apply_edit_and_fixup_positions(\@cursors, sub {
+        my ($positions, $idx) = @_;
+        my $c = $positions->[$idx];
+        my ($sl, $sc, $el, $ec) = ($c->{line}, $c->{col}, $c->{line}, $c->{col});
 
         # Delete selection at this cursor if any
         if (defined $c->{anchor_line}) {
-            my ($sl, $sc, $el, $ec) = _normalize_selection(
+            ($sl, $sc, $el, $ec) = _normalize_selection(
                 $c->{anchor_line}, $c->{anchor_col}, $c->{line}, $c->{col});
             my $start_off = $doc->line_col_to_offset($sl, $sc);
             my $end_off = $doc->line_col_to_offset($el, $ec);
             my $del_len = $end_off - $start_off;
             $doc->delete($start_off, $del_len) if $del_len > 0;
-            $delta -= ($ec - $sc) if $sl == $el;  # Same-line deletion shifts columns
-            $c->{line} = $sl;
-            $c->{col} = $sc;
+            $c->{anchor_line} = undef;
+            $c->{anchor_col} = undef;
         }
 
         # Insert character
-        my $offset = $doc->line_col_to_offset($c->{line}, $c->{col});
+        my $offset = $doc->line_col_to_offset($sl, $sc);
         $doc->insert($offset, $char);
-        $c->{col} += $char_len;
-        $delta += $char_len;
-        $c->{anchor_line} = undef;
-        $c->{anchor_col} = undef;
+        $c->{line} = $sl;
+        $c->{col} = $sc + $char_len;
 
-        # Adjust previously-processed cursors on the same line (they're at higher columns)
-        if ($delta != 0) {
-            for my $prev_idx (0 .. $idx - 1) {
-                if ($cursors[$prev_idx]->{line} == $c->{line}) {
-                    $cursors[$prev_idx]->{col} += $delta;
-                }
-            }
-        }
-    }
-
-    $doc->end_undo_group();
+        return { start_line => $sl, start_col => $sc, end_line => $el, end_col => $ec, ins_len => $char_len };
+    });
 
     $self->_write_back_multi_cursors(\@cursors);
     $view->invalidate_wrap_map();
@@ -4114,11 +4205,9 @@ sub _multi_cursor_backspace {
 
     my @cursors = reverse $view->all_cursors_sorted();
 
-    $doc->begin_undo_group();
-
-    for my $idx (0 .. $#cursors) {
-        my $c = $cursors[$idx];
-        my $delta = 0;
+    $self->_apply_edit_and_fixup_positions(\@cursors, sub {
+        my ($positions, $idx) = @_;
+        my $c = $positions->[$idx];
 
         # If selection exists, delete it
         if (defined $c->{anchor_line}) {
@@ -4127,48 +4216,36 @@ sub _multi_cursor_backspace {
             my $start_off = $doc->line_col_to_offset($sl, $sc);
             my $end_off = $doc->line_col_to_offset($el, $ec);
             $doc->delete($start_off, $end_off - $start_off) if $end_off > $start_off;
-            $delta = -($ec - $sc) if $sl == $el;
             $c->{line} = $sl;
             $c->{col} = $sc;
             $c->{anchor_line} = undef;
             $c->{anchor_col} = undef;
+            return { start_line => $sl, start_col => $sc, end_line => $el, end_col => $ec, ins_len => 0 };
         }
         # No selection: delete one char before cursor
         elsif ($c->{line} == 0 && $c->{col} == 0) {
-            # Nothing to delete
+            return undef;  # Nothing to delete
         }
         elsif ($c->{col} > 0) {
             my $offset = $doc->line_col_to_offset($c->{line}, $c->{col});
             $doc->delete($offset - 1, 1);
+            my $edit = { start_line => $c->{line}, start_col => $c->{col} - 1,
+                         end_line => $c->{line}, end_col => $c->{col}, ins_len => 0 };
             $c->{col}--;
-            $delta = -1;
-        } else {
+            return $edit;
+        }
+        else {
             # At start of line — join with previous line
             my $prev_len = $doc->line_length($c->{line} - 1);
             my $offset = $doc->line_col_to_offset($c->{line}, 0);
             $doc->delete($offset - 1, 1);
+            my $edit = { start_line => $c->{line} - 1, start_col => $prev_len,
+                         end_line => $c->{line}, end_col => 0, ins_len => 0 };
             $c->{line}--;
             $c->{col} = $prev_len;
-            # Line join: adjust previously-processed cursors on lines after this
-            for my $prev_idx (0 .. $idx - 1) {
-                if ($cursors[$prev_idx]->{line} > $c->{line}) {
-                    $cursors[$prev_idx]->{line}--;
-                }
-            }
-            next;  # Skip same-line delta adjustment for line joins
+            return $edit;
         }
-
-        # Adjust previously-processed cursors on the same line
-        if ($delta != 0) {
-            for my $prev_idx (0 .. $idx - 1) {
-                if ($cursors[$prev_idx]->{line} == $c->{line}) {
-                    $cursors[$prev_idx]->{col} += $delta;
-                }
-            }
-        }
-    }
-
-    $doc->end_undo_group();
+    });
 
     $self->_write_back_multi_cursors(\@cursors);
     $view->invalidate_wrap_map();
@@ -4222,9 +4299,11 @@ sub _column_insert_char {
     return unless defined $top;
     my $has_width = ($left != $right);
 
-    $doc->begin_undo_group();
+    my @rows = map { { line => $_, col => $left } } reverse $top .. $bottom;
 
-    for my $ln (reverse $top .. $bottom) {
+    $self->_apply_edit_and_fixup_positions(\@rows, sub {
+        my ($positions, $idx) = @_;
+        my $ln = $positions->[$idx]{line};
         my $line_len = $doc->line_length($ln);
 
         # Pad line with spaces if shorter than left edge
@@ -4234,23 +4313,25 @@ sub _column_insert_char {
             $doc->insert($offset, $pad);
         }
 
+        my $del_end_col = $left;
         if ($has_width) {
             # Delete the rectangle content first
             my $cur_len = $doc->line_length($ln);
-            my $del_end = $right < $cur_len ? $right : $cur_len;
-            my $del_len = $del_end - $left;
+            my $de = $right < $cur_len ? $right : $cur_len;
+            my $del_len = $de - $left;
             if ($del_len > 0) {
                 my $offset = $doc->line_col_to_offset($ln, $left);
                 $doc->delete($offset, $del_len);
+                $del_end_col = $de;
             }
         }
 
         # Insert the character
         my $offset = $doc->line_col_to_offset($ln, $left);
         $doc->insert($offset, $char);
-    }
 
-    $doc->end_undo_group();
+        return { start_line => $ln, start_col => $left, end_line => $ln, end_col => $del_end_col, ins_len => CORE::length($char) };
+    });
 
     # Collapse to zero-width column cursor at left + char_length
     my $new_col = $left + CORE::length($char);
@@ -4283,16 +4364,17 @@ sub _column_backspace {
     # Zero-width: delete one char before cursor column on each line
     return if $left == 0;
 
-    $doc->begin_undo_group();
+    my @rows = map { { line => $_, col => $left } } reverse $top .. $bottom;
 
-    for my $ln (reverse $top .. $bottom) {
+    $self->_apply_edit_and_fixup_positions(\@rows, sub {
+        my ($positions, $idx) = @_;
+        my $ln = $positions->[$idx]{line};
         my $line_len = $doc->line_length($ln);
-        next if $line_len < $left;  # Skip lines shorter than cursor
+        return undef if $line_len < $left;  # Skip lines shorter than cursor
         my $offset = $doc->line_col_to_offset($ln, $left - 1);
         $doc->delete($offset, 1);
-    }
-
-    $doc->end_undo_group();
+        return { start_line => $ln, start_col => $left - 1, end_line => $ln, end_col => $left, ins_len => 0 };
+    });
 
     # Move cursor column left by 1
     my $new_col = $left - 1;
@@ -4319,16 +4401,18 @@ sub _column_delete {
     }
 
     # Zero-width: delete one char at cursor column on each line
-    $doc->begin_undo_group();
+    my @rows = map { { line => $_, col => $left } } reverse $top .. $bottom;
 
-    for my $ln (reverse $top .. $bottom) {
+    $self->_apply_edit_and_fixup_positions(\@rows, sub {
+        my ($positions, $idx) = @_;
+        my $ln = $positions->[$idx]{line};
         my $line_len = $doc->line_length($ln);
-        next if $line_len <= $left;  # Skip lines at or shorter than cursor
+        return undef if $line_len <= $left;  # Skip lines at or shorter than cursor
         my $offset = $doc->line_col_to_offset($ln, $left);
         $doc->delete($offset, 1);
-    }
+        return { start_line => $ln, start_col => $left, end_line => $ln, end_col => $left + 1, ins_len => 0 };
+    });
 
-    $doc->end_undo_group();
     $view->ensure_cursor_visible();
 }
 

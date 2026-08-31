@@ -2516,3 +2516,70 @@ VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
           discoverable via the command palette. Verified non-tautological
           by temporarily neutering cmd_find_next and confirming the
           script fails (2 of 6 checks) before restoring it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-203
+NAME:     Multi-cursor backspace across a line-join no longer desyncs the
+          other cursor's position
+PRIORITY: P1
+BUG:      P1 "Multi-cursor backspace/insert desyncs secondary cursor
+          positions across line-joins and multi-line-selection deletes —
+          real data corruption" — bugs.md "Scorecard audit round 3".
+CROSS-REF: tests/multi_cursor.t "Multi-cursor backspace across line-join
+           repositions other cursor (QA-REG-203)"
+VERIFY    `_multi_cursor_backspace`'s line-join branch adjusted a
+          not-yet-processed cursor sharing the joined-away line's LINE
+          number but never its COLUMN, even though the join shifts that
+          cursor's content by the previous line's length. Fixed by
+          extracting a shared position-fixup helper
+          (`_adjust_pos_for_edit`/`_apply_edit_and_fixup_positions` in
+          Editor.pm) used by all 5 of the column-select and multi-cursor
+          editing functions, which handles the line-join case correctly
+          by construction. `qa/scripts/tier1/reg_203_multicursor_linejoin_desync.sh`
+          creates two cursors via Ctrl+D on the same line, types a
+          replacement char, backspaces twice (the second backspace joins
+          that now-empty line into the previous "PREFIX" line), confirms
+          the joining cursor lands at the correct column, then types a
+          follow-up character and confirms BOTH cursors append it after
+          "PREFIX" ("PREFIXQQ") rather than the bug's signature — a
+          stray character inserted at the very start of PREFIX
+          ("QPREFIXQ") from the desynced cursor's wrong column. Verified
+          failing (2 of 8 checks, exactly the two corruption-detecting
+          assertions) against the pre-fix binary and passing (8/8)
+          against the fix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-204
+NAME:     Multi-cursor backspace that deletes a multi-line selection no
+          longer leaves another cursor pointing at a line that no longer
+          exists
+PRIORITY: P1
+BUG:      P1 "...and multi-line-selection deletes — real data
+          corruption" — bugs.md "Scorecard audit round 3" (same finding
+          as QA-REG-203, the multi-line-selection half of it).
+CROSS-REF: tests/multi_cursor.t "Multi-cursor backspace with multi-line
+           selection repositions cursor below (QA-REG-204)"
+VERIFY    `_multi_cursor_backspace`/`_multi_cursor_insert_char` only
+          computed a column-shift ("delta") for a SAME-line selection
+          delete; for a selection spanning multiple lines, delta stayed
+          0 and the code skipped fixing up every other cursor entirely —
+          not even their line numbers. Fixed by the same shared
+          position-fixup helper as QA-REG-203 (`_adjust_pos_for_edit`
+          handles the multi-line-deletion case as one of its three
+          general cases, not a special one).
+          `qa/scripts/tier1/reg_204_multicursor_multiline_selection_desync.sh`
+          creates a secondary cursor via Ctrl+D on the last line of a
+          4-line file, then gives the primary cursor a genuine
+          multi-line selection via click + shift-click (confirmed this
+          does not clear the secondary cursor — only arrow-key
+          navigation and Escape do), and backspaces. The multi-line
+          delete collapses 3 lines into the document; the script asserts
+          the surviving bystander cursor's status-bar position reports
+          the correct (now-shifted) line rather than a line number the
+          deletion just removed. Verified failing against the pre-fix
+          binary — the status bar showed cursor position "4:1" in a
+          document that only had 2 lines left (an out-of-bounds line
+          number silently produced by the missing fixup) where the fix
+          correctly reports "2:1" — and passing against the fix.
