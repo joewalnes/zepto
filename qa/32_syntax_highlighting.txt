@@ -373,3 +373,40 @@ STEPS
 VERIFY
   - All 52 languages' tokenized output matches expected files.
   - Guards against accidental grammar regressions.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-023
+NAME:     Incremental re-highlighting stays correct after an edit that
+          changes a downstream line's starting state (token cache)
+PRIORITY: P2
+FEATURE:  syntax cache incremental
+RELATED:  bugs.md P2 "Syntax highlighter re-tokenizes every visible line
+          on every render — no token cache"; QA-REG-199, QA-REG-200
+          (qa/40_regression_bugs.txt)
+
+STEPS
+  1. Open a JS file with a plain code line, followed later by an
+     ordinary "boundary" line, followed by more plain code.
+  2. Edit the boundary line so it opens an unclosed `/* block comment`.
+  3. Observe the lines below it (never directly edited).
+  4. Undo the edit.
+  5. Observe the same lines again.
+
+VERIFY
+  - After step 2: the untouched lines below the boundary render in the
+    comment color (not their original keyword/string colors) — the
+    highlighter re-tokenizes them using the NEW state carried down from
+    the edited line, not stale cached tokens from before the edit.
+  - Everything after the boundary line stays comment-colored until an
+    actual `*/` closes it (verified by adding one mid-line further down
+    and confirming normal coloring resumes on the rest of that line).
+  - After step 4 (undo): those same lines revert to their original
+    coloring — not stuck showing the mid-edit comment coloring.
+  - Discoverable: this is passive, automatic behavior with no separate
+    command — any syntax-highlighted file re-highlights live as you type,
+    matching how highlighting already behaves everywhere else in the UI.
+  - Automated as `qa/scripts/tier1/reg_199_highlighter_cache_upstream_edit.sh`
+    and `qa/scripts/tier1/reg_200_highlighter_cache_undo_restores_tokens.sh`,
+    which check the actual rendered ANSI color codes rather than just
+    screen text (text is identical either way — only the color changes).
