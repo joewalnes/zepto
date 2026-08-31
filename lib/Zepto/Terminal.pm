@@ -66,6 +66,16 @@ use constant {
     READ_BUFFER_SIZE => 1024,
 };
 
+# Match-time budget for a blocking clipboard-paste read (bugs.md P1
+# "Clipboard paste has no timeout"). A hung paste command (e.g. wl-paste
+# with no reachable Wayland compositor over SSH, or a wedged
+# powershell.exe under WSL) would otherwise freeze the whole editor with
+# no recovery path -- raw mode disables ISIG, so the user can't even
+# Ctrl-C out. A few seconds is generous for any real clipboard tool
+# (which returns near-instantly) while still bounding the worst case.
+# Mirrors FindEngine.pm's MATCH_ALARM_SECS alarm-guard idiom.
+use constant CLIPBOARD_PASTE_ALARM_SECS => 3;
+
 sub new {
     my ($class, %opts) = @_;
 
@@ -600,7 +610,10 @@ sub copy_to_clipboard {
 }
 
 # Read text from system clipboard
-# Returns clipboard contents or empty string if unavailable
+# Returns clipboard contents, empty string if unavailable, or undef if the
+# platform clipboard command hung past CLIPBOARD_PASTE_ALARM_SECS (a
+# distinct outcome from "no content" so callers can surface a real error
+# instead of silently treating a hang as an empty clipboard).
 sub paste_from_clipboard {
     my ($self) = @_;
 
@@ -614,8 +627,33 @@ sub paste_from_clipboard {
         exec(@cmd) or exit(127);
     }
     binmode($fh, ':raw');
-    my $text = do { local $/; <$fh> };
+
+    # Guard the blocking slurp with a match-time alarm, same idiom as
+    # FindEngine.pm's _match_with_alarm: localize $SIG{ALRM}, arm before
+    # the blocking call, disarm on both the success path inside the eval
+    # and unconditionally afterward so no alarm is ever left armed.
+    my $text = eval {
+        local $SIG{ALRM} = sub { die "clipboard_paste_timeout\n" };
+        alarm(CLIPBOARD_PASTE_ALARM_SECS);
+        my $t = do { local $/; <$fh> };
+        alarm(0);
+        $t;
+    };
+    alarm(0);  # Ensure alarm is cancelled even on exception
+
+    if ($@) {
+        die $@ unless $@ eq "clipboard_paste_timeout\n";
+        # Timed out: the child is still running (or wedged). Kill it and
+        # reap so it doesn't linger as a zombie, then report the distinct
+        # timeout outcome to the caller.
+        kill('TERM', $pid) if $pid;
+        close($fh);
+        waitpid($pid, 0) if $pid;
+        return undef;
+    }
+
     close($fh);
+    waitpid($pid, 0);
     return '' unless defined $text;
     utf8::decode($text);
     return $text;

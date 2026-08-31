@@ -123,10 +123,33 @@ sub get {
     return $self->{prefs}{$key};
 }
 
+# Validate/clamp a preference value. Shared by every path that can put a
+# value into $self->{prefs}{$key} -- set() (programmatic/UI writes),
+# _load_from_store() (startup load from disk), and
+# _apply_external_changes() (cross-instance sync) -- because
+# preferences.json is intentionally hand-editable (see docs), and all
+# three paths can independently introduce a bogus value. tab_width in
+# particular must stay a positive integer: 0 or negative would otherwise
+# persist silently and later blow up with an uncaught "Illegal modulus
+# zero" the first time anything computes a visual width against it
+# (bugs.md P3 "Preferences::visual_width divides by zero on
+# tab_width == 0"). Clamp to the nearest valid value instead of rejecting
+# outright, so a bogus edit degrades gracefully rather than silently
+# discarding the whole write.
+sub _validate_value {
+    my ($key, $value) = @_;
+    if ($key eq 'tab_width') {
+        $value = 1 if !defined $value || $value !~ /^\d+$/ || $value < 1;
+    }
+    return $value;
+}
+
 # Set a preference value
 sub set {
     my ($self, $key, $value) = @_;
     return unless defined $key;
+
+    $value = _validate_value($key, $value);
 
     my $old_value = $self->{prefs}{$key};
     $self->{prefs}{$key} = $value;
@@ -301,6 +324,10 @@ sub tab_string {
 sub visual_width {
     my ($self, $text, $tab_width) = @_;
     $tab_width //= $self->tab_width();
+    # Second layer of defense: set() clamps tab_width to >=1 on the way
+    # in, but guard here too in case this is ever called with an explicit
+    # override value that bypassed set() (bugs.md P3 divide-by-zero fix).
+    $tab_width = 1 if !defined $tab_width || $tab_width < 1;
     return 0 unless defined $text;
 
     my $width = 0;
@@ -329,7 +356,7 @@ sub _load_from_store {
     for my $key (CORE::keys %$data) {
         # Only load known preferences
         if (exists $DEFAULTS{$key}) {
-            $self->{prefs}{$key} = $data->{$key};
+            $self->{prefs}{$key} = _validate_value($key, $data->{$key});
         }
     }
     $self->{_loading} = 0;
@@ -343,7 +370,7 @@ sub _apply_external_changes {
     for my $key (CORE::keys %$data) {
         next unless exists $DEFAULTS{$key} && $GLOBAL_PREFS{$key};
         my $old = $self->{prefs}{$key};
-        my $new = $data->{$key};
+        my $new = _validate_value($key, $data->{$key});
         if (!defined $old || !defined $new || $old ne $new) {
             $self->{prefs}{$key} = $new;
             $self->_notify($key, $new, $old);

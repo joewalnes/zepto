@@ -265,7 +265,7 @@ sub wrap_line {
     $width //= $self->{width};
 
     # Expand tabs to get visual column mapping
-    my ($expanded, $char_to_visual) = Zepto::Renderer::_expand_tabs($line_content);
+    my ($expanded, $char_to_visual) = Zepto::Renderer::_expand_tabs($line_content, $self->{tab_width});
     my $expanded_len = length($expanded);
     my $char_len = length($line_content);
 
@@ -285,7 +285,7 @@ sub wrap_line {
     # Compute hanging indent from leading whitespace
     my $indent_width = 0;
     if ($line_content =~ /^(\s+)/) {
-        $indent_width = Zepto::Renderer::_char_to_visual_col($line_content, length($1));
+        $indent_width = Zepto::Renderer::_char_to_visual_col($line_content, length($1), $self->{tab_width});
     }
     # Clamp: if indent is too large, disable it
     if ($indent_width > $width - MIN_CONTENT_COLS) {
@@ -442,7 +442,7 @@ sub doc_to_visual {
 
             # Get the line content for visual col computation
             my $content = $self->{document}->get_line_content($doc_line);
-            my $vis_col_abs = Zepto::Renderer::_char_to_visual_col($content, $clamped_col);
+            my $vis_col_abs = Zepto::Renderer::_char_to_visual_col($content, $clamped_col, $self->{tab_width});
             my $vis_col_in_row = ($vis_col_abs - $seg->{vis_start}) + $seg->{indent_width};
 
             return ($base_vrow + $i, $vis_col_in_row);
@@ -480,7 +480,7 @@ sub visual_to_doc {
     my $abs_vis_col = $seg->{vis_start} + $content_vcol;
 
     # Convert visual column to character position
-    my $doc_col = Zepto::Renderer::visual_to_char_col($content, $abs_vis_col);
+    my $doc_col = Zepto::Renderer::visual_to_char_col($content, $abs_vis_col, $self->{tab_width});
 
     # Clamp to segment range
     $doc_col = $seg->{col_start} if $doc_col < $seg->{col_start};

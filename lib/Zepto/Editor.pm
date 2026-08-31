@@ -1941,7 +1941,7 @@ sub handle_mouse_event {
                 # Need to add scroll_col to visual position first
                 my $absolute_visual_col = $view->scroll_col() + $visual_col;
                 my $line_content = $self->active_doc()->get_line($doc_line) // '';
-                $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
+                $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col, $self->{prefs}->tab_width());
             }
 
             if ($alt) {
@@ -2132,7 +2132,7 @@ sub handle_mouse_event {
             # Convert visual column to document column, accounting for tabs
             my $absolute_visual_col = $view->scroll_col() + $visual_col;
             my $line_content = $self->active_doc()->get_line($doc_line) // '';
-            $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col);
+            $doc_col = Zepto::Renderer::visual_to_char_col($line_content, $absolute_visual_col, $self->{prefs}->tab_width());
         }
 
         if ($visual_col >= 0 && !$view->has_selection()) {
@@ -4882,7 +4882,14 @@ sub render {
             $wrap_width = Zepto::Renderer::MIN_TEXT_WIDTH if $wrap_width < Zepto::Renderer::MIN_TEXT_WIDTH;
 
             my $wm = $self->active_view()->wrap_map();
-            if (!$wm || $wm->{width} != $wrap_width) {
+            # Rebuild on a tab_width preference change too, not just a
+            # viewport width change -- otherwise changing "Tab Width" in
+            # the palette has no visible effect until the next content
+            # edit or resize happens to invalidate/rebuild the map (see
+            # bugs.md P1 "Tab Width preference has no effect on rendering
+            # existing tab characters").
+            if (!$wm || $wm->{width} != $wrap_width
+                     || $wm->{tab_width} != $self->{prefs}->tab_width()) {
                 $wm = Zepto::WrapMap->new(
                     document  => $self->active_doc(),
                     width     => $wrap_width,

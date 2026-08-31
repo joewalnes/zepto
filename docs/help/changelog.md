@@ -22,6 +22,8 @@
 - Fixed a real screen-corruption bug: with multi-cursor mode or column-select mode active at a narrow terminal width, the status bar could overflow past the terminal's column count, causing the terminal itself to scroll and lose the tab bar/ruler from view. The status bar's supplementary indicators (cursor count, column-selection size) now drop gracefully instead of overflowing — the cursor position and "Commands" pills always stay visible
 - Fixed the blank rows reserved below an inline Markdown image (Kitty-graphics-capable terminals) sometimes showing the wrong background color instead of the current theme's real background
 - Fixed Ctrl+Enter, Ctrl+Tab, Ctrl+Backspace, and Ctrl+Escape being silently dropped on terminals that use the Kitty keyboard protocol (e.g. Kitty, WezTerm, Ghostty) — these modified special keys previously did nothing at all; they now register correctly
+- Fixed "Tab Width" only affecting newly-typed indentation — it now also affects how a file's existing tab characters are displayed and wrapped. Changing it in the palette re-renders any already-open tab-indented file immediately
+- Paste (⌃V) no longer freezes the editor indefinitely if the system clipboard command hangs — it now times out after a few seconds and shows an error message instead
 
 ## 2026-08-29
 

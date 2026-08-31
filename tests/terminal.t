@@ -369,6 +369,33 @@ subtest 'paste_from_clipboard decodes UTF-8' => sub {
     is($result, $test_str, 'UTF-8 round-trip through clipboard preserves characters');
 };
 
+# Regression test for bugs.md P1 "Clipboard paste has no timeout -- a
+# hung paste command freezes the UI indefinitely" / QA-REG-188. Before
+# the fix, paste_from_clipboard() did a bare blocking `<$fh>` slurp with
+# no alarm() guard (unlike FindEngine.pm's MATCH_ALARM_SECS pattern), so
+# a wedged clipboard command (e.g. wl-paste with no reachable Wayland
+# compositor, or a hung powershell.exe under WSL) would freeze the whole
+# editor forever with no recovery path.
+subtest 'paste_from_clipboard times out on a hung clipboard command' => sub {
+    my $term = Zepto::Terminal->new();
+
+    # Simulate a wedged platform clipboard command: 'sleep' comfortably
+    # outlives CLIPBOARD_PASTE_ALARM_SECS (3s) but is portable (POSIX
+    # standard, no macOS/Linux-specific flags) and self-terminates so the
+    # test process doesn't leak a runaway child if something goes wrong.
+    $term->{_clipboard_paste_cmd} = ['sleep', '30'];
+
+    my $start = time();
+    my $result = $term->paste_from_clipboard();
+    my $elapsed = time() - $start;
+
+    ok(!defined $result,
+        'Returns undef on timeout -- distinct from "" (empty clipboard), so callers can tell the difference');
+    ok($elapsed < Zepto::Terminal::CLIPBOARD_PASTE_ALARM_SECS + 3,
+        "Returns promptly after the alarm fires (${elapsed}s), not after the full 30s hang")
+        or diag('paste_from_clipboard is blocking past its alarm -- the timeout guard has regressed');
+};
+
 # ============================================================================
 # Cleanup
 # ============================================================================
