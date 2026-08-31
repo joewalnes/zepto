@@ -2693,10 +2693,22 @@ sub handle_find_event {
             } else {
                 # Tab: toggle between find/replace fields, or show replace
                 if (!$self->{find_replace_active}) {
-                    # Show replace field, prepopulate with find string
+                    # Show replace field, prepopulate with find string.
+                    # Pre-select the prepopulated text (same convention as
+                    # enter_find_mode's find-field pre-select above) so the
+                    # first keystroke replaces it rather than appending to
+                    # it -- without this, typing "XYZ" produced "fooXYZ"
+                    # instead of the intended "XYZ" (bugs.md P0 finding:
+                    # "wrong preview text").
+                    my $seed = $self->{find_widget}->value();
                     $self->{find_replace_active} = 1;
                     $self->{find_focus} = 'replace';
-                    $self->{find_replace_widget}->set_value($self->{find_widget}->value());
+                    $self->{find_replace_widget}->set_value($seed);
+                    if (length($seed)) {
+                        $self->{find_replace_widget}->{sel_start} = 0;
+                        $self->{find_replace_widget}->{sel_end}   = length($seed);
+                        $self->{find_replace_widget}->{cursor}    = length($seed);
+                    }
                 } elsif ($self->{find_focus} eq 'find') {
                     $self->{find_focus} = 'replace';
                 } else {
@@ -2772,16 +2784,10 @@ sub handle_find_bar_click {
     my $replace_active = $self->{find_replace_active};
     my $right_side_width = 45 + $match_text_len;
 
-    # Input field width (same formula as renderer)
-    my $available;
-    if ($replace_active) {
-        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
-    } else {
-        $available = $cols - 2 - 5 - $right_side_width;
-    }
-    my $input_width = $replace_active ? int($available / 2) : $available;
-    $input_width = 8 if $input_width < 8;
-    $input_width = 40 if $input_width > 40;
+    # Input field width -- delegates to Renderer's find_bar_input_width so
+    # click regions always match what was actually drawn, including the
+    # narrow-terminal overflow fix (bugs.md P0 find/replace screen corruption)
+    my $input_width = Zepto::Renderer->find_bar_input_width($cols, $replace_active, $right_side_width);
 
     # Click region positions (1-indexed, matching renderer)
     my $pos = 1;  # Leading space
@@ -2857,15 +2863,8 @@ sub _handle_find_bar_drag {
         ? (length($self->{find_widget}->value()) ? 'No matches' : '')
         : ("\x{2191}\x{2193} " . (($self->{find_current} // 0) + 1) . ' of ' . $match_count);
     my $right_side_width = 45 + length($match_text);
-    my $available;
-    if ($replace_active) {
-        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;
-    } else {
-        $available = $cols - 2 - 5 - $right_side_width;
-    }
-    my $input_width = $replace_active ? int($available / 2) : $available;
-    $input_width = 8  if $input_width < 8;
-    $input_width = 40 if $input_width > 40;
+    # Delegates to Renderer's find_bar_input_width -- see handle_find_bar_click
+    my $input_width = Zepto::Renderer->find_bar_input_width($cols, $replace_active, $right_side_width);
 
     my $find_start    = 7;  # " " + " Find:" = 7
     my $find_end      = $find_start + $input_width - 1;

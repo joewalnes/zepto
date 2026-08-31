@@ -2516,3 +2516,74 @@ VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
           discoverable via the command palette. Verified non-tautological
           by temporarily neutering cmd_find_next and confirming the
           script fails (2 of 6 checks) before restoring it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-203
+NAME:     Find & Replace preview never mutates the document or corrupts
+          on-screen rendering
+PRIORITY: P0
+BUG:      P0 "Find & Replace's 'preview' mutates the real document and
+          corrupts on-screen rendering — despite being explicitly
+          documented as non-mutating" — bugs.md "Scorecard audit round 3".
+          Reported as three compounding symptoms from ⌃F, type "foo", Tab
+          to replace, type a replacement, against a file with several
+          "foo" matches each followed by more text on the same line: (1)
+          screen corruption — every replace-field keystroke left a
+          stacked duplicate row of the find/replace bar and preview lines
+          instead of overwriting in place; (2) wrong preview text —
+          showed "fooXYZ" instead of the correct "XYZ bar"; (3) claimed
+          real document mutation via the undo stack.
+CROSS-REF: tests/find.t ('Replace preview never mutates document content
+           or undo stack', 'Replace preview text is correct in-place
+           substitution, not concatenation', 'Tab-prepopulated replace
+           field is pre-selected (typing replaces, not appends)',
+           'preview_line: replacement substituted in place, remaining
+           line text preserved'); tests/renderer.t ('find_bar_input_width
+           never lets fields exceed their budget', 'Find bar with replace
+           field never exceeds $cols at common terminal widths', 'Find
+           bar with no matches / longer match counts never exceeds
+           $cols')
+VERIFY    Root-cause investigation found symptoms (1) and (2) to be two
+          real, distinct root causes — see bugs.md's FIXED writeup for
+          full detail:
+            (1) `_render_find_bar`'s input-field width calculation
+                clamped up to a usability-floor minimum (8 cols/field)
+                unconditionally, even when the actual layout budget was
+                smaller — confirmed this overflowed an 80-column terminal
+                (the common default) by 4 characters with a 3-match
+                count. The overflow wrapped onto the row below via the
+                terminal's own auto-wrap, which the differential renderer
+                (Editor.pm's render(), tracking content per logical row)
+                has no way to account for or clear, producing the
+                reported stacked duplicate rows. Fixed via a new shared
+                `Renderer::find_bar_input_width()` (also used by
+                Editor.pm's click/drag handlers, replacing 3 duplicated
+                copies of the same formula) that only grows to the
+                usability floor when the budget actually allows it.
+            (2) Tab-prepopulating the replace field with the find term
+                (`set_value()`) didn't pre-select the seeded text the way
+                the find field's own prepopulation does — so the first
+                keystroke appended instead of replacing, producing
+                "fooXYZ" instead of "XYZ". This also silently corrupted
+                real (non-preview) Replace-All results the same way.
+                Fixed by pre-selecting the seeded replace text on Tab.
+          Symptom (3) — real document mutation — did NOT reproduce.
+          Traced every call in the preview path
+          (`FindEngine::preview_line`/`preview_viewport`,
+          `Editor::_apply_replace_preview`) and confirmed all reads go
+          through `$doc->get_line_content()` with no mutating call
+          anywhere in the path; both an isolated Perl-level harness and
+          full interactive `hangon` testing showed the undo stack
+          unchanged (`0 -> 0` depth) and document content byte-identical
+          throughout the exact repro. `qa/scripts/tier1/
+          reg_203_find_replace_preview_no_mutation.sh` still asserts the
+          no-mutation guarantee directly (undo stack shows "Nothing to
+          undo" after Escape) as a permanent regression guard. Verified
+          non-tautological: 8 of 18 QA-script assertions fail against the
+          pre-fix binary (exactly the stacked-row and wrong-text
+          symptoms — including "REPL bar" showing as "fooREPL bar" in a
+          real, non-preview Replace-All, confirming the pre-select bug
+          affected more than just the preview), all 18 pass against the
+          fix; `tests/find.t`'s two new fix-dependent subtests likewise
+          fail against pre-fix code (`git stash` verified) and pass after.

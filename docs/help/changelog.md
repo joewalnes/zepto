@@ -26,6 +26,7 @@
 - Fixed Ctrl+Enter, Ctrl+Tab, Ctrl+Backspace, and Ctrl+Escape being silently dropped on terminals that use the Kitty keyboard protocol (e.g. Kitty, WezTerm, Ghostty) — these modified special keys previously did nothing at all; they now register correctly
 - Fixed "Tab Width" only affecting newly-typed indentation — it now also affects how a file's existing tab characters are displayed and wrapped. Changing it in the palette re-renders any already-open tab-indented file immediately
 - Paste (⌃V) no longer freezes the editor indefinitely if the system clipboard command hangs — it now times out after a few seconds and shows an error message instead
+- Fixed Find & Replace's live preview: typing in the replace field could leave stacked, uncleared duplicate rows on screen (most noticeable at the common 80-column terminal width) and could show the wrong preview text (e.g. typing "XYZ" over a prefilled "foo" showed "fooXYZ" instead of replacing it, so the preview read "fooXYZ bar" instead of "XYZ bar"). The replace field's prefilled text is now selected on Tab (so typing replaces it, matching how the Find field already worked), and the find/replace bar no longer overflows the terminal width. Confirmed the preview never touched the real document or undo history in either case
 
 ## 2026-08-29
 

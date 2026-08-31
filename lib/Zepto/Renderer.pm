@@ -460,6 +460,50 @@ sub get_minimap_width {
     return $tentative_text >= MIN_TEXT_WIDTH ? MINIMAP_WIDTH : 0;
 }
 
+# Calculate the find/replace bar's input field width for a given terminal
+# width. Exported so Editor.pm's click/drag handlers can use the same
+# calculation as the renderer for hit-testing (same convention as
+# get_gutter_width above).
+#
+# Correctness requirement: the returned width, plus all the bar's other
+# fixed-width elements (labels, pills, match-count text), must NEVER exceed
+# $cols. Previously, FIND_INPUT_WIDTH_MIN was applied unconditionally as a
+# floor, which could force the input field(s) wider than the actual budget
+# on terminals narrower than ~90 cols with replace mode active (the 2 input
+# fields share one budget, divided in half). At the very common 80-column
+# terminal width, this overflowed the line by several characters on every
+# replace-field keystroke (match-count text length varies with match
+# count/searching state, so did the overflow). The overflow wraps onto the
+# row below via the terminal's own auto-wrap, which the differential
+# renderer (Editor.pm's render()) has no way to account for or clear — it
+# tracks content per logical row, not per physical terminal line, and only
+# re-emits rows it believes changed. The result was stacked, uncleared
+# duplicate find-bar/preview rows on screen (bugs.md P0 "Find & Replace
+# preview... corrupts on-screen rendering").
+#
+# Fix: only grow up to the usability-floor minimum when the budget actually
+# allows it for every field; otherwise shrink below it (down to a hard
+# floor of 1) rather than overflow.
+sub find_bar_input_width {
+    my ($class, $cols, $replace_active, $right_side_width) = @_;
+
+    my $available;
+    if ($replace_active) {
+        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
+    } else {
+        $available = $cols - 2 - 5 - $right_side_width;  # " Find:" only
+    }
+
+    my $num_fields = $replace_active ? 2 : 1;
+    my $input_width = int($available / $num_fields);
+    $input_width = FIND_INPUT_WIDTH_MAX if $input_width > FIND_INPUT_WIDTH_MAX;
+    if ($input_width < FIND_INPUT_WIDTH_MIN && $available >= FIND_INPUT_WIDTH_MIN * $num_fields) {
+        $input_width = FIND_INPUT_WIDTH_MIN;
+    }
+    $input_width = 1 if $input_width < 1;
+    return $input_width;
+}
+
 # Render the complete editor screen
 # Returns a string of escape sequences
 sub render {
@@ -4996,16 +5040,9 @@ sub _render_find_bar {
     # ".* ^R" (9+1) + "Aa ^C" (9+1) + "X Esc" (9+1) + "✓ Enter" (11) + spaces
     my $right_side_width = FIND_BAR_RIGHT_SIDE_BASE_WIDTH + length($match_text) + $capture_hint_width;
 
-    # Calculate input field widths
-    my $available;
-    if ($replace_active) {
-        $available = $cols - 2 - 5 - 1 - 8 - 1 - $right_side_width;  # " Find:" + "Replace:" + spaces
-    } else {
-        $available = $cols - 2 - 5 - $right_side_width;  # " Find:" only
-    }
-    my $input_width = $replace_active ? int($available / 2) : $available;
-    $input_width = FIND_INPUT_WIDTH_MIN if $input_width < FIND_INPUT_WIDTH_MIN;
-    $input_width = FIND_INPUT_WIDTH_MAX if $input_width > FIND_INPUT_WIDTH_MAX;
+    # Calculate input field widths (never overflows $cols -- see
+    # find_bar_input_width's doc comment for why this matters)
+    my $input_width = $class->find_bar_input_width($cols, $replace_active, $right_side_width);
 
     my $content = '';
     my $x = 1;  # Track position for click regions
@@ -5208,7 +5245,12 @@ sub _render_find_bar {
 
     # Add padding, capture hint, and match text
     my $padding_needed = $cols - $visible_width - length($match_text) - $capture_hint_width - 1;
-    $padding_needed = 1 if $padding_needed < 1;
+    # Floor at 0, not 1: on a narrow terminal, forcing a minimum of 1 here
+    # can add an extra character beyond what find_bar_input_width already
+    # budgeted for, re-introducing a 1-char overflow in the tightest case
+    # (see find_bar_input_width's doc comment -- this line contributed to
+    # the same bugs.md P0 screen-corruption bug).
+    $padding_needed = 0 if $padding_needed < 0;
     $content .= ' ' x $padding_needed;
 
     # Render capture hint with colored $N tokens

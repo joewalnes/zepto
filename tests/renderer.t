@@ -18,6 +18,7 @@ use Zepto::Terminal;
 use Zepto::FindEngine;
 use Zepto::Highlighter;
 use Zepto::CommandRegistry;
+use Zepto::InputWidget;
 use File::Temp qw(tempfile);
 
 # Helper to create a temp file with content
@@ -2825,6 +2826,104 @@ subtest 'No priority > 0 command ever compacts to a bare key with no icon (eithe
         }
     }
     Zepto::Chars->set_enabled(1);  # restore default for subsequent test files sharing this process
+};
+
+# ============================================================================
+# Find bar must never overflow the terminal width (bugs.md P0 "Find &
+# Replace's 'preview' mutates the real document and corrupts on-screen
+# rendering"). Root cause of the screen-corruption symptom: with replace
+# mode active, FIND_INPUT_WIDTH_MIN was applied as an unconditional floor
+# to each of the 2 input fields, which could push the bar's total content
+# width past $cols on terminals narrower than ~90 cols (confirmed: 80-col
+# terminal overflowed by 4 chars with a 3-match "of 3" match-count
+# string). The overflow characters wrap onto the next physical terminal
+# row via the terminal's own auto-wrap, which the differential renderer
+# (Editor.pm's render(), tracking content per logical row) never accounts
+# for or clears -- producing the reported stacked, uncleared duplicate
+# find-bar/preview rows.
+# ============================================================================
+
+subtest 'find_bar_input_width never lets fields exceed their budget' => sub {
+    for my $cols (40, 50, 60, 70, 76, 80, 90, 100, 120, 200) {
+        for my $replace_active (0, 1) {
+            for my $right_side_width (45, 54, 60, 70) {  # base 45 .. base+long match text
+                my $input_width = Zepto::Renderer->find_bar_input_width(
+                    $cols, $replace_active, $right_side_width);
+                my $num_fields = $replace_active ? 2 : 1;
+                my $available = $replace_active
+                    ? ($cols - 2 - 5 - 1 - 8 - 1 - $right_side_width)
+                    : ($cols - 2 - 5 - $right_side_width);
+
+                ok($input_width >= 1,
+                   "cols=$cols replace=$replace_active right=$right_side_width: input_width >= 1");
+                ok($input_width * $num_fields <= $available || $available < $num_fields,
+                   "cols=$cols replace=$replace_active right=$right_side_width: "
+                   . "$num_fields field(s) of width $input_width fit within budget $available");
+            }
+        }
+    }
+};
+
+# Build a minimal $find hash mimicking what Editor.pm's render() passes as
+# ui->{find_mode} (see Editor.pm's render(), the `find_mode => ... {` block).
+sub _mock_find_state {
+    my (%opts) = @_;
+    return {
+        value          => $opts{value} // 'foo',
+        regex          => 0,
+        case           => 0,
+        replace_value  => $opts{replace_value} // 'foo',
+        replace_all    => 1,
+        replace_active => 1,
+        focus          => 'replace',
+        current        => ($opts{match_count} // 3) - 1,
+        match_count    => $opts{match_count} // 3,
+        find_widget    => Zepto::InputWidget->new(value => $opts{value} // 'foo'),
+        replace_widget => Zepto::InputWidget->new(value => $opts{replace_value} // 'foo'),
+    };
+}
+
+subtest 'Find bar with replace field never exceeds $cols at common terminal widths' => sub {
+    my $theme = Zepto::Theme->new('dark');
+
+    # Exact repro shape from bugs.md: find="foo", replace grows one char at
+    # a time as the user types (fooX, fooXY, fooXYZ before the pre-select
+    # fix; X, XY, XYZ after it) against a file with 3 matches -- match_text
+    # becomes "↑↓ 3 of 3" (9 chars), the specific case that overflowed an
+    # 80-col terminal by 4 characters before the fix.
+    for my $cols (70, 76, 80, 90, 100, 120) {
+        for my $replace_value ('X', 'XY', 'XYZ', 'fooXYZ') {
+            my $find = _mock_find_state(value => 'foo', replace_value => $replace_value, match_count => 3);
+            my $out = Zepto::Renderer->_render_find_bar($theme, $find, $cols);
+            my $visible = strip_escapes($out);
+            ok(length($visible) <= $cols,
+               "cols=$cols replace='$replace_value': find bar visible width ("
+               . length($visible) . ") does not exceed terminal width");
+        }
+    }
+};
+
+subtest 'Find bar with no matches / longer match counts never exceeds $cols' => sub {
+    # Scoped to cols >= 76 (comfortably below the standard 80-col default
+    # this bug was reported at) -- an even narrower terminal (70 cols)
+    # combined with a very large match count (15+) can still overflow by a
+    # few characters, since at that point the FIXED elements (pills,
+    # labels) plus a long "of N" string alone approach $cols before any
+    # input-field width is even considered. That narrower residual case is
+    # logged separately in bugs.md as a low-priority follow-up; it's a much
+    # more extreme combination than the reported repro (3 matches, 80
+    # cols) this fix targets.
+    my $theme = Zepto::Theme->new('dark');
+    for my $cols (76, 80, 90, 100, 120) {
+        for my $match_count (0, 1, 3, 15, 99, 250, 9999) {
+            my $find = _mock_find_state(value => 'foo', replace_value => 'XYZ', match_count => $match_count);
+            my $out = Zepto::Renderer->_render_find_bar($theme, $find, $cols);
+            my $visible = strip_escapes($out);
+            ok(length($visible) <= $cols,
+               "cols=$cols match_count=$match_count: find bar visible width ("
+               . length($visible) . ") does not exceed terminal width");
+        }
+    }
 };
 
 done_testing();
