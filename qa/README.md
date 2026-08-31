@@ -127,9 +127,18 @@ vision-capable model and returns `PASS`/`FAIL: <reason>`; `qa_assert_visual`
 `qa_pass`/`qa_fail` reporting as every other check, and skips gracefully
 (not a hard failure) when no LLM is configured.
 
-**Running it:** `make qa-visual` (tier 1 + 2) or `make qa-full` (+ tier 3).
+**Running it:** `make qa-visual` (tier 1 + 2) or `make qa-full` (tiers 1,2,3).
 Plain `make qa` (tier 1 only, the default and what CI/rule-3 compliance
 requires) never touches any of this — no LLM dependency at all.
+
+**Tier 3 is reserved, not yet populated.** `qa-full`/`qa-list` pass `--tier
+1,2,3` to `qa/runner.pl` for forward-compatibility, but no scripts exist
+under `qa/scripts/tier3/` yet — `make qa-full` today runs identically to
+`make qa-visual`. Nothing is broken by this (the runner just reports zero
+tier-3 scripts found); it's a placeholder for a future coverage tier (e.g.
+slow/expensive checks like full-matrix performance benchmarking or
+cross-platform runs) that hasn't been built out. If you add the first
+tier-3 script, update this note.
 
 **Credentials:** `qa/lib/qa-llm-defaults.sh` (sourced automatically by
 `qa-helpers.sh`) fills in a working `ZEPTO_QA_API_URL`/`_KEY`/`_MODEL`

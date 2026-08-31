@@ -72,7 +72,7 @@ it's the pragmatic choice.
 | **Buffer**           | Gap buffer text storage with line indexing         | Pure (no I/O)                |
 | **Document**         | File operations, undo/redo, VCS diff integration  | Stateful                     |
 | **View**             | Viewport position, cursor, selection state        | Stateful                     |
-| **Renderer**         | Converts editor state to ANSI escape sequences    | Pure function                |
+| **Renderer**         | Converts editor state to ANSI escape sequences    | State in → string out, with internal memoization caches (char-width, file-exists, image-dims, tab-bar geometry) |
 | **InputParser**      | Decodes terminal input into semantic events       | Stateful (partial sequences) |
 | **Terminal**         | Raw mode, screen size, clipboard, low-level I/O   | Side effects                 |
 | **Theme**            | Color definitions for UI elements                 | Pure data                    |
@@ -85,7 +85,7 @@ it's the pragmatic choice.
 | **FileSearchEngine** | Cross-file search via external tools              | Stateful (async I/O)         |
 | **Diff**             | Myers diff algorithm for VCS gutter               | Pure function                |
 | **InputWidget**      | Text input for find bar, palette, footer          | Stateful                     |
-| **WrapMap**          | Word wrap computation, visual row mapping         | Pure function                |
+| **WrapMap**          | Word wrap computation, visual row mapping         | State in → wrap map out; calls into Renderer's private `_`-prefixed tab/column helpers directly (accepted coupling, not a public API) |
 | **LineMap**          | Maps display rows to document lines (diff view)   | Pure function                |
 | **Minimap**          | Braille-based scrollbar/minimap computation       | Pure function                |
 | **Chars**            | Nerd Font / ASCII glyph abstraction               | Pure data                    |
@@ -277,8 +277,10 @@ This allows consistent theming—change the theme, and every UI element updates 
 
 See `docs/CODE_QUALITY.md` for testing standards, test categories, and patterns.
 
-The key architectural enabler: keeping Renderer pure (state in → string out) means rendering can
-be tested without a terminal. `make test` runs the full suite; `make check` verifies Perl syntax.
+The key architectural enabler: Renderer's core contract is state in → string out (it holds no
+reference to the terminal or editor object, just internal memoization caches keyed on its inputs),
+which means rendering can be tested without a terminal. `make test` runs the full suite; `make
+check` verifies Perl syntax.
 
 ## Build System
 
@@ -298,5 +300,11 @@ The build process:
 
 ### Why Not Use a Perl Bundler?
 
-Tools like PAR or FatPacker add complexity and dependencies. Our build.pl is 50 lines of simple
-string manipulation. It does exactly what we need and nothing more.
+Tools like PAR or FatPacker add complexity and dependencies. Our build.pl is ~440 lines of plain
+Perl: it walks `lib/` for `.pm` files, sorts them into dependency order via an explicit priority
+table (core modules first, `Syntax::Base` before other grammars, `Editor.pm` last), applies a
+handful of per-file regex transforms (strip shebangs/comments, convert `use parent` to `@ISA`,
+inline `use Zepto::*` away, wrap each module in its own `{ }` block to avoid `my`-variable name
+clashes), embeds the `docs/help/*.md` files into the `HelpDocs` module, and appends a `main`
+entry point (CLI arg parsing, `--install`, `--version`). It does exactly what we need and nothing
+more — no bundler dependency, just string manipulation.
