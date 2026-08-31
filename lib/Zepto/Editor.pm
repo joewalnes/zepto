@@ -66,6 +66,7 @@ use constant {
 # Load command and menu modules (they add methods to this package)
 use Zepto::Editor::Commands;
 use Zepto::Editor::Palette;
+use Zepto::Editor::PaletteController;
 
 # Timing and UI settings
 use constant {
