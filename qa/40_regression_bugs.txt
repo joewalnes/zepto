@@ -2516,3 +2516,109 @@ VERIFY    `qa/scripts/tier1/reg_196_find_next_prev_real_cmd.sh` sets a
           discoverable via the command palette. Verified non-tautological
           by temporarily neutering cmd_find_next and confirming the
           script fails (2 of 6 checks) before restoring it.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-212
+NAME:     Renderer's tab-expansion cache does not bleed a stale result
+          between two different lines that share identical content
+PRIORITY: P2
+BUG:      P2 "Renderer.pm's _expand_tabs() has no cache -- same missed
+          pattern the Highlighter token cache (round 2) just fixed" — see
+          bugs.md Performance section (Scorecard audit round 3,
+          2026-08-30).
+CROSS-REF: tests/renderer.t ("expand_tabs cache: ..." subtests, 7 new
+           subtests covering identical-call memoization, content-change
+           invalidation, tab-width-change invalidation, key-collision
+           safety, and bounded eviction), QA-REG-189 (tab_width threading
+           itself — companion, different fix), QA-REG-213 (perf side of
+           this same fix)
+VERIFY    `_expand_tabs()` now memoizes on (tab_width, text) rather than
+          recomputing from scratch on every visible line on every render.
+          Because the cache key is CONTENT, not line number, two
+          different document lines with byte-identical text legitimately
+          share one cache entry — a design unique to this fix (a naive
+          per-line-number cache wouldn't have this specific risk, but
+          also wouldn't help across scrolling/typing that shifts which
+          line number holds which content).
+          `qa/scripts/tier1/reg_212_expand_tabs_cache_no_cross_line_bleed.sh`
+          opens a file where lines 2 and 4 start out byte-identical
+          ("\tSHARED_TAB_TEXT"), confirms both render their marker at the
+          same column (same cache entry, as expected), edits ONLY line 2
+          to add a second leading tab, then confirms line 2's marker
+          shifted right (correctly recomputed) while line 4's marker
+          stayed at its original column (the shared cache entry for the
+          original content was not corrupted by line 2's edit). Verified
+          non-tautological via mutation testing at the unit level
+          (tests/renderer.t): deliberately collapsing the cache key to
+          ignore tab_width made both the pre-existing tab-width tests and
+          the new cache tests fail (5 of 102), confirming they exercise
+          the real cache path, then the fix was restored and all 102
+          passed again.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-213
+NAME:     Typing in a large, tab-indented file stays responsive
+          (expand_tabs cache regression guard)
+PRIORITY: P2
+BUG:      P2 "Renderer.pm's _expand_tabs() has no cache -- same missed
+          pattern the Highlighter token cache (round 2) just fixed" — see
+          bugs.md Performance section (Scorecard audit round 3,
+          2026-08-30).
+CROSS-REF: QA-REG-212 (correctness side of this same fix);
+           qa/scripts/tier1/reg_201_highlighter_cache_large_file_typing_perf.sh
+           (same timing-based approach, same fix category, round 2's
+           precedent for this exact style of test)
+VERIFY    Timing-based, not vision-based (see qa/lib/qa-perf-helpers.sh)
+          — catches gross regressions/hangs, not a micro-benchmark of the
+          fix's own improvement (that's measured directly with isolated
+          Perl benchmarks; see bugs.md for the real before/after numbers:
+          ~22.7x faster for _expand_tabs() itself, ~1.24x faster for a
+          full Renderer->render() pass).
+          `qa/scripts/tier1/reg_213_expand_tabs_cache_large_file_typing_perf.sh`
+          opens a 3000-line file where every line is multiply
+          tab-indented (nesting depth cycling 1-4), jumps to the middle,
+          and asserts a typing burst renders within a generous budget — a
+          future regression that reintroduces full-viewport tab
+          re-expansion on every keystroke has room to show up here
+          without the test flaking on ordinary variance.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-214
+NAME:     StateStore's check_for_changes() debounce does not break
+          cross-instance preference sync
+PRIORITY: P2
+BUG:      P2 "StateStore::check_for_changes() runs a stat() per category
+          on every render (per keystroke), not ~1/sec as documented" —
+          see bugs.md Performance section (Scorecard audit round 3,
+          2026-08-30). StateStore.pm's own doc comment said "Call from
+          event loop (~1/sec)", but the only caller (Editor::render(),
+          which runs on essentially every keystroke) invoked it
+          completely unconditionally — the exact same problem
+          Editor::_check_external_file_changes() already fixed for
+          itself three lines above, in the same render() method.
+CROSS-REF: tests/state_store.t ("check_for_changes is debounced..." and
+           "...debounce field starts at 0..." subtests), QA-REG-106
+           (session isolation — same two-session pattern, opposite
+           property: this test relies on two sessions deliberately
+           SHARING one --state-dir)
+VERIFY    check_for_changes() now debounces itself
+          (CHECK_INTERVAL_SEC = 1.0), mirroring
+          _check_external_file_changes()'s existing guard. The risk this
+          guards against: a debounce implemented wrong could either (a)
+          never let a real cross-instance change through at all (a
+          functional regression, not just a perf one), or (b) fail to
+          debounce at all (silently reverting the fix, no perf benefit).
+          `qa/scripts/tier1/reg_214_statestore_debounce_cross_instance_sync.sh`
+          runs two real zepto instances sharing one --state-dir, changes
+          the Tab Width preference in session A, and confirms session B
+          picks up the change (via its own rendered tab-expansion column
+          shifting) within a generous 6s polling window. Verified
+          non-tautological via mutation testing: deliberately making the
+          debounce timestamp jump 999999 seconds into the future (so it
+          never re-opens after the first check) made this script fail
+          exactly as expected — cross-instance sync silently stopped
+          working — before the real fix was restored and the script
+          passed again.

@@ -278,37 +278,100 @@ sub _ellipsis {
     return substr($str, 0, $max_width - 1) . "\x{2026}";
 }
 
+# Bound on the tab-expansion memo cache (see _expand_tabs() below). Cleared
+# wholesale once exceeded, mirroring Highlighter.pm's _token_cache pattern
+# (which itself mirrors this file's own _table_cache "evict by clearing"
+# approach) rather than introducing a full LRU. 8000 keeps memory bounded
+# (each entry is a short string + a same-length arrayref of small integers)
+# while comfortably covering many screenfuls of scrolling/typing through a
+# large real-world file without thrashing.
+use constant MAX_EXPAND_TABS_CACHE_ENTRIES => 8000;
+
 # Expand tabs in a string to spaces, respecting tab stops
 # Also returns a mapping from original char positions to visual positions
 # Returns: ($expanded_string, \@char_to_visual)
 # @char_to_visual[i] = visual column where character i starts
 # $tab_width is optional; defaults to the current render pass's effective
 # width (see set_tab_width() above).
-sub _expand_tabs {
-    my ($text, $tab_width) = @_;
-    return ('', []) unless defined $text && length($text) > 0;
-    $tab_width = $_tab_width unless defined $tab_width && $tab_width >= 1;
+#
+# Memoized on (tab_width, text) -- Renderer.pm's main render loop
+# (~2478) and diff-view old-content render (~3353) both call this once per
+# visible line on EVERY render() (i.e. on essentially every keystroke), but
+# the vast majority of visible lines are unchanged from the previous frame.
+# Like Highlighter.pm's token cache (round 2's fix for the same class of
+# problem, one file over), this is a pure memoization keyed on every input
+# that can affect the output -- expansion is a pure function of exactly
+# ($text, $tab_width), verified by inspection (no other state read below).
+# That makes the cache self-invalidating with no separate bookkeeping:
+#   - Editing a line's own content changes $text -> new key -> natural miss.
+#   - Changing the tab-width preference changes $tab_width -> new key ->
+#     natural miss; stale entries for the old width are simply never hit
+#     again (no explicit "clear on tab-width change" needed, and no risk of
+#     serving a different width's expansion under the new one).
+# A cache hit only ever happens when both inputs are byte-identical to a
+# previous call, in which case the pure function is guaranteed to return
+# the same result. Returned arrayrefs are shared with the cache, not
+# cloned -- safe because every caller (Renderer.pm's own render methods,
+# plus WrapMap.pm via the public expand_tabs() wrapper) only reads
+# char_to_visual entries by index/length; nothing mutates it in place.
+{
+    my %_expand_tabs_cache;        # tab_width => { text => [expanded, \@char_to_visual] }
+    my $_expand_tabs_cache_count = 0;
 
-    my $expanded = '';
-    my @char_to_visual;
-    my $visual_col = 0;
+    sub _expand_tabs {
+        my ($text, $tab_width) = @_;
+        return ('', []) unless defined $text && length($text) > 0;
+        $tab_width = $_tab_width unless defined $tab_width && $tab_width >= 1;
 
-    for my $i (0 .. length($text) - 1) {
-        my $char = substr($text, $i, 1);
-        push @char_to_visual, $visual_col;
-
-        if ($char eq "\t") {
-            # Expand to next tab stop
-            my $spaces = $tab_width - ($visual_col % $tab_width);
-            $expanded .= ' ' x $spaces;
-            $visual_col += $spaces;
-        } else {
-            $expanded .= $char;
-            $visual_col += _char_display_width($char);
+        my $bucket = $_expand_tabs_cache{$tab_width} //= {};
+        if (my $cached = $bucket->{$text}) {
+            return @$cached;
         }
+
+        my $expanded = '';
+        my @char_to_visual;
+        my $visual_col = 0;
+
+        for my $i (0 .. length($text) - 1) {
+            my $char = substr($text, $i, 1);
+            push @char_to_visual, $visual_col;
+
+            if ($char eq "\t") {
+                # Expand to next tab stop
+                my $spaces = $tab_width - ($visual_col % $tab_width);
+                $expanded .= ' ' x $spaces;
+                $visual_col += $spaces;
+            } else {
+                $expanded .= $char;
+                $visual_col += _char_display_width($char);
+            }
+        }
+
+        # Bound the memo cache: clear wholesale once it grows past the cap,
+        # mirroring Highlighter.pm's _token_cache eviction.
+        if ($_expand_tabs_cache_count >= MAX_EXPAND_TABS_CACHE_ENTRIES) {
+            %_expand_tabs_cache = ();
+            $_expand_tabs_cache_count = 0;
+            $bucket = $_expand_tabs_cache{$tab_width} = {};
+        }
+        $bucket->{$text} = [$expanded, \@char_to_visual];
+        $_expand_tabs_cache_count++;
+
+        return ($expanded, \@char_to_visual);
     }
 
-    return ($expanded, \@char_to_visual);
+    # Test-only: drop all cached entries. Lets tests/renderer.t assert
+    # cache-population behavior from a known-empty starting state without
+    # depending on test execution order.
+    sub _reset_expand_tabs_cache_for_tests {
+        %_expand_tabs_cache = ();
+        $_expand_tabs_cache_count = 0;
+    }
+
+    # Test-only: current cache size, for asserting eviction behavior.
+    sub _expand_tabs_cache_size_for_tests {
+        return $_expand_tabs_cache_count;
+    }
 }
 
 # Convert a character position to visual column
@@ -377,6 +440,28 @@ sub visual_to_char_col {
     # Visual column is beyond end of line — return virtual position
     # (line length + overshoot in virtual whitespace)
     return $len + ($visual_col - $current_visual);
+}
+
+# =============================================================================
+# Public tab-expansion API
+# =============================================================================
+# Thin, no-underscore wrappers around _expand_tabs()/_char_to_visual_col()
+# for callers in *other* modules (e.g. WrapMap.pm's wrap-layout math, which
+# needs the same char<->visual column mapping this module already computes).
+# Underscore-prefixed subs are private-by-convention (docs/CODE_QUALITY.md
+# "Naming") and were previously reached directly via full package
+# qualification from WrapMap.pm — a layering violation with no compile-time
+# enforcement (see bugs.md "WrapMap.pm reaches into Renderer.pm's private
+# functions"). These wrappers are the supported entry point instead; they
+# just forward args, with no behavior change. Called the same way as the
+# private functions they wrap (plain function call, not a method call —
+# e.g. Zepto::Renderer::expand_tabs($text, $tab_width)).
+sub expand_tabs {
+    return _expand_tabs(@_);
+}
+
+sub char_to_visual_col {
+    return _char_to_visual_col(@_);
 }
 
 # Store and retrieve tab bar button positions for click handling

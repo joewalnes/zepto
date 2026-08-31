@@ -2,6 +2,8 @@
 
 ## 2026-08-30
 
+- Fixed tab-character rendering re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Rendering is unaffected (tab-indented lines and Tab Width changes still display exactly as before) — this is a speed-only fix, most noticeable when typing in large, heavily tab-indented files
+- Fixed a preference-sync check re-running far more often than intended (documented as roughly once a second, actually running on every single keystroke). Cross-instance preference sync (e.g. changing Tab Width in one open window and seeing it in another) still works exactly the same, just checked at its originally intended interval instead of continuously — this is a speed-only fix
 - Fixed syntax highlighting re-computing every visible line from scratch on every keystroke, scroll, or cursor move, instead of reusing work for lines that didn't actually change. Highlighting itself is unaffected (multi-line comments/strings still re-highlight correctly the moment an earlier line changes what they should look like) — this is a speed-only fix, most noticeable when typing in large files with syntax highlighting on
 
 - The file tree's status bar now shows a "⌃B back" hint for switching focus back to the editor (the tree stays open — this is different from Esc, which closes it) — previously there was no on-screen hint for this anywhere while the tree was focused. When there's enough room, the tree's status bar also shows the same close-tab/switch-tabs/quit hint the editor's tab bar shows

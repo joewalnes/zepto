@@ -270,6 +270,59 @@ subtest 'check_for_changes skips unchanged files' => sub {
 };
 
 # ============================================================================
+# check_for_changes() debounce (bugs.md "Scorecard audit round 3" P2:
+# "StateStore::check_for_changes() runs a stat() per category on every
+# render (per keystroke), not ~1/sec as documented"). Mirrors the
+# _theme_poll_last / _last_external_check idiom already established in
+# tests/editor.t: manipulate the internal timestamp field directly (0 =
+# guaranteed-elapsed, "now" = guaranteed-not-elapsed) rather than a real
+# sleep(), so this stays fast and deterministic.
+# ============================================================================
+subtest 'check_for_changes is debounced -- a second call within the interval does not re-stat' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+
+    $store->put('preferences', { theme => 'dark' });
+    $store->get('preferences');
+
+    my $called = 0;
+    $store->on_change('preferences', sub { $called++ });
+
+    # First call always runs (no prior check) -- primes _last_check.
+    $store->check_for_changes();
+    is($called, 0, 'First call: no external change yet, no callback');
+
+    # Simulate an external write, then call again immediately (well within
+    # CHECK_INTERVAL_SEC). Debounced -- the change must NOT be detected yet.
+    # Force the mtime forward with utime() rather than sleep()ing past
+    # filesystem mtime granularity -- a real sleep here would itself let
+    # the debounce window elapse, defeating the "immediate" re-call this
+    # subtest is testing.
+    open my $fh, '>', "$dir/preferences.json" or die $!;
+    print $fh '{"theme":"light"}';
+    close $fh;
+    my $future = time() + 5;
+    utime($future, $future, "$dir/preferences.json") or die "utime: $!";
+
+    $store->check_for_changes();
+    is($called, 0, 'Immediate re-call is debounced -- external change not yet picked up');
+
+    # Force the debounce window open (mirrors tests/editor.t's
+    # $editor->{_theme_poll_last} = 0 idiom for the analogous Editor.pm
+    # debounce) and confirm the SAME external change is now detected --
+    # proving this is a timing debounce, not a missed/dropped change.
+    $store->{_last_check} = 0;
+    $store->check_for_changes();
+    is($called, 1, 'Once the debounce interval has elapsed, the pending external change is detected');
+};
+
+subtest 'check_for_changes debounce field starts at 0 so the very first call always runs' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    my $store = Zepto::StateStore->new(base_dir => $dir);
+    is($store->{_last_check}, 0, '_last_check initialized to 0 -- never debounces the first real call');
+};
+
+# ============================================================================
 # Atomic write safety
 # ============================================================================
 subtest 'File contains valid JSON after put' => sub {
