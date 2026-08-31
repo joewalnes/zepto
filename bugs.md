@@ -1503,3 +1503,122 @@ The redesign above was built on a real observation (a zoomed *hangon screenshot*
 
 ### P2: Tab drag-to-reorder and mouse-wheel tab-cycling gate on the wrong row
 `Editor.pm::_handle_tab_drag` (`return unless $y == 2`) and the `scroll` action handler's tab-cycling branch (`if ($y == 2) { ... cmd_prev_tab/cmd_next_tab ... }`, comment: "Scroll on tab bar — cycle through tabs") both check row 2. But the tab bar is row 1 everywhere else in this file — `handle_mouse_event`'s `press` handler checks `$y == 1` for tab-bar clicks, and `_update_hover` checks `$y == 1` for tab hover — and row 2 is explicitly the *ruler* bar (`Renderer.pm`'s own layout comment: "Render tab bar (row 1 = index 0)" then "ruler bar goes to row 2"). Net effect: dragging a tab to reorder it only continues if the drag crosses down into the ruler row, not while dragging along the tab bar itself; scrolling the mouse wheel while hovering the actual tab bar does nothing, but scrolling while hovering the ruler row (one row below the tabs) cycles tabs — the opposite of both features' own comments. Not touched here — unrelated to the visual redesign and its own fix/test cycle; flagging with exact locations for whoever picks it up.
+
+---
+
+## Scorecard audit round 2 (2026-08-30) — full findings from a 5-agent parallel re-audit
+
+Findings from a fresh codebase scorecard (architecture, code quality, security, tests/docs, performance/duplication), run as a before/after comparison after the substantial fixing this session already did. Overall grade: **B-**. Every item below is newly found this round — not a re-report of anything already tracked/fixed elsewhere in this file. Each will be marked FIXED with a root-cause/fix/test writeup by whichever agent picks it up, following this file's normal convention.
+
+### Availability / hang risk (P1)
+
+### P1: `cmd_transform` (⌥T, "Transform via Shell") can deadlock the whole editor
+`Editor/Commands.pm:1058-1069` reads the child's stdout to EOF via `IPC::Open3` *before* reading stderr at all. If the user's shell command writes enough to stderr to fill the OS pipe buffer (~64KB) while also writing to stdout, the child blocks writing to a full stderr pipe nobody is reading yet, while the parent blocks reading stdout waiting for the child to close it — the classic `IPC::Open3` synchronous-read deadlock `perldoc IPC::Open3` itself warns about. Since raw mode disables `ISIG` (`Terminal.pm:143`), the user cannot Ctrl-C out — the whole process hangs. Fix: read both handles concurrently (`IO::Select`) or via a non-blocking loop instead of sequential blocking reads.
+
+### P1: Clipboard paste has no timeout — a hung paste command freezes the UI indefinitely
+`Terminal.pm:604-622` (`paste_from_clipboard`, called synchronously from `cmd_paste`, `Editor/Commands.pm:477-478`) forks/execs the platform paste command (`pbpaste`/`xclip -o`/`wl-paste`/`powershell.exe -command Get-Clipboard`) and does a blocking `<$fh>` slurp with **no `alarm()`/timeout**, unlike `FindEngine.pm`'s `MATCH_ALARM_SECS`-guarded regex paths or `FileSearchEngine.pm`'s equivalent guard. A hung paste command (e.g. `wl-paste` with no reachable Wayland compositor over SSH, or a wedged `powershell.exe` under WSL) freezes the whole editor with no recovery path. Fix: wrap the read in the same `alarm()`-guard pattern already established elsewhere in the codebase.
+
+### P1: "Tab Width" preference has no effect on rendering existing tab characters
+`Renderer.pm:97` hardcodes `use constant TAB_WIDTH => 4;`, and all three tab-expansion functions (`_expand_tabs` L261, `_char_to_visual_col` L286, `visual_to_char_col` L316) use this constant, never the user's preference. `Editor.pm:4889` dutifully threads `tab_width => $self->{prefs}->tab_width()` into `WrapMap->new()`, and `WrapMap.pm:36` stores it in `$self->{tab_width}` — but that field is **never read anywhere** in `WrapMap.pm` (`wrap_line()` calls `Zepto::Renderer::_expand_tabs($line_content)` with no width argument). Net effect: the "Tab Width" preference (`cmd_set_tab_width`, `Editor/Commands.pm:1366`) only affects indentation *insertion* — it has zero effect on how a file's existing literal `\t` characters visually render, wrap, or how the cursor lands on them. Setting Tab Width to 2 or 8 and opening a tab-indented file still renders/wraps at 4 columns regardless. Distinct from the already-tracked "vestigial preferences" list, which does not mention `tab_width`.
+
+### P1: `qa/scripts/tier1/sec_001_path_traversal.sh` cannot fail under any outcome
+Confirmed the most severe of the tautological-test findings below because it's tagged security: the script types a path (`/tmp/../tmp/zepto_qa_sec001_safe.txt`, which normalizes right back into `/tmp` — not a real traversal-outside-root attempt) and then has **no `qa_fail` branch anywhere** — both the success and the "possibly rejected" fallback branch call `qa_pass`. A real path-traversal regression here would go completely undetected by the one script whose whole job is to catch it. Contrast with `sec_009_binary_no_exec.sh`/`sec_011_fif_safe_exec.sh` in the same directory, which are correctly written with a real `qa_fail` on the actual injection signal. Fix: rewrite to attempt a real traversal outside a sandboxed root and assert it's rejected, with genuine pass/fail branches.
+
+### Security (P2)
+
+### P2: `ImageConverter.pm` uses a predictable temp filename with no exclusive creation — symlink-follow risk
+`ImageConverter.pm:76` builds `"$tmpdir/zepto-img-$$-$basename"` via string concatenation — a predictable path in the shared `/tmp`, with no `O_EXCL`/exclusive creation — then runs `sips`/`convert` against it (`ImageConverter.pm:71-93`). Unlike `Document.pm`'s save path (which correctly uses `File::Temp` for exactly this reason), `sips`/`convert` will follow a pre-existing symlink at that predictable path. On a shared multi-user host, another local user who can observe the PID (`ps`) and the image's basename could pre-plant a symlink pointing at a file the victim can write (e.g. `~/.bashrc`), causing the victim's own image-preview invocation to overwrite that target through the symlink. Fix: use `File::Temp::tempfile()` here, matching `Document.pm`'s existing pattern.
+
+### P2: AI API key briefly written world-readable before `chmod 0600` catches up
+`StateStore.pm:103-110` opens the secrets temp file with default umask permissions (often `0644`), writes the AI API key content, closes it, and only *then* `chmod 0600`s it before the atomic rename. A narrow but real window where the key is world-readable, contradicting `docs/SECURITY.md`'s parenthetical "secrets: ... (mode 0600)" claim, which implies secrets are always protected. Contrast with `Document.pm`'s `File::Temp` usage, which is 0600 from creation. Fix: `sysopen($fh, $tmp_path, O_WRONLY|O_CREAT|O_EXCL, 0600)` before writing, at least for the `secrets` category.
+
+### P2: `VCS/Git.pm::is_tracked()` has a git argument-injection edge case
+`VCS/Git.pm:103`: `_git('ls-files', '--error-unmatch', $rel_path)` has no `--` separator before `$rel_path`. A file whose relative path starts with `-` could be parsed by git as an option rather than a pathspec, causing `is_tracked()` to misreport (not itself exploitable for code execution/disclosure — the other `git show` calls at `Git.pm:121,150` are safe since they prefix with `HEAD:`/`:`, which can't start with `-`). Fix: add `'--'` before `$rel_path`.
+
+### P3: No regex-match timeout in the syntax-highlighting path (structural gap, no exploit found)
+`Highlighter.pm`/`Syntax/Base.pm` have zero `alarm`/timeout protection, unlike `FindEngine.pm`'s explicit 1s match-time alarms added earlier this session specifically to close a ReDoS gap. Highlighting runs ~53 hand-written grammar regexes against file content automatically on every open/edit — a larger, more automatic attack surface than Find's user-typed-pattern case. No exploitable pattern was found in this audit pass (nested-quantifier-shaped patterns in `Protobuf.pm` and elsewhere were empirically tested with no measurable slowdown), but there's no safety net if one exists in an untested grammar or is introduced later. Worth a documented decision either way — either add the same `alarm()` guard `FindEngine.pm` uses, or explicitly document why highlighting is considered lower-risk than Find.
+
+### Tautological / weak tests (P1/P2)
+
+### P2: 6 more tautological QA scripts follow the exact anti-pattern `qa/README.md` documents and forbids
+Each has a dual-`qa_pass`-on-one-condition fallback (or, for `reg_070`, computes both sides of a comparison and never actually compares them) that lets a real regression pass silently:
+- `qa/scripts/tier1/tab_017_cache_theme.sh` (QA-TAB-017) and `qa/scripts/tier1/reg_084_tab_theme_cache.sh` (QA-REG-084) — near-duplicate scripts, both `qa_pass` regardless of whether the screen actually changed after a theme toggle.
+- `qa/scripts/tier1/nav_010_scroll_no_move.sh` (QA-NAV-010) — named to verify Ctrl+Up/Down scrolls *without* moving the cursor, but `qa_pass`es even when the cursor moves (the exact failure mode it's named to catch).
+- `qa/scripts/tier1/reg_070_message_persist.sh` (QA-REG-070) — meant to verify status messages persist past 2s (a rule stated in `docs/UI_GUIDELINES.md:236`/`docs/CODE_QUALITY.md:179`); computes `saved_before`/`saved_after` but never compares them, unconditionally passing either way.
+- `qa/scripts/tier1/gut_002_click_minimap.sh` (QA-GUT-002) and `qa/scripts/tier1/prmt_006_pill_click.sh` (QA-PRMT-006) — both have an "click executed"/"test inconclusive" fallback pass on the else branch of the actual behavioral check.
+
+### P2: 2 tautological unit-test subtests in `tests/completion.t`
+`tests/completion.t:397-425` ("Controller accept with snippets") and `:430-455` ("Controller records accepted to RecentProvider") both gate their real assertions behind `if ($ctrl->is_active())` and fall through to `pass('no completion active (acceptable)')` otherwise. For a deterministic input, if the trigger logic silently breaks, both subtests report green without ever exercising the behavior they're named to test.
+
+### P2: `AIComplete.pm` — the one network-calling module — has zero test coverage
+446 lines, 24 subs (`new`, `trigger`, `poll`, `_fire_request`, `_build_context`, `_build_payload`, `_parse_streaming_buffer`, `_json_escape`, `_hash`, etc.), confirmed via `grep -rl AIComplete tests/*.t` returning nothing. Several of its subs (`_build_payload`, `_json_escape`) are pure/near-pure and would be trivial to unit test without a network dependency, yet aren't tested at all.
+
+### P3: `qa/scripts/tier3/` doesn't exist despite being referenced as real by docs and the Makefile
+`qa/README.md:130` and the `Makefile`'s `qa-full`/`qa-list` targets (`--tier 1,2,3`) describe a tier-3 QA layer as runnable — `perl qa/runner.pl --list --tier 3` returns "No test scripts found for tier(s) 3" (exit 0, silent no-op). `make qa-full` today runs identically to `make qa-visual` despite implying additional coverage. Fix: either populate `tier3/` with whatever it was meant to hold, or update the docs/Makefile to not imply a populated tier that doesn't exist.
+
+### P3: 6 unit tests use `sleep 1` to force mtime differences; one root-runner test fails outright instead of skipping
+`tests/document.t:409,431,453`, `tests/preferences.t:379`, `tests/state_store.t:95,173,231` — relies on filesystem mtime granularity being ≤1s (true almost everywhere, but a timing assumption nonetheless). Separately, `tests/editor.t:3140-3200` (file-tree preview permission-race test) correctly detects when its `chmod 0000` probe can't actually restrict access (e.g. running as root) via a sanity-check `ok()`, but does not `skip()` the downstream assertions in that case — under a root CI runner this test fails outright rather than skipping.
+
+### Documentation accuracy (P3)
+
+### P3: `DESIGN.md:301` — "Our build.pl is 50 lines of simple string manipulation" is stale
+Actual `build.pl` is **441 lines**, with a priority-ordered module dependency graph, per-file regex transforms, and embedded-doc logic.
+
+### P3: `docs/FIND_REPLACE_SPEC.md` has three stale/wrong claims
+- Line 64: "Default: ON" for regex search — actual default is OFF (`Editor.pm:131`, `FindEngine.pm:33`), and the project's own changelog documents this exact behavior change; the spec was never updated to match.
+- Line 17: "Replace Mode (Ctrl+R or Tab from Find)" — wrong; Ctrl+R toggles regex mode (`Editor.pm:2719-2720`). The `find_replace` command has no direct shortcut at all (`CommandRegistry.pm:333-342`).
+- Line 189: lists "Search history not implemented" as a known TODO — it's fully implemented (`Editor.pm:392-437`, persisted, 30-entry cap).
+
+### P3: `FEATURES.md:51`'s enumerated language list is missing 2 of the 52 languages its own header claims
+AsciiDoc and KDL are both real, registered, changelog-documented languages (`Highlighter.pm:170-171,322-325`) but missing from the comma-separated list on line 51.
+
+### P3: `docs/UI_GUIDELINES.md:193` directly contradicts a real, shipped, documented shortcut
+"Do not depend on... `Ctrl+Shift+letter`; terminals cannot distinguish these reliably" — contradicted by `find_in_files`'s real, working, end-user-documented `Ctrl+Shift+F` (`CommandRegistry.pm:417`, `docs/help/tutorial.md:62`, with two independent working key-dispatch paths for it). Either the guideline needs an explicit carve-out or it should be softened from an absolute rule to a strong default.
+
+### P3: `DESIGN.md` labels `Renderer` and `WrapMap` "Pure function" — both claims are false
+`Renderer.pm` holds three package-level mutable caches (`%_cdw_cache`, `%_file_exists_cache`, `%_image_dims_cache`, plus a tab-bar geometry cache) — implementation-level memoization, not a pure state-in/string-out function as documented. `WrapMap.pm:25` does `use Zepto::Renderer;` and calls `Zepto::Renderer::_expand_tabs()`/`_char_to_visual_col()` as fully-qualified calls into Renderer's underscore-prefixed (conventionally private) internals (`WrapMap.pm:268,288,445,483`) rather than a public API — a leaky abstraction that also isn't "pure" in the sense the doc implies. Fix: either correct the doc's claims, or (bigger scope) give Renderer a proper public API for the two helpers WrapMap needs and stop reaching into private internals.
+
+### Dead code / consistency (P3)
+
+### P3: 5 confirmed-dead subs
+- `Renderer::_render_pill` (`Renderer.pm:3844-3869`) — never called; the actually-used pill renderer is `_render_pill_list` (`Renderer.pm:3967`), an independent reimplementation. Bonus: `_render_pill`'s own nerd-font/non-nerd-font branches are byte-for-byte identical to each other.
+- `Terminal::set_cursor_color` (`Terminal.pm:201-207`) — never called; cursor color is actually set via a raw inline `print STDOUT "\x1b]12;..."` in `Editor/Commands.pm:1228` that bypasses this method entirely (arguably that call site should use this method instead of duplicating the OSC 12 sequence).
+- `Terminal::read_available` (`Terminal.pm:362-380`) — never called; `read_blocking` is what's actually used.
+- `Buffer::_debug_state` (`Buffer.pm:448-453`) — never called; a leftover debugging aid.
+- `Preferences::visual_width` (`Preferences.pm:299-315`) — only referenced from `tests/preferences.t`, never production code. **Also has a live landmine**: `$width += $tab_width - ($width % $tab_width)` divides by `$tab_width` with zero validation anywhere in `Preferences::set()` — a hand-edited `tab_width: 0` in the (intentionally hand-editable) `preferences.json` would hit an uncaught fatal `Illegal modulus zero` the moment anything calls this. Currently latent since nothing calls it, but worth fixing alongside deciding whether to keep or delete the dead sub.
+
+### P3: `do_find_next`/`do_find_prev` are 77 lines of dead production code, confusingly named next to the real commands
+`Editor/Commands.pm:724-800` duplicate `cmd_find_next`/`cmd_find_prev`'s job via a completely different, older implementation (`$doc->text()` + `index`/`rindex` scan) instead of the actually-wired path (`cmd_find_next/prev` → `enter_find_mode` → `_find_navigate`, `Editor.pm:3055-3078`, which uses FindEngine's precomputed match list). Called only from `tests/editor.t` (8 call sites) — unreachable in the shipped editor, kept alive/green by tests, and confusingly similar-named to the real commands.
+
+### P3: Kitty/fixterms CSI-u modified special keys (Ctrl+Enter, etc.) are silently and permanently dropped
+`InputParser.pm:337-342` only handles CSI-u codepoints in the printable range (32-126); codepoints for Enter (13)/Tab (9)/Backspace (8)/Escape (27) sent with a modifier via the Kitty keyboard protocol fall through to "Unknown CSI sequence" → `EVT_NONE`. An earlier fix (already tracked in this file) resolved the *stall* this used to cause for the *following* keystroke, but doesn't recover the dropped codepoint itself — on a Kitty-protocol terminal, shortcuts like `Ctrl+Enter` simply do nothing today, with no code path that could make them work. Fix: map these codepoints to their corresponding named key events instead of falling through.
+
+### P3: Minor inconsistency — one `eval` swallow is documented as intentional, a structurally identical one isn't
+`Preferences.pm:210`: `eval { $cb->($key,...) }; # Ignore callback errors` — documented. `StateStore.pm:171`: `eval { $cb->($data) };` — same shape, no comment. Also `Terminal.pm:172-176` (`disable_raw_mode`) swallows `setattr` failures with no `warn`, asymmetric with `enable_raw_mode` (`Terminal.pm:158-161`), which does `warn "Could not enable raw mode: $@"`. Small — worth normalizing (either add matching comments or matching warns) so the pattern reads as a deliberate convention rather than an accident.
+
+### P3: `⌃` (U+2303) control-key glyph hand-duplicated 13× in `Renderer.pm`
+Lines 3901, 3903, 3906, 3908, 4053, 4057, 4116, 4237, 4245, 5358, 5360, 5363, 5365 all inline `\x{2303}` as a raw literal instead of a named constant, directly contradicting `docs/CODE_QUALITY.md`'s own stated convention ("Define constants at module level for: Unicode characters... shortcut symbols"). `Zepto::Chars` has no entry for it either. Fix: one `CTRL_GLYPH => "\x{2303}"` constant, 13-site find/replace.
+
+### P3: Tab Width's `1`/`16` bounds are duplicated as bare literals
+`Editor/Commands.pm:1374,1380` — the `'1-16'` hint string and the `$input >= 1 && $input <= 16` validation both hardcode the same bounds 6 lines apart with no shared constant.
+
+### Performance (P2/P3)
+
+### P2: Syntax highlighter re-tokenizes every visible line on every render — no token cache
+`Highlighter.pm:539-565` (`tokenize_line`) only caches per-line *end state*, not the resulting token list. `Renderer.pm:2415` calls `tokenize_line()` once per visible line on every single render — and `render()` runs on essentially every keystroke/scroll/cursor-move. Moving the cursor one column re-tokenizes all ~40-80 visible lines from scratch, not just the changed line. Fix: add a `(content, start_state) → tokens` memo, mirroring the content-keyed caching pattern `WrapMap.pm`'s `_wrap_cache` already uses successfully.
+
+### P2/DRY: ~48 of 53 syntax grammars share a systemic O(n²) tokenizer pattern that's explicitly documented as the "correct" way to write one
+Nearly every grammar's `tokenize()` loop does `my $rest = substr($line, $pos); ... $pos++` — reallocating a copy of the remaining line on every iteration, which is O(line-length²) for a line advanced mostly one character at a time (long minified/generated/log lines). `Syntax/Base.pm:293-354` documents this exact pattern as the recommended template ("copy into your grammar") rather than offering shared helpers — so this is architecturally sanctioned duplication as much as a performance issue. The block-comment/line-comment/quoted-string/char-literal scanning blocks themselves are near-verbatim identical across `C.pm`, `Java.pm`, `Cpp.pm`, `CSharp.pm`, `JavaScript.pm`, `TypeScript.pm`, `Go.pm`, `Swift.pm`, `Kotlin.pm`, `Scala.pm`, `ObjectiveC.pm`, `Groovy.pm`, `PHP.pm`, and others — the single largest duplication surface in the codebase. Fix (larger scope, cross-cutting): introduce shared `scan_block_comment()`/`scan_quoted_string()`-style helpers in `Base.pm` and migrate grammars onto them; lower-risk partial fix is just the token-cache above, which reduces how often the O(n²) cost is even paid.
+
+### P3: Minimap VCS-status aggregation scans the whole document on every keystroke
+`Minimap.pm:141-150` (`_cache_key`) includes `content_version()`, so the entire minimap recomputes on every edit, not just when VCS/diff state changes. `_aggregate_vcs_status()` (`Minimap.pm:310-344`) scans every document line in each row's span with no subsampling (unlike the braille density path, which is capped at `MAX_SAMPLE_LINES => 4`). For a 100k-line file with ~50 minimap rows, that's up to ~100k-200k hash-lookup calls per keystroke — individually cheap but scales with total document size, not viewport size.
+
+### P3: `LineMap::_rebuild()` does a full O(document) rebuild per keystroke in a narrow scenario
+`LineMap.pm:90-206` is correctly gated to only rebuild when hunks or line count change (`Editor.pm:4824-4832`), but line count changes on every Enter/newline-delete — so editing a large file while in an expanded-diff-hunk word-wrap view triggers a full rebuild per newline keystroke. Narrow trigger condition (diff view + expanded hunk specifically), low overall severity.
+
+### P3: `Diff.pm` hunk-pairing is O(inserts × deletes) per hunk
+`Diff.pm:328-345` — pairing inserted/deleted lines within a "modified" hunk is a nested loop bounded by hunk size, not file size. Diff computation is already debounced (0.3-1s); only a concern for a single hunk spanning hundreds of consecutive modified lines (e.g. a full-file reformat).
+
+### Architecture (tracked separately, cross-referenced here)
+
+The Editor god-object (`Editor.pm`/`Editor/Commands.pm`/`Editor/Palette.pm`, all three literally re-declaring `package Zepto::Editor;` so there's no real encapsulation between them — 7,816 lines/222 methods, confirmed +29%/+36% growth with zero extraction since the last self-audit) is already tracked as "P3: [Architecture] Editor is a 6000-line god object" elsewhere in this file. Not re-logged as a new entry here — see that existing entry, and the separate strategy discussion in this session's conversation for the incremental-extraction approach being considered.
