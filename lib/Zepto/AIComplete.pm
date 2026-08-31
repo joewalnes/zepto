@@ -20,6 +20,7 @@ use warnings;
 use IO::Select;
 use POSIX qw(:sys_wait_h);
 use File::Spec;
+use File::Temp ();
 
 # Context and output limits
 use constant {
@@ -309,16 +310,72 @@ sub _child_http_request {
     open(STDERR, '>', '/dev/null');
     close($write_fh);
 
-    # Use curl with streaming — outputs SSE data lines directly
-    exec('curl', '-sS', '-N',
-        '-X', 'POST',
-        '-H', 'Content-Type: application/json',
-        '-H', "Authorization: Bearer $api_key",
-        '-d', $payload,
-        '--max-time', REQUEST_TIMEOUT,
-        $url,
-    );
-    # exec failed
+    # Write the Authorization header to a short-lived, mode-0600 temp file
+    # instead of putting the API key in curl's argv. Process argv (unlike
+    # file contents) is visible to any local user via `ps`/`/proc/<pid>/cmdline`
+    # for the whole lifetime of the curl process, and this fires on every AI
+    # completion request while the user types — see bugs.md "AI API key
+    # passed as a curl command-line argument". Uses File::Temp the same way
+    # Document.pm's atomic-save path does: unpredictable filename + exclusive
+    # (O_EXCL) creation at open time, so another local user can't symlink-race
+    # or pre-create the path before we write the key into it.
+    my ($cfg_fh, $cfg_path) = eval {
+        File::Temp::tempfile(
+            '.zepto-ai-curl-XXXXXXXX',
+            DIR    => File::Spec->tmpdir(),
+            UNLINK => 0,
+        );
+    };
+    return unless defined $cfg_path;
+    chmod 0600, $cfg_path;  # belt-and-suspenders on top of File::Temp's default
+
+    # curl config-file format: `header = "..."` — quotes/backslashes inside
+    # the value must be backslash-escaped.
+    my $header_val = "Authorization: Bearer $api_key";
+    $header_val =~ s/([\\"])/\\$1/g;
+    print {$cfg_fh} qq(header = "$header_val"\n);
+    close($cfg_fh);
+
+    # Fork+exec curl ourselves (rather than exec()-replacing this process, or
+    # using system()) so we retain curl's pid: if the editor cancels this
+    # request mid-flight (_kill_child sends TERM to us — routine, happens on
+    # basically every keystroke while a request is in flight), we can
+    # propagate the signal to curl AND unlink the header file before exiting,
+    # rather than leaving either an orphaned curl process or a leftover
+    # secret-bearing temp file behind.
+    my $curl_pid = fork();
+    if (!defined $curl_pid) {
+        unlink($cfg_path);
+        return;
+    }
+
+    if ($curl_pid == 0) {
+        # Grandchild: becomes curl. -K/--config supplies the Authorization
+        # header from the temp file, keeping it out of argv entirely.
+        # Wrapped in unless() rather than a bare exec()-then-statement so
+        # perl's "Statement unlikely to be reached" compile-time warning
+        # (which fires for any statement textually following a bare exec()
+        # call, even one only reachable on exec failure) doesn't fire on
+        # every load of this module.
+        unless (exec('curl', '-sS', '-N',
+            '-X', 'POST',
+            '-K', $cfg_path,
+            '-H', 'Content-Type: application/json',
+            '-d', $payload,
+            '--max-time', REQUEST_TIMEOUT,
+            $url,
+        )) {
+            POSIX::_exit(127);  # exec failed
+        }
+    }
+
+    local $SIG{TERM} = sub {
+        kill('TERM', $curl_pid);
+        unlink($cfg_path);
+        POSIX::_exit(1);
+    };
+    waitpid($curl_pid, 0);
+    unlink($cfg_path);
 }
 
 # =============================================================================
