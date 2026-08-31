@@ -520,21 +520,25 @@ subtest 'Controller accept' => sub {
     my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
+    # "hel" (3 chars, past the 2-char minimum) prefix-matches "hello_world"
+    # which CrossBufferWordProvider finds by scanning the rest of the
+    # buffer -- the same deterministic setup already confirmed in the
+    # "Controller records accepted to RecentProvider" subtest above.
+    # CrossBufferWordProvider is the only provider registered here, so
+    # this deterministically triggers. Verified via direct invocation and
+    # 3x `prove` runs before removing the old is_active()-gated fallback.
     my $doc = make_doc("function hello_world() {}\nhel\n");
     my $view = Zepto::View->new(document => $doc);
     $view->set_cursor(1, 3);
 
     $ctrl->trigger($doc, $view, undef);
+    ok($ctrl->is_active(), 'completion triggers for "hel" against buffer word hello_world');
 
-    if ($ctrl->is_active()) {
-        my $suffix = $ctrl->accept();
-        ok(length($suffix) > 0, 'accept returns non-empty suffix');
-        # suffix should be "lo_world" (the part after "hel")
-        like($suffix, qr/lo_world/, 'suffix completes the word');
-        ok(!$ctrl->is_active(), 'idle after accept');
-    } else {
-        pass('no completion active (acceptable in minimal test)');
-    }
+    my $suffix = $ctrl->accept();
+    ok(length($suffix) > 0, 'accept returns non-empty suffix');
+    # suffix should be "lo_world" (the part after "hel")
+    like($suffix, qr/lo_world/, 'suffix completes the word');
+    ok(!$ctrl->is_active(), 'idle after accept');
 };
 
 # =============================================================================
@@ -545,32 +549,37 @@ subtest 'Menu navigation' => sub {
     my $bw = Zepto::Completion::CrossBufferWordProvider->new();
     $ctrl->add_provider($bw);
 
+    # "fo" (2 chars, meets the minimum) prefix-matches three buffer words
+    # -- foo/foobar/foobaz -- which CrossBufferWordProvider finds by
+    # scanning the rest of the buffer. CrossBufferWordProvider is the
+    # only provider registered here, and 3 distinct matches guarantee a
+    # non-trivial menu (needed for menu_down/menu_up to have somewhere to
+    # navigate), so this deterministically triggers. Verified via direct
+    # invocation and 3x `prove` runs before removing the old
+    # is_active()-gated fallback.
     my $doc = make_doc("function foo() {}\nfunction foobar() {}\nfunction foobaz() {}\nfo\n");
     my $view = Zepto::View->new(document => $doc);
     $view->set_cursor(3, 2);
 
     $ctrl->trigger($doc, $view, undef);
+    ok($ctrl->is_active(), 'completion triggers for "fo" against buffer words foo/foobar/foobaz');
 
-    if ($ctrl->is_active()) {
-        # Open menu
-        $ctrl->open_menu();
-        ok($ctrl->is_menu(), 'menu is open');
+    # Open menu
+    $ctrl->open_menu();
+    ok($ctrl->is_menu(), 'menu is open');
 
-        # Navigate down
-        my $initial_idx = $ctrl->{menu_index};
-        $ctrl->menu_down();
-        is($ctrl->{menu_index}, $initial_idx + 1, 'menu_down advances index');
+    # Navigate down
+    my $initial_idx = $ctrl->{menu_index};
+    $ctrl->menu_down();
+    is($ctrl->{menu_index}, $initial_idx + 1, 'menu_down advances index');
 
-        # Navigate up
-        $ctrl->menu_up();
-        is($ctrl->{menu_index}, $initial_idx, 'menu_up goes back');
+    # Navigate up
+    $ctrl->menu_up();
+    is($ctrl->{menu_index}, $initial_idx, 'menu_up goes back');
 
-        # Accept from menu
-        my $suffix = $ctrl->accept();
-        ok(length($suffix) > 0, 'accept from menu returns suffix');
-    } else {
-        pass('no completion active (acceptable in minimal test)');
-    }
+    # Accept from menu
+    my $suffix = $ctrl->accept();
+    ok(length($suffix) > 0, 'accept from menu returns suffix');
 };
 
 # =============================================================================
