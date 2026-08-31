@@ -2263,15 +2263,20 @@ subtest 'Tab bar cache invalidates on theme change' => sub {
 # ============================================================================
 # Tab bar "tabby" redesign (2026-08-30) — see bugs.md and
 # qa/21_tabs.txt. User feedback: tabs "really don't look great" — inactive
-# tabs had no visible background fill (only underlined plain text) and the
-# old ◢/◣ diagonal-corner glyphs were a 1-cell wedge, confirmed via a
-# zoomed screenshot to be nearly invisible at normal viewing size. Fix:
-# every tab (active/inactive/hover) is now a solid filled pill capped on
-# both edges with a full block glyph (█, U+2588), and tab_inactive_bg/
-# tab_hover_bg were both given meaningfully higher contrast against
-# tab_bar_bg in both themes (see Theme.pm "Tabby redesign" comments).
+# tabs had no visible background fill (only underlined plain text), and a
+# zoomed *hangon screenshot* crop of the ◢/◣ diagonal-corner glyphs showed
+# them as a nearly-invisible 1-cell wedge. A same-day redesign temporarily
+# replaced the triangles with a full-block (█, U+2588) cap glyph — but the
+# "nearly invisible" premise turned out to be a hangon rendering bug (it
+# drew geometric-shape characters via ordinary font glyphs instead of
+# procedurally, unlike a real terminal), confirmed and fixed in hangon
+# itself (see hangon's CHANGELOG). Reverted the cap glyph back to ◢/◣
+# accordingly. The independently-real fix — tab_inactive_bg/tab_hover_bg
+# given meaningfully higher contrast against tab_bar_bg in both themes —
+# is unrelated to cap shape and is kept (see Theme.pm "Tabby redesign"
+# comments, and the subtest right after this one).
 # ============================================================================
-subtest 'Tab caps use the solid full-block glyph, not the old diagonal triangle notches' => sub {
+subtest 'Tab caps use the ◢/◣ diagonal triangle glyphs' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $ui = {
         tabs => [
@@ -2284,11 +2289,11 @@ subtest 'Tab caps use the solid full-block glyph, not the old diagonal triangle 
 
     my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
 
-    unlike($bar, qr/\x{25e2}/, 'Old ◢ lower-right-triangle glyph is gone');
-    unlike($bar, qr/\x{25e3}/, 'Old ◣ lower-left-triangle glyph is gone');
-    # 2 tabs x 2 caps each = 4 full-block glyphs minimum
-    my $cap_count = () = $bar =~ /\x{2588}/g;
-    cmp_ok($cap_count, '>=', 4, 'Full-block (█) cap glyph appears for every tab edge');
+    # 2 tabs x 1 left cap each = 2 minimum; same for right cap
+    my $left_count  = () = $bar =~ /\x{25e2}/g;
+    my $right_count = () = $bar =~ /\x{25e3}/g;
+    cmp_ok($left_count,  '>=', 2, '◢ left-cap glyph appears for every tab');
+    cmp_ok($right_count, '>=', 2, '◣ right-cap glyph appears for every tab');
 };
 
 subtest 'Inactive tab background is visually distinct from the bar background' => sub {

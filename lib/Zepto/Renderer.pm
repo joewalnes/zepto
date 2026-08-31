@@ -909,26 +909,30 @@ sub _render_tab_bar {
 
     my $tab_cols = $cols - $tree_width;  # available width for tabs
 
-    # Tab cap shape (redesigned 2026-08-30, see bugs.md "make tabs more
-    # tabby"). The old ◢/◣ diagonal-corner glyphs (U+25E2/25E3) each filled
-    # only a thin wedge of one cell — confirmed via a zoomed screenshot to
-    # be nearly invisible at normal viewing size, and inactive tabs had no
-    # background fill to compensate. An interim design tried a half-filled
-    # taper cap (▐/▌) for inactive/hover tabs so the active tab's crisp
-    # full-block edge would stand out by comparison — but a side-by-side
-    # screenshot check showed the half-fill was actively counterproductive:
-    # it puts the SURROUNDING bar color into half of the one cell doing the
-    # most work to signal "this is a tab boundary", diluting exactly the
-    # contrast this redesign exists to fix. Settled on a single glyph for
-    # every state: FULL BLOCK (█, U+2588 — the same Unicode block already
-    # used for the VCS gutter's expanded-hunk indicator elsewhere in this
-    # file, so no new font dependency). Every cell of every tab, corners
-    # included, now carries the tab's real fill color at full strength;
-    # active/inactive/hover are told apart by fill-color contrast (see
-    # Theme.pm's tab_active_bg/tab_inactive_bg/tab_hover_bg — the inactive
-    # bump was the primary fix here) and by the underline-baseline break
-    # under the active tab (see $UL_ON/$UL_OFF below), not by cap shape.
-    my $TAB_CAP = "\x{2588}";  # █ full block, both edges, every tab state
+    # Tab cap shape. Originally ◢/◣ (U+25E2/25E3, geometric quadrant
+    # triangles). A same-day redesign (2026-08-30, "make tabs more tabby")
+    # briefly replaced these with a full-block glyph (█, U+2588) after a
+    # zoomed *hangon screenshot* crop showed the triangles rendering as a
+    # nearly-invisible thin wedge in one corner of the cell. That turned out
+    # to be a hangon rendering bug, not a real terminal limitation: hangon's
+    # screenshot renderer drew geometric-shape characters via ordinary font
+    # glyph outlines (a small centered dingbat) instead of procedurally,
+    # the way real terminal emulators render box-drawing/geometric-shape
+    # characters — confirmed by the user's own real terminal, where these
+    # triangles always rendered full-height. hangon was fixed to draw them
+    # as cell-filling vector shapes (see hangon's CHANGELOG, "Fix three
+    # screenshot PNG rendering bugs"), and re-verified against the fix:
+    # triangles now correctly fill the cell in screenshots too. Reverted to
+    # ◢/◣ accordingly. The one genuinely real, independent problem the
+    # redesign also fixed — inactive/hover tabs having NO background fill
+    # at all (~1.17-1.19:1 contrast against the bar) — is kept: see
+    # Theme.pm's tab_inactive_bg/tab_hover_bg bump, unrelated to cap shape.
+    my $TAB_CAP_LEFT  = "\x{25e2}";  # ◢ — left edge, both cap shape and
+                                     # position: fg fills the lower-right
+                                     # triangle of the cell, positioned as
+                                     # the tab's left/opening edge.
+    my $TAB_CAP_RIGHT = "\x{25e3}";  # ◣ — right/closing edge, mirror of
+                                     # the above.
     my $close_char = "\x{00d7}";  # × (multiplication sign, reliable single-width)
     my $modified_char = "\x{25cf}";  # ● (filled circle)
 
@@ -1040,9 +1044,9 @@ sub _render_tab_bar {
                     :              $theme->color('tab_inactive_edge');
 
         # Left cap — underlined (part of bar territory). $edge_fg equals
-        # this tab's own bg color (see Theme.pm), and TAB_CAP is a full
-        # block, so the cell renders as a solid extension of the tab's fill.
-        push @_out, $bar_bg . $edge_fg . $TAB_CAP;
+        # this tab's own bg color (see Theme.pm), so the triangle's filled
+        # corner reads as a solid extension of the tab's own fill.
+        push @_out, $bar_bg . $edge_fg . $TAB_CAP_LEFT;
         $x++;
 
         # Tab interior
@@ -1106,7 +1110,7 @@ sub _render_tab_bar {
         if ($is_active) {
             push @_out, $UL_ON;
         }
-        push @_out, $bar_bg . $edge_fg . $TAB_CAP;
+        push @_out, $bar_bg . $edge_fg . $TAB_CAP_RIGHT;
         $x++;
 
         push @buttons, {
@@ -1178,7 +1182,8 @@ sub _render_tab_bar {
 
 # Calculate the display width of a tab pill (not counting inter-tab gap)
 # Width = left_cap(1) + " name" + [" ●"(2)] + [" ⌥N"(3)] + " ×"(2) + right_cap(1) + gap(1)
-# (cap glyph — TAB_CAP, a full block — is always exactly 1 column)
+# (cap glyphs — TAB_CAP_LEFT/RIGHT, geometric triangles — are always
+# exactly 1 column each, same as the earlier full-block design)
 sub _calc_tab_pill_width {
     my ($name, $is_dirty, $tab_index) = @_;
     my $w = 1 + 1 + length($name) + 2 + 1 + 1;  # left_cap + space + name + " ×" + right_cap + gap
