@@ -2,7 +2,8 @@
 # QA-REG-182: Tab bar overflow/scroll and the × close button's mouse
 # hit-testing still work correctly after the "tabby" redesign (bugs.md
 # "Tab bar visual redesign (2026-08-30)") — the redesign changed the cap
-# glyph (◢/◣ -> █) but NOT the per-tab width formula, so button columns
+# glyph (originally ◢/◣, briefly █, reverted back to ◢/◣) but NOT the
+# per-tab width formula, so button columns
 # should be unaffected; this is the regression guard that proves it,
 # specifically for the overflow/scroll case where multiple tabs share the
 # row and a wrong column would close the wrong tab.

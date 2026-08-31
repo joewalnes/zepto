@@ -11,7 +11,7 @@ qa_start "$file1" "$file2" "$file3"
 qa_assert_screen "b.txt" "tab B visible"
 
 # Tab bar layout (with nerd font off, rounded caps):
-# " █ a.txt ⌥1 ×█ █ b.txt ⌥2 ×█ █ c.txt ⌥3 ×█"
+# " ◢ a.txt ⌥1 ×◣ ◢ b.txt ⌥2 ×◣ ◢ c.txt ⌥3 ×◣"
 # Find the × for tab B by looking for it in the screen
 qa_screen
 # Get the tab bar line (first line)
@@ -20,7 +20,7 @@ tab_line=$(echo "$QA_SCREEN" | head -1)
 # Find the position of the × for tab B
 # The × char for tab B comes after "⌥2 " — find its byte position
 # Use a more reliable approach: click on tab B area to switch, then ctrl-w
-# Tab B body is between the two █ markers, roughly col 19-33
+# Tab B body is between the two ◢/◣ markers, roughly col 19-33
 hangon mouse-click "$QA_SESSION" --x 24 --y 1
 sleep 0.3
 qa_assert_screen "content B" "clicked tab B to switch"

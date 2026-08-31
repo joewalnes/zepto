@@ -27,16 +27,16 @@ qa_keys "ctrl-q"
 sleep 0.4
 
 # Relaunch with NO arguments from the same directory. Assertions use the
-# "█ name ⌥N" tab-bar decoration specifically — the file tree sidebar
+# "◢ name ⌥N" tab-bar decoration specifically — the file tree sidebar
 # (visible by default) also lists every file in the directory on its own
 # row, and since it renders side-by-side with the tab bar in the flat
 # terminal capture, a bare "a\.txt" match would false-pass even if the
 # tab bar were empty.
 qa_restart
-qa_wait_screen "█ b\.txt ⌥2" 5
+qa_wait_screen "◢ b\.txt ⌥2" 5
 
-qa_assert_screen "█ a\.txt ⌥1" "a.txt tab restored"
-qa_assert_screen "█ b\.txt ⌥2" "b.txt tab restored"
+qa_assert_screen "◢ a\.txt ⌥1" "a.txt tab restored"
+qa_assert_screen "◢ b\.txt ⌥2" "b.txt tab restored"
 qa_assert_cursor_at "2:2" "active tab (b.txt) cursor position restored"
 
 qa_keys "alt-," 0.3

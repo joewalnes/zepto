@@ -21,13 +21,13 @@ sleep 0.4
 # Delete b.txt from disk before the next launch. Since it's gone from
 # disk, the file tree won't list it either, so a bare "b\.txt" check is
 # unambiguous here (unlike sessions where the deleted file is still on
-# disk — see sess_003/004, which use the "█ name ⌥N" tab-bar marker).
+# disk — see sess_003/004, which use the "◢ name ⌥N" tab-bar marker).
 rm -f "$dir/b.txt"
 
 qa_restart
-qa_wait_screen "█ a\.txt ⌥1" 5
+qa_wait_screen "◢ a\.txt ⌥1" 5
 
-qa_assert_screen "█ a\.txt ⌥1" "surviving file (a.txt) restored as the only tab"
+qa_assert_screen "◢ a\.txt ⌥1" "surviving file (a.txt) restored as the only tab"
 qa_assert_not_screen "b\.txt" "deleted file (b.txt) is skipped entirely — gone from tree and tabs"
 qa_assert_screen "survivor" "a.txt content loaded correctly"
 
