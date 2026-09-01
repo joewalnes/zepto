@@ -3108,8 +3108,8 @@ sub _mock_find_state {
         regex          => 0,
         case           => 0,
         replace_value  => $opts{replace_value} // 'foo',
-        replace_all    => 1,
-        replace_active => 1,
+        replace_all    => $opts{replace_all} // 1,
+        replace_active => $opts{replace_active} // 1,
         focus          => 'replace',
         current        => ($opts{match_count} // 3) - 1,
         match_count    => $opts{match_count} // 3,
@@ -3320,6 +3320,90 @@ subtest 'Ghost text: mid-line cursor after a tab accounts for tab expansion (bug
     my $visible = strip_escapes($row3);
     my $efg_count = () = ($visible =~ /efg/g);
     is($efg_count, 1, 'real trailing content "efg" appears exactly once (not duplicated)');
+};
+
+# ============================================================================
+# bugs.md P2 "No on-screen indicator for Replace-One vs. Replace-All mode,
+# and no palette command to switch between them" -- the find bar's
+# "Replace:" label now doubles as a clickable replace-mode indicator,
+# reading "Rep All:" or "Rep One:" (colored like the regex/case toggle
+# pills' active/inactive states) depending on the current mode. It is
+# exactly as wide as the original "Replace:" label (8 chars either way),
+# which was a deliberate choice: a separate pill was tried first and broke
+# the P0 overflow-guard tests below, because this find bar already shrinks
+# its input fields to their floor at common widths (76-90 cols) with zero
+# spare margin -- see the "never exceeds $cols" subtest for the regression
+# this guards against. See tests/find.t for Editor.pm-side
+# toggle/click/palette-command coverage.
+# ============================================================================
+subtest 'Find bar replace-mode label reflects replace_all state' => sub {
+    my $theme = Zepto::Theme->new('dark');
+    my $cols = 80;
+
+    my $find_on = _mock_find_state(value => 'foo', replace_value => 'bar', replace_all => 1);
+    my $visible_on = strip_escapes(Zepto::Renderer->_render_find_bar($theme, $find_on, $cols));
+    ok(index($visible_on, 'Rep All:') >= 0, 'Replace All mode: label reads "Rep All:"');
+    ok(index($visible_on, 'Rep One:') < 0, 'Replace All mode: label does not also read "Rep One:"');
+
+    my $find_off = _mock_find_state(value => 'foo', replace_value => 'bar', replace_all => 0);
+    my $visible_off = strip_escapes(Zepto::Renderer->_render_find_bar($theme, $find_off, $cols));
+    ok(index($visible_off, 'Rep One:') >= 0, 'Replace One mode: label reads "Rep One:"');
+    ok(index($visible_off, 'Rep All:') < 0, 'Replace One mode: label does not also read "Rep All:"');
+
+    # Plain "Replace:" (the old, mode-less label) must be gone -- this is
+    # the actual bug fix, not just an additive change.
+    ok(index($visible_on, 'Replace:') < 0, 'Replace All mode: old unlabeled "Replace:" text is gone');
+    ok(index($visible_off, 'Replace:') < 0, 'Replace One mode: old unlabeled "Replace:" text is gone');
+};
+
+subtest 'Find bar has no replace-mode label when the replace field is not shown' => sub {
+    my $theme = Zepto::Theme->new('dark');
+    my $find = _mock_find_state(value => 'foo', replace_active => 0, replace_all => 1);
+    my $visible = strip_escapes(Zepto::Renderer->_render_find_bar($theme, $find, 80));
+    ok(index($visible, 'Rep All:') < 0,
+       'Find-only mode (no replace field): no "Rep All:" label leaks in');
+    ok(index($visible, 'Rep One:') < 0,
+       'Find-only mode (no replace field): no "Rep One:" label leaks in either');
+};
+
+subtest 'Replace-mode label does not change the find bar\'s total width between All and One' => sub {
+    # "Rep All:" and "Rep One:" are both exactly 8 characters -- same as
+    # the original "Replace:" -- so the overflow-guard tests below don't
+    # need to enumerate both states separately. Verified here against the
+    # real renderer output (not just the literal strings) so it fails if
+    # that assumption ever breaks.
+    my $theme = Zepto::Theme->new('dark');
+    my $cols = 80;
+    my $find_all = _mock_find_state(value => 'foo', replace_value => 'bar', replace_all => 1);
+    my $find_one = _mock_find_state(value => 'foo', replace_value => 'bar', replace_all => 0);
+    my $w_all = length(strip_escapes(Zepto::Renderer->_render_find_bar($theme, $find_all, $cols)));
+    my $w_one = length(strip_escapes(Zepto::Renderer->_render_find_bar($theme, $find_one, $cols)));
+    is($w_all, $w_one, 'Rendered find bar width is identical regardless of replace mode');
+};
+
+subtest 'Find bar with replace-mode label never exceeds $cols (P0 overflow-guard tests still hold)' => sub {
+    # Same combinations the P0 fix's own overflow-guard subtests cover
+    # (see "Find bar with no matches / longer match counts never exceeds
+    # $cols" above), plus both replace_all states -- this is the
+    # regression check for the P2 fix's own first (reverted) attempt,
+    # which broke these exact cases at cols=76 (every match count) and
+    # cols=80 (match_count >= 250) by adding a separate fixed-width pill.
+    my $theme = Zepto::Theme->new('dark');
+    for my $cols (76, 80, 90, 100, 120) {
+        for my $replace_all (0, 1) {
+            for my $match_count (0, 1, 3, 15, 99, 250, 9999) {
+                my $find = _mock_find_state(
+                    value => 'foo', replace_value => 'XYZ',
+                    match_count => $match_count, replace_all => $replace_all);
+                my $out = Zepto::Renderer->_render_find_bar($theme, $find, $cols);
+                my $visible = strip_escapes($out);
+                ok(length($visible) <= $cols,
+                   "cols=$cols replace_all=$replace_all match_count=$match_count: "
+                   . "find bar visible width (" . length($visible)
+                   . ") does not exceed terminal width");
+            }
+        }
+    }
 };
 
 done_testing();

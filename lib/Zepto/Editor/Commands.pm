@@ -679,6 +679,18 @@ sub cmd_find_replace {
     $self->enter_find_mode(replace => 1);
 }
 
+# bugs.md P2 "No on-screen indicator for Replace-One vs. Replace-All
+# mode, and no palette command to switch between them" -- opens Find and
+# Replace if it isn't already open, then toggles the mode and confirms
+# via the status message (the find bar's "Rep All:"/"Rep One:" label
+# also updates).
+sub cmd_toggle_replace_all_mode {
+    my ($self) = @_;
+    $self->enter_find_mode(replace => 1) unless $self->{find_replace_active};
+    $self->_toggle_replace_all_mode();
+    $self->show_message($self->{find_replace_all} ? 'Replace All mode' : 'Replace One mode');
+}
+
 sub cmd_find_next {
     my ($self) = @_;
 

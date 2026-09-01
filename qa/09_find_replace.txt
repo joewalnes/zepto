@@ -494,3 +494,42 @@ VERIFY
     document" contract.
   - A real Replace-All (Enter, not just preview) still works correctly
     and is fully undoable back to the original content.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-029
+NAME:     Find bar shows which replace mode is active (Rep All: / Rep One:)
+PRIORITY: P2
+FEATURE:  replace mode indicator
+RELATED:  QA-REG-217
+SCRIPT:   tier1/reg_217_find_replace_mode_indicator.sh
+
+STEPS
+  1. ⌃F, type a search term, Tab to replace field.
+  2. Observe the label to the left of the replace field.
+  3. Press Shift+Tab once (toggles Replace All -> Replace One).
+  4. Observe the label again.
+  5. Open the command palette (⌃Space), search "Replace All Mode", run it.
+  6. Observe the label a third time.
+  7. Click directly on the label (mouse).
+
+VERIFY
+  - The label reads "Rep All:" when Replace All mode is active (the
+    default), styled like the regex/case toggle pills' active (colored)
+    state.
+  - After Shift+Tab, the label reads "Rep One:" instead, styled like the
+    toggle pills' inactive (dim) state — this is the actual fix: before
+    it, there was no on-screen difference at all between the two modes,
+    and no way to discover the mode without reading source code.
+  - The command palette's "Replace All Mode" entry shows an "[on]"/"[off]"
+    state matching the current mode, and running it toggles the label the
+    same way Shift+Tab does (opening Find and Replace first if it wasn't
+    already active).
+  - Clicking directly on the label toggles the mode the same way, without
+    needing Shift+Tab's key combo at all.
+  - At no terminal width does adding this label cause the find bar to
+    overflow — verified at both the common 80-column default and a
+    narrower 76-column terminal (this find bar has a very tight width
+    budget; see bugs.md's FIXED writeup for why a separate pill widget
+    was tried first and reverted after it broke the P0 overflow-guard
+    tests at these exact widths).

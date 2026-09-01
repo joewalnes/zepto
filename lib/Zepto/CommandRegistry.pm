@@ -341,6 +341,22 @@ my @COMMANDS = (
         method   => 'cmd_find_replace',
     },
     {
+        # bugs.md P2 "No on-screen indicator for Replace-One vs.
+        # Replace-All mode, and no palette command to switch between
+        # them" -- opens Find and Replace (if not already open) and
+        # toggles the mode. See also the find bar's "Rep All:"/"Rep One:"
+        # label, which shows/toggles this same state visually and is
+        # itself clickable.
+        id       => 'toggle_replace_all_mode',
+        label    => 'Replace All Mode',
+        icon     => 'search',
+        shortcut => '',
+        section  => 'NAVIGATE',
+        type     => 'toggle',
+        priority => 0,
+        method   => 'cmd_toggle_replace_all_mode',
+    },
+    {
         id       => 'goto_line',
         label    => 'Go to Line',
         icon     => 'goto',
@@ -843,6 +859,10 @@ sub get_toggle_state {
     # File tree: per-window state, not from prefs
     if ($cmd->{id} eq 'toggle_tree') {
         return $editor->{_show_tree} ? 1 : 0;
+    }
+    # Replace All mode: session-only find-bar state, not from prefs
+    if ($cmd->{id} eq 'toggle_replace_all_mode') {
+        return $editor->{find_replace_all} ? 1 : 0;
     }
     # AI completion: check AIComplete module
     if ($cmd->{id} eq 'toggle_ai') {

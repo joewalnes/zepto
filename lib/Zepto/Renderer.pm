@@ -5295,8 +5295,28 @@ sub _render_find_bar {
 
     my $replace_field_start = $x;
     if ($replace_active) {
-        # Replace label
-        $content .= 'Replace:';
+        # Replace label -- doubles as the replace-mode indicator (bugs.md
+        # P2 "No on-screen indicator for Replace-One vs. Replace-All
+        # mode, and no palette command to switch between them"). "Rep
+        # All:"/"Rep One:" are exactly as wide as the original "Replace:"
+        # (8 chars), so this is a zero-width-budget change -- no caller of
+        # find_bar_input_width (this function, render()'s cursor-position
+        # code, or Editor.pm's click/drag handlers) needs updating. A
+        # separate pill was tried first but broke the P0 overflow-guard
+        # tests: this find bar already shrinks its input fields to their
+        # floor at common widths (76-90 cols) with zero spare margin, so
+        # any extra fixed-width element overflows there. Colored like the
+        # regex/case toggle pills' active/inactive states for the same
+        # at-a-glance convention, and clickable (see
+        # handle_find_bar_click's $label_start/$label_end region).
+        $content .= $theme->color('status_bg');
+        if ($replace_all) {
+            $content .= $theme->color('menu_active_bg') . $theme->color('menu_active_text');
+            $content .= 'Rep All:';
+        } else {
+            $content .= $theme->color('menu_pill_bg') . $theme->color('menu_pill_text');
+            $content .= 'Rep One:';
+        }
         $x += 8;
 
         # Replace input field (clickable)

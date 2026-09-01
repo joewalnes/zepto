@@ -12,6 +12,7 @@ use Zepto::Document;
 use Zepto::View;
 use Zepto::FindEngine;
 use Zepto::Highlighter;
+use Zepto::CommandRegistry;
 
 # Create a mock terminal for testing
 sub mock_terminal {
@@ -383,6 +384,108 @@ subtest 'Tab toggles focus between fields' => sub {
 
     $editor->handle_find_event({ type => 'key', key => 'tab' });
     is($editor->{find_focus}, 'find', 'Tab moves back to find');
+};
+
+# ============================================================================
+# bugs.md P2: "No on-screen indicator for Replace-One vs. Replace-All mode,
+# and no palette command to switch between them" -- Renderer.pm now shows a
+# clickable "All"/"One" pill in the find bar, Editor.pm's
+# _toggle_replace_all_mode() gives a clean (non-cycling) way to flip it,
+# and CommandRegistry.pm exposes it as the "Replace All Mode" palette
+# command. See also tests/renderer.t for the rendered-pill/overflow tests.
+# ============================================================================
+subtest 'find_replace_all defaults to Replace All mode' => sub {
+    my $editor = create_editor_with_content("test\n");
+    is($editor->{find_replace_all}, 1, 'Replace All is the default mode');
+};
+
+subtest '_toggle_replace_all_mode flips the mode with no side effects on regex/case' => sub {
+    my $editor = create_editor_with_content("aaa aaa aaa\n");
+    $editor->enter_find_mode(replace => 1);
+    $editor->{find_widget}->set_value('aaa');
+    $editor->_update_find_matches();
+
+    is($editor->{find_replace_all}, 1, 'Starts in Replace All mode');
+    is($editor->{find_regex}, 0, 'regex starts off');
+    is($editor->{find_case}, 0, 'case starts off');
+
+    $editor->_toggle_replace_all_mode();
+    is($editor->{find_replace_all}, 0, 'First toggle: Replace All -> Replace One');
+    is($editor->{find_regex}, 0, 'regex untouched by the clean toggle');
+    is($editor->{find_case}, 0, 'case untouched by the clean toggle');
+
+    $editor->_toggle_replace_all_mode();
+    is($editor->{find_replace_all}, 1, 'Second toggle: Replace One -> Replace All');
+    is($editor->{find_regex}, 0, 'regex still untouched (unlike Shift+Tab\'s cycle)');
+    is($editor->{find_case}, 0, 'case still untouched (unlike Shift+Tab\'s cycle)');
+};
+
+subtest 'Clicking the find bar "Rep All:"/"Rep One:" label toggles find_replace_all' => sub {
+    my $editor = create_editor_with_content("test\n");
+    $editor->enter_find_mode(replace => 1);
+    # Leave the find field empty so match_text is '' (an empty find value
+    # short-circuits the "No matches" branch) -- keeps the click-region
+    # arithmetic below simple and exactly mirroring handle_find_bar_click's
+    # own formula (cols defaults to 80 for the mock terminal; see
+    # tests/renderer.t's overflow-guard tests for the same technique of
+    # duplicating the layout formula to verify it independently).
+    is($editor->{find_widget}->value(), '', 'find field starts empty');
+
+    my ($rows, $cols) = $editor->{terminal}->get_size();
+    is($cols, 80, 'mock terminal defaults to 80 cols');
+
+    # No extra width budget vs. pre-fix layout -- the "Rep All:"/"Rep One:"
+    # label is exactly as wide as the old plain "Replace:" label (bugs.md
+    # P2 fix note: a separate pill was tried first and had to be reverted
+    # because it broke the P0 overflow-guard tests at common widths).
+    my $right_side_width = 45;  # base only, no match text
+    my $input_width = Zepto::Renderer->find_bar_input_width($cols, 1, $right_side_width);
+    my $find_start  = 7;
+    my $find_end    = $find_start + $input_width - 1;
+    my $label_start = $find_end + 2;
+    my $label_end   = $label_start + 7;  # 8 chars: "Rep All:"/"Rep One:"
+    my $label_click_x = int(($label_start + $label_end) / 2);
+
+    is($editor->{find_replace_all}, 1, 'Starts in Replace All mode');
+
+    $editor->handle_find_bar_click($label_click_x);
+    is($editor->{find_replace_all}, 0, 'Click on label toggled Replace All -> Replace One');
+
+    $editor->handle_find_bar_click($label_click_x);
+    is($editor->{find_replace_all}, 1, 'Click on label toggled Replace One -> Replace All');
+};
+
+subtest 'cmd_toggle_replace_all_mode opens replace mode and toggles it via the palette command' => sub {
+    my $editor = create_editor_with_content("test\n");
+
+    # Not in find mode at all yet -- command should open Find and Replace
+    is($editor->{find_replace_active}, 0, 'Find/replace not active initially');
+    $editor->cmd_toggle_replace_all_mode();
+    is($editor->{find_replace_active}, 1, 'Command opens the replace field');
+    is($editor->{find_replace_all}, 0, 'Command toggled the default All -> One');
+
+    # Already in replace mode -- command should just toggle again, not
+    # reset the find/replace field values by re-entering find mode.
+    $editor->{find_widget}->set_value('needle');
+    $editor->cmd_toggle_replace_all_mode();
+    is($editor->{find_replace_all}, 1, 'Second call toggles One -> All');
+    is($editor->{find_widget}->value(), 'needle',
+       'Find field value preserved -- command did not blindly re-enter find mode');
+};
+
+subtest 'toggle_replace_all_mode is registered in the command palette' => sub {
+    my $cmd = Zepto::CommandRegistry->find_command('toggle_replace_all_mode');
+    ok($cmd, 'Command is registered');
+    is($cmd->{method}, 'cmd_toggle_replace_all_mode', 'Wired to the right method');
+    is($cmd->{type}, 'toggle', 'Registered as a toggle command (shows on/off state)');
+
+    my $editor = create_editor_with_content("test\n");
+    $editor->{find_replace_all} = 1;
+    is(Zepto::CommandRegistry->get_toggle_state($cmd, $editor), 1,
+       'get_toggle_state reflects find_replace_all=1 as on');
+    $editor->{find_replace_all} = 0;
+    is(Zepto::CommandRegistry->get_toggle_state($cmd, $editor), 0,
+       'get_toggle_state reflects find_replace_all=0 as off');
 };
 
 # ============================================================================
