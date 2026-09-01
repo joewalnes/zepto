@@ -10,7 +10,7 @@
 # triggers filter mode (Editor.pm::handle_tree_event), this asserts the
 # real behavior with qa_fail on mismatch, and also locks in that plain
 # typing WITHOUT '/' does NOT filter (the design this bug fix settled on).
-# See also QA-REG-215 in qa/40_regression_bugs.txt.
+# See also QA-REG-216 in qa/40_regression_bugs.txt.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-TREE-013: Tree filter via / trigger"
 

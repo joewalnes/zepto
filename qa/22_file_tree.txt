@@ -212,7 +212,7 @@ NAME:     Tree filter via typing / to filter
 PRIORITY: P1
 FEATURE:  tree filter
 RELATED:  bugs.md P1 "File-tree flat-filter search... has zero UI
-          trigger" (FIXED, QA-REG-215) — this feature was fully built and
+          trigger" (FIXED, QA-REG-216) — this feature was fully built and
           unit-tested underneath but completely unreachable from the
           running editor until that fix wired '/' up as the trigger.
           qa/scripts/tier1/tree_013_filter.sh

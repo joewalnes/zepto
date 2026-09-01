@@ -2893,7 +2893,7 @@ VERIFY    check_for_changes() now debounces itself
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-215
+ID:       QA-REG-216
 NAME:     File-tree fuzzy filter is reachable via a '/' keybinding while
           the tree is focused
 PRIORITY: P1
