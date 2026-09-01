@@ -15,8 +15,11 @@ qa_assert_expect "Find and Replace|Find & Replace|replace" "find and replace ent
 # Execute it
 qa_keys "enter"
 
-# Replace field should be visible from the start
-qa_assert_expect "Replace|replace" "replace field visible after palette command"
+# Replace field should be visible from the start. The label reads
+# "Rep All:"/"Rep One:" (mode-aware, bugs.md P2 "No on-screen indicator
+# for Replace-One vs. Replace-All mode" fix, QA-REG-217) rather than a
+# plain "Replace:" -- match either mode.
+qa_assert_expect "Rep (All|One):" "replace field visible after palette command"
 
 qa_keys "escape"
 qa_keys "ctrl-q"

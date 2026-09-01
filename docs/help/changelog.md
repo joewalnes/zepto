@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-31
+
+- The find bar now shows which replace mode is active: the label next to the replace field reads "Rep All:" or "Rep One:" (colored like the regex/case toggle buttons) instead of a plain "Replace:" that looked the same either way. Previously there was no way to tell which mode you were in, or that Shift+Tab even toggled it, without reading the source code. Click the label to switch modes directly, or use the new "Replace All Mode" command in the command palette — Shift+Tab still works exactly as before
+
 ## 2026-08-30
 
 - Fixed a real data-corruption bug in multi-cursor and column-select editing: backspacing across a line-join, or deleting a multi-line selection, while a second cursor was active could leave that other cursor pointing at the wrong place in the document (or at a line number that no longer existed) — the very next keystroke would then silently insert or delete in the wrong spot. Multi-cursor and column-select editing that stays within a single line was never affected

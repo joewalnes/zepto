@@ -2624,6 +2624,26 @@ sub exit_find_mode {
     $self->{state} = STATE_EDITING;
 }
 
+# Toggle Replace All vs Replace One mode directly, with no other side
+# effects. Unlike Shift+Tab's four-state cycle (replace-all -> replace-one
+# -> regex -> case -> replace-all; see handle_find_event's 'tab' branch
+# below), which also flips regex/case when cycling back to replace-all,
+# this always does exactly one thing: flip the mode. Used by both the find
+# bar's "Rep All:"/"Rep One:" label (click to toggle) and the "Replace All
+# Mode" palette command (bugs.md P2 "No on-screen indicator for
+# Replace-One vs. Replace-All mode, and no palette command to switch
+# between them").
+sub _toggle_replace_all_mode {
+    my ($self) = @_;
+    if ($self->{find_replace_all}) {
+        $self->{find_replace_all} = 0;
+    } else {
+        $self->{find_replace_all} = 1;
+        $self->_apply_replace_preview() if $self->{find_replace_active};
+    }
+    $self->_update_find_matches(1) if $self->{find_replace_active};
+}
+
 sub handle_find_event {
     my ($self, $event) = @_;
 
@@ -2796,9 +2816,16 @@ sub handle_find_bar_click {
     $pos++;
     my $find_start = $pos + 5;  # After "Find:"
     my $find_end = $find_start + $input_width - 1;
-    my ($replace_start, $replace_end);
+    my ($label_start, $label_end, $replace_start, $replace_end);
     if ($replace_active) {
-        $replace_start = $find_end + 1 + 1 + 8;  # space + "Replace:"
+        # The "Rep All:"/"Rep One:" label (8 chars, same width as the
+        # original "Replace:" -- see _render_find_bar) doubles as the
+        # replace-mode indicator and toggle (bugs.md P2 "No on-screen
+        # indicator for Replace-One vs. Replace-All mode, and no palette
+        # command to switch between them").
+        $label_start = $find_end + 2;  # space + label start
+        $label_end = $label_start + 7;  # 8 chars
+        $replace_start = $label_end + 1;
         $replace_end = $replace_start + $input_width - 1;
     }
 
@@ -2807,6 +2834,9 @@ sub handle_find_bar_click {
         $self->{find_focus} = 'find';
         my $char_offset = $x - $find_start;
         $self->{find_widget}->handle_mouse_click($char_offset);
+    }
+    elsif ($replace_active && $x >= $label_start && $x <= $label_end) {
+        $self->_toggle_replace_all_mode();
     }
     elsif ($replace_active && $x >= $replace_start && $x <= $replace_end) {
         $self->{find_focus} = 'replace';

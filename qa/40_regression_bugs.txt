@@ -2890,3 +2890,72 @@ VERIFY    check_for_changes() now debounces itself
           exactly as expected — cross-instance sync silently stopped
           working — before the real fix was restored and the script
           passed again.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-217
+NAME:     Find bar shows which replace mode (All / One) is active
+PRIORITY: P2
+BUG:      P2 "No on-screen indicator for Replace-One vs. Replace-All mode,
+          and no palette command to switch between them" — see bugs.md
+          "Found while fixing the P0 find/replace preview bug"
+          (2026-08-30). `Renderer.pm::_render_find_bar` read
+          `$find->{replace_all}` into a local variable but never used it
+          anywhere — the "Replace:" label looked identical regardless of
+          mode, and the only way to switch (Shift+Tab) gave zero visual
+          feedback that anything changed, or that a toggle existed at
+          all. A real CLAUDE.md Rule 2 discoverability gap.
+CROSS-REF: QA-FIND-029 (qa/09_find_replace.txt — primary feature test
+           case); tests/renderer.t ('Find bar replace-mode label reflects
+           replace_all state', 'Find bar has no replace-mode label when
+           the replace field is not shown', 'Replace-mode label does not
+           change the find bar's total width between All and One',
+           'Find bar with replace-mode label never exceeds $cols (P0
+           overflow-guard tests still hold)'); tests/find.t
+           ('_toggle_replace_all_mode flips the mode with no side effects
+           on regex/case', 'Clicking the find bar "Rep All:"/"Rep One:"
+           label toggles find_replace_all', 'cmd_toggle_replace_all_mode
+           opens replace mode and toggles it via the palette command',
+           'toggle_replace_all_mode is registered in the command
+           palette')
+VERIFY    The "Replace:" label (only shown once the replace field is
+          active) now reads "Rep All:" or "Rep One:" depending on
+          `find_replace_all`, colored like the regex/case toggle pills'
+          active (colored) vs. inactive (dim) states — both strings are
+          exactly 8 characters, the same width as the old "Replace:", so
+          no caller of `find_bar_input_width` needed to change. This
+          width-neutrality was not the first design tried: a separate
+          rounded pill (matching the regex/case pills' full styling) was
+          implemented first and broke `tests/renderer.t`'s pre-existing
+          P0 overflow-guard tests at cols=76 (every match count) and
+          cols=80 (match_count >= 250) — this find bar already shrinks
+          its input fields to their floor at common widths (76-90 cols)
+          with zero spare margin (confirmed by measuring the pristine,
+          unmodified renderer: `find_bar_input_width` already lands
+          exactly at `$cols` with no slack at those widths), so any
+          additional fixed-width element overflows there. Reverted that
+          approach in favor of reusing the existing label's fixed budget.
+          Also added `Editor.pm::_toggle_replace_all_mode()` (a clean,
+          single-purpose toggle used by both the label's click handler
+          and the new `cmd_toggle_replace_all_mode` palette command
+          "Replace All Mode" — unlike Shift+Tab's four-state cycle, which
+          also flips regex/case when cycling back to replace-all) and a
+          `get_toggle_state` special case in `CommandRegistry.pm` so the
+          palette shows `[on]`/`[off]` matching the current mode.
+          `qa/scripts/tier1/reg_217_find_replace_mode_indicator.sh` opens
+          find/replace, confirms the default "Rep All:" label, toggles
+          via raw Shift+Tab (CSI `Z`) and confirms "Rep One:", toggles
+          twice more via the palette command (confirming the `[off]`/
+          `[on]` display each time), and confirms no overflow at both an
+          80-col and a 76-col terminal (via `qa_resize_window`) with the
+          label visible throughout. Verified non-tautological: 8 of 12
+          assertions fail against the pre-fix binary (no mode text at
+          all, old "Replace:" label present, "Replace All Mode" command
+          doesn't exist so the typed search text lands in the document
+          instead) exactly as expected; all 12 pass against the fix.
+          Also discovered and logged (not fixed, out of scope, see
+          bugs.md) a separate pre-existing minor quirk found while
+          writing this script: opening the command palette while find
+          mode is active and then pressing Escape (without running a
+          command) drops back to plain editing instead of restoring the
+          find bar.
