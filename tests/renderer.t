@@ -3234,6 +3234,55 @@ subtest 'Find bar with no matches / longer match counts never exceeds $cols' => 
     }
 };
 
+# bugs.md P2 "Shift+Tab in the find/replace bar drops the last character of
+# BOTH the Find and Replace field values". Root cause: InputWidget::viewport()
+# caches its scroll offset (view_offset) across calls. The find bar's shared
+# input_width shrinks for exactly one render frame whenever is_searching is
+# momentarily true (match_text grows by "..."), which can push a same-width
+# value's cursor past the scroll-into-view threshold and scroll the field.
+# Once is_searching goes false again on the very next frame and input_width
+# widens back out, the stale scroll offset used to stick around even though
+# the whole value now fits -- rendering it with leading characters hidden
+# even though the underlying widget value was never touched. Reproduced here
+# at the exact Renderer/InputWidget boundary (not just InputWidget in
+# isolation, and not by injecting raw Shift+Tab bytes -- InputParser's CSI-Z
+# handling was traced and confirmed correct; this is a pure rendering bug
+# reachable by anything that flips is_searching for one frame while a field
+# sits at its width boundary, of which a Shift+Tab-triggered re-search is
+# just the reliable trigger the bug was found through).
+subtest 'Find bar fields recover full value after a transient is_searching width narrowing' => sub {
+    my $theme = Zepto::Theme->new('dark');
+
+    # Same widget objects reused across both render calls -- critical, since
+    # the bug is entirely about view_offset state persisting on the widget
+    # between renders (exactly how Editor.pm's real find_widget/
+    # find_replace_widget objects are reused frame to frame).
+    my $find_widget    = Zepto::InputWidget->new(value => 'aaa');
+    my $replace_widget = Zepto::InputWidget->new(value => 'bbb');
+
+    my %base = (
+        regex => 0, case => 0, replace_all => 1, replace_active => 1,
+        focus => 'replace', current => 0, match_count => 1,
+        find_widget => $find_widget, replace_widget => $replace_widget,
+    );
+
+    # Frame 1: find engine still reports is_searching -- match_text grows by
+    # "..." (matches bugs.md's exact repro: cols=80, 3-char find/replace
+    # values, 1 match). This transiently narrows the shared input field
+    # width enough to scroll both fields.
+    Zepto::Renderer->_render_find_bar($theme, { %base, is_searching => 1 }, 80);
+
+    # Frame 2: search finished, is_searching now false, width widens back
+    # out -- the whole 3-char value fits again in the wider field.
+    my $out = strip_escapes(
+        Zepto::Renderer->_render_find_bar($theme, { %base, is_searching => 0 }, 80));
+
+    like($out, qr/Find:aaa(?!\S)/, 'Find field shows the full "aaa", not truncated to "aa"');
+    like($out, qr/(?:Rep All|Rep One):bbb(?!\S)/, 'Replace field shows the full "bbb", not truncated to "bb"');
+    is($find_widget->value(), 'aaa', 'Underlying find_widget value was never touched');
+    is($replace_widget->value(), 'bbb', 'Underlying replace_widget value was never touched');
+};
+
 # ============================================================================
 # Ghost text completion rendering (bugs.md P1 "Ghost-text completion renders
 # at the end of the line's real content, not at the cursor")

@@ -3077,3 +3077,92 @@ VERIFY    `Renderer.pm`'s status-bar Theme pill concatenated the raw
           not just one. Verified non-tautological: the primary 140-col
           assertion fails against the pre-fix binary (confirmed via `git
           stash` on `Renderer.pm` alone) and passes against the fix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-219
+NAME:     Find/replace bar Shift+Tab no longer truncates field display
+PRIORITY: P2
+BUG:      P2 "Shift+Tab in the find/replace bar drops the last character of
+          BOTH the Find and Replace field values" — see bugs.md. Found
+          2026-08-31 while independently re-verifying the Replace-mode-
+          indicator fix (QA-REG-217): ⌃F → type "aaa" → Tab to replace
+          field → type "bbb" → raw Shift+Tab (CSI `Z`) to toggle replace
+          mode — both "Find:aaa" and "Rep One:bbb" rendered with their
+          trailing character missing ("aa"/"bb"), 100% reproducible.
+          Confirmed pre-existing (reproduced identically on a build from
+          before QA-REG-217's fix), not a regression from that or any
+          other same-session change.
+CROSS-REF: QA-FIND-030 (qa/09_find_replace.txt — primary feature test
+           case); tests/input_widget.t ('viewport self-corrects stale
+           view_offset once value fits again', 'viewport resets stale
+           offset to 0 whenever full value fits width', 'viewport does
+           not disturb legitimate end-of-value scroll for long values' —
+           this last one is a regression guard confirming the fix below
+           doesn't touch the pre-existing, deliberately tested
+           end-of-value overflow-scroll behavior); tests/renderer.t
+           ('Find bar fields recover full value after a transient
+           is_searching width narrowing')
+VERIFY    Root cause traced with temporary debug instrumentation added to
+          a scratch build (logged raw input bytes, parsed events, and
+          widget/view_offset state at every step), not guessed. The
+          suspected culprits from the original bugs.md entry were both
+          ruled out: `InputParser.pm`'s CSI-`Z` handling
+          (`Zepto::InputParser::_decode_csi`, `$final eq 'Z'` branch) was
+          confirmed to consume the raw `\x1b[Z` sequence in one parse
+          pass and emit exactly one `key=tab,modifiers=[shift]` event —
+          no stray byte leaks through as a separate Backspace/Delete. The
+          find bar's Shift+Tab handler (`Editor.pm::handle_find_event`'s
+          `tab`+shift branch) was confirmed to leave both widgets'
+          `{value}` completely untouched — logged `find=aaa replace=bbb`
+          immediately before AND after that branch runs.
+          The actual bug is a pure rendering/display defect in the
+          shared `Zepto::InputWidget::viewport()` (used by every
+          status-bar text field: find/replace bars, Go To Line, Save As,
+          command palette filter). `viewport()` caches its horizontal
+          scroll offset (`view_offset`) on the widget object across
+          render calls. Shift+Tab calls `Editor.pm::_update_find_matches
+          (1)`, which re-runs the find engine's `search()` and leaves its
+          `is_searching` flag transiently true for exactly one render
+          frame. While true, `Renderer.pm::_render_find_bar` appends
+          "..." to the match-count text (9 chars -> 12 chars for a
+          single match), which shrinks `right_side_width` and therefore
+          `find_bar_input_width()`'s shared budget for both fields (4 ->
+          3 columns in the exact repro: cols=80, "aaa"/"bbb", 1 match).
+          With both fields exactly as wide as that transiently narrowed
+          width and the cursor at the end, `viewport()`'s scroll-into-
+          view check (`$cursor >= $vo + $width`) fires on both widgets
+          and bumps `view_offset` from 0 to 1. On the very next render
+          frame (a few ms later), `is_searching` goes false and the width
+          widens back to 4 — but the stale `view_offset=1` was never
+          reset, because the cursor still fit inside the (now wider)
+          `[view_offset, view_offset+width)` window, so nothing re-
+          triggered a correction. Both fields then permanently rendered
+          `substr($value, 1, 4)` — their first character scrolled out of
+          view — even though `$self->{value}` itself was never touched.
+          Not Shift+Tab-specific and not find-bar-specific: any caller
+          that hands `viewport()` a transiently narrower width for one
+          frame, while a same-width-or-shorter value's cursor sits at
+          the end, can trigger the same stale-offset drift on any
+          InputWidget-backed field.
+          Fix: `viewport()` (`lib/Zepto/InputWidget.pm`) now resets
+          `view_offset` to 0 whenever the caller-supplied width is wide
+          enough to show the entire value (`$len <= $width`), instead of
+          trusting a cached offset that may have been computed for a
+          narrower call. This only applies when the whole value already
+          fits — the deliberate "one empty trailing cell at cursor" scroll
+          behavior for values genuinely longer than the field (see
+          tests/input_widget.t's pre-existing 'viewport scrolls to keep
+          cursor visible when at end') is completely unaffected, verified
+          by both the existing test suite (unchanged, all passing) and a
+          new explicit regression-guard test.
+          `qa/scripts/tier1/reg_219_find_replace_shifttab_truncation.sh`
+          reproduces the exact bugs.md repro against a real running
+          zepto (raw Shift+Tab via CSI `Z` injection, same technique as
+          QA-REG-217's script), confirms both fields keep their full
+          value through a complete Shift+Tab mode cycle (5+ more
+          presses, back to Replace All), and repeats with a second,
+          differently-sized term. Verified non-tautological: the primary
+          repro assertions fail against the pre-fix binary exactly as
+          expected (both fields show their value one character short);
+          all assertions pass against the fix.

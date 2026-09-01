@@ -104,6 +104,31 @@ sub viewport {
     my $len    = length($val);
     my $vo     = $self->{view_offset} // 0;
 
+    # If the whole value now fits within $width, there is never a reason
+    # to hide any of it -- reset to no scroll unconditionally rather than
+    # trusting a cached view_offset from a previous call. view_offset is
+    # sticky across calls (see the "Also updates..." doc note above), and
+    # the caller-supplied $width can shrink for a single transient render
+    # frame -- e.g. the find bar's match-count text grows by "..." for the
+    # one frame where the find engine's is_searching flag is briefly true,
+    # narrowing input_width just long enough to push a same-width value
+    # like "aaa" (cursor at the end) past the scroll-into-view threshold
+    # below and bump view_offset up by 1. When the next frame's $width
+    # returns to normal (value now fits again), the cursor still fit
+    # inside the stale [vo, vo+width) window under the old logic, so
+    # nothing corrected view_offset back down, and the widget rendered
+    # with its first character permanently scrolled off screen even
+    # though $self->{value} itself was never touched (bugs.md P2
+    # "Shift+Tab in the find/replace bar drops the last character of BOTH
+    # the Find and Replace field values" -- not a Shift+Tab or InputParser
+    # bug at all; any transient one-frame narrowing of the field width can
+    # trigger this on any InputWidget-backed field). This reset only
+    # applies when the full value fits ($len <= $width); it does not
+    # touch the deliberate "one empty trailing cell at end-of-value"
+    # scroll behavior exercised when the value is longer than the field
+    # (see "viewport scrolls to keep cursor visible when at end" below).
+    $vo = 0 if $len <= $width;
+
     # Scroll view_offset so cursor stays within [vo, vo + width - 1]
     if ($cursor < $vo) {
         $vo = $cursor;
