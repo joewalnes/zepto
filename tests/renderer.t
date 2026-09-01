@@ -19,7 +19,8 @@ use Zepto::FindEngine;
 use Zepto::Highlighter;
 use Zepto::CommandRegistry;
 use Zepto::InputWidget;
-use File::Temp qw(tempfile);
+use Zepto::FileTree;
+use File::Temp qw(tempfile tempdir);
 
 # Helper to create a temp file with content
 sub create_temp_file {
@@ -1430,6 +1431,60 @@ subtest 'File-tree flat-filter rendering truncates via _ellipsis and remaps matc
 };
 
 # ============================================================================
+# _render_tree_panel's search-bar row (bugs.md P1: "File-tree flat-filter
+# search... has zero UI trigger" — the cursor-placement logic for this row
+# already existed, but nothing actually drew the row's visible content
+# until this fix). Uses a real Zepto::FileTree against a tempdir so the
+# search bar is exercised end-to-end, not just the isolated row-content
+# helper tested above.
+# ============================================================================
+subtest '_render_tree_panel draws a search-bar row with the query text when filtering' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/needle.txt") or die $!;
+    close $fh;
+
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Zepto::FileTree->new(root_path => $dir);
+    $tree->set_focused(1);
+    $tree->start_filter();
+    # "edl" is used (not e.g. "ndl") because FileTree's pre-filter step
+    # requires the query to appear as a literal contiguous substring
+    # (index() check) before fuzzy-scoring a candidate at all — "edl" is
+    # a contiguous run within "needle.txt" (n-e-e-d-l-e...), "ndl" isn't.
+    $tree->filter_append_char($_) for split //, 'edl';
+
+    my $rows = Zepto::Renderer->_render_tree_panel($tree, 10, $theme, 20, {});
+    my $row1 = $rows->[0];
+    (my $visible = $row1) =~ s/\x1b\[[0-9;]*m//g;
+
+    my $icon = Zepto::Chars->get('search') || '*';
+    like($visible, qr/\Q$icon\E\s*edl/, 'Row 1 shows the search icon followed by the typed query "edl"');
+
+    # Tree content (the flat filtered match) must start on row 2, not
+    # overwrite the search bar.
+    my $row2 = $rows->[1];
+    (my $visible2 = $row2) =~ s/\x1b\[[0-9;]*m//g;
+    like($visible2, qr/needle\.txt/, 'Row 2 shows the matched file — content is pushed below the search bar');
+};
+
+subtest '_render_tree_panel omits the search-bar row when not filtering' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/plain.txt") or die $!;
+    close $fh;
+
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Zepto::FileTree->new(root_path => $dir);
+    $tree->set_focused(1);
+
+    my $rows = Zepto::Renderer->_render_tree_panel($tree, 10, $theme, 20, {});
+    my $row1 = $rows->[0];
+    (my $visible = $row1) =~ s/\x1b\[[0-9;]*m//g;
+
+    like($visible, qr/plain\.txt/,
+        'Row 1 shows tree content directly (no search bar reserved) when not filtering');
+};
+
+# ============================================================================
 # _char_to_visual_col and visual_to_char_col with wide characters
 # ============================================================================
 subtest '_char_to_visual_col handles wide characters' => sub {
@@ -2785,6 +2840,58 @@ subtest 'FILE_TREE hint row shows a ⌃B back-to-editor pill when there is room'
     like($s, qr/back/, 'FILE_TREE hint row labels ⌃B with "back" (not a bare, unlabeled glyph)');
 };
 
+# ----------------------------------------------------------------------------
+# bugs.md P1: "File-tree flat-filter search... has zero UI trigger" — the
+# FILE_TREE hint row now advertises "/" as the trigger, and swaps to
+# "Esc clear" once filter mode is actually active, so the mechanism for
+# both entering AND leaving filter mode is always on screen.
+# ----------------------------------------------------------------------------
+package Test::FakeFilterTree;
+our @ISA = ('Test::FakeTree');
+sub new {
+    my ($class, %args) = @_;
+    my $self = Test::FakeTree::new($class, %args);
+    $self->{filter_active} = $args{filter_active} // 0;
+    return $self;
+}
+sub filter_active { return $_[0]->{filter_active}; }
+package main;
+
+subtest 'FILE_TREE hint row shows a "/ filter" pill when not filtering' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeFilterTree->new(filter_active => 0);
+    my $ui = { file_tree => $tree };
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 80, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr{/ filter}, 'FILE_TREE hint row advertises "/" as the fuzzy-filter trigger');
+    unlike($s, qr/Esc clear/, 'Does not show the "Esc clear" pill while not filtering');
+};
+
+subtest 'FILE_TREE hint row swaps to "Esc clear" once filter mode is active' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeFilterTree->new(filter_active => 1);
+    my $ui = { file_tree => $tree };
+
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 80, '', 0, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    like($s, qr/Esc clear/, 'FILE_TREE hint row shows "Esc clear" while filtering');
+    unlike($s, qr{/ filter}, 'Does not show the "/ filter" trigger pill while already filtering');
+    unlike($s, qr{\x{2190}\x{2192} fold}, '"←→ fold" is omitted while filtering (flat results have no dirs to fold)');
+};
+
+subtest 'FILE_TREE hint row against a tree object with no filter_active method does not die (real FileTree always has it)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $tree = Test::FakeTree->new();  # deliberately lacks filter_active()
+    my $ui = { file_tree => $tree };
+
+    my $bar = eval { Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 80, '', 0, $ui, 0) };
+    ok(!$@, 'Rendering does not die against a tree stand-in missing filter_active()') or diag("error: $@");
+    like(strip_escapes($bar), qr{/ filter}, 'Falls back to the non-filtering pill set');
+};
+
 subtest 'FILE_TREE ⌃B back pill is highest priority — survives narrower widths than the other tree pills' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $tree = Test::FakeTree->new();
@@ -2819,8 +2926,11 @@ subtest 'FILE_TREE hint row shares the core-nav hint (close/tabs/quit) with DOCU
 
     # Needs more width than DOCUMENT context's tab bar before this segment
     # has room — the FILE_TREE row carries more fixed chrome (breadcrumb +
-    # Open/Commands pills). Confirmed via probe this appears by 130 cols.
-    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 130, '', 0, $ui, 0);
+    # Open/Commands pills). Confirmed via probe this appears by 135 cols
+    # (was 130 before the "/ filter" tree pill was added alongside ⌃B back
+    # — see bugs.md "File-tree flat-filter search... has zero UI trigger" —
+    # which pushed the threshold out by one pill's width).
+    my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 140, '', 0, $ui, 0);
     my $s = strip_escapes($bar);
 
     like($s, qr/close/, 'FILE_TREE hint row labels the close-tab shortcut ("close")');

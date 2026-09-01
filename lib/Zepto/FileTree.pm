@@ -263,12 +263,16 @@ sub end {
     $self->_ensure_visible();
 }
 
-# Rows available for tree content (total viewport minus search bar and stickies)
+# Rows available for tree content (total viewport minus search bar, when the
+# fuzzy filter is active, and stickies). The search bar row only exists while
+# filter_active — normal browsing uses the full viewport, matching what
+# Renderer::_render_tree_panel actually draws in each mode.
 sub _content_rows {
     my ($self) = @_;
     my $vh = $self->{viewport_height};
     my $sticky_count = scalar @{$self->sticky_headers()};
-    my $rows = $vh - $sticky_count - 1;  # -1 for always-present search bar
+    my $search_bar_rows = $self->{filter_active} ? 1 : 0;
+    my $rows = $vh - $sticky_count - $search_bar_rows;
     return $rows > 1 ? $rows : 1;
 }
 

@@ -4619,18 +4619,40 @@ sub handle_tree_event {
         elsif ($key eq 'left')     { $tree->collapse_current(); }
         elsif ($key eq 'right')    { $tree->expand_current(); }
         elsif ($key eq 'enter')    { $self->_tree_open_selected(); }
-        elsif ($key eq 'escape') { $self->_tree_unfocus(); }
+        elsif ($key eq 'escape') {
+            # First Esc while filtering clears the filter and returns to
+            # normal tree browsing; a second Esc (filter no longer active)
+            # unfocuses the tree back to the editor, per the existing
+            # documented Esc behavior (docs/UI_GUIDELINES.md).
+            if ($tree->filter_active()) { $tree->clear_filter(); }
+            else                        { $self->_tree_unfocus(); }
+        }
         elsif ($key eq 'pageup')   { $tree->page_up($tree->viewport_height()); $self->_tree_preview_current(); }
         elsif ($key eq 'pagedown') { $tree->page_down($tree->viewport_height()); $self->_tree_preview_current(); }
         elsif ($key eq 'home')     { $tree->home(); $self->_tree_preview_current(); }
         elsif ($key eq 'end')      { $tree->end(); $self->_tree_preview_current(); }
-        elsif ($key eq 'backspace') { }  # no-op in tree
+        elsif ($key eq 'backspace') {
+            # No-op in normal browse mode; while filtering, removes the last
+            # typed character (or exits filter mode on an empty query — see
+            # FileTree::filter_backspace).
+            if ($tree->filter_active()) {
+                $tree->filter_backspace();
+                $self->_tree_preview_current();
+            }
+        }
     }
     elsif ($event->{type} eq 'char') {
         my $char = $event->{char};
-        if    ($char eq '{') { $tree->shrink(2); }
+        if ($tree->filter_active()) {
+            # Once filtering, every printable character (including '/')
+            # is part of the query, not a tree command.
+            $tree->filter_append_char($char);
+            $self->_tree_preview_current();
+        }
+        elsif ($char eq '{') { $tree->shrink(2); }
         elsif ($char eq '}') { $tree->grow(2); }
         elsif ($char eq ' ') { $tree->toggle_current(); }
+        elsif ($char eq '/') { $tree->start_filter(); }
     }
     elsif ($event->{type} eq 'mouse') {
         $self->handle_mouse_event($event);

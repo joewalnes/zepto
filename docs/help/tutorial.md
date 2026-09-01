@@ -65,7 +65,9 @@ filter. This is the fastest way to discover everything Zepto can do.
   through any shell command (sort, awk, jq, etc.).
 - **Column Editing** - `Alt+C` to toggle column selection mode. Select
   a rectangle of text and edit it.
-- **File Tree** - `Ctrl+B` to toggle the sidebar file tree.
+- **File Tree** - `Ctrl+B` to toggle the sidebar file tree. With the
+  tree focused, press `/` to type-to-filter across every file in the
+  project.
 - **Theme** - `Ctrl+T` to switch between dark and light themes.
 - **Word Wrap** - `Alt+Z` to toggle word wrap.
 - **Minimap** - `Alt+M` to toggle the document minimap.

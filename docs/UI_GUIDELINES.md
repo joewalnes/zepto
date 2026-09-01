@@ -181,6 +181,7 @@ category-ordered list with the modifier repeated on every pill:
 - Any focusable area that is visible on screen must show a visible keyboard shortcut label next to it so users can jump to it quickly.
 - `⌃B` is context-dependent: when the file tree is hidden it shows the tree and focuses it; when the tree is visible it toggles focus between the tree and the editor. The tree is dismissed by pressing `Esc` while it is focused (which returns focus to the editor) or by toggling it off via the command palette.
 - File tree arrow navigation previews files: moving the highlight with `↑`/`↓` immediately opens (or switches to) the highlighted file in the editor pane. This is a preview behavior — the file is opened in a tab but the tree retains focus until the user presses `Enter` or `Esc`.
+- `/` activates fuzzy-filter mode while the tree is focused (type-to-filter across every file in the project, flat results with match highlighting; a `/ filter` status-bar pill advertises this). `Esc` is two-step and mode-aware here, unlike its single-step meaning elsewhere: the first press clears the filter and returns to normal hierarchical browsing (tree stays focused, pill reverts to `/ filter`); a second press then dismisses the tree per the general `⌃B`/`Esc` rule above. `Enter` opens the highlighted filtered result and exits filter mode, same as plain-mode Enter.
 
 ## Modifier Policy And Chord Limits
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-31
+
+- Added file tree filtering: press `/` while the tree is focused to type-to-filter across every file in the project — matching files appear in a flat list with the matched characters highlighted, and Enter opens the highlighted result. Backspace edits the search; Escape clears the search first, then a second Escape returns focus to the editor. A "/ filter" hint now appears in the tree's status bar so this is discoverable without reading any documentation
+
 ## 2026-08-30
 
 - Fixed a real data-corruption bug in multi-cursor and column-select editing: backspacing across a line-join, or deleting a multi-line selection, while a second cursor was active could leave that other cursor pointing at the wrong place in the document (or at a line number that no longer existed) — the very next keystroke would then silently insert or delete in the wrong spot. Multi-cursor and column-select editing that stays within a single line was never affected

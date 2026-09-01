@@ -2890,3 +2890,48 @@ VERIFY    check_for_changes() now debounces itself
           exactly as expected — cross-instance sync silently stopped
           working — before the real fix was restored and the script
           passed again.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-215
+NAME:     File-tree fuzzy filter is reachable via a '/' keybinding while
+          the tree is focused
+PRIORITY: P1
+BUG:      P1 "File-tree flat-filter search (FileTree::start_filter/
+          filter_active) is fully built and rendered but has zero UI
+          trigger — completely unreachable from the running editor" — see
+          bugs.md "Found while fixing the 'Scorecard audit round 3' DRY
+          items" (2026-08-31 fix). FileTree.pm's start_filter/
+          filter_append_char/filter_backspace/clear_filter and Renderer's
+          flat-filter row/cursor-placement code were all fully implemented
+          and unit-tested, but nothing in Editor.pm's handle_tree_event
+          ever called any of them, no CommandRegistry.pm entry triggered
+          it, and no mouse handler targeted a filter region — a complete,
+          tested feature that no user could ever discover or reach.
+CROSS-REF: QA-TREE-013 (the primary catalog entry for this feature —
+          qa/22_file_tree.txt), QA-TREE-030 (Enter-opens-filtered-result,
+          the companion happy-path variant), tests/editor.t's "File tree:
+          ..." subtests (unit coverage of the same wiring), tests/
+          renderer.t's "_render_tree_panel draws a search-bar row..." /
+          "FILE_TREE hint row shows a '/ filter' pill..." subtests
+          (rendering + discoverability-pill coverage).
+VERIFY    `qa/scripts/tier1/tree_013_filter.sh` is the primary regression
+          guard: it first asserts the OLD broken behavior can't silently
+          reappear (plain typing with no '/' trigger must NOT filter —
+          this script used to just qa_skip when nothing filtered, a
+          tautological soft-pass that could never have caught this bug in
+          the first place — see the script's own header comment), then
+          exercises the full new flow end-to-end against a real running
+          zepto: '/' activates filter mode (hint row swaps '/ filter' ->
+          'Esc clear'), typed characters filter the flat results list
+          (non-matches disappear from the tree pane), Backspace edits the
+          query and un-filters once empty, a first Escape clears the
+          filter while keeping the tree focused, and a second Escape
+          unfocuses the tree back to the editor. `tree_030_filter_enter_
+          opens.sh` covers Enter opening the highlighted filtered result
+          and exiting filter mode + tree focus together, mirroring
+          QA-TREE-006's plain-mode Enter. `tree_005_filter.sh` (its
+          filename predates today's fix and doesn't match its own
+          catalog ID — see the script's header note) covers the adjacent
+          edge case of arrow-key navigation still working the instant
+          '/' is pressed, before any query is typed.

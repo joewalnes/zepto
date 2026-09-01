@@ -67,6 +67,7 @@ AsciiDoc, C, C++, C#, Clojure, CMake, Crontab, CSS, Diff, Dockerfile, Fish, Go, 
 - Natural sort ("file2" before "file10")
 - Keyboard navigation, mouse click/scroll/drag-resize
 - Preview files by navigating the tree
+- Type-to-filter (`/`) -- fuzzy-searches every file in the project into a flat, match-highlighted list
 - Sticky parent headers while scrolling
 - Auto-reveals current file when switching tabs
 

@@ -924,12 +924,18 @@ sub render {
         # Hide cursor during prompt - no text input
         $cursor_seq .= HIDE_CURSOR;
     } elsif ($ui->{file_tree} && $ui->{file_tree}->focused()) {
-        # Tree is focused — show cursor in search bar (always row 2, above stickies)
+        # Tree is focused — show cursor in the search bar (always row 1,
+        # above stickies — see _render_tree_panel's filter-bar block, which
+        # this width math must match exactly so the cursor lands on the
+        # character the user is actually about to type over).
         if ($ui->{file_tree}->filter_active()) {
             my $filter_len = length($ui->{file_tree}->filter_query() // '');
             my $prefix_len = 3;  # " {icon} " = 3 visible chars
             my $panel_w = $tree_width > 0 ? $tree_width - 1 : 0;  # subtract border
-            my $max_query = $panel_w - $prefix_len;
+            my $sb = $ui->{file_tree}->scrollbar_data();
+            my $has_scrollbar = ($sb->{total} > $sb->{visible});
+            my $content_width = $panel_w - ($has_scrollbar ? 1 : 0);
+            my $max_query = $content_width - $prefix_len;
             my $visible_cursor = ($max_query > 0 && $filter_len > $max_query)
                 ? $max_query : $filter_len;
             $cursor_seq .= _move_to(1, $prefix_len + $visible_cursor + 1);
@@ -2972,6 +2978,43 @@ sub _render_tree_panel {
     # Track which row we're rendering
     my $row_idx = 0;
 
+    # Render the fuzzy-filter search bar (always row 1, above stickies) when
+    # filter mode is active. Shows a search icon + the typed query so the
+    # user can see what they're filtering on — the cursor-placement logic
+    # below (in the main render()'s cursor_seq block) positions the terminal
+    # cursor within this same row using identical width math.
+    if ($filter_active && $row_idx < $height) {
+        my $screen_row = $row_idx + 1;
+        my $query = $tree->filter_query() // '';
+        my $icon = Zepto::Chars->get('search') || '*';
+        my $prefix_len = 3;  # ' ' + icon + ' '
+        my $max_query = $content_width - $prefix_len;
+
+        my $display_query = $query;
+        if ($max_query <= 0) {
+            $display_query = '';
+        } elsif (length($query) > $max_query) {
+            # Scroll to show the tail, matching the cursor-placement math
+            # which clamps the cursor to the right edge on overflow.
+            $display_query = substr($query, -$max_query);
+        }
+
+        my @_out = (_move_to($screen_row, 1));
+        push @_out, $tree_bg . $tree_fg . " $icon ";
+        push @_out, $display_query;
+        my $pad = $content_width - $prefix_len - length($display_query);
+        push @_out, (' ' x $pad) if $pad > 0;
+
+        if ($has_scrollbar) {
+            push @_out, $theme->color('tree_scrollbar_bg') . ' ';
+        }
+
+        # Border
+        push @_out, $border_fg . $tree_bg . $border_char;
+        push @tree_rows, join('', @_out);
+        $row_idx++;
+    }
+
     # Render sticky headers
     for my $sticky (@$stickies) {
         last if $row_idx >= $height;
@@ -4266,12 +4309,20 @@ sub _render_context_status_bar {
         #      editor" (P1, confirmed by both the automated LLM vision-judge
         #      sweep and manual testing). This is the single most important
         #      addition here, so it goes first.
-        #   2. ↵ open — opening the highlighted file (arrow-key navigation
+        #   2. / filter (not filtering) or Esc clear (filtering) — the
+        #      fuzzy-filter trigger has NO other discovery path (unlike
+        #      arrow-key preview/enter-to-open, which a user can stumble
+        #      into by trying the obvious keys), so it ranks just below
+        #      ⌃B back. See bugs.md "File-tree flat-filter search... has
+        #      zero UI trigger" — this pill is the fix for that gap.
+        #   3. ↵ open — opening the highlighted file (arrow-key navigation
         #      already previews/opens files, so this is a close second, not
-        #      a first-time-blocking gap the way #1 was).
-        #   3. ↑↓ / ←→ fold — navigation basics a user is more likely to
+        #      a first-time-blocking gap the way #1/#2 were).
+        #   4. ↑↓ / ←→ fold — navigation basics a user is more likely to
         #      already know or find via ⌃␣ Commands (the always-visible
-        #      fallback pill on the right), so these drop first.
+        #      fallback pill on the right), so these drop first. ←→ fold
+        #      only applies to hierarchical browsing, so it's omitted while
+        #      filtering (the flat results list has no dirs to fold).
         #
         # Width-fitting reuses _fit_pill_group (shared with the DOCUMENT
         # status bar's ⌃/⌥ pill columns) instead of a hand-rolled
@@ -4280,15 +4331,23 @@ sub _render_context_status_bar {
         # budget at all, rather than vanishing outright just because its
         # full label didn't quite fit.
         my $nav_icon = Zepto::Chars->get('cursor_pos');
+        my $tree_filtering = $tree->can('filter_active') && $tree->filter_active();
         my @tree_pill_candidates = (
             { full_text => CTRL_GLYPH . "B back",  compact_text => CTRL_GLYPH . "B",
               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            $tree_filtering
+                ? { full_text => "Esc clear", compact_text => "Esc",
+                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' }
+                : { full_text => "/ filter", compact_text => "/",
+                    fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { full_text => "\x{21B5} open",   compact_text => "\x{21B5}",
               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
             { full_text => "$nav_icon \x{2191}\x{2193}", compact_text => "\x{2191}\x{2193}",
               fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
-            { full_text => "\x{2190}\x{2192} fold", compact_text => "\x{2190}\x{2192}",
-              fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            ($tree_filtering ? () : (
+                { full_text => "\x{2190}\x{2192} fold", compact_text => "\x{2190}\x{2192}",
+                  fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+            )),
         );
         $_->{full_width}    = length($_->{full_text}) + 2    for @tree_pill_candidates;
         $_->{compact_width} = length($_->{compact_text}) + 2 for @tree_pill_candidates;
