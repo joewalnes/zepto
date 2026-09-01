@@ -3166,3 +3166,73 @@ VERIFY    Root cause traced with temporary debug instrumentation added to
           repro assertions fail against the pre-fix binary exactly as
           expected (both fields show their value one character short);
           all assertions pass against the fix.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-220
+NAME:     ⌃B refocuses (instead of hiding) a visible-but-unfocused file
+          tree
+PRIORITY: P2
+BUG:      P2 "⌃B hides the tree instead of refocusing it when the tree is
+          already visible-but-unfocused, contradicting
+          docs/UI_GUIDELINES.md" — see bugs.md "File-tree fuzzy-filter
+          trigger fix" (2026-08-31), found as a side effect while
+          interactively testing that session's `/` filter-trigger fix.
+          `Editor.pm::cmd_toggle_tree` only ever checked whether the tree
+          was visible (`$self->{_show_tree}`), not whether it was
+          focused, so it had exactly two branches: hidden -> show+focus,
+          visible -> hide. From the real, easily-reached "visible but
+          unfocused" state (e.g. right after Enter opens a file from the
+          tree, which unfocuses it but leaves `_show_tree` on; or after
+          Esc returns focus to the editor while the tree stays open, or
+          after clicking into the document), pressing ⌃B hid the tree
+          instead of refocusing it, per
+          docs/UI_GUIDELINES.md's "Navigation And Focus": "⌃B is
+          context-dependent: when the file tree is hidden it shows the
+          tree and focuses it; when the tree is visible it toggles focus
+          between the tree and the editor."
+CROSS-REF: QA-TREE-002 (qa/22_file_tree.txt — primary catalog entry for
+          ⌃B's focus-toggle behavior, updated with this fix's findings);
+          tests/editor.t ('cmd_toggle_tree: hidden -> shows and focuses
+          tree', 'cmd_toggle_tree: visible+focused -> hides the tree',
+          'cmd_toggle_tree: visible+unfocused -> refocuses the tree (not
+          hide)', 'cmd_toggle_tree: visible+unfocused after Enter-opening
+          a file, then refocus', 'cmd_toggle_tree: full three-state cycle
+          round-trips correctly').
+VERIFY    `cmd_toggle_tree` (`Editor.pm`) now checks focus state, not
+          just visibility: visible-and-unfocused refocuses the tree
+          (`set_focused(1)` + `_tree_reveal_current()` to resync the
+          highlight to the active tab, same as the hidden->shown path);
+          visible-and-focused still hides it (unchanged — this remains
+          the only code path that clears `_show_tree`, so it's still the
+          sole way to actually close the tree panel); hidden still
+          shows+focuses it (unchanged). `qa/scripts/tier1/
+          reg_220_tree_ctrlb_refocus.sh` reproduces the bug's exact
+          trigger (⌃B to open+focus the tree, Enter to open a second file
+          from it — which unfocuses the tree but leaves it visible — then
+          ⌃B again) and asserts non-tautologically: it checks for a third
+          file (`ccc.txt`) that is never opened as a tab and can
+          therefore only appear on screen via the tree panel's own file
+          listing, unlike checking the *open* file's name (which the tab
+          bar would show regardless of tree visibility — see this
+          script's own header note on why `reg_183_tree_back_hint.sh`'s
+          similarly-shaped "Tree panel remains open" assertion is
+          tautological and never would have caught this class of bug).
+          It also checks the `⌃B back` focus-hint pill's presence/absence
+          and a functional check that a typed character does not leak
+          into the document while the tree is (re)focused. Verified
+          non-tautological: 3 of 8 assertions (the ones specific to the
+          bug) fail against the pre-fix binary and pass after the fix;
+          the other 5 (covering the unaffected hidden->shown and
+          focused->hidden transitions, used as preconditions) pass
+          against both. Interactively re-verified via `hangon` for all
+          three states plus the mouse-click-into-editor path (which also
+          leaves the tree visible-but-unfocused) and the Esc-based
+          unfocus path, confirming ⌃B correctly refocuses from each.
+          Also found and logged (not fixed, out of scope for this P2 fix)
+          in bugs.md: `reg_183_tree_back_hint.sh`'s "Tree panel remains
+          open after ⌃B" assertion and QA-TREE-002/QA-TREE-020's prior
+          text both describe ⌃B-while-focused as never hiding the tree —
+          contradicted by the actual, confirmed, unchanged behavior
+          (hides on the second press, matching QA-TREE-001) and by
+          reg_183's own assertion being tautological (see above).
