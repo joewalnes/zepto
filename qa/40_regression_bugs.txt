@@ -2890,3 +2890,40 @@ VERIFY    check_for_changes() now debounces itself
           exactly as expected — cross-instance sync silently stopped
           working — before the real fix was restored and the script
           passed again.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-215
+NAME:     Ghost-text completion renders at the cursor's screen column,
+          not at the end of the line's real content
+PRIORITY: P1
+BUG:      bugs.md P1 "Ghost-text completion renders at the end of the
+          line's real content, not at the cursor — garbles arbitrary
+          lines when cursor isn't at line-end" (found 2026-08-30, fixed
+          2026-08-31). `Renderer.pm`'s ghost-text block in
+          `_render_text_area` always computed its start column from
+          `$content_display_width` (the visual end of the line's REAL
+          content) instead of the cursor's actual screen column —
+          invisible when the cursor sat at true end-of-line (the common
+          typing case), but garbled the display whenever the cursor was
+          genuinely mid-line with real content still after it (e.g.
+          after undo/redo left a stale cursor, or navigation through
+          multi-byte content).
+CROSS-REF: QA-CPLT-024
+VERIFY    With the cursor positioned immediately after a completable
+          prefix and unrelated real content still following it on the
+          same line, the ghost-text suggestion renders right at the
+          cursor (extending the prefix in place), never glued onto the
+          end of the line's real trailing content and never bled onto a
+          different row. The cursor's reported position is unchanged.
+          Accepting the suggestion (Tab) inserts it at the cursor and
+          the saved file matches exactly what was shown. The common
+          end-of-line case is unaffected — ghost text still renders
+          immediately after the real content there, exactly as before.
+          `qa/scripts/tier1/reg_215_ghost_text_cursor_position.sh`
+          reproduces the bug against the pre-fix binary (asserts the
+          buggy `...XYZana`/`...XYZdana` shape is absent, and that the
+          correctly-positioned `ban(ana|dana)` shape is present, scoped
+          to the actual screen row so a coincidental match on an
+          unrelated line's own content can't produce a false pass) and
+          passes after the fix.

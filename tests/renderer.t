@@ -3051,4 +3051,165 @@ subtest 'Find bar with no matches / longer match counts never exceeds $cols' => 
     }
 };
 
+# ============================================================================
+# Ghost text completion rendering (bugs.md P1 "Ghost-text completion renders
+# at the end of the line's real content, not at the cursor")
+#
+# Renderer::_render_text_area's ghost-text block used to always paint the
+# suggestion starting at $content_display_width -- the visual end of the
+# line's REAL content -- instead of at the cursor's actual screen column.
+# This was invisible when the cursor sat at true end-of-line (the common
+# typing case) but garbled the display whenever the cursor was mid-line
+# with real characters after it (e.g. after undo/redo, or navigation
+# through multi-byte content -- see bugs.md for the original repros).
+# ============================================================================
+
+# Extract just row 3's raw (unstripped) rendered segment -- the first text
+# row -- from a full render_string() output, for byte-level assertions
+# about exactly what was emitted for that row.
+sub _extract_row3 {
+    my ($out) = @_;
+    if ($out =~ /(\x1b\[3;\d+H.*?)(?=\x1b\[4;\d+H)/s) {
+        return $1;
+    }
+    return '';
+}
+
+subtest 'Ghost text: cursor at true end-of-line renders in the fill area (baseline, unchanged)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    Zepto::Renderer->set_tab_width(4);
+
+    my ($doc, $view) = create_test_state("hello\n");
+    is($doc->line_count(), 1, 'single-line fixture');
+    $view->set_cursor(0, 5);    # true end of "hello"
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($doc->line_count());
+    my $ghost_fg = $theme->color('completion_ghost_fg');
+
+    my $out = Zepto::Renderer->render_string(
+        document => $doc, view => $view, theme => $theme,
+        rows => 24, cols => 80,
+        ui => { completion => { ghost_text => 'XX' } },
+    );
+
+    my $row3 = _extract_row3($out);
+    ok(length($row3) > 0, 'row 3 (first text row) was rendered');
+
+    # Ghost text immediately follows the real content, in the fill area --
+    # no mid-row cursor-repositioning sequence is needed or emitted when
+    # the cursor is already at the end of the real content.
+    my $expected = $ghost_fg . 'XX' . Zepto::Renderer::RESET;
+    like($row3, qr/\Q$expected\E/, 'ghost text follows real content directly, still in the fill area');
+
+    # Regression guard: the old ghost-text block never needed a second
+    # mid-row cursor jump for this case, and still doesn't -- only the
+    # single row-start move-to should appear.
+    my $move_count = () = ($row3 =~ /\x1b\[3;\d+H/g);
+    is($move_count, 1, 'no extra mid-row cursor repositioning for the end-of-line case');
+};
+
+subtest 'Ghost text: mid-line cursor with plain content after it renders at the cursor column (bugs.md P1)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    Zepto::Renderer->set_tab_width(4);
+
+    my ($doc, $view) = create_test_state("hello world\n");
+    is($doc->line_count(), 1, 'single-line fixture');
+    is($doc->get_line_content(0), 'hello world', 'fixture content as expected');
+
+    # Cursor between "hello" and " world" -- real content follows the
+    # cursor on this line, which is exactly the scenario the bug garbled.
+    $view->set_cursor(0, 5);
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($doc->line_count());
+    my $tree_width = 0;
+    my $cols = 80;
+    my $rows = 24;
+    my $minimap_width = 0;    # show_minimap defaults off when no prefs given
+    my $avail_width = $cols - $tree_width - $gutter_width - $minimap_width;
+
+    my $visual_cursor_col = Zepto::Renderer::_char_to_visual_col('hello world', 5);
+    is($visual_cursor_col, 5, 'no tabs before the cursor -- visual column equals char column');
+
+    my $ghost_col = $tree_width + $gutter_width + $visual_cursor_col + 1;    # 1-indexed
+    my $row_end_col = $tree_width + $gutter_width + $avail_width + 1;
+    my $ghost_fg = $theme->color('completion_ghost_fg');
+
+    my $out = Zepto::Renderer->render_string(
+        document => $doc, view => $view, theme => $theme,
+        rows => $rows, cols => $cols,
+        ui => { completion => { ghost_text => 'XX' } },
+    );
+
+    my $row3 = _extract_row3($out);
+    ok(length($row3) > 0, 'row 3 (first text row) was rendered');
+
+    # Correct position: ghost text is painted as an overlay at the cursor's
+    # actual screen column, then the terminal cursor is restored to the
+    # natural end of the content row (for the minimap/CLEAR_LINE that follow).
+    my $expected = Zepto::Renderer::_move_to(3, $ghost_col)
+        . $ghost_fg . 'XX' . Zepto::Renderer::RESET
+        . Zepto::Renderer::_move_to(3, $row_end_col);
+    like($row3, qr/\Q$expected\E/,
+        "ghost text renders at the cursor's screen column (col $ghost_col), not line-content end");
+
+    # Wrong (pre-fix) position: the line's real content is 11 chars wide, so
+    # the old buggy code painted the ghost suffix starting right after it,
+    # i.e. immediately adjacent to the real content with NO cursor
+    # repositioning beforehand. Confirm the ghost color+text sequence
+    # appears exactly once in this row -- the one correctly-positioned
+    # occurrence just matched above -- and not a second, un-repositioned
+    # occurrence glued onto the end of the real content (the pre-fix shape).
+    my $ghost_occurrences = () = ($row3 =~ /\Q${ghost_fg}XX\E/g);
+    is($ghost_occurrences, 1, 'ghost color+text appears exactly once, at the repositioned cursor column');
+
+    # Real trailing content ("hello world") is rendered intact exactly
+    # once -- not duplicated, not corrupted, not shifted out of the string.
+    my $visible = strip_escapes($row3);
+    my $hello_count = () = ($visible =~ /hello/g);
+    my $world_count = () = ($visible =~ /world/g);
+    is($hello_count, 1, 'real content "hello" appears exactly once (not duplicated)');
+    is($world_count, 1, 'real content "world" appears exactly once (not duplicated)');
+};
+
+subtest 'Ghost text: mid-line cursor after a tab accounts for tab expansion (bugs.md P1)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    Zepto::Renderer->set_tab_width(4);
+
+    my ($doc, $view) = create_test_state("a\tbcd efg\n");
+    is($doc->line_count(), 1, 'single-line fixture');
+    is($doc->get_line_content(0), "a\tbcd efg", 'fixture content as expected');
+
+    # Cursor right after "d" (char index 5: a=0, \t=1, b=2, c=3, d=4, cursor=5),
+    # with " efg" as real trailing content after it.
+    $view->set_cursor(0, 5);
+
+    my $gutter_width = Zepto::Renderer->get_gutter_width($doc->line_count());
+    my $tree_width = 0;
+
+    # Manually-derived expected visual column: 'a' -> visual col 1; tab
+    # at visual col 1 expands to the next multiple of 4 -> visual col 4;
+    # 'b','c','d' each add 1 -> visual col 7.
+    my $visual_cursor_col = Zepto::Renderer::_char_to_visual_col("a\tbcd efg", 5);
+    is($visual_cursor_col, 7, 'tab expansion is accounted for in the cursor visual column');
+
+    my $ghost_col = $tree_width + $gutter_width + $visual_cursor_col + 1;
+    my $ghost_fg = $theme->color('completion_ghost_fg');
+
+    my $out = Zepto::Renderer->render_string(
+        document => $doc, view => $view, theme => $theme,
+        rows => 24, cols => 80,
+        ui => { completion => { ghost_text => 'Q' } },
+    );
+
+    my $row3 = _extract_row3($out);
+    my $expected = Zepto::Renderer::_move_to(3, $ghost_col) . $ghost_fg . 'Q' . Zepto::Renderer::RESET;
+    like($row3, qr/\Q$expected\E/,
+        "ghost text renders at the tab-expanded cursor column (col $ghost_col)");
+
+    # Real trailing content after the cursor ("efg") must survive intact.
+    my $visible = strip_escapes($row3);
+    my $efg_count = () = ($visible =~ /efg/g);
+    is($efg_count, 1, 'real trailing content "efg" appears exactly once (not duplicated)');
+};
+
 done_testing();

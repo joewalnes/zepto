@@ -105,14 +105,26 @@ qa_assert_screen "xyrow1text" "start-of-file line reads correctly after front-of
 qa_assert_not_screen "xyrow1textrow1text" "no duplicate at start of file"
 
 # --- Same pattern at the END of the file (line 5000) ---
+# Deliberately uses a DIFFERENT 2-char prefix ("wz") than the start-of-file
+# case above ("xy"): the previous sub-test just created a real, different
+# word "xyrow1text" elsewhere in the buffer, so reusing "xy" here would
+# make CrossBufferWordProvider offer THAT as a legitimate (non-self-match)
+# ghost-text candidate at this cursor too -- a real, intentional inline
+# suggestion that (correctly, post-bugs.md-P1-fix -- see Renderer.pm's
+# ghost-text overlay) visually overlays part of "row5000text" at the
+# cursor rather than being pushed harmlessly past it. That's expected,
+# desired behavior for a genuinely different candidate, but it would
+# make this SELF-match-only assertion non-deterministic / test the wrong
+# thing depending on unrelated prior sub-test state. A fresh, unused
+# prefix keeps this sub-test isolated to the self-match scenario alone.
 qa_keys "ctrl-g"
 qa_send "5000" 0.2
 qa_keys "enter"
 sleep 0.3
-qa_send "x" 0.3
-qa_send "y" 0.5
-qa_assert_screen "xyrow5000text" "end-of-file line reads correctly after front-of-word typing"
-qa_assert_not_screen "xyrow5000textrow5000text" "no duplicate at end of file"
+qa_send "w" 0.3
+qa_send "z" 0.5
+qa_assert_screen "wzrow5000text" "end-of-file line reads correctly after front-of-word typing"
+qa_assert_not_screen "wzrow5000textrow5000text" "no duplicate at end of file"
 
 # --- Regression guard: a genuinely DIFFERENT completion candidate (not a
 # self-match) must still be offered -- the fix must not have disabled

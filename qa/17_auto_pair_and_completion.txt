@@ -443,3 +443,67 @@ NOTES
   actually specific to completion-dismissal — any Escape followed by a
   32-126 byte in a separate read within the old ~0.5s window triggered
   it; ghost-text dismissal was just the discovery scenario.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-CPLT-024
+NAME:     Ghost text renders at the cursor's screen column when the
+          cursor is mid-line, not at the end of the line's real content
+          (REGRESSION)
+PRIORITY: P1
+FEATURE:  completion, rendering
+RELATED:  bugs.md P1 "Ghost-text completion renders at the end of the
+          line's real content, not at the cursor — garbles arbitrary
+          lines when cursor isn't at line-end" (fixed 2026-08-31);
+          QA-REG-215
+
+STEPS
+  1. Open a file with a line supplying two completion candidates for a
+     shared prefix elsewhere in the buffer (e.g. `banana bandana` on
+     one line), and a second line with that prefix followed by
+     unrelated real content, e.g. `ban XYZ`.
+  2. Move the cursor to immediately after `ban` on the second line —
+     mid-line, with ` XYZ` still after it — not to the true end of
+     the line.
+  3. Re-trigger word-completion at that exact position (e.g. delete
+     and retype the last character of the prefix).
+
+VERIFY
+  - The ghost-text suggestion (`ana`/`dana`) appears immediately at
+    the cursor, extending `ban` to `banana`/`bandana` — NOT glued
+    onto the end of the real ` XYZ` tail (which was the bug: it used
+    to render as `ban XYZana`/`ban XYZdana`).
+  - The cursor's reported position is unchanged by the ghost text
+    appearing.
+  - The unrelated line supplying the candidates renders untouched —
+    the ghost text never bleeds onto a different row.
+  - Accepting the suggestion (Tab) inserts it at the cursor, producing
+    `banana XYZ`/`bandana XYZ` with ` XYZ` correctly still present
+    after it; saving confirms the file on disk matches exactly what
+    was shown (the ghost-text preview never touches the document).
+  - The common case — cursor at the true end of the line — still
+    renders the ghost text immediately after the real content with no
+    change in behavior (no regression to the everyday typing path).
+
+NOTES
+  Root cause was purely in rendering, not completion logic:
+  `Renderer.pm`'s ghost-text block in `_render_text_area` always
+  computed its insertion point from `$content_display_width` (the
+  visual end of the line's REAL content) instead of the cursor's own
+  screen column, so this was invisible whenever the cursor happened
+  to be at true end-of-line (the overwhelmingly common typing case)
+  and only garbled the display when the cursor was genuinely mid-line
+  with real content after it. Fixed by computing the cursor's local
+  visual column (same tab/wide-char-aware `_char_to_visual_col`
+  computation already used for the real block cursor) and, when it
+  falls strictly before the end of the row's real content, painting
+  the ghost text as a same-row terminal cursor-repositioning overlay
+  at that exact column rather than splicing it into the already
+  syntax-highlighted content string (which would have required
+  shifting every downstream token/match/selection position and risked
+  reintroducing the exact "duplicated/misplaced content" shape this
+  bug already had). The real content already rendered is never
+  spliced, shifted, or duplicated — confirmed via save-to-disk staying
+  byte-identical to the pre-ghost-text file content. See
+  `qa/scripts/tier1/reg_215_ghost_text_cursor_position.sh` for the
+  executable regression coverage.
