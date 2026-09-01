@@ -209,20 +209,65 @@ VERIFY
 
 ID:       QA-TREE-013
 NAME:     Tree filter via typing / to filter
-PRIORITY: P2
+PRIORITY: P1
 FEATURE:  tree filter
+RELATED:  bugs.md P1 "File-tree flat-filter search... has zero UI
+          trigger" (FIXED, QA-REG-216) — this feature was fully built and
+          unit-tested underneath but completely unreachable from the
+          running editor until that fix wired '/' up as the trigger.
+          qa/scripts/tier1/tree_013_filter.sh
 
 SETUP
   Tree focused.
 
 STEPS
-  1. Press `/`.
-  2. Type "edit".
+  1. Without pressing `/`, type a few plain letters.
+  2. Press `/`.
+  3. Type a query matching one file but not others (e.g. "edit").
+  4. Press Backspace enough times to empty the query.
+  5. Press Escape once, then Escape again.
 
 VERIFY
-  - Tree switches to flat filter mode.
-  - Only files matching "edit" are shown.
-  - Filter query is visible in header.
+  - Step 1: plain typing with no `/` trigger does NOT filter — the tree
+    stays in normal browse mode (this is the exact bug the fix above
+    addresses: confirms the old broken "nothing happens" state hasn't
+    silently come back in a different form).
+  - Step 2: the status bar's tree-context hint row swaps its `/ filter`
+    pill to `Esc clear`, and the search bar (search icon + query, always
+    row 1 of the tree panel) becomes visible with the cursor positioned
+    in it.
+  - Step 3: tree switches to a flat filter list — only matching files are
+    shown, with matched characters highlighted; non-matching files (and
+    all directories) drop out of the list entirely.
+  - Step 4: as the query shrinks back to empty, the full hierarchical
+    tree reappears (filter mode stays active with an empty query — see
+    QA-TREE-005's script for that specific edge case).
+  - Step 5: the first Escape clears the filter but the tree stays
+    focused (hint row reverts to `/ filter`); the second Escape unfocuses
+    the tree back to the editor, matching Esc's normal-mode behavior.
+  - See QA-TREE-030 for Enter opening the highlighted filtered result.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-TREE-030
+NAME:     Enter opens the highlighted result while filtering
+PRIORITY: P1
+FEATURE:  tree filter
+RELATED:  QA-TREE-013 (filter trigger/typing/backspace/escape), QA-TREE-006
+          (the plain-mode equivalent this mirrors)
+          qa/scripts/tier1/tree_030_filter_enter_opens.sh
+
+SETUP
+  Tree focused, filter mode active with a query matching exactly one file.
+
+STEPS
+  1. Press Enter.
+
+VERIFY
+  - The highlighted (only) filtered result opens in the editor.
+  - Filter mode exits (hint row no longer shows `Esc clear`).
+  - Focus returns to the editor (DOCUMENT-context status bar shows),
+    mirroring plain-mode Enter's behavior (QA-TREE-006).
 
 --------------------------------------------------------------------------------
 

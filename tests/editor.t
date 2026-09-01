@@ -3223,6 +3223,248 @@ subtest 'Tree preview of unreadable file surfaces an error message' => sub {
 };
 
 # ============================================================================
+# File-tree fuzzy-filter trigger wiring (bugs.md P1: "File-tree flat-filter
+# search (FileTree::start_filter/filter_active) is fully built and rendered
+# but has zero UI trigger — completely unreachable from the running editor")
+# ============================================================================
+# FileTree::start_filter/filter_append_char/filter_backspace/clear_filter
+# were fully implemented and already unit-tested in tests/file_tree.t, but
+# nothing in Editor.pm's handle_tree_event ever called any of them. These
+# tests cover the NEW wiring only: '/' triggers filter mode, subsequent
+# char/backspace events route to the filter while active, Escape
+# clears-then-unfocuses across two presses, and Enter opens the selected
+# filtered result. They chdir into the tree root the same way the
+# "Tree preview of unreadable file" subtest above does, since filter-mode
+# navigation also drives _tree_preview_current(), which resolves the node's
+# tree-relative path against the process cwd.
+require Zepto::FileTree;
+
+subtest 'File tree: "/" enters filter mode while tree is focused' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $initial = create_temp_file("hello\n");
+    setup_editor_doc($editor, $initial);
+
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+    $editor->{file_tree}->set_focused(1);
+
+    ok(!$editor->{file_tree}->filter_active(), 'Sanity: filter not active before "/"');
+
+    $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+
+    ok($editor->{file_tree}->filter_active(), '"/" activates filter mode');
+    is($editor->{file_tree}->filter_query(), '', 'Filter query starts empty');
+};
+
+subtest 'File tree: typed characters route to filter_append_char while filtering' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh1, '>', "$dir/needle.txt") or die $!;
+    close $fh1;
+    open(my $fh2, '>', "$dir/other.txt") or die $!;
+    close $fh2;
+
+    my $orig_cwd = Cwd::getcwd();
+    my $ok = eval {
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+
+        $editor->handle_tree_event({ type => 'char', char => 'n', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'e', modifiers => [] });
+
+        is($editor->{file_tree}->filter_query(), 'ne',
+           'Typed chars accumulate into the filter query via handle_tree_event');
+        my $flat = $editor->{file_tree}->flat_list();
+        ok((grep { $_->{path} eq 'needle.txt' } @$flat),
+           'needle.txt matches the "ne" filter');
+        ok(!(grep { $_->{path} eq 'other.txt' } @$flat),
+           'other.txt does not match the "ne" filter');
+
+        1;
+    };
+    my $err = $@;
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+subtest 'File tree: "/" while already filtering is treated as a query character, not a re-trigger' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    mkdir("$dir/lib") or die "mkdir failed: $!";
+    open(my $fh, '>', "$dir/lib/sub.txt") or die $!;
+    close $fh;
+
+    my $orig_cwd = Cwd::getcwd();
+    my $ok = eval {
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'l', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'i', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'b', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+
+        is($editor->{file_tree}->filter_query(), 'lib/',
+           'A second "/" while filtering is appended to the query, not treated as the trigger again');
+
+        1;
+    };
+    my $err = $@;
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+subtest 'File tree: Backspace routes to filter_backspace while filtering, and exits filter mode on an empty query' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/needle.txt") or die $!;
+    close $fh;
+
+    my $orig_cwd = Cwd::getcwd();
+    my $ok = eval {
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'a', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'b', modifiers => [] });
+
+        $editor->handle_tree_event({ type => 'key', key => 'backspace', modifiers => [] });
+        is($editor->{file_tree}->filter_query(), 'a', 'Backspace removes the last typed character');
+        ok($editor->{file_tree}->filter_active(), 'Filter mode is still active after a mid-query backspace');
+
+        # Backspacing the last character empties the query but does NOT
+        # itself exit filter mode — per FileTree::filter_backspace, only
+        # backspacing an ALREADY-empty query exits (one more press below).
+        $editor->handle_tree_event({ type => 'key', key => 'backspace', modifiers => [] });
+        is($editor->{file_tree}->filter_query(), '', 'Backspace empties the query');
+        ok($editor->{file_tree}->filter_active(), 'Filter mode is still active with an empty query');
+
+        $editor->handle_tree_event({ type => 'key', key => 'backspace', modifiers => [] });
+        ok(!$editor->{file_tree}->filter_active(),
+           'Backspacing past an empty query exits filter mode (matches FileTree::filter_backspace)');
+
+        1;
+    };
+    my $err = $@;
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+subtest 'File tree: Backspace is a no-op in normal (non-filtering) browse mode' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/a.txt") or die $!;
+    close $fh;
+
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $initial = create_temp_file("hello\n");
+    setup_editor_doc($editor, $initial);
+
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+    $editor->{file_tree}->set_focused(1);
+    my $cursor_before = $editor->{file_tree}->cursor();
+
+    $editor->handle_tree_event({ type => 'key', key => 'backspace', modifiers => [] });
+
+    ok(!$editor->{file_tree}->filter_active(), 'Backspace does not activate filter mode outside of it');
+    is($editor->{file_tree}->cursor(), $cursor_before, 'Backspace leaves tree cursor unchanged in browse mode');
+};
+
+subtest 'File tree: Escape clears the filter first, then unfocuses the tree on a second press' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/x.txt") or die $!;
+    close $fh;
+
+    my $orig_cwd = Cwd::getcwd();
+    my $ok = eval {
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+        $editor->handle_tree_event({ type => 'char', char => 'x', modifiers => [] });
+        ok($editor->{file_tree}->filter_active(), 'Sanity: filter active before Escape');
+
+        $editor->handle_tree_event({ type => 'key', key => 'escape', modifiers => [] });
+        ok(!$editor->{file_tree}->filter_active(), 'First Escape clears the filter');
+        ok($editor->{file_tree}->focused(), 'Tree remains focused after the first Escape');
+
+        $editor->handle_tree_event({ type => 'key', key => 'escape', modifiers => [] });
+        ok(!$editor->{file_tree}->focused(), 'Second Escape unfocuses the tree back to the editor');
+
+        1;
+    };
+    my $err = $@;
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+subtest 'File tree: Enter opens the selected filtered result and exits filter mode' => sub {
+    my $dir = tempdir(CLEANUP => 1);
+    open(my $fh, '>', "$dir/needle.txt") or die $!;
+    close $fh;
+
+    my $orig_cwd = Cwd::getcwd();
+    my $ok = eval {
+        chdir $dir or die "chdir failed: $!";
+
+        my $term = mock_terminal();
+        my $editor = Zepto::Editor->new(terminal => $term);
+        my $initial = create_temp_file("hello\n");
+        setup_editor_doc($editor, $initial);
+
+        $editor->{file_tree} = Zepto::FileTree->new(root_path => $dir);
+        $editor->{file_tree}->set_focused(1);
+        $editor->handle_tree_event({ type => 'char', char => '/', modifiers => [] });
+        for my $c (split //, 'needle') {
+            $editor->handle_tree_event({ type => 'char', char => $c, modifiers => [] });
+        }
+
+        my $flat = $editor->{file_tree}->flat_list();
+        ok((grep { $_->{path} eq 'needle.txt' } @$flat),
+           'Sanity: needle.txt is in the filtered results before Enter');
+
+        $editor->handle_tree_event({ type => 'key', key => 'enter', modifiers => [] });
+
+        ok(!$editor->{file_tree}->filter_active(), 'Enter clears filter mode after opening the result');
+        ok(!$editor->{file_tree}->focused(), 'Enter returns focus to the editor');
+        is($editor->active_file_path(), 'needle.txt',
+           'Enter opened the highlighted filtered result, mirroring normal-mode Enter-to-open');
+
+        1;
+    };
+    my $err = $@;
+    chdir $orig_cwd or die "failed to restore cwd: $!";
+    ok($ok, 'Test body completed without dying') or diag("error: $err");
+};
+
+# ============================================================================
 # StateStore test isolation (bugs.md P1: "Zepto::Editor->new() defaults to
 # the developer's real ~/.config/zepto StateStore")
 # ============================================================================

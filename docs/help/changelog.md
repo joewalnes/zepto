@@ -2,6 +2,7 @@
 
 ## 2026-08-31
 
+- Added file tree filtering: press `/` while the tree is focused to type-to-filter across every file in the project — matching files appear in a flat list with the matched characters highlighted, and Enter opens the highlighted result. Backspace edits the search; Escape clears the search first, then a second Escape returns focus to the editor. A "/ filter" hint now appears in the tree's status bar so this is discoverable without reading any documentation
 - Fixed completion suggestions (ghost text) rendering in the wrong place when the cursor wasn't at the end of the line — previously the suggestion always appeared after the line's real content, which looked confusingly garbled whenever the cursor was mid-line with other text after it (e.g. after undo/redo, or navigating back into a word). Suggestions now always appear right at the cursor. The common case — typing normally, cursor at the end of the line — is unaffected. Accepting a suggestion (Tab) still inserts it correctly either way
 
 ## 2026-08-30
