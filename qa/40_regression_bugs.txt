@@ -3041,3 +3041,39 @@ VERIFY    The "Replace:" label (only shown once the replace field is
           mode is active and then pressing Escape (without running a
           command) drops back to plain editing instead of restoring the
           find bar.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-218
+NAME:     Toggling Light/Dark theme does not shift the status bar
+PRIORITY: P2
+BUG:      P2 "Toggling Light/Dark theme shifts the status bar because
+          'light' has one more character than 'dark'" — see bugs.md
+          (2026-08-31, found via direct user feedback while live-testing
+          the editor).
+CROSS-REF: tests/renderer.t "Theme pill has constant width across
+           dark/light/auto (no status bar shift)"
+VERIFY    `Renderer.pm`'s status-bar Theme pill concatenated the raw
+          toggle-display value ('dark'/'light'/'auto') onto its label
+          with no width normalization — unlike every other toggle
+          command, which only ever displays the fixed-width 'on'/'off'.
+          Since "light" is one character wider than "dark", switching
+          themes shifted every pill rendered after the Theme pill by a
+          column; at some terminal widths (140 cols, confirmed live) this
+          crossed the neighboring Word Wrap pill's priority-based
+          visibility threshold entirely — dark showed the full "Word
+          Wrap Z" label, light silently dropped to a bare "Z" glyph, the
+          same content rendered inconsistently depending on which theme
+          happened to be active. Fixed by padding the theme display value
+          to the width of the widest possible value ('light', 5 chars),
+          so the Theme pill's width never depends on which theme is
+          active. `qa/scripts/tier1/reg_218_theme_toggle_statusbar_shift.sh`
+          resizes to 140 cols, captures the status bar row, toggles theme
+          (⌃T), and confirms the row is byte-for-byte identical apart
+          from the theme word and its icon glyph (which deliberately
+          differs by design — moon vs. sun — and is normalized out of the
+          comparison); separately resizes to 145 cols and confirms the
+          "Word Wrap" label is visible after toggling in BOTH directions,
+          not just one. Verified non-tautological: the primary 140-col
+          assertion fails against the pre-fix binary (confirmed via `git
+          stash` on `Renderer.pm` alone) and passes against the fix.

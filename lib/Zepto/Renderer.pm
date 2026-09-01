@@ -4640,6 +4640,18 @@ sub _render_context_status_bar {
                 my $state = Zepto::CommandRegistry->get_toggle_state($cmd, $editor);
                 my $state_display = Zepto::CommandRegistry->get_toggle_display($cmd, $editor);
 
+                # Theme's display value is one of 'dark'/'light'/'auto' --
+                # unlike every other toggle (fixed-width 'on'/'off'), these
+                # differ in length, so the pill (and everything rendered
+                # after it) would otherwise shift by a column depending on
+                # which theme is active, which can even push a neighboring
+                # pill's plain-language label below its visibility
+                # threshold. Pad to the widest of the three ('light', 5
+                # chars) so the pill's width never depends on theme state.
+                if (($cmd->{pref} // '') eq 'theme') {
+                    $state_display = sprintf('%-5s', $state_display);
+                }
+
                 # Determine effective on/off (handle theme specially)
                 $is_on = $state ? 1 : 0;
                 if ($cmd->{pref} && $cmd->{pref} eq 'theme') {

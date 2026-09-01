@@ -201,6 +201,79 @@ subtest 'Status bar groups Ctrl pills left, Alt pills right, modifier shown once
     ok($wrap_pos < $cmds_pos, 'Alt group renders left of the palette trigger pill');
 };
 
+subtest 'Theme pill has constant width across dark/light/auto (no status bar shift)' => sub {
+    # bugs.md P2 "Toggling Light/Dark theme shifts the status bar because
+    # 'light' has one more character than 'dark'" -- Renderer.pm's status
+    # bar pill concatenates the RAW preference value ('dark'/'light'/'auto')
+    # onto the Theme label with no width normalization, so the pill (and
+    # everything rendered after it) shifts by one column depending on
+    # which theme is active. At the wrong width, this can push a neighbor
+    # pill's plain-language label (e.g. "Word Wrap") below its visibility
+    # threshold entirely -- not just a cosmetic shift. cols=140 is the
+    # exact width confirmed (via a live hangon repro) to cross that
+    # threshold: dark shows "Word Wrap" in full, light drops it to a bare
+    # glyph, purely because "light" is one character wider than "dark".
+    # This subtest uses cols=145, a nearby width where "Word Wrap" is
+    # visible in both states after the fix, so the assertions below
+    # demonstrate the label actually surviving intact -- not just
+    # "consistently absent in both," which cols=140 itself becomes after
+    # the fix (both states now agree, they just both drop it at that
+    # specific width -- see the sweep below for that width specifically).
+    my ($editor, $doc, $view) = create_test_editor();
+    my $dark_theme  = Zepto::Theme->dark_theme();
+    my $light_theme = Zepto::Theme->light_theme();
+    my $cols = 145;
+
+    $editor->{prefs}->set_theme('dark');
+    my $bar_dark = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $dark_theme, $cols, undef, undef, { editor => $editor }, 0
+    );
+    my $s_dark = strip_escapes($bar_dark);
+
+    $editor->{prefs}->set_theme('light');
+    my $bar_light = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $light_theme, $cols, undef, undef, { editor => $editor }, 0
+    );
+    my $s_light = strip_escapes($bar_light);
+
+    is(length($s_dark), length($s_light),
+        "Rendered status bar width is identical for dark vs light theme (cols=$cols)");
+
+    # The real symptom: everything after the Theme pill (e.g. the Word Wrap
+    # label) must land at the exact same column in both states, and must
+    # not be dropped entirely in one state but not the other.
+    my $wrap_pos_dark  = index($s_dark, 'Word Wrap');
+    my $wrap_pos_light = index($s_light, 'Word Wrap');
+    ok($wrap_pos_dark >= 0 && $wrap_pos_light >= 0,
+        "Word Wrap label is present in both theme states (cols=$cols)");
+    is($wrap_pos_dark, $wrap_pos_light,
+        'Word Wrap label starts at the same column regardless of theme');
+
+    # 'auto' ('dark'/'auto' are both 4 chars, coincidentally the same width
+    # as each other but not as 'light' -- confirm it too matches 'light's
+    # width, not just 'dark's, since all three are the same padded width.
+    $editor->{prefs}->set_theme('auto');
+    my $bar_auto = Zepto::Renderer->_render_context_status_bar(
+        $doc, $view, $dark_theme, $cols, undef, undef, { editor => $editor }, 0
+    );
+    my $s_auto = strip_escapes($bar_auto);
+    is(length($s_auto), length($s_light),
+        'Rendered status bar width for auto matches light (both padded to the same width)');
+
+    # Sweep a broader range of widths to catch the same class of bug at
+    # OTHER threshold-crossing widths, not just the one confirmed live.
+    for my $sweep_cols (60 .. 160) {
+        $editor->{prefs}->set_theme('dark');
+        my $bd = strip_escapes(Zepto::Renderer->_render_context_status_bar(
+            $doc, $view, $dark_theme, $sweep_cols, undef, undef, { editor => $editor }, 0));
+        $editor->{prefs}->set_theme('light');
+        my $bl = strip_escapes(Zepto::Renderer->_render_context_status_bar(
+            $doc, $view, $light_theme, $sweep_cols, undef, undef, { editor => $editor }, 0));
+        is(length($bd), length($bl),
+            "cols=$sweep_cols: identical total width for dark vs light");
+    }
+};
+
 subtest 'Status bar priority-1 pill in each column survives narrow widths' => sub {
     my ($editor, $doc, $view) = create_test_editor();
     my $theme = Zepto::Theme->dark_theme();
