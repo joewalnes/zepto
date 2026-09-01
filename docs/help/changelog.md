@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-31
+
+- Fixed completion suggestions (ghost text) rendering in the wrong place when the cursor wasn't at the end of the line — previously the suggestion always appeared after the line's real content, which looked confusingly garbled whenever the cursor was mid-line with other text after it (e.g. after undo/redo, or navigating back into a word). Suggestions now always appear right at the cursor. The common case — typing normally, cursor at the end of the line — is unaffected. Accepting a suggestion (Tab) still inserts it correctly either way
+
 ## 2026-08-30
 
 - Fixed a real data-corruption bug in multi-cursor and column-select editing: backspacing across a line-join, or deleting a multi-line selection, while a second cursor was active could leave that other cursor pointing at the wrong place in the document (or at a line number that no longer existed) — the very next keystroke would then silently insert or delete in the wrong spot. Multi-cursor and column-select editing that stays within a single line was never affected

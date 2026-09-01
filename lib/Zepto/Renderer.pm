@@ -2809,10 +2809,27 @@ sub _render_text_area {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
                 }
             } elsif ($fill_remaining > 0) {
-                # Ghost text: render inline completion hint on cursor line
-                if ($is_cursor_line && $completion && $completion->{ghost_text}
+                # Ghost text: render inline completion hint on cursor line.
+                # The suggestion belongs at the cursor's actual screen column,
+                # not at the visual end of the line's real content — those
+                # only coincide when the cursor happens to be at true
+                # end-of-line (the common case). Compute the cursor's local
+                # column within this row so mid-line cursors (e.g. after
+                # undo/redo, or navigation through multi-byte content) don't
+                # garble unrelated trailing content. See bugs.md P1 "Ghost-text
+                # completion renders at the end of the line's real content".
+                my $has_ghost = $is_cursor_line && $completion && $completion->{ghost_text}
                     && length($completion->{ghost_text}) > 0
-                    && !$is_wrap_cont) {
+                    && !$is_wrap_cont;
+                my $ghost_cursor_local = $has_ghost
+                    ? ($visual_cursor_col - $effective_scroll_col)
+                    : undef;
+
+                if ($has_ghost && $ghost_cursor_local >= $content_display_width) {
+                    # Cursor is at (or past) the visual end of the real
+                    # content on this row — the common typing case. Ghost
+                    # text simply continues right where content left off,
+                    # exactly as before.
                     my $ghost = $completion->{ghost_text};
                     my $ghost_len = length($ghost);
                     if ($ghost_len > $fill_remaining) {
@@ -2825,6 +2842,39 @@ sub _render_text_area {
                     push @_out, ' ' x $after if $after > 0;
                 } else {
                     push @_out, $fill_bg . (' ' x $fill_remaining);
+
+                    if ($has_ghost && $ghost_cursor_local >= 0
+                        && $ghost_cursor_local < $content_display_width) {
+                        # Cursor is genuinely mid-line, with real content
+                        # already rendered after it. Rather than splicing the
+                        # ghost text into the highlighted content string
+                        # (which would require shifting every downstream
+                        # syntax/selection/match position and risks
+                        # duplicating or corrupting real characters — exactly
+                        # how this bug originally manifested), paint the
+                        # ghost text as a same-row overlay: jump the terminal
+                        # cursor to the real cursor's screen column, draw the
+                        # suggestion on top, then restore the terminal cursor
+                        # to where sequential row rendering (minimap,
+                        # CLEAR_LINE) expects it. The real content already
+                        # rendered above is never touched or duplicated.
+                        my $room = $avail_width - $ghost_cursor_local;
+                        if ($room > 0) {
+                            my $ghost = $completion->{ghost_text};
+                            my $ghost_len = length($ghost);
+                            if ($ghost_len > $room) {
+                                $ghost = substr($ghost, 0, $room);
+                                $ghost_len = $room;
+                            }
+                            my $ghost_col = $tree_width + $gutter_width
+                                + $wrap_indicator_width + $ghost_cursor_local + 1;
+                            my $row_end_col = $tree_width + $gutter_width + $width + 1;
+                            my $ghost_fg = $theme->color('completion_ghost_fg');
+                            push @_out, _move_to($screen_row + 3, $ghost_col);
+                            push @_out, $ghost_fg . $ghost . RESET;
+                            push @_out, _move_to($screen_row + 3, $row_end_col);
+                        }
+                    }
                 }
             }
         }
