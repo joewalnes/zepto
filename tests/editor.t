@@ -2127,6 +2127,114 @@ subtest 'Clicking document area confirms preview instead of dismissing' => sub {
 };
 
 # ============================================================================
+# cmd_toggle_tree (⌃B) — three-state focus behavior
+#
+# Per docs/UI_GUIDELINES.md: when the tree is hidden, ⌃B shows it and
+# focuses it. When the tree is visible, ⌃B toggles focus between the tree
+# and the editor — from focused it hides the tree; from visible-but-
+# unfocused it refocuses the tree (QA-REG-220 / bugs.md P2 fix).
+# ============================================================================
+
+subtest 'cmd_toggle_tree: hidden -> shows and focuses tree' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    # show_tree defaults to 1 (Preferences.pm) but the file_tree object
+    # itself is only created by init() (not called for a bare Editor->new
+    # in these tests) — force the hidden state explicitly.
+    $editor->{_show_tree} = 0;
+    $editor->{file_tree} = undef;
+
+    ok(!$editor->{_show_tree}, 'Tree starts hidden');
+
+    $editor->cmd_toggle_tree();
+
+    ok($editor->{_show_tree}, 'Tree now visible');
+    ok($editor->{file_tree}, 'Tree object created');
+    ok($editor->{file_tree}->focused(), 'Tree is focused after showing');
+};
+
+subtest 'cmd_toggle_tree: visible+focused -> hides the tree' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    require Zepto::FileTree;
+    $editor->{_show_tree} = 1;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    $editor->{file_tree}->set_focused(1);
+
+    $editor->cmd_toggle_tree();
+
+    ok(!$editor->{_show_tree}, 'Tree hidden after toggling from focused state');
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused after hiding');
+};
+
+subtest 'cmd_toggle_tree: visible+unfocused -> refocuses the tree (not hide)' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    # Reproduce the reported bug's setup: tree visible but unfocused, e.g.
+    # after opening a file from the tree (which unfocuses it but leaves
+    # _show_tree on).
+    require Zepto::FileTree;
+    $editor->{_show_tree} = 1;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    $editor->{file_tree}->set_focused(0);
+
+    $editor->cmd_toggle_tree();
+
+    ok($editor->{_show_tree}, 'Tree remains visible (not hidden)');
+    ok($editor->{file_tree}->focused(), 'Tree is refocused, not hidden');
+};
+
+subtest 'cmd_toggle_tree: visible+unfocused after Enter-opening a file, then refocus' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+
+    my $filename = create_temp_file("test content\n");
+    setup_editor_doc($editor, $filename);
+
+    require Zepto::FileTree;
+    $editor->{file_tree} = Zepto::FileTree->new(root_path => '.');
+    $editor->{_show_tree} = 1;
+    $editor->{file_tree}->set_focused(1);
+
+    # Simulate opening a file from the tree via Enter: _tree_open_selected's
+    # normal-open path ends by calling _tree_unfocus(), leaving the tree
+    # visible but unfocused.
+    $editor->_tree_unfocus();
+    ok($editor->{_show_tree}, 'Tree still visible after _tree_unfocus');
+    ok(!$editor->{file_tree}->focused(), 'Tree unfocused after _tree_unfocus');
+
+    $editor->cmd_toggle_tree();
+
+    ok($editor->{_show_tree}, 'Tree still visible after refocusing ⌃B');
+    ok($editor->{file_tree}->focused(), '⌃B refocused the tree instead of hiding it');
+};
+
+subtest 'cmd_toggle_tree: full three-state cycle round-trips correctly' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    $editor->{_show_tree} = 0;
+    $editor->{file_tree} = undef;
+
+    # hidden -> visible+focused
+    $editor->cmd_toggle_tree();
+    ok($editor->{_show_tree} && $editor->{file_tree}->focused(), 'Step 1: hidden -> visible+focused');
+
+    # visible+focused -> visible+unfocused (simulate losing focus to the editor,
+    # e.g. via a click or opening a file, without hiding)
+    $editor->{file_tree}->set_focused(0);
+
+    # visible+unfocused -> visible+focused (the bug fix)
+    $editor->cmd_toggle_tree();
+    ok($editor->{_show_tree} && $editor->{file_tree}->focused(), 'Step 2: visible+unfocused -> visible+focused');
+
+    # visible+focused -> hidden
+    $editor->cmd_toggle_tree();
+    ok(!$editor->{_show_tree}, 'Step 3: visible+focused -> hidden');
+};
+
+# ============================================================================
 # Enter key / newline insertion
 # ============================================================================
 

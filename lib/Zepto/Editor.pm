@@ -4692,7 +4692,17 @@ sub handle_tree_event {
 sub cmd_toggle_tree {
     my ($self) = @_;
 
-    if ($self->{_show_tree}) {
+    if ($self->{_show_tree} && $self->{file_tree} && !$self->{file_tree}->focused()) {
+        # Visible but unfocused (e.g. after opening a file from the tree,
+        # or after Esc returns focus to the editor while the tree stays
+        # open): refocus the tree instead of hiding it. Per
+        # docs/UI_GUIDELINES.md, ⌃B toggles focus between the tree and the
+        # editor while the tree is visible — it only hides the tree from
+        # the visible-and-focused state (below).
+        $self->{file_tree}->set_focused(1);
+        $self->_tree_reveal_current();
+    }
+    elsif ($self->{_show_tree}) {
         # Hide tree (per-window only)
         $self->{_show_tree} = 0;
         if ($self->{file_tree} && $self->{file_tree}->focused()) {

@@ -28,18 +28,37 @@ PRIORITY: P1
 FEATURE:  tree focus
 
 STEPS
-  1. Tree visible. Editor focused.
+  1. Tree visible. Editor focused (e.g. after opening a file from the
+     tree, which unfocuses it but leaves it open — see QA-REG-220).
   2. Press ⌃B.
 
 VERIFY
-  - Focus moves to tree.
+  - Focus moves to tree (refocuses it — it does NOT re-hide the tree from
+    this state; see QA-REG-220, the fix for bugs.md's P2 "⌃B hides the
+    tree instead of refocusing it when visible-but-unfocused").
   - Status bar shows tree-context pills (not document pills).
-  - Press ⌃B again: focus returns to editor.
+  - Press ⌃B again (now tree-focused): tree hides entirely, editor uses
+    full width — confirmed via direct `hangon` interactive testing
+    2026-08-31 while fixing QA-REG-220, matching QA-TREE-001 and
+    `cmd_toggle_tree`'s current code (`Editor.pm`). This is the confirmed
+    current behavior for the "Confirm which is current" question below.
 
 NOTES
-  Some prior behavior was "⌃B only toggles focus". Current intended
-  behavior per bugs.md "P3 Tree hide" FIXED: ⌃B toggles visibility
-  when hidden; toggles focus when visible. Confirm which is current.
+  This entry previously carried an unresolved note ("Confirm which is
+  current") about whether ⌃B-while-focused hides the tree or only
+  unfocuses it — `qa/scripts/tier1/reg_183_tree_back_hint.sh` and
+  QA-TREE-020 below both describe/assert the latter, but reg_183's
+  "Tree panel remains open after ⌃B" check is tautological (it greps for
+  the currently-open file's name, which is always present via the tab bar
+  regardless of whether the tree panel itself is visible) and has been
+  giving a false pass for the "stays open" claim rather than actually
+  verifying it. Confirmed directly via `hangon` (2026-08-31, QA-REG-220
+  fix session) that the real, current behavior hides the tree on the
+  second press, matching QA-TREE-001. Not changing the "hides" behavior
+  itself — only the VU (visible-but-unfocused) → refocus case was an
+  actual bug (QA-REG-220). Logged the reg_183/QA-TREE-020 stale-text and
+  tautological-assertion mismatch in bugs.md; not fixed there (out of
+  scope for this session).
 
 --------------------------------------------------------------------------------
 
@@ -386,8 +405,10 @@ STEPS
 
 VERIFY
   - Status bar shows pills with icons, not plain text, highest priority
-    first: `⌃B back` (switch focus to the editor, tree stays open),
-    `↵ open`, `↑↓`, `←→ fold`.
+    first: `⌃B back` (switch focus to the editor; a further ⌃B press from
+    the tree-focused state then hides the tree entirely — see QA-TREE-002's
+    NOTES, confirmed 2026-08-31 while fixing QA-REG-220), `↵ open`, `↑↓`,
+    `←→ fold`.
   - `⌃B back` is the highest-priority tree pill — it degrades to a bare
     `⌃B` before disappearing, and survives narrower widths than the other
     tree-specific pills (see QA-REG-183/185 for the dedicated width checks).
