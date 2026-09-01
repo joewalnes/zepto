@@ -533,3 +533,32 @@ VERIFY
     budget; see bugs.md's FIXED writeup for why a separate pill widget
     was tried first and reverted after it broke the P0 overflow-guard
     tests at these exact widths).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-030
+NAME:     Find and Replace field values survive Shift+Tab (no display truncation)
+PRIORITY: P2
+FEATURE:  find/replace field display integrity
+RELATED:  QA-REG-219
+SCRIPT:   tier1/reg_219_find_replace_shifttab_truncation.sh
+
+STEPS
+  1. ⌃F, type a search term, Tab to replace field, type a replace term.
+  2. Observe both field values on screen.
+  3. Press Shift+Tab (toggles replace mode).
+  4. Observe both field values again.
+  5. Repeat Shift+Tab a few more times to cycle through all modes
+     (replace-all -> replace-one -> regex -> case -> replace-all).
+  6. Repeat with a different-length search/replace term.
+
+VERIFY
+  - Both the Find field and the Replace field continue to display their
+    full typed value after Shift+Tab, with no trailing (or otherwise)
+    character silently missing from what's shown on screen.
+  - This holds through repeated Shift+Tab presses (a full mode cycle),
+    not just the first press.
+  - The mode toggle itself (the "Rep All:"/"Rep One:" label, and the
+    underlying regex/case cycle once past replace-all/replace-one)
+    continues to work correctly — this is a display-corruption fix, not
+    a change to the toggle behavior covered by QA-FIND-029.

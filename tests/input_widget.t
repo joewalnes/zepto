@@ -482,6 +482,68 @@ subtest 'viewport updates view_offset persistently' => sub {
     is($w->view_offset(), $first_offset, 'view_offset stable across calls');
 };
 
+# bugs.md P2 "Shift+Tab in the find/replace bar drops the last character
+# of BOTH the Find and Replace field values" -- root cause traced to
+# viewport() leaving a stale view_offset in place after a caller passes a
+# transiently narrower $width (e.g. the find bar shrinks its input field
+# by the length of "..." for the single render frame where the find
+# engine's is_searching flag is momentarily true), then widens back out.
+# The stale offset used to persist because the scroll-into-view check
+# only reacts when the cursor falls OUTSIDE [vo, vo+width) -- it never
+# notices that a smaller/zero vo would now show strictly more of a value
+# that fits entirely within the new width. These tests reproduce the
+# narrow-then-wide call sequence directly against InputWidget, without
+# needing the full find bar / renderer machinery, and assert the widget
+# self-corrects once the value fits again -- i.e. no character is ever
+# hidden from view that doesn't need to be.
+subtest 'viewport self-corrects stale view_offset once value fits again' => sub {
+    my $w = Zepto::InputWidget->new(value => 'aaa');  # 3 chars, cursor at end (3)
+    # Simulate one transient render frame at a width narrower than the
+    # value (2 < 3) -- e.g. the find bar's match-count text growing by
+    # "..." for the single render where the find engine's is_searching
+    # flag is momentarily true, shrinking the shared input_width. This
+    # legitimately can't show the whole value and scrolls, same as any
+    # overflowing field.
+    my $vp_narrow = $w->viewport(2);
+    is($vp_narrow->{view_offset}, 2, 'Narrow-frame call scrolls view_offset (sanity check)');
+    is($vp_narrow->{display_text}, 'a', 'Narrow frame itself cannot show the full value (expected overflow)');
+
+    # Next frame: width widens back to 4 (search finished, "..." gone),
+    # and the full 3-char value now fits inside it. Before the fix, the
+    # stale view_offset=2 stuck because cursor(3) still fit inside
+    # [2, 2+4)=[2,6), so nothing corrected it, and this call still hid
+    # the first two characters even though the whole value now fits --
+    # the exact bug: "aaa" rendered as a single trailing character while
+    # $w->{value} itself was never touched.
+    my $vp_wide = $w->viewport(4);
+    is($vp_wide->{display_text}, 'aaa', 'Widened frame shows the full value again, not truncated');
+    is($vp_wide->{view_offset}, 0, 'view_offset resets to 0 once the full value fits');
+    is($w->value(), 'aaa', 'Underlying value was never touched by any viewport() call');
+};
+
+subtest 'viewport resets stale offset to 0 whenever full value fits width' => sub {
+    my $w = Zepto::InputWidget->new(value => 'bbb');
+    # Force a stale, larger-than-necessary view_offset directly (as if
+    # left over from an earlier narrower/different-cursor render) and
+    # confirm viewport() does not trust it once the value fits.
+    $w->{view_offset} = 2;
+    my $vp = $w->viewport(10);
+    is($vp->{display_text}, 'bbb', 'Full value shown despite stale view_offset');
+    is($vp->{view_offset}, 0, 'Stale view_offset corrected to 0');
+};
+
+subtest 'viewport does not disturb legitimate end-of-value scroll for long values' => sub {
+    # Guards against an overly broad fix: when the value is genuinely
+    # longer than the field (len > width), the deliberate "one empty
+    # trailing cell at cursor" behavior (see 'viewport scrolls to keep
+    # cursor visible when at end' above) must be unaffected by the
+    # len<=width self-correction added for the bug above.
+    my $w = Zepto::InputWidget->new(value => 'abcdefghij');  # 10 chars
+    my $vp = $w->viewport(5);
+    is($vp->{display_text}, 'ghij', 'Still shows trailing chars for an overflowing value');
+    is($vp->{view_offset}, 6, 'Still scrolls right as before (unaffected by the fix)');
+};
+
 # =============================================================================
 # Mouse: click to place cursor
 # =============================================================================
