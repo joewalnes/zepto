@@ -54,11 +54,11 @@ Design, confirmed by the user 2026-09-01 (kept below for the record — turned o
 
 **One nuance for the record, not a further action item:** the "via mouse drag" half of the original report has a real explanation that's *not* a bug — mouse-drag recomputes the cursor column fresh from the live pointer position on every drag-move event (via `set_cursor()`, same call every keyboard reposition uses), so it has no persistent goal column at all. A real mouse drag is essentially never perfectly vertical, so the column will visibly shift row-to-row during an ordinary drag — this is almost certainly what read as "jumping." Implementing goal-column snapping during a live drag would itself be a regression (it would stop the selection from following the pointer, which is what a drag-select is for). Nothing to fix here; flagging as context in case the user asks about it.
 
-## 3. Unify tab-bar and status-bar button/pill styling (2026-09-01)
+## 3. [DONE — 2026-09-01, `470eac9`/`82d21ca` on `main`, pushed] Unify tab-bar and status-bar button/pill styling
 
 Reported live: "buttons at bottom have pill shape, but at top (e.g. close, quit) use a different style. Also they're lowercase. Build a common component (reusable code)."
 
-Needs investigation first: locate the tab-bar hint rendering code in `Renderer.pm` and compare against `_render_pill_list`/the status-bar pill helpers. Decide (or flag as DECISION NEEDED if it's not obvious) whether to point the tab-bar hints at the existing pill helper directly, or whether a new shared primitive is needed because the tab bar has different constraints (e.g. no click targets, different color needs). This is mechanical enough that a straightforward "point tab-bar hints at the existing helper" fix probably doesn't need a UX sign-off — but changing the tab bar's visual appearance is user-facing, so ship a screenshot for confirmation before merging, same as the modifier-label redesign did.
+Tab bar's close/tabs/quit hint converted to `_render_pill_list` (extended with a `$bg_color_name` param so it can paint into the tab bar's own background), Title Case labels. Screenshot sign-off caught a real bug before merge: pill text and rounded caps were rendering underlined with a mismatched cap color (root cause: the tab bar's deliberate baseline underline wasn't turned off before the new pill block — `QA-REG-232`). Fixed, re-screenshotted, confirmed, merged, pushed.
 
 ## 4. [DONE — 2026-09-01, logged not fixed] hangon resize mechanism after the tool's tmux-removal rewrite
 
