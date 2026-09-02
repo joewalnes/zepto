@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# QA-REG-233: Syntax highlighter has a tokenize-time timeout guard, and
+# QA-REG-234: Syntax highlighter has a tokenize-time timeout guard, and
 # normal highlighting is unaffected by it.
 #
 # Bug (bugs.md P3 "No regex-match timeout in the syntax-highlighting
@@ -31,7 +31,7 @@
 # change like this one actually carries in practice.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 source "$(dirname "$0")/../../lib/qa-perf-helpers.sh"
-qa_header "QA-REG-233: Highlighter tokenize-time alarm guard does not affect normal highlighting"
+qa_header "QA-REG-234: Highlighter tokenize-time alarm guard does not affect normal highlighting"
 
 qa_project; dir="$QA_PROJECT_DIR"
 

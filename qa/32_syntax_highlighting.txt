@@ -420,7 +420,7 @@ PRIORITY: P3
 FEATURE:  syntax highlighter regex timeout guard
 RELATED:  bugs.md P3 "No regex-match timeout in the syntax-highlighting
           path" (structural gap, no exploit found in any of the ~53
-          shipped grammars — see writeup); QA-REG-233
+          shipped grammars — see writeup); QA-REG-234
           (qa/40_regression_bugs.txt); QA-SEC-012 (FindEngine.pm's
           equivalent match-time alarm for Find, which this mirrors).
 
@@ -443,7 +443,7 @@ VERIFY
   - Discoverable indirectly: if a grammar ever does hit the timeout, the
     affected line falls back to plain/unhighlighted text rather than
     freezing the editor — a visible (if degraded) result, never a hang.
-  - Automated as `qa/scripts/tier1/reg_233_highlighter_timeout_guard.sh`
+  - Automated as `qa/scripts/tier1/reg_234_highlighter_timeout_guard.sh`
     (drives the real running editor: opens a highlighted file, confirms
     content renders, and confirms a typed edit is accepted and rendered
     within a 3-second budget). The actual guard-fires-on-a-pathological-

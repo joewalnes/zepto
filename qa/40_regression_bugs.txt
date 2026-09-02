@@ -3803,7 +3803,7 @@ QA:       `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` — copies a
 
 ---------------------------------------------------------------------------------
 
-ID:       QA-REG-233
+ID:       QA-REG-234
 NAME:     Syntax highlighter's grammar tokenize() calls are bounded by a
           tokenize-time alarm guard (P3 -- structural gap, no confirmed
           exploit in any shipped grammar)
@@ -3873,7 +3873,7 @@ TESTS:    `tests/highlighter_regex_timeout.t` (6 subtests) -- reproduced
           `tests/highlighter.t` and `tests/syntax_samples.t` (189
           combined subtests) re-run unchanged -- no regression in any
           real grammar's output.
-QA:       `qa/scripts/tier1/reg_233_highlighter_timeout_guard.sh` --
+QA:       `qa/scripts/tier1/reg_234_highlighter_timeout_guard.sh` --
           drives the real running editor: opens a `.pl` file with
           keywords/strings/comments/numbers, confirms the content
           renders, jumps to the end of the document, types a new line,
@@ -3889,4 +3889,4 @@ QA:       `qa/scripts/tier1/reg_233_highlighter_timeout_guard.sh` --
           guards against the realistic regression risk of a
           wrap-every-tokenize-call change: that it slows down or breaks
           ordinary highlighting. Verified via `perl qa/runner.pl --tier 1
-          --filter reg_233` -- 4/4 assertions pass.
+          --filter reg_234` -- 4/4 assertions pass.

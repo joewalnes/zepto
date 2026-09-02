@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # Regression test for bugs.md "Highlighter.pm has no timeout guard around
-# grammar tokenize() regex matching" (QA-REG-233).
+# grammar tokenize() regex matching" (QA-REG-234).
 #
 # None of the ~53 shipped grammars in Syntax/*.pm are known to contain a
 # catastrophic-backtracking regex -- this is a structural gap (no safety
