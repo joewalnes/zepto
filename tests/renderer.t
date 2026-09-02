@@ -2447,6 +2447,38 @@ subtest '_get_image_dimensions' => sub {
     };
 };
 
+subtest 'Public get_image_dimensions() wrapper matches the private function exactly' => sub {
+    # bugs.md P3: Editor.pm previously reached into _get_image_dimensions()
+    # via full package-qualified underscore-prefixed (private) name --
+    # the same class of layering violation WrapMap.pm had into
+    # _expand_tabs()/_char_to_visual_col() (see the "Public expand_tabs()/
+    # char_to_visual_col() wrappers" subtest above, and bugs.md's FIXED
+    # WrapMap entry this fix follows the same pattern as). This public
+    # wrapper is the fix -- confirm it's a pure pass-through with identical
+    # behavior, not a second implementation that could drift from the
+    # private one.
+    use File::Temp qw(tempdir);
+    use File::Spec;
+
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $png_path = File::Spec->catfile($tmpdir, 'wrapper_dim.png');
+    open my $fh, '>:raw', $png_path or die;
+    # 1x1 PNG (same fixture bytes as the '_get_image_dimensions' subtest above)
+    print $fh pack('H*', '89504e470d0a1a0a0000000d494844520000000100000001' .
+        '0100000000376ef9240000000a49444154789c626001000000050001e98aab' .
+        '6c0000000049454e44ae426082');
+    close $fh;
+
+    my ($w_priv, $h_priv) = Zepto::Renderer::_get_image_dimensions($png_path);
+    my ($w_pub, $h_pub)   = Zepto::Renderer::get_image_dimensions($png_path);
+    is($w_pub, $w_priv, 'get_image_dimensions() matches _get_image_dimensions() width');
+    is($h_pub, $h_priv, 'get_image_dimensions() matches _get_image_dimensions() height');
+
+    my @dims_priv = Zepto::Renderer::_get_image_dimensions('/nonexistent/path.png');
+    my @dims_pub  = Zepto::Renderer::get_image_dimensions('/nonexistent/path.png');
+    is_deeply(\@dims_pub, \@dims_priv, 'get_image_dimensions() matches _get_image_dimensions() empty-list failure case');
+};
+
 # ============================================================================
 # Image height clamping near screen bottom
 # ============================================================================

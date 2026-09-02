@@ -486,6 +486,22 @@ sub char_to_visual_col {
     return _char_to_visual_col(@_);
 }
 
+# Thin, no-underscore wrapper around _get_image_dimensions() for callers in
+# *other* modules (e.g. Editor.pm's markdown-image-fit sizing logic, which
+# needs the same image pixel dimensions this module already computes).
+# Underscore-prefixed subs are private-by-convention (docs/CODE_QUALITY.md
+# "Naming") and were previously reached directly via full package
+# qualification from Editor.pm — a layering violation with no compile-time
+# enforcement (see bugs.md "WrapMap.pm reaches into Renderer.pm's private
+# functions" for the identical pattern already fixed once). This wrapper is
+# the supported entry point instead; it just forwards args, with no behavior
+# change. Called the same way as the private function it wraps (plain
+# function call, not a method call — e.g.
+# Zepto::Renderer::get_image_dimensions($path)).
+sub get_image_dimensions {
+    return _get_image_dimensions(@_);
+}
+
 # Store and retrieve tab bar button positions for click handling
 # Each entry: { start => $x, end => $x, index => $tab_idx, type => 'tab'|'close' }
 {
