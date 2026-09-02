@@ -3615,6 +3615,109 @@ QA:       `qa/scripts/tier1/ms_023_scroll_wheel_eof_clamp.sh` — opens a
           an empty "201" gutter row at the top of the viewport instead
           of line 200 near the bottom), passes after the fix.
 
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-231
+NAME:     Tab bar corner hint (close/tabs/quit) renders as Title Case
+          pills, matching the status bar, and never overflows
+PRIORITY: P2
+BUG:      P2 "Tab-bar buttons (close/tabs/quit hints) use a visually
+          different style than the bottom status bar's pills" (reported
+          by user, 2026-09-01) -- rendered as plain lowercase text with
+          no rounded caps/chip background, unlike every pill elsewhere
+          in the UI.
+CROSS-REF: QA-TAB-013 (qa/21_tabs.txt -- primary catalog entry); QA-REG-179 /
+           QA-REG-186 (same overflow-guard technique, different rows);
+           tests/renderer.t width-floor + overflow sweep subtests
+VERIFY    `_render_tab_bar`'s corner hint (and its FILE_TREE-context twin
+          in `_render_context_status_bar`) now render via the same
+          `_render_pill_list` helper the status bar's own pills use, with
+          Title Case labels ("Close"/"Tabs"/"Quit" instead of "close"/
+          "tabs"/"quit"), via a new shared `_core_nav_hint_pill_
+          candidates()`/`_fit_core_nav_hint_pills()` pair (an ATOMIC
+          all-full/all-compact/none fit across all three pills -- using
+          the existing per-pill-greedy `_fit_pill_group` instead would
+          silently drop the Quit pill at some widths even when it would
+          fit compact, reopening the QA-REG-171 "quit has no hint
+          anywhere" gap). `_render_pill_list` gained a `$bg_color_name`
+          parameter (was hardcoded to the status bar's own background
+          color) so it paints the correct background for whichever bar
+          it's rendering into. Measured trade-off: real pill chrome needs
+          more room than the old dense plain text, so the "never
+          disappears" floor moved from a flat 40 cols to ~44-51 cols
+          depending on tab name length/nerd-font mode -- confirmed via
+          `tests/renderer.t`'s direct synthetic sweep, not assumed; below
+          its floor the hint degrades to blank fill (no corruption, no
+          garbled/truncated glyphs).
+          `qa/scripts/tier1/reg_231_tabbar_hint_pill_style.sh` confirms,
+          against the real running binary: (1) at 80 cols, the hint shows
+          Title Case pill text and no lowercase leaks through; (2) at
+          40 cols, the tab bar itself stays visible as row 1 (no
+          soft-wrap scroll corruption) and the hint degrades to fully
+          absent rather than partially rendered. Verified non-tautological
+          by temporarily swapping in the pre-fix `Renderer.pm` (from
+          `main`) and rebuilding: 2 of 4 checks correctly fail (the exact
+          lowercase text `⌃W close   ⌥←/→ tabs   ⌃Q quit` is present),
+          then pass again once the fix is restored.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-REG-232
+NAME:     Tab bar corner-hint pills (Close/Tabs/Quit) render underlined,
+          with rounded caps that read as a different color than the pill
+          body
+PRIORITY: P2
+BUG:      Reported by user reviewing a screenshot of QA-REG-231's pill
+          conversion (2026-09-01): "I see some text underlined in the
+          tabs and pills. And the rounded caps of the pills seem to be a
+          different color to rest of pill." `_render_tab_bar` deliberately
+          keeps the whole baseline row underlined — with its own SGR-58
+          underline color, `$ul_color` (theme token `tab_baseline_ul`),
+          independent of foreground color — from `$UL_ON` near the top of
+          the function until a single `$UL_OFF` at the very end, AFTER
+          the corner-hint pill block that QA-REG-231 added. The pill
+          text and its rounded caps both rendered while still inside
+          that underlined span, so they inherited the underline and its
+          distinct color — visible as stray underlines on the pill text,
+          and (since the cap glyph sits right at the boundary between
+          the bar background and the pill's own color) an underline-color
+          fragment at the cap that reads as a mismatched edge color. Both
+          symptoms were one root cause, not two separate bugs.
+CROSS-REF: QA-REG-231/QA-REG-229 (qa/40_regression_bugs.txt — the pill
+          conversion this bug was introduced by); tests/renderer.t
+          ('Tab bar corner hint pills are never underlined (QA-REG-232)').
+FIX:      `Renderer.pm::_render_tab_bar` now pushes `$UL_OFF` immediately
+          before the corner-hint pill block begins (right after computing
+          `$remaining`, before the `if (@$fit_nav_pills)` branch), so the
+          pills render with underline off, matching every other pill in
+          the UI. The FILE_TREE-context twin (`_render_context_status_bar`)
+          was checked and is unaffected — it's a different function with
+          no underline logic at all, so nothing there needed changing.
+TESTS:    `tests/renderer.t` — new subtest 'Tab bar corner hint pills are
+          never underlined (QA-REG-232)': renders the tab bar at 80 cols,
+          locates the raw (non-escape-stripped) offset of the literal
+          "Close" pill text, and asserts the nearest underline-affecting
+          SGR sequence before that offset is `\e[24m` (off), not `\e[4m`
+          (on) with no intervening off. This inspects the actual ANSI
+          byte sequence directly, which is the authoritative signal for
+          an attribute-only bug like this one — more precise than a
+          hangon screen/screenshot check could be, since `hangon screen`'s
+          plain-text capture doesn't preserve underline state and a
+          screenshot would need an LLM-vision judge for what a byte-level
+          assertion answers exactly. Verified non-tautological via
+          `git stash` on `lib/Zepto/Renderer.pm` alone (single-worktree,
+          no concurrent agent risk at the time): fails 1/124 against the
+          pre-fix code, passes after. No dedicated `qa/scripts/tier1/*.sh`
+          script added for this entry — the underline/color-attribute
+          nature of the bug isn't observable through `hangon screen`'s
+          text capture, and the unit test above is the more precise
+          instrument for exactly this claim.
+QA:       Interactively re-verified via `hangon screenshot` in both dark
+          and light themes, and in the FILE_TREE-context narrow-width
+          compact form (confirmed unaffected, as expected) — pills render
+          with no visible underline and caps matching the pill body color
+          in all three.
+
 ---------------------------------------------------------------------------------
 
 ID:       QA-REG-230

@@ -15,12 +15,14 @@ file=$(qa_tmpfile_nl "reg171.txt" "hello world")
 qa_start "$file"
 qa_assert_expect "reg171" "file is open"
 
-# The tab bar's right-aligned corner hint should mention quit somewhere.
+# The tab bar's right-aligned corner hint should mention Quit somewhere.
 # Default hangon terminal size (80 cols) is wide enough for the labeled
-# form ("⌃Q quit"); tests/renderer.t covers the narrower glyphs-only
-# fallback (down to 40 cols) deterministically since hangon sessions here
-# can't easily be resized.
-qa_assert_screen "quit" "Tab bar corner hint mentions 'quit'"
+# form ("⌃Q Quit"); tests/renderer.t covers the narrower compact-pill
+# fallback (see QA-REG-231) deterministically since hangon sessions here
+# can't easily be resized. Title Case since the 2026-09-01 pill-styling
+# conversion (bugs.md "Tab-bar buttons... use a visually different
+# style" — was lowercase "quit").
+qa_assert_screen "Quit" "Tab bar corner hint mentions 'Quit'"
 
 # Functional check, not just cosmetic: the hint must correspond to a real,
 # working shortcut.
