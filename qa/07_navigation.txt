@@ -318,3 +318,56 @@ STEPS
 VERIFY
   - Viewport scrolls by visual rows (not document lines).
   - Cursor moves to matching visual position.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-NAV-019
+NAME:     Sticky/goal column survives shorter lines
+PRIORITY: P1
+FEATURE:  arrow pageupdown sticky-column
+RELATED:  QA-NAV-008, QA-NAV-009, QA-NAV-018
+
+Discoverability: pure cursor-movement behavior, not a command — nothing to
+find in the palette because there is nothing to turn on. It should just
+feel like the expected, unsurprising way arrow keys/Page Up/Page Down
+already behave (this is the standard "sticky column" pattern most editors
+implement). Reported live by the user 2026-09-01: "As I move cursor down
+across lines (either via mouse drag or arrows), the column indicator on
+top ruler jumps around due to lines ending before cursor position."
+
+SETUP
+  File with a long line, two short lines, then a long line again, e.g.:
+    This is a somewhat long line for column te
+    short
+    hi
+    This is another somewhat long line for testing
+
+STEPS
+  1. Move cursor to col 30 on line 1.
+  2. Press Down twice (through the two short lines).
+  3. Press Down once more (onto the second long line).
+  4. Press Up three times (back to line 1).
+  5. From a short line, press Left, then Down to the next short line,
+     then Up twice back to line 1.
+  6. From col 30 on line 1, Down onto a short line, then type a character.
+
+VERIFY
+  - Step 2: cursor is pinned at the TRUE end of each short line (col 6 on
+    "short", col 3 on "hi") — never drawn past the actual text.
+  - Step 3: cursor lands back at col 30 - the original goal column is
+    restored exactly, not left at wherever the short line's end was.
+  - Step 4: same restoration holds on the way back up.
+  - Step 5: Left-arrow (explicit horizontal movement) resets the goal to
+    the new real column - the OLD goal (30) is not what gets restored.
+  - Step 6: typed character lands immediately after the short line's true
+    end (no whitespace padding out toward the old goal column); saved
+    file content confirms no stray spaces were inserted. New goal becomes
+    the post-type column.
+  - Page Up/Down (QA-NAV-008/009/018) go through the identical View.pm
+    code path and are covered there — this test focuses on plain arrows,
+    Home/End reset, and the type-past-end interaction that those don't.
+
+Automated: qa/scripts/tier1/nav_019_sticky_goal_column.sh
+Also unit-tested directly against Zepto::View / Zepto::Editor (both
+word-wrap-off and word-wrap-on) in tests/view.t, tests/view_wordwrap.t,
+and tests/editor.t.

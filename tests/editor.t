@@ -3983,4 +3983,69 @@ subtest 'cmd_ai_setup accepts a well-formed https API URL and proceeds to step 2
     is($editor->{footer_input}{prompt}, 'Model:', 'Wizard advanced to step 2 (Model)');
 };
 
+# ============================================================================
+# Sticky/goal column - end-to-end through real key events (ASKS.md item 2,
+# 2026-09-01). tests/view.t and tests/view_wordwrap.t already exercise
+# View's _preferred_col directly; these go through Editor::handle_event
+# the same way real keystrokes do, covering the do_insert_char() call
+# site specifically (the "typing past end" design decision).
+# ============================================================================
+
+subtest 'Typing at a line pinned past its real end snaps to true end (no padding) via real key events' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("a much longer first line here\nhi\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    $view->set_cursor(0, 20);
+    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
+    is($view->cursor_line(), 1, 'Moved to short line');
+    is($view->cursor_col(), 2, 'Pinned at true end of "hi" (col 2), not padded to col 20');
+
+    $editor->handle_event({ type => 'char', char => 'X', modifiers => [] });
+    is($doc->get_line_content(1), 'hiX', 'Typed char landed right after "hi" - no whitespace padding inserted');
+    is($view->cursor_col(), 3, 'Cursor now at true col 3');
+
+    # Goal must now be 3 (from the type), not the stale 20 - prove it by
+    # going back up: a broken implementation that never reset the goal on
+    # type would restore col 20 here instead.
+    $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
+    is($view->cursor_col(), 3, 'After typing, the goal is the post-type column (3), not the pre-type 20');
+};
+
+subtest 'Sanity control: without the intervening type, the pre-existing goal (20) IS what survives' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("a much longer first line here\nhi\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    $view->set_cursor(0, 20);
+    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
+    is($view->cursor_col(), 2, 'Pinned at true end of "hi"');
+
+    # No typing here - just go straight back up.
+    $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
+    is($view->cursor_col(), 20, 'Goal (20) restored - confirms the previous test\'s col-3 result was really caused by the type, not some other reset');
+};
+
+subtest 'Page Up/Down through real key events respect the goal column' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file(
+        "loooooooooooooooooooooong 0\ns1\ns2\ns3\ns4\nloooooooooooooooooooooong 5\n"
+    );
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->{viewport_rows} = 3;  # page_size = 2
+
+    $view->set_cursor(0, 22);
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    is($view->cursor_line(), 2, 'Page down landed on s2 (2 lines down)');
+    is($view->cursor_col(), 2, 'Clamped to true end of s2');
+
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    is($view->cursor_line(), 5, 'Page down lands on the final long line');
+    is($view->cursor_col(), 22, 'Goal column (22) restored, proving Page Down carried it through s2/s4');
+};
+
 done_testing();

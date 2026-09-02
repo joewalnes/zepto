@@ -389,4 +389,72 @@ subtest 'set_word_wrap_override persists' => sub {
     is($view->word_wrap_override(), undef, 'Override cleared to undef');
 };
 
+# ============================================================================
+# Sticky/goal column across full DOCUMENT lines, not just wrap segments
+# (ASKS.md item 2, 2026-09-01). The existing "preferred_col preserved
+# across wrap rows" test above only covers segments *within* one long
+# logical line. These tests cross real document-line boundaries (short
+# lines in between two long ones) with word wrap active, mirroring the
+# exact scenario from the user's live bug report ("mouse drag or arrows,
+# the column indicator on top ruler jumps around due to lines ending
+# before cursor position").
+# ============================================================================
+
+subtest 'Goal column survives crossing short DOC lines and restores on a longer one (wrap mode)' => sub {
+    my ($view, $doc, $wm) = make_view(10, "x" x 25, "s", "t", "y" x 25);
+
+    # Start in the middle of the first wrap row of line 0 (vcol 5).
+    $view->set_cursor(0, 15);
+    my ($vrow0, $vcol0) = $wm->doc_to_visual(0, 15);
+    is($vrow0, 1, 'Sanity: col 15 is on the second visual row of line 0');
+    is($vcol0, 5, 'Sanity: visual col within that row is 5');
+
+    $view->move_down();  # third (last) visual row of line 0: only 5 chars
+    is($view->cursor_line(), 0, 'Still on line 0, last wrap row');
+    is($view->cursor_col(), 25, 'Clamped to true end of line 0 (25), not padded to vcol 5');
+
+    $view->move_down();  # line 1: "s" (1 char)
+    is($view->cursor_line(), 1, 'Crossed into short doc line 1');
+    is($view->cursor_col(), 1, 'Clamped to true end of line 1 ("s")');
+
+    $view->move_down();  # line 2: "t" (1 char)
+    is($view->cursor_line(), 2, 'Crossed into short doc line 2');
+    is($view->cursor_col(), 1, 'Clamped to true end of line 2 ("t")');
+
+    $view->move_down();  # line 3: long again
+    is($view->cursor_line(), 3, 'Crossed into the long line 3');
+    is($view->cursor_col(), 5, 'Goal (visual col 5 from the very first move) restored, not left at 1');
+
+    # And back up again.
+    $view->move_up();
+    $view->move_up();
+    $view->move_up();
+    is($view->cursor_line(), 0, 'Back on line 0');
+    is($view->cursor_col(), 25, 'Still on the last wrap row of line 0 (true end)');
+};
+
+subtest 'End resets the goal column in wrap mode too' => sub {
+    my ($view, $doc, $wm) = make_view(10, "x" x 25, "s", "y" x 25);
+
+    # Start on the FINAL wrap row of line 0 (only 5 chars: vcol 0-4), at
+    # visual col 2 - a goal that would clamp on the "s" line either way,
+    # so the interesting assertion is what goal survives past it.
+    $view->set_cursor(0, 22);
+    my ($vrow, $vcol) = $wm->doc_to_visual(0, 22, $view->cursor_affinity());
+    is($vcol, 2, 'Sanity: starting at visual col 2 of the final wrap row');
+
+    $view->move_to_line_end();  # END on final wrap row -> real end of line 0 (col 25)
+    is($view->cursor_col(), 25, 'End landed at the true end of line 0');
+    is($view->{_preferred_col}, 5, 'End reset the goal to vcol 5 (this row is only 5 chars), not left at vcol 2');
+
+    $view->move_down();  # line 1: "s" (1 char) - goal 5 clamps down to 1
+    is($view->cursor_line(), 1, 'Crossed into short line 1');
+    is($view->cursor_col(), 1, 'Pinned at true end of "s"');
+
+    $view->move_down();  # line 2: long again - goal 5 (from End) should be restored
+    is($view->cursor_line(), 2, 'Crossed into long line 2');
+    my ($vrow2, $vcol2) = $wm->doc_to_visual(2, $view->cursor_col());
+    is($vcol2, 5, 'Goal set by End (vcol 5) restored on line 2, proving it was not the pre-End vcol 2');
+};
+
 done_testing();
