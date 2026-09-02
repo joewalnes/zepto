@@ -3506,7 +3506,64 @@ VERIFY    `Document::_push_undo()`'s grouped branch now increments
           clip_007_column_paste.sh` (the third caller, column-paste)
           passes cleanly.
 
----------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-229
+NAME:     FileTree::_dir_vcs_status_from_hash() rescanned the entire VCS
+          status hash per unloaded directory -- O(unloaded-dirs x
+          changed-files)
+PRIORITY: P3
+BUG:      P3 (scorecard finding, bugs.md 2026-09-01) -- see the full
+          FIXED entry in bugs.md for root cause, fix, and real
+          `Time::HiRes` before/after timing numbers at multiple scales.
+          `_propagate_dir_status()` called `_dir_vcs_status_from_hash()`
+          for every directory node whose children weren't loaded yet,
+          which did `for my $path (keys %$statuses)` over the *entire*
+          changed-files hash, filtered by a per-path `index()` prefix
+          check -- O(D*S) for D unloaded dirs and S changed files.
+          Mitigated by the existing 5s VCS debounce, so it was a
+          periodic hitch rather than a per-keystroke one, but the
+          algorithmic cost was real: confirmed via direct
+          `Time::HiRes`-timed calls to the actual function (not a
+          theoretical estimate) at D=100/S=1000 (6.8ms), D=300/S=3000
+          (59ms), D=600/S=6000 (261ms) -- consistent with O(D*S)
+          scaling.
+CROSS-REF: QA-PERF-022 (interactive hang-detection leg); QA-TREE-010,
+          QA-VCS-013 (existing vision-based file-tree VCS-coloring
+          coverage, unaffected by this fix -- output is unchanged, only
+          faster).
+SCRIPT:   tests/filetree_vcs_perf.t (unit-level, primary regression
+          guard) + tier1/perf_022_filetree_vcs_many_dirs.sh (interactive
+          hang-detection leg, see QA-PERF-022 above).
+VERIFY    Fixed by pre-indexing the changed-files hash by every ancestor
+          directory ONCE per propagation pass (new
+          `_build_vcs_dir_index()`, a single O(S*depth) walk), instead of
+          rescanning the full hash per unloaded directory --
+          `_propagate_dir_status_rec()` now does an O(1) hash lookup per
+          directory. `tests/filetree_vcs_perf.t` reconstructs the exact
+          pre-fix algorithm as local subs and runs it side-by-side
+          against the new code on identical synthetic VCS-status data
+          (no matches, mixed-priority overlapping changes at varying
+          depths, empty status hash) -- `is_deeply` confirms
+          byte-identical directory-status results in every case.
+          Performance: D=300/S=3000 old=63-66ms vs new=1.9ms (~35x);
+          D=600/S=6000 old=245-267ms vs new=3.9-5.5ms (~47-69x). The
+          test's own bound guards (30ms / 150ms) were confirmed to fail
+          against the actual pre-fix function by running the identical,
+          unmodified test file in a second worktree checked out at the
+          pre-fix commit (5a720fd): D=300/S=3000 took 58.9ms (fails the
+          30ms bound), D=600/S=6000 took 245.7ms (fails the 150ms
+          bound) -- proving the guards actually bite, not just pass
+          trivially. `make test`: 47 files, 1282 tests, all pass, no
+          stdout/stderr noise, 33s wallclock (was 32s -- the new file
+          adds ~0.6s in isolation). Interactively verified via `hangon`:
+          git repo with 4 subdirs (2 modified, 1 untracked, 1 clean) plus
+          a clean root file -- file tree's directory-name colors
+          correctly reflect status (modified dirs share one color,
+          untracked dir a different one, clean dir/file the default),
+          matching `git status --porcelain` exactly.
+
+--------------------------------------------------------------------------------
 
 ID:       QA-REG-221
 NAME:     Mouse wheel scroll-down clamps at end of file instead of
@@ -3660,3 +3717,86 @@ QA:       Interactively re-verified via `hangon screenshot` in both dark
           compact form (confirmed unaffected, as expected) — pills render
           with no visible underline and caps matching the pill body color
           in all three.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-REG-230
+NAME:     Cursor left outside the document's valid line numbers after
+          undoing a multi-line paste (P0 -- silent mis-insertion on the
+          next keystroke)
+PRIORITY: P0
+BUG:      P0 "Cursor can end up outside valid line numbers after paste ->
+          undo" — reported live by the user (2026-09-01, ASKS.md item 0):
+          "I pasted a block of text, then hit undo, then some sequence of
+          moving / redo, and my cursor ended up outside of the valid line
+          numbers. I'm not sure exactly how I did it."
+          Root cause: `Zepto::Document` does not store cursor positions in
+          its undo entries at all, and `Editor::Commands::cmd_undo` /
+          `cmd_redo` called `$doc->undo()` / `$doc->redo()` and then left
+          the view's cursor exactly where it was. Undoing a multi-line
+          paste shrinks the document, so a cursor that the paste had
+          placed at the end of the pasted block was left pointing at a
+          line that no longer existed. `View::set_cursor()` clamps, but
+          undo/redo never routed through it.
+          NOT caused by this session's `Document.pm` undo-group /
+          `_content_version` work (QA-REG-226/227/228): the permutation
+          sweep below fails identically (9082 of 27480 permutations) at
+          `a424abb`, the commit immediately BEFORE `e59af09` which landed
+          those fixes, and `e59af09` does not touch
+          `lib/Zepto/Editor/Commands.pm` at all. `cmd_undo`'s last
+          functional change was `2d3055f`; the defect is original to the
+          Editor module.
+          User-visible symptoms on a 3-line file after pasting a 3-line
+          block at end-of-document and pressing Undo: the status bar
+          reported line 5 on a 3-line document; the next typed character
+          silently landed on line 3 (because `line_col_to_offset()`
+          saturates at the last line) rather than where the cursor was
+          drawn; and the redrawn line was visually mangled ("Xgamm"
+          instead of "Xgamma") from the stale render cache.
+CROSS-REF: QA-UNDO-013 (the primary feature test for cursor bounds across
+          undo/redo, qa/04_undo_redo.txt); QA-UNDO-001/002 (which already
+          state that undo/redo reposition the cursor).
+FIX:      `lib/Zepto/View.pm` — new `clamp_to_document()` re-clamps every
+          document position the view holds (cursor, selection anchor, all
+          multi-cursors and their anchors, and `scroll_line`) into the
+          document's current bounds, using the same rules as
+          `set_cursor()` including the column-select virtual-whitespace
+          exemption. `lib/Zepto/Editor/Commands.pm` — `cmd_undo` and
+          `cmd_redo` call it immediately after a successful
+          `$doc->undo()` / `$doc->redo()`. These are the only two callers
+          of `Document::undo`/`redo` in the codebase, so the invariant
+          holds for every undo/redo, not just the reported sequence.
+VERIFY    `tests/undo_redo_cursor_bounds.t` — a fuzz-style sweep over 6
+          document shapes x 4 paste payloads x 5 paste positions x 199
+          undo/redo/movement sequences (23,880 permutations), asserting
+          the cursor, selection anchor and every multi-cursor are in
+          range after EVERY step, not just at the end. Verified
+          non-tautological two ways: (1) against the pre-fix code it
+          reported 9082 of 27480 permutations failing (the sweep was
+          slightly larger before being trimmed for speed), and (2) the
+          file carries its own self-check subtest that pokes known-bad
+          values into the view and asserts the bounds checker flags them,
+          so a broken checker cannot produce a vacuous pass.
+          `tests/editor.t` 'Cursor stays in bounds across undo/redo'
+          drives the real `cmd_paste`/`cmd_undo`/`cmd_redo` command path
+          (11 of its 24 assertions fail against the pre-fix code, all
+          "cursor line N out of range [0, 3)") and additionally asserts
+          that a character typed after the undo lands at the cursor's own
+          reported position, computed from the live cursor rather than
+          hardcoded.
+QA:       `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` — copies a
+          3-line block inside the editor, pastes it at END of document
+          (cursor -> line 5 of 5), presses Undo, and asserts the status
+          bar's reported line is within the now-3-line document, that a
+          typed character lands on the line the cursor claims, and that
+          the cursor stays in range through a following
+          undo/move-down/redo. Verified non-tautological: 3 assertions
+          FAIL against the unfixed binary ("Document has 3 lines, status
+          bar reports line 5"), all 10 pass after the fix, stable across
+          3 consecutive runs of each.
+          NOTE for future authors: an earlier draft of this script pasted
+          at the TOP of the document, which left the cursor on line 3 of
+          a 3-line document after undo — in range by coincidence — so it
+          passed against the unfixed binary and proved nothing. The paste
+          must leave the cursor BELOW the document's original last line
+          for this bug to be reachable.

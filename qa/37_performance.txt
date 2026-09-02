@@ -394,3 +394,39 @@ VERIFY
     fixed on-screen pattern (PageDown's exact per-press line delta
     depends on terminal height, so a numeric threshold is the robust
     check here, not a hardcoded expected line).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-PERF-022
+NAME:     File tree with many collapsed dirs + many changed files renders
+          within budget (REGRESSION)
+PRIORITY: P2
+FEATURE:  perf tree, vcs, hang-detection
+RELATED:  bugs.md's 2026-09-01 "FileTree scans entire VCS status hash per
+          unloaded directory" fix; QA-REG-229; QA-TREE-010; QA-VCS-013
+SCRIPT:   tier1/perf_022_filetree_vcs_many_dirs.sh
+
+SETUP
+  Git repo with 50 top-level directories (6 files each), ~150 of those
+  files modified/untracked after the initial commit — spread across every
+  directory so every collapsed dir has at least one changed file
+  underneath it.
+
+STEPS
+  1. Open a file at the repo root.
+  2. Press ctrl-b to show the file tree (also triggers the initial VCS
+     status scan across all 50 collapsed directories).
+
+VERIFY
+  - A directory entry renders within 4s (generous budget) — not a hang.
+  - No error/fatal text on screen.
+
+NOTES
+  This is the coarse hang-detection leg (see qa/lib/qa-perf-helpers.sh
+  header for the "not vision-based" rationale) — it catches gross
+  regressions/hangs in this specific code path, not the precise
+  algorithmic complexity. The rigorous before/after proof (real
+  Time::HiRes wall-clock numbers for the old O(dirs×changes) scan vs. the
+  new O(1)-per-directory indexed lookup, at multiple D/S scales) lives in
+  the unit-level regression test tests/filetree_vcs_perf.t, which also
+  proves output-identical correctness between the two algorithms.

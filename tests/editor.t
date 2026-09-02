@@ -711,6 +711,146 @@ subtest 'Ctrl char mapping' => sub {
 };
 
 # ============================================================================
+# Cursor bounds across undo/redo (QA-REG-230)
+#
+# Regression for the P0 in ASKS.md item 0: "I pasted a block of text, then hit
+# undo, then some sequence of moving / redo, and my cursor ended up outside of
+# the valid line numbers." cmd_undo/cmd_redo used to mutate the document
+# without re-clamping the view, so undoing a multi-line paste left the cursor
+# on a line that no longer existed. The broad permutation sweep lives in
+# tests/undo_redo_cursor_bounds.t; these cover the real command path.
+# ============================================================================
+
+# Asserts the view's cursor indexes a line and column that actually exist.
+sub cursor_in_bounds_ok {
+    my ($editor, $label) = @_;
+    my $doc  = $editor->active_doc();
+    my $view = $editor->active_view();
+    my ($line, $col) = ($view->cursor_line(), $view->cursor_col());
+    my $count = $doc->line_count();
+
+    if ($line < 0 || $line >= $count) {
+        fail("$label: cursor line $line out of range [0, $count)");
+        return;
+    }
+    my $len = $doc->line_length($line);
+    if ($col < 0 || $col > $len) {
+        fail("$label: cursor col $col out of range [0, $len] on line $line");
+        return;
+    }
+    pass("$label: cursor ($line,$col) in bounds (doc has $count lines)");
+}
+
+# cmd_paste() consults the SYSTEM clipboard first and only falls back to
+# $editor->{clipboard}. Left alone it would shell out to pbpaste/xclip and
+# splice whatever the developer happened to have copied into these tests, so
+# the platform command is disabled here to force the internal-clipboard path.
+sub editor_with_paste_isolated {
+    my ($content) = @_;
+    my $term = mock_terminal();
+    my $filename = create_temp_file($content);
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    $editor->{terminal}{_clipboard_paste_cmd} = undef;
+    return $editor;
+}
+
+subtest 'Cursor stays in bounds across undo/redo' => sub {
+    # --- Minimal repro: paste a multi-line block, then a single undo -------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        # Document::load() normalises the trailing newline away, so the file
+        # "alpha\nbeta\ngamma\n" loads as 3 lines and pasting 5 gives 8.
+        is($editor->active_doc()->line_count(), 3, 'document starts with 3 lines');
+        $editor->cmd_paste();
+        is($editor->active_doc()->line_count(), 8, 'paste added 5 lines');
+        cursor_in_bounds_ok($editor, 'after paste');
+
+        my $line_before = $editor->active_view()->cursor_line();
+        cmp_ok($line_before, '>=', 3,
+               'cursor is past the original last line after paste (would be stale on undo)');
+
+        $editor->cmd_undo();
+        is($editor->active_doc()->text(), "alpha\nbeta\ngamma", 'undo reverted the paste');
+        cursor_in_bounds_ok($editor, 'after undo of multi-line paste');
+    }
+
+    # --- The user's described shape: paste -> undo -> move -> redo --------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        $editor->cmd_paste();
+        $editor->cmd_undo();
+        cursor_in_bounds_ok($editor, 'paste/undo');
+
+        $editor->active_view()->move_down();
+        cursor_in_bounds_ok($editor, 'paste/undo/move-down');
+
+        $editor->cmd_redo();
+        cursor_in_bounds_ok($editor, 'paste/undo/move/redo');
+
+        $editor->cmd_undo();
+        cursor_in_bounds_ok($editor, 'paste/undo/move/redo/undo');
+    }
+
+    # --- Typing after undo must land where the cursor appears -------------
+    # This is the corruption the out-of-range cursor caused: line_col_to_offset
+    # saturates at end-of-buffer, so the character went to the end of the file
+    # instead of to the cursor.
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        $editor->active_view()->set_cursor(0, 0);
+        $editor->cmd_paste();
+        $editor->cmd_undo();
+
+        is($editor->active_doc()->text(), "alpha\nbeta\ngamma",
+           'undo restored the original content');
+
+        my ($line, $col) = ($editor->active_view()->cursor_line(),
+                            $editor->active_view()->cursor_col());
+
+        # Build what the document MUST look like if the character lands at the
+        # cursor's own reported position -- computed from the live cursor, so
+        # this cannot pass by coincidence if the character goes elsewhere.
+        my @lines = split(/\n/, $editor->active_doc()->text(), -1);
+        substr($lines[$line], $col, 0) = 'X';
+        my $expected = join("\n", @lines);
+
+        $editor->do_insert_char('X');
+
+        is($editor->active_doc()->text(), $expected,
+           "typed character landed at the cursor's reported position ($line,$col), "
+           . "not at end of document");
+    }
+
+    # --- Multiple back-to-back paste/undo/redo cycles ---------------------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\n";
+        $editor->{clipboard_columnar} = 0;
+
+        for my $cycle (1 .. 3) {
+            $editor->cmd_paste();
+            cursor_in_bounds_ok($editor, "cycle $cycle paste");
+            $editor->cmd_undo();
+            cursor_in_bounds_ok($editor, "cycle $cycle undo");
+            $editor->cmd_redo();
+            cursor_in_bounds_ok($editor, "cycle $cycle redo");
+            $editor->cmd_undo();
+            cursor_in_bounds_ok($editor, "cycle $cycle final undo");
+        }
+    }
+};
+
+# ============================================================================
 # Insert and delete with selection
 # ============================================================================
 subtest 'Delete selection' => sub {
@@ -3981,6 +4121,71 @@ subtest 'cmd_ai_setup accepts a well-formed https API URL and proceeds to step 2
     is($editor->{_ai_complete}{api_url}, 'https://api.example.com/v1',
         'https:// URL is applied to the live AIComplete object');
     is($editor->{footer_input}{prompt}, 'Model:', 'Wizard advanced to step 2 (Model)');
+};
+
+# ============================================================================
+# Sticky/goal column - end-to-end through real key events (ASKS.md item 2,
+# 2026-09-01). tests/view.t and tests/view_wordwrap.t already exercise
+# View's _preferred_col directly; these go through Editor::handle_event
+# the same way real keystrokes do, covering the do_insert_char() call
+# site specifically (the "typing past end" design decision).
+# ============================================================================
+
+subtest 'Typing at a line pinned past its real end snaps to true end (no padding) via real key events' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("a much longer first line here\nhi\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    $view->set_cursor(0, 20);
+    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
+    is($view->cursor_line(), 1, 'Moved to short line');
+    is($view->cursor_col(), 2, 'Pinned at true end of "hi" (col 2), not padded to col 20');
+
+    $editor->handle_event({ type => 'char', char => 'X', modifiers => [] });
+    is($doc->get_line_content(1), 'hiX', 'Typed char landed right after "hi" - no whitespace padding inserted');
+    is($view->cursor_col(), 3, 'Cursor now at true col 3');
+
+    # Goal must now be 3 (from the type), not the stale 20 - prove it by
+    # going back up: a broken implementation that never reset the goal on
+    # type would restore col 20 here instead.
+    $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
+    is($view->cursor_col(), 3, 'After typing, the goal is the post-type column (3), not the pre-type 20');
+};
+
+subtest 'Sanity control: without the intervening type, the pre-existing goal (20) IS what survives' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file("a much longer first line here\nhi\n");
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+
+    $view->set_cursor(0, 20);
+    $editor->handle_event({ type => 'key', key => 'down', modifiers => [] });
+    is($view->cursor_col(), 2, 'Pinned at true end of "hi"');
+
+    # No typing here - just go straight back up.
+    $editor->handle_event({ type => 'key', key => 'up', modifiers => [] });
+    is($view->cursor_col(), 20, 'Goal (20) restored - confirms the previous test\'s col-3 result was really caused by the type, not some other reset');
+};
+
+subtest 'Page Up/Down through real key events respect the goal column' => sub {
+    my $term = mock_terminal();
+    my $editor = Zepto::Editor->new(terminal => $term);
+    my $filename = create_temp_file(
+        "loooooooooooooooooooooong 0\ns1\ns2\ns3\ns4\nloooooooooooooooooooooong 5\n"
+    );
+    my ($doc, $view) = setup_editor_doc($editor, $filename);
+    $view->{viewport_rows} = 3;  # page_size = 2
+
+    $view->set_cursor(0, 22);
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    is($view->cursor_line(), 2, 'Page down landed on s2 (2 lines down)');
+    is($view->cursor_col(), 2, 'Clamped to true end of s2');
+
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    $editor->handle_event({ type => 'key', key => 'pagedown', modifiers => [] });
+    is($view->cursor_line(), 5, 'Page down lands on the final long line');
+    is($view->cursor_col(), 22, 'Goal column (22) restored, proving Page Down carried it through s2/s4');
 };
 
 done_testing();
