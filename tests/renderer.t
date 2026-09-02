@@ -173,7 +173,7 @@ subtest 'Status bar has palette trigger pill' => sub {
 # are only built when ui.editor is set, so tests here need a real editor
 # (create_test_editor), not just a bare document/view.
 
-subtest 'Status bar groups Ctrl pills left, Alt pills right, modifier shown once' => sub {
+subtest 'Status bar groups Ctrl pills left, Alt pills right, each pill shows its own modifier' => sub {
     my ($editor, $doc, $view) = create_test_editor();
     my $theme = Zepto::Theme->dark_theme();
 
@@ -182,15 +182,20 @@ subtest 'Status bar groups Ctrl pills left, Alt pills right, modifier shown once
     );
     my $s = strip_escapes($bar);
 
-    # Ctrl-shortcut command: label shown, modifier stripped from the pill
-    # itself (e.g. "Save S", not "Save \x{2303}S") because the group label
-    # carries the modifier once for the whole column.
-    like($s, qr/Save S\b/, 'Ctrl group: Save pill shows bare key, not repeated ⌃');
-    unlike($s, qr/Save\s+\x{2303}S/, 'Save pill does not repeat the ⌃ glyph');
+    # Ctrl-shortcut command: pill carries its own modifier glyph (e.g.
+    # "Save \x{2303}S") -- an earlier design showed the modifier once per
+    # column as a shared header, but direct user feedback found that made
+    # individual pills hard to read in isolation ("I just saw 'T' but not
+    # '^T'"). See docs/UI_GUIDELINES.md.
+    like($s, qr/Save\s+\x{2303}S\b/, 'Ctrl group: Save pill repeats the ⌃ glyph');
 
     # Alt-shortcut command: same treatment.
-    like($s, qr/Word Wrap Z\b/, 'Alt group: Word Wrap pill shows bare key, not repeated ⌥');
-    unlike($s, qr/Word Wrap\s+\x{2325}Z/, 'Word Wrap pill does not repeat the ⌥ glyph');
+    like($s, qr/Word Wrap\s+\x{2325}Z\b/, 'Alt group: Word Wrap pill repeats the ⌥ glyph');
+
+    # There is no standalone column-header glyph anymore -- the modifier is
+    # only ever attached to a pill, never rendered on its own.
+    unlike($s, qr/\s\x{2303}\s/, 'no standalone ⌃ header separate from a pill');
+    unlike($s, qr/\s\x{2325}\s/, 'no standalone ⌥ header separate from a pill');
 
     # Ctrl group renders left of Alt group, both left of the palette trigger.
     my $save_pos  = index($s, 'Save');

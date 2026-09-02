@@ -15,26 +15,23 @@ ctrl_glyph=$(printf '\xe2\x8c\x83')  # ⌃ U+2303
 alt_glyph=$(printf '\xe2\x8c\xa5')   # ⌥ U+2325
 
 # At the default (80-col) terminal several lower-priority pills already
-# drop off (QA-SBAR-006). Save (⌃ priority 1) is the first thing after the
-# ⌃ GROUP LABEL (rendered as " ⌃ ", space-glyph-space — distinct from the
-# ⌃ inside the cursor pill's "⌃G" badge, which has no leading space); it
-# must still render, full ("Save S") or compact ("S").
-ctrl_segment=$(echo "$bar" | awk -v g=" $ctrl_glyph " -v a="$alt_glyph" \
-    '{ s=index($0,g); e=index($0,a); if (s>0 && e>s) print substr($0,s+length(g),e-s-length(g)) }')
-if echo "$ctrl_segment" | grep -qE "Save|[[:space:]]S[[:space:]]"; then
+# drop off (QA-SBAR-006). Save (⌃ priority 1) is the highest-priority Ctrl
+# pill and renders first in the Ctrl column (right after the cursor-pos
+# pill's gap); it must still render, full ("Save ⌃S") or compact ("⌃S").
+ctrl_segment=$(echo "$bar" | awk -v c="Commands" \
+    '{ s=index($0,"1:1"); e=index($0,c); if (s>0 && e>s) print substr($0,s,e-s) }')
+if echo "$ctrl_segment" | grep -qE "Save|[[:space:]]${ctrl_glyph}S[[:space:]]"; then
     qa_pass "Ctrl priority-1 pill (Save) visible: [$ctrl_segment]"
 else
     qa_fail "Ctrl priority-1 pill (Save) visible" "ctrl segment: [$ctrl_segment], bar: $bar"
 fi
 
-# Word Wrap (⌥ priority 1) is the first thing after the ⌥ label; must
-# still render, full ("Word Wrap Z") or compact ("Z").
-alt_segment=$(echo "$bar" | awk -v a="$alt_glyph" \
-    '{ s=index($0,a); c=index($0,"Commands"); if (s>0 && c>s) print substr($0,s,c-s) }')
-if echo "$alt_segment" | grep -qE "Word Wrap|[[:space:]]Z[[:space:]]"; then
-    qa_pass "Alt priority-1 pill (Word Wrap) visible: [$alt_segment]"
+# Word Wrap (⌥ priority 1) must still render, full ("Word Wrap ⌥Z") or
+# compact ("⌥Z"), somewhere before the Commands/palette pill.
+if echo "$bar" | grep -qE "Word Wrap|[[:space:]]${alt_glyph}Z[[:space:]]"; then
+    qa_pass "Alt priority-1 pill (Word Wrap) visible: [$bar]"
 else
-    qa_fail "Alt priority-1 pill (Word Wrap) visible" "alt segment: [$alt_segment], bar: $bar"
+    qa_fail "Alt priority-1 pill (Word Wrap) visible" "bar: $bar"
 fi
 
 # The two truly unconditional elements.

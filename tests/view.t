@@ -332,6 +332,30 @@ subtest 'Scroll without cursor move' => sub {
     is($view->scroll_line(), 1, 'Scrolled up');
 };
 
+subtest 'scroll_down clamps so the last line stays pinned at the bottom, not the top' => sub {
+    # bugs.md: "Scrolling to the end of a file lets the final line scroll
+    # off the top of the viewport, past the point where most editors stop."
+    # scroll_down used to clamp scroll_line to line_count()-1, letting the
+    # last document line become the TOP of the viewport and leaving the
+    # rest of the viewport blank underneath it. It should clamp to
+    # line_count()-viewport_rows instead, so the last line lands at the
+    # BOTTOM of the viewport and stays there.
+    my ($doc, $view) = make_view("1\n2\n3\n4\n5\n6\n7\n8\n9\n10", rows => 4);
+
+    $view->set_cursor(0, 0);
+    $view->scroll_down(1000);  # scroll drastically past the end
+    is($view->scroll_line(), 6, 'scroll_line clamps to line_count(10) - viewport_rows(4) = 6');
+
+    my ($start, $end) = $view->visible_line_range();
+    is($end, 10, 'visible range ends at line_count (exclusive) -- last doc line (index 9) is the bottom row, not scrolled past');
+
+    # A document shorter than the viewport should never scroll at all.
+    my ($doc2, $view2) = make_view("1\n2\n3", rows => 10);
+    $view2->set_cursor(0, 0);
+    $view2->scroll_down(1000);
+    is($view2->scroll_line(), 0, 'a document shorter than the viewport never scrolls');
+};
+
 subtest 'Scroll sets explicit flag to prevent viewport snap-back' => sub {
     my ($doc, $view) = make_view("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20", rows => 5);
 

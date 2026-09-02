@@ -4211,15 +4211,6 @@ sub _fit_pill_group {
     return $try_mode->('compact');
 }
 
-# Render a non-interactive modifier group label (e.g. " ⌃ ") — a Separator,
-# not a pill: no rounded caps, dim text, not clickable. Mutates $center_col_ref.
-sub _render_group_label {
-    my ($class, $theme, $sym, $out_ref, $center_col_ref) = @_;
-    push @$out_ref, $theme->color('status_bg') . $theme->color('gutter_fg');
-    push @$out_ref, " $sym ";
-    $$center_col_ref += 3;
-}
-
 # Render a list of already-fit pills (from _fit_pill_group) with rounded
 # caps, hover highlighting, and click button registration. Mutates
 # $out_ref, $buttons_ref, $center_col_ref, and $btn_offset_ref (so the
@@ -4230,9 +4221,8 @@ sub _render_group_label {
 # OPTIONAL: pass undef for all three to render a purely informational pill
 # list — no hover highlighting, no click-button registration. This is for
 # hint-only pills that show a keyboard shortcut but bind to no command
-# (e.g. the FILE_TREE tree-context hint row) — as opposed to
-# _render_group_label, which is for non-pill-shaped labels (no rounded
-# caps at all). Callers that need interactive pills must pass all three.
+# (e.g. the FILE_TREE tree-context hint row). Callers that need
+# interactive pills must pass all three.
 sub _render_pill_list {
     my ($class, $theme, $nerd_font, $round_l, $round_r, $fit_list,
         $hover_pill_index, $btn_offset_ref, $out_ref, $buttons_ref, $center_col_ref) = @_;
@@ -4601,8 +4591,15 @@ sub _render_context_status_bar {
     }
 
     # 3. CENTER: two modifier-grouped pill columns — ⌃ (Ctrl) on the left,
-    # ⌥ (Alt) on the right — each showing its modifier glyph once instead
-    # of repeating it on every pill. See docs/UI_GUIDELINES.md.
+    # ⌥ (Alt) on the right — each pill shows its own modifier glyph (e.g.
+    # "⌃S", "⌥Z") rather than a single glyph-once column header. An
+    # earlier design showed the modifier exactly once per column as a
+    # small dim separator label — direct user feedback found this made
+    # individual pills hard to read at a glance ("I just saw 'T' but not
+    # '^T'"): the shared header is easy to miss when scanning one pill in
+    # isolation. Repeating the modifier costs one extra character per
+    # pill but removes the 3-character standalone header entirely, so it
+    # roughly nets out in practice. See docs/UI_GUIDELINES.md.
     my $editor = $ui->{editor};
     # -2 accounts for the gap after the cursor pill and the gap before the palette pill
     my $available = $cols - $left_width - $palette_total_width - 2;
@@ -4626,7 +4623,9 @@ sub _render_context_status_bar {
                       : undef;
             next unless $group;
             my $sym = $group eq 'ctrl' ? $ctrl_sym : $alt_sym;
-            (my $stripped = $shortcut) =~ s/\Q$sym\E//g;
+            # Keep the modifier on the pill itself (e.g. "⌃S") rather than
+            # stripping it — see the no-standalone-header rationale above.
+            my $stripped = $shortcut;
 
             my $icon = Zepto::Chars->get($cmd->{icon} // 'menu');
             # Theme pill: icon reflects the actual current mode (auto/dark/
@@ -4722,16 +4721,18 @@ sub _render_context_status_bar {
     }
 
     # Budget negotiation: figure out the minimum width each column needs to
-    # show just its priority-1 pill (label + compact form of the top item).
-    # Whenever both minimums fit in the available width, reserve alt's
-    # minimum up front so ctrl can never greedily starve it, then hand
-    # back whatever ctrl didn't use. This guarantees the priority-1 pill in
-    # *each* column renders (full or compact) as long as the terminal has
-    # room for both. Under genuine extreme-narrow scarcity (not even both
-    # minimums fit), ctrl — rendered first, holds Save — wins the
-    # remaining space and alt may drop entirely; see docs/UI_GUIDELINES.md.
-    my $ctrl_label_w = @ctrl_candidates ? 3 : 0;  # " ⌃ "
-    my $alt_label_w  = @alt_candidates  ? 3 : 0;  # " ⌥ "
+    # show just its priority-1 pill (compact form of the top item — each
+    # pill carries its own modifier glyph, so there's no separate column
+    # header to budget for). Whenever both minimums fit in the available
+    # width, reserve alt's minimum up front so ctrl can never greedily
+    # starve it, then hand back whatever ctrl didn't use. This guarantees
+    # the priority-1 pill in *each* column renders (full or compact) as
+    # long as the terminal has room for both. Under genuine extreme-narrow
+    # scarcity (not even both minimums fit), ctrl — rendered first, holds
+    # Save — wins the remaining space and alt may drop entirely; see
+    # docs/UI_GUIDELINES.md.
+    my $ctrl_label_w = 0;
+    my $alt_label_w  = 0;
 
     my $ctrl_min = @ctrl_candidates
         ? $ctrl_label_w + $ctrl_candidates[0]{compact_width} + ($nerd_font ? 3 : 1)
@@ -4758,9 +4759,8 @@ sub _render_context_status_bar {
     my $pill_btn_offset = scalar @buttons;
 
     if (@$ctrl_fit) {
-        push @_out, $theme->color('status_bg') . ' ';
+        push @_out, $theme->color('status_bg') . ' ';  # gap after cursor pill
         $center_col += 1;
-        $class->_render_group_label($theme, $ctrl_sym, \@_out, \$center_col);
         $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $ctrl_fit,
             $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }
@@ -4774,7 +4774,6 @@ sub _render_context_status_bar {
     $center_col += $remaining;
 
     if (@$alt_fit) {
-        $class->_render_group_label($theme, $alt_sym, \@_out, \$center_col);
         $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $alt_fit,
             $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }

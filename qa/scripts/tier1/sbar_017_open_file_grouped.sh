@@ -11,18 +11,14 @@ qa_assert_expect "1:1" "editor loaded"
 qa_status_bar
 bar="$QA_STATUS_BAR"
 
-# Shown as "Open File O/P" (bare key), not the old "⌃O/⌃P" hardcoded form.
-if echo "$bar" | grep -qF "Open File O/P"; then
-    qa_pass "Open File pill shows bare key O/P (Ctrl-column form)"
-else
-    qa_fail "Open File pill shows bare key O/P (Ctrl-column form)" "status bar: $bar"
-fi
-
+# Shown as an ordinary Ctrl-column pill ("Open File ⌃O/⌃P", modifier
+# repeated on the pill like every other Ctrl-column pill), not a second
+# hardcoded pill pinned next to the palette trigger.
 ctrl_glyph=$(printf '\xe2\x8c\x83')  # ⌃ U+2303
-if echo "$bar" | grep -qF "${ctrl_glyph}O/${ctrl_glyph}P"; then
-    qa_fail "Open File pill does not use the old hardcoded ⌃O/⌃P form" "status bar: $bar"
+if echo "$bar" | grep -qF "Open File ${ctrl_glyph}O/${ctrl_glyph}P"; then
+    qa_pass "Open File pill shows ⌃O/⌃P as an ordinary Ctrl-column pill"
 else
-    qa_pass "Open File pill does not use the old hardcoded ⌃O/⌃P form"
+    qa_fail "Open File pill shows ⌃O/⌃P as an ordinary Ctrl-column pill" "status bar: $bar"
 fi
 
 # It sits left of the palette trigger, inside the same column as Save.

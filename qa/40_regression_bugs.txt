@@ -3505,3 +3505,55 @@ VERIFY    `Document::_push_undo()`'s grouped branch now increments
           `⌃Z` reverts it in one step; `qa/scripts/tier1/
           clip_007_column_paste.sh` (the third caller, column-paste)
           passes cleanly.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-REG-221
+NAME:     Mouse wheel scroll-down clamps at end of file instead of
+          scrolling the last line to the top of the viewport
+PRIORITY: P2
+BUG:      P2/P3 "Scrolling to the end of a file lets the final line
+          scroll off the top of the viewport, past the point where most
+          editors stop" — reported by user via direct interactive
+          feedback (2026-09-01): "it's possible to scroll most of doc
+          (except final line) off screen. most editors keep final line at
+          bottom but dont allow to scroll further." `View.pm::scroll_down`
+          (used exclusively by mouse-wheel-down, `Editor.pm:2041`,
+          independent of cursor position) clamped `scroll_line` to
+          `document->line_count() - 1` — letting the very last document
+          line become the TOP row of the viewport, with every row below
+          it rendering blank. Reproduced live via `hangon mouse-scroll`
+          on a 200-line file: scrolling drastically down landed on "line
+          200" as the first (topmost) visible row, with 19+ blank rows
+          under it. Note this bug was specific to the mouse-wheel path —
+          arrow-key/cursor-driven scrolling goes through a separate
+          function, `ensure_cursor_visible()`, which already clamped
+          correctly (verified: pressing Down 210 times on the same file
+          correctly stopped with line 200 pinned at the bottom row).
+CROSS-REF: QA-MS-023 (qa/31_mouse_interactions.txt — primary catalog
+          entry); tests/view.t ('scroll_down clamps so the last line
+          stays pinned at the bottom, not the top').
+FIX:      `View.pm::scroll_down` now computes
+          `max_scroll = total_lines > viewport_rows ? total_lines -
+          viewport_rows : 0` instead of `total_lines - 1`, so the last
+          line lands at the bottom of the viewport and further
+          scroll-down events are no-ops. A document shorter than the
+          viewport now never scrolls at all (max_scroll = 0), which is
+          also more correct than the old behavior (previously such a
+          document could still be scrolled by `line_count() - 1` lines,
+          pushing its own last line to the top with blank space below —
+          the same bug, just also reachable on short files).
+TESTS:    `tests/view.t` — new subtest with two cases: a 10-line doc in a
+          4-row viewport clamps to `scroll_line == 6` (so the last line,
+          index 9, is the bottom row) after `scroll_down(1000)`; a
+          3-line doc in a 10-row viewport never scrolls at all. Verified
+          non-tautological via `git stash` on `lib/Zepto/View.pm` —
+          fails against the pre-fix code (`scroll_line` would clamp to
+          9, not 6), passes after the fix.
+QA:       `qa/scripts/tier1/ms_023_scroll_wheel_eof_clamp.sh` — opens a
+          200-line file, sends a large mouse-wheel scroll-down delta,
+          asserts line 200 is visible AND is in the bottom few rows of
+          the pane (not the top). Verified non-tautological via the same
+          `git stash` technique: fails against the pre-fix binary (shows
+          an empty "201" gutter row at the top of the viewport instead
+          of line 200 near the bottom), passes after the fix.

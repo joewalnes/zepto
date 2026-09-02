@@ -253,22 +253,28 @@ VERIFY
 --------------------------------------------------------------------------------
 
 ID:       QA-SBAR-016
-NAME:     Ctrl pills grouped left, Alt pills grouped right, modifier shown once
+NAME:     Ctrl pills grouped left, Alt pills grouped right, each pill shows its own modifier
 PRIORITY: P1
 FEATURE:  sbar layout modifier-group
 RELATED:  bugs.md P1 "Status bar rework"
 
 STEPS
-  1. Open a file in the DOCUMENT context (default state, no find/tree/palette).
+  1. Open a file in the DOCUMENT context (default state, no find/tree/palette),
+     wide enough (~145 cols) for both groups to render their full-text pills.
   2. Observe the status bar between the cursor-pos pill and the Commands pill.
 
 VERIFY
-  - A `⌃` glyph appears once (a plain dim label, not a pill) followed by
-    Ctrl-shortcut pills (e.g. Save, Open File) whose own shortcut badges do
-    NOT repeat `⌃` — just the bare key (`S`, `O/P`).
-  - A `⌥` glyph appears once, further right, followed by Alt-shortcut pills
-    (e.g. Word Wrap) whose badges show just the bare key (`Z`), not `⌥Z`.
-  - The `⌃` group renders entirely to the left of the `⌥` group, which
+  - Ctrl-shortcut pills (e.g. Save, Open File) show their badge WITH the `⌃`
+    glyph repeated on each pill (`⌃S`, `⌃O/⌃P`) — not a bare key.
+  - Alt-shortcut pills (e.g. Word Wrap) show their badge WITH the `⌥` glyph
+    repeated on each pill (`⌥Z`) — not a bare key.
+  - There is no standalone `⌃` or `⌥` glyph rendered on its own between two
+    pills — the modifier only ever appears attached to a pill's badge. An
+    earlier design showed the modifier once per column as a shared dim
+    label; direct user feedback found this made individual pills hard to
+    read at a glance ("I just saw 'T' but not '^T'") since the shared
+    header is easy to miss when scanning one pill in isolation.
+  - The Ctrl group renders entirely to the left of the Alt group, which
     renders entirely to the left of the `⌃␣ Commands` pill.
 
 --------------------------------------------------------------------------------
@@ -286,8 +292,8 @@ STEPS
 
 VERIFY
   - Open File pill sits inside the `⌃` column next to Save/Find/etc, shown
-    as `Open File O/P` (not `⌃O/⌃P`) — it is no longer a second
-    hardcoded pill pinned next to the palette trigger.
+    as `Open File ⌃O/⌃P` like any other Ctrl-column pill — it is no
+    longer a second hardcoded pill pinned next to the palette trigger.
   - Only the `⌃␣ Commands` pill is unconditionally pinned rightmost; Open
     File can drop at narrow widths like any other `⌃` column pill.
 

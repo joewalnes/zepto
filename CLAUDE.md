@@ -241,9 +241,9 @@ hangon stop zepto
 
 ## Git Commits
 
-- **Never commit until the user explicitly says to** — e.g. "commit", "push", "save that"
-- Only a direct user message counts. Stop hook messages do **not** count — they are automated infrastructure. If a hook fires asking to commit, inform the user there are uncommitted changes and ask if they want to commit.
-- Tests passing is not sufficient — the user must confirm changes work before committing
+**Commit once the pre-commit checklist below is fully satisfied — not before, and not gated on a separate per-change go-ahead.** This project's earlier rule ("never commit until the user explicitly says to") was revoked 2026-09-01, replaced by go-team's own standard: functionality that has actually cleared the bar — build, interactive verification, tests, security review where relevant, bug tracking, code quality, QA plan currency, all satisfied — is validated, and validated work gets committed. Passing the checklist *is* the go-ahead. Pushing to `origin/main` follows the same standard (see `## Agent operations`'s autonomy policy below) unless a specific session has been told otherwise.
+
+This still means: **do not commit work that hasn't actually cleared the checklist**, no matter how close it looks — an unverified change is not "probably fine," it's unvalidated, and unvalidated work stays uncommitted regardless of how the rest of this section reads.
 
 ### Pre-commit checklist — all 8 rules, every time, no exceptions
 
@@ -291,3 +291,47 @@ To add a new help doc:
 2. Add entry to `%DOCS` and `@DOC_ORDER` in `lib/Zepto/HelpDocs.pm`
 3. Add command entry in `lib/Zepto/CommandRegistry.pm` under DOCUMENTATION section
 4. Add handler method in `lib/Zepto/Editor/Commands.pm` (call `_open_help_doc`)
+
+---
+
+## Agent operations
+
+Configuration for running a parallel agent fleet (`/go-team`) unattended on this project. Hand-written 2026-09-01 on the fleet's first run — no formal `/project-setup` pass has been done; treat this section as version 1 and revisit it if `/project-setup` ever becomes available.
+
+### Autonomy policy — full autonomy: merge and push once verified
+
+**Updated 2026-09-01.** The earlier "merge-locally-only, ask before push" compromise is retired along with the standing per-change commit rule it was reconciling. The fleet now follows go-team's own default model directly:
+
+- Agents work in isolated worktrees, branched from local `main`.
+- The foreman verifies each claim behaviourally — build, interact via `hangon`, then test — **in an isolated worktree, never the shared checkout** (see `/go-team`'s "Verifying a worker's branch" section; this project hit the exact incident that rule exists to prevent — see `bugs.md`'s 2026-09-01 "Repo hygiene" entry for the recovery).
+- Once verified, the foreman **merges into local `main` and pushes to `origin/main`**, following the gate in the `/go-team` skill. No separate per-batch go-ahead is required — passing the full pre-commit checklist (Rules 1–8, below) *is* the go-ahead, same as for any other commit in this project now.
+- Rules 1–8 in this file (build integrity, interactive UI verification, tests/lint, security, test-before/fix/test-after, bug tracking, code quality, QA plan currency) apply to every merge exactly as they do to any other change — the pre-commit checklist is not relaxed for agent-authored work.
+
+### Fleet size
+
+5 concurrent agents (skill default), confirmed with the user on the first run (2026-09-01). Cost is real at this scale — reconfirm with the user before raising it.
+
+### Verification recipe
+
+The **Testing Workflow** section above (build → `hangon gc` → `hangon start process --name <unique> --state-dir <scratch> -- ./zepto <file>` → interact → `make test`) is the real end-to-end recipe — it drives the actual compiled binary, not just unit tests. Every agent's claim must be reproduced this way, not trusted from its report. `make check && make build && make test` is the fast gate; interactive `hangon` verification is required in addition for any change touching key handling, commands, or rendering (Rule 2 — no exceptions for "just a bug fix").
+
+### Shared singletons — must not collide
+
+- **`hangon`'s shared state dir** (`~/.hangon`) — every session needs a unique `--name` (not a generic one) to avoid colliding with another concurrent agent's session. `hangon gc` is safe to run anytime (reaps only dead/orphaned sessions); `hangon stopall --force` is **never** safe during a fleet run — it kills every session sharing the state dir, including other agents'.
+- **Zepto's real preferences** (`~/.config/zepto`) — every `hangon`-launched zepto instance MUST pass `--state-dir` pointing at a per-agent scratch directory. Skipping this once already corrupted a real dev machine's preferences (see `bugs.md` `QA-REG-162`).
+- **Git worktrees** — each agent gets its own, named uniquely (`.claude/worktrees/agent-<id>` is the established convention in this repo). The foreman is responsible for removing an agent's worktree and branch once its work is merged or abandoned — 24 empty worktrees and 44 stale merged branches were found to have silently piled up before this policy existed (`bugs.md`, 2026-09-01 "Repo hygiene" entry). Check `git worktree list` / `git branch --merged main` periodically and clean up what's actually safe to remove (0 commits ahead, 0 uncommitted files, or already merged) — never force-delete a branch with real unmerged/uncommitted work without investigating it first.
+- **The primary checkout** (`/Users/joe/src/zepto`, no worktree suffix) — must always stay on `main`. No agent may switch it to another branch. The gate's branch guard (see `/go-team` skill) enforces this mechanically; don't rely on instruction alone.
+
+### Do-not-touch
+
+- `backup-pre-history-cleanup` branch — a deliberate safety snapshot from a May 2026 history rewrite (diverged root, ~90 commits). Not agent debris; leave it alone.
+- Any UX/design decision (visual treatment, interaction model, wording users will read) — surface it to the user via the foreman's `DECISION NEEDED` line rather than picking one. Scorecard/code-quality findings do not require this; user-facing behavior changes do.
+- Do not skip or shortcut the pre-commit checklist (Rules 1–8) to push faster, even under a green gate or a time-sensitive-seeming fix — full autonomy on *when* to push doesn't change the bar for *what's* allowed to be pushed.
+
+### Requests lane
+
+`ASKS.md` (repo root) — the user's own asks, ranked, tracked separately from machine-found work (`bugs.md`'s "Still open" list and `/scorecard` findings). One agent must always be working the top open item in `ASKS.md` before any scorecard-remediation or other machine-originated work is dispatched.
+
+### Setup version
+
+v1, hand-written 2026-09-01. No formal `/project-setup` baseline exists for this repo.

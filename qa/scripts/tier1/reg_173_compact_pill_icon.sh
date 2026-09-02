@@ -23,11 +23,18 @@ file=$(qa_tmpfile_nl "reg173.txt" "hello world")
 qa_start --no-nerd-font "$file"
 qa_assert_expect "reg173" "file is open"
 
-# At the default 80-column session width, the ⌥ column's Word Wrap pill
-# renders in compact form ("W Z" = icon 'W' + key 'Z'), not full form —
-# this is the exact pill the LLM-vision sweep flagged. Assert the icon
-# character is actually there, immediately before the key.
-qa_assert_screen "W[[:space:]]+Z" "Word Wrap compact pill shows icon 'W' before key 'Z' (not bare)"
+# Removing the standalone ⌃/⌥ column-header glyph (see QA-SBAR-016) freed
+# up 6 columns, so the default 80-column session now fits "Word Wrap ⌥Z"
+# in full form — narrow the terminal to force the compact path this test
+# is actually about.
+qa_resize_window 74 24
+
+# At this width, the ⌥ column's Word Wrap pill renders in compact form
+# ("W ⌥Z" = icon 'W' + modifier+key '⌥Z'), not full form — this is the
+# exact pill the LLM-vision sweep flagged. Assert the icon character is
+# actually there, immediately before the key.
+alt_glyph=$(printf '\xe2\x8c\xa5')  # ⌥ U+2325
+qa_assert_screen "W[[:space:]]+${alt_glyph}Z" "Word Wrap compact pill shows icon 'W' before key '⌥Z' (not bare)"
 
 qa_keys "ctrl-q"
 qa_summary

@@ -965,7 +965,13 @@ sub scroll_up {
 sub scroll_down {
     my ($self, $lines) = @_;
     $lines //= 1;
-    my $max_scroll = $self->{document}->line_count() - 1;
+    my $total_lines = $self->{document}->line_count();
+    # Clamp so the last line can never scroll past the bottom of the
+    # viewport -- once reached, it stays pinned there rather than rising
+    # to the top and leaving the rest of the viewport blank.
+    my $max_scroll = $total_lines > $self->{viewport_rows}
+        ? $total_lines - $self->{viewport_rows}
+        : 0;
     $self->{scroll_line} += $lines;
     $self->{scroll_line} = $max_scroll if $self->{scroll_line} > $max_scroll;
     $self->{_explicit_scroll} = 1;

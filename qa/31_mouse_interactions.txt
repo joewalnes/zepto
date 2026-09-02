@@ -338,3 +338,26 @@ VERIFY
   - The pill becomes BRIGHTER (light vivid blue), not dimmer/grayer.
   - Moving the mouse off returns it to its normal color.
   - Same holds for the Commands (palette) pill and diff pills.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MS-023
+NAME:     Scroll wheel clamps at end of file (REGRESSION)
+PRIORITY: P2
+FEATURE:  mouse scroll eof
+RELATED:  QA-REG-221
+SCRIPT:   tier1/ms_023_scroll_wheel_eof_clamp.sh
+
+STEPS
+  1. Open a file with far more lines than fit on screen.
+  2. Scroll the mouse wheel down drastically -- well past the point where
+     the last line first becomes visible.
+
+VERIFY
+  - The last line of the document stays pinned at the BOTTOM of the
+    viewport, matching the behavior of most editors.
+  - The viewport never scrolls further, leaving the last line at the TOP
+    of the viewport with the rest of the pane blank underneath it.
+  - Arrow-key/cursor-driven scrolling (a separate code path) already got
+    this right; only the mouse-wheel path (View.pm's `scroll_down`,
+    independent of cursor position) had the bug.

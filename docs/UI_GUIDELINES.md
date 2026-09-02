@@ -115,23 +115,30 @@ category-ordered list with the modifier repeated on every pill:
   left-aligned. The `⌥` (Alt) column renders immediately before the `⌃␣`
   palette trigger, right-aligned. A middle fill gap separates them, so the
   Ctrl/Alt split is visually obvious even before reading any labels.
-- Each column shows its modifier glyph exactly once, as a small dim
-  non-clickable label (a `Separator`, not a pill — no rounded caps, no
-  background fill) — never repeated inside the pills that follow it.
+- **Each pill carries its own modifier glyph** (e.g. `Save ⌃S`, `Word Wrap
+  ⌥Z`) — there is no standalone column-header glyph. An earlier design
+  showed the modifier exactly once per column, as a small dim
+  non-clickable separator label with the glyph stripped from every pill
+  that followed it; direct user feedback found this made individual pills
+  hard to read at a glance ("I just saw 'T' but not '^T'") — a shared
+  header is easy to miss when scanning one pill in isolation. Repeating
+  the modifier costs one extra character per pill but removes the
+  3-character standalone header entirely, so it roughly nets out.
 - A command belongs to a column only if its shortcut starts with exactly
   that modifier (`⌃X` or `⌥X`). Commands with no shortcut, a bare function
   key (e.g. `F1`), or a multi-modifier chord (e.g. `⌃⇧F`) never appear as a
   status bar pill — they're still reachable from the command palette, which
   always shows the full, un-stripped shortcut.
 - Within a column, pills are ordered by priority (see below) and can render
-  in two forms: **full** (`icon label key`, e.g. `Save S`) when there's
-  room, or **compact** (`icon key`, e.g. `W Z` for Word Wrap: icon `W`, key
-  `Z`) when there isn't. A pill's on/off color still conveys toggle state
-  in compact form even though the label text is gone. **The icon is never
-  optional in compact form** — a compact pill that degraded to a bare key
-  letter with no icon would be indistinguishable from random text to a
-  first-time user, which the Discoverability Contract prohibits (see
-  `tests/renderer.t`'s whole-registry regression guard for this).
+  in two forms: **full** (`icon label ⌃key`, e.g. `S Save ⌃S`) when there's
+  room, or **compact** (`icon ⌃key`, e.g. `W ⌥Z` for Word Wrap: icon `W`,
+  modifier+key `⌥Z`) when there isn't. A pill's on/off color still conveys
+  toggle state in compact form even though the label text is gone. **The
+  icon is never optional in compact form** — a compact pill that degraded
+  to a bare modifier+key with no icon would be indistinguishable from
+  random text to a first-time user, which the Discoverability Contract
+  prohibits (see `tests/renderer.t`'s whole-registry regression guard for
+  this).
 - Open File (`⌃O/⌃P`) is an ordinary `⌃` column pill, not a hardcoded
   fixed-position pill — only the `⌃␣` palette trigger is unconditionally
   pinned to the rightmost position.
