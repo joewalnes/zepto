@@ -218,3 +218,51 @@ VERIFY
 NOTES
   Some editors keep the dirty flag because the undo itself is an edit;
   zepto's behavior should be predictable and documented.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-013
+NAME:     Cursor stays within valid line numbers across undo and redo
+PRIORITY: P0
+FEATURE:  undo redo cursor-bounds
+
+SETUP
+  A 3-line file:
+      alpha
+      beta
+      gamma
+
+STEPS
+  1. Select all three lines (⇧↓, ⇧↓, ⇧End) and press ⌃C.
+  2. Go to the end of the document (⌃G → 3 → Enter, then End).
+  3. Press ⌃V. The document grows to 5 lines and the cursor lands on
+     line 5 — below the document's ORIGINAL last line.
+  4. Press ⌃Z. The document shrinks back to 3 lines.
+  5. Press Escape so the transient "Undo" message clears and the status
+     bar's line:col indicator is visible again.
+  6. Type a character.
+  7. Press ⌃Z, ↓, then ⌃Y.
+
+VERIFY
+  - After step 5 the status bar reports a line between 1 and 3. It must
+    NOT report line 4 or 5 — a line number greater than the document's
+    line count is the bug this test exists for (QA-REG-230).
+  - After step 6 the typed character appears on the line the status bar
+    reported, not on some other line. Before the fix the status bar said
+    line 5 while the character was silently inserted on line 3, because
+    the offset lookup saturates at the last real line.
+  - The redrawn line is not visually truncated or mangled.
+  - After step 7 the cursor is still within the document's line range.
+  - The same holds for the selection anchor and for every extra cursor
+    when multi-cursor mode is active.
+
+NOTES
+  The paste MUST leave the cursor below the document's original last
+  line, otherwise the post-undo cursor happens to be in range anyway and
+  the test proves nothing. Pasting at the top of the document does not
+  reach this bug.
+
+  Automated coverage: qa/scripts/tier1/reg_230_undo_cursor_bounds.sh
+  (interactive), tests/undo_redo_cursor_bounds.t (23,880-permutation
+  sweep), tests/editor.t 'Cursor stays in bounds across undo/redo'
+  (real command path).

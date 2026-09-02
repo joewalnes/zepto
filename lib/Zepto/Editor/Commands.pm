@@ -358,6 +358,10 @@ sub _load_file {
 sub cmd_undo {
     my ($self) = @_;
     if ($self->active_doc()->undo()) {
+        # Undo can shrink the document underneath the view (e.g. undoing a
+        # multi-line paste), leaving the cursor past the last line. Re-clamp
+        # before anything else reads it -- see View::clamp_to_document.
+        $self->active_view()->clamp_to_document();
         $self->show_message("Undo");
         # Re-trigger completion if cursor is now at a word character
         $self->_retrigger_completion_if_word();
@@ -370,6 +374,9 @@ sub cmd_undo {
 sub cmd_redo {
     my ($self) = @_;
     if ($self->active_doc()->redo()) {
+        # Redo can also shrink the document (redoing a delete), so it needs
+        # the same re-clamp as undo.
+        $self->active_view()->clamp_to_document();
         $self->show_message("Redo");
         $self->_retrigger_completion_if_word();
     }

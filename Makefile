@@ -49,8 +49,13 @@ clean:
 build: zepto
 
 MODULES := $(shell find lib -name '*.pm')
+# build.pl embeds docs/help/*.md into the binary (see its glob of that
+# directory), so a help-doc edit alone must also trigger a rebuild --
+# otherwise `make build` reports "Nothing to be done" and ships a binary
+# with stale built-in documentation.
+HELPDOCS := $(wildcard docs/help/*.md)
 
-zepto: $(MODULES) build.pl
+zepto: $(MODULES) $(HELPDOCS) build.pl
 	@echo "Building single-file zepto..."
 	@perl build.pl > zepto
 	@chmod +x zepto
