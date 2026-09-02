@@ -189,3 +189,12 @@ Items identified during code review. Add new findings here. Move to `bugs.md` wh
 - Time-based behavior: timers, delays, auto-dismiss — all messages persist until user action
 - Modal behavior without a clear Esc exit path
 - Bypassing CommandRegistry for key bindings
+
+### Status bar pill rendering — two deliberately different shapes
+
+`Renderer.pm` has two families of rounded status-bar "pill" rendering, and they are **not** interchangeable — a `/scorecard` DRY pass flagged this as duplication once (2026-09-01, see bugs.md "Status-bar pill rendering hand-rolled at 4 call sites"); only 1 of 4 flagged sites turned out to be safe to unify.
+
+- **Dynamic command pills** (`_render_pill_list`, used for the Ctrl/Alt shortcut groups and the FILE_TREE hint pills): click region starts *after* the left rounded cap and ends *before* the trailing gap space; supports hover highlighting via `$ui->{hover_pill_index}`. `$buttons_ref`/`$hover_pill_index`/`$btn_offset_ref` are optional — pass `undef` for all three to render a purely informational (non-clickable, non-hoverable) pill list, as the FILE_TREE hint pills now do.
+- **Anchor trigger pills** (Open File, the Palette-trigger pill in both FILE_TREE and DOCUMENT contexts — still hand-rolled): click region deliberately spans the *entire* pill including both rounded caps (a larger, more forgiving target for the most-used, always-visible actions), and they never respond to hover. These are rendered in the branches of `_render_context_status_bar` that don't even read `$ui->{hover_pill_index}`.
+
+If a future change wants to fold the anchor pills into `_render_pill_list` too, that requires **two more deliberate extensions**, not a silent conversion: an opt-in "cap-inclusive click region" flag, and a way to suppress the trailing per-pill gap space on the last item in a list (needed because the FILE_TREE Open File + Palette pills currently rely on *not* having a trailing gap after the last one to avoid re-overflowing `$cols` — see QA-REG-186). Do it as its own reviewed change, with click-region and hover behavior called out explicitly, not bundled into an unrelated refactor.

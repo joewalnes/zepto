@@ -4225,14 +4225,25 @@ sub _render_group_label {
 # $out_ref, $buttons_ref, $center_col_ref, and $btn_offset_ref (so the
 # caller can chain multiple groups and keep hover indices contiguous with
 # render order — see Editor::_handle_mouse_hover / get_status_buttons).
+#
+# $buttons_ref (and, by extension, $hover_pill_index/$btn_offset_ref) is
+# OPTIONAL: pass undef for all three to render a purely informational pill
+# list — no hover highlighting, no click-button registration. This is for
+# hint-only pills that show a keyboard shortcut but bind to no command
+# (e.g. the FILE_TREE tree-context hint row) — as opposed to
+# _render_group_label, which is for non-pill-shaped labels (no rounded
+# caps at all). Callers that need interactive pills must pass all three.
 sub _render_pill_list {
     my ($class, $theme, $nerd_font, $round_l, $round_r, $fit_list,
         $hover_pill_index, $btn_offset_ref, $out_ref, $buttons_ref, $center_col_ref) = @_;
 
     for my $i (0 .. $#$fit_list) {
         my $pill = $fit_list->[$i];
-        my $btn_idx  = $$btn_offset_ref + $i;
-        my $is_hover = defined $hover_pill_index && $hover_pill_index == $btn_idx;
+        my $is_hover = 0;
+        if ($buttons_ref) {
+            my $btn_idx = $$btn_offset_ref + $i;
+            $is_hover = defined $hover_pill_index && $hover_pill_index == $btn_idx;
+        }
         my $eff_fg   = $is_hover ? 'pill_hover_fg'   : $pill->{fg};
         my $eff_bg   = $is_hover ? 'pill_hover_bg'   : $pill->{bg};
         my $eff_edge = $is_hover ? 'pill_hover_edge' : $pill->{edge};
@@ -4245,11 +4256,13 @@ sub _render_pill_list {
 
         push @$out_ref, $theme->color($eff_bg) . $theme->color($eff_fg);
         push @$out_ref, " $pill->{text} ";
-        push @$buttons_ref, {
-            x_start    => $$center_col_ref,
-            x_end      => $$center_col_ref + $pill->{width} - 1,
-            command_id => $pill->{cmd}{id},
-        };
+        if ($buttons_ref) {
+            push @$buttons_ref, {
+                x_start    => $$center_col_ref,
+                x_end      => $$center_col_ref + $pill->{width} - 1,
+                command_id => $pill->{cmd}{id},
+            };
+        }
         $$center_col_ref += $pill->{width};
 
         if ($nerd_font) {
@@ -4262,7 +4275,7 @@ sub _render_pill_list {
         $$center_col_ref += 1;
     }
 
-    $$btn_offset_ref += scalar @$fit_list;
+    $$btn_offset_ref += scalar @$fit_list if $btn_offset_ref;
 }
 
 sub _render_context_status_bar {
@@ -4408,23 +4421,11 @@ sub _render_context_status_bar {
 
         my ($fit_tree_pills, undef) = _fit_pill_group(\@tree_pill_candidates, $available, $nerd_font);
 
-        for my $pill (@$fit_tree_pills) {
-            if ($nerd_font) {
-                push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
-                push @_out, $round_l;
-                $center_col += 1;
-            }
-            push @_out, $theme->color($pill->{bg}) . $theme->color($pill->{fg});
-            push @_out, " $pill->{text} ";
-            $center_col += length($pill->{text}) + 2;
-            if ($nerd_font) {
-                push @_out, $theme->color('status_bg') . $theme->color($pill->{edge});
-                push @_out, $round_r;
-                $center_col += 1;
-            }
-            push @_out, $theme->color('status_bg') . ' ';
-            $center_col += 1;
-        }
+        # These are hint-only pills (keyboard shortcut labels, not bound to
+        # a command) — no hover highlighting, no click buttons. Pass undef
+        # for the interactive-only args; see _render_pill_list's doc comment.
+        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $fit_tree_pills,
+            undef, undef, \@_out, undef, \$center_col);
 
         # Fill remaining space, with the same core-nav hint (close tab /
         # switch tabs / quit) the DOCUMENT-context tab bar shows, if there's
