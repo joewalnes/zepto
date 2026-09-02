@@ -5,7 +5,7 @@
 Covers: the preferences system (defaults, global vs per-window), each key,
 persistence via StateStore, cross-instance sync.
 
-Reference: /Users/joe/src/zepto/lib/Zepto/Preferences.pm.
+Reference: lib/Zepto/Preferences.pm (relative to repo root).
 
 --------------------------------------------------------------------------------
 
