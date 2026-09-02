@@ -256,3 +256,36 @@ VERIFY
     color bleeding through instead, in both themes. Found via code audit
     while investigating QA-REG-174 (see bugs.md 2026-08-30 "Light-theme
     dark background fill investigation").
+
+--------------------------------------------------------------------------------
+
+ID:       QA-MD-013
+NAME:     Inline code span styled distinctly from body text (vision-judge)
+PRIORITY: P3
+FEATURE:  md code visual
+SCRIPT:   tier2/md_013_code_inline.sh
+
+SETUP
+  A Markdown file with a heading and several inline code spans
+  (`` `print()` ``, `` `x` ``, `` `make build` ``) inside body paragraphs.
+
+STEPS
+  1. Open the file.
+  2. Screenshot and ask a vision judge whether the heading renders in a
+     color distinct from body text and whether at least 2 different
+     colors appear in the document overall.
+
+VERIFY
+  - Judge replies PASS: heading color is distinct from body text, and
+    multiple colors are present (consistent with inline code spans and
+    headings being styled differently from plain paragraph text).
+  - Requires ZEPTO_QA_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY (skips
+    gracefully without one — see qa/README.md).
+
+NOTES
+  This script previously collided with QA-MD-009's ID (both scripts
+  declared themselves "QA-MD-009" in their header comments — see
+  bugs.md's QA catalog ID-collision hygiene entry). QA-MD-009 covers the
+  emphasis-delimiter-dimming behavior; this test is a separate, narrower
+  check on inline-code/heading color distinctness and was previously
+  uncataloged despite being a real, passing script.

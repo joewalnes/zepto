@@ -266,3 +266,67 @@ NOTES
   (interactive), tests/undo_redo_cursor_bounds.t (23,880-permutation
   sweep), tests/editor.t 'Cursor stays in bounds across undo/redo'
   (real command path).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-014
+NAME:     New edit clears redo stack (typed-suffix variant)
+PRIORITY: P2
+FEATURE:  redo
+RELATED:  QA-UNDO-006 (same behavior, single-character fixture)
+SCRIPT:   tier1/undo_014_redo_stack_after_second_edit.sh
+
+SETUP
+  A file containing "original".
+
+STEPS
+  1. Move to end of line, type " first".
+  2. Press ⌃Z (undo — removes " first").
+  3. Type " second".
+  4. Press ⌃Y (redo).
+
+VERIFY
+  - ⌃Y has no effect — "first" does not reappear anywhere on screen.
+  - "second" remains the visible suffix (the new edit, not the undone
+    one, is what's on screen).
+
+NOTES
+  This script previously collided with QA-UNDO-010's ID (both claimed
+  "010" — see bugs.md's QA catalog ID-collision hygiene entry) and tests
+  materially the same behavior as QA-UNDO-006 with a multi-char-suffix
+  fixture instead of QA-UNDO-006's single-character one. Kept as a
+  distinct (if narrow) regression check rather than deleted, since it was
+  already a working, passing script; a future consolidation pass could
+  fold it into QA-UNDO-006 as a second scenario.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-UNDO-015
+NAME:     Undo stack behavior after command-palette forced reload
+PRIORITY: P2
+FEATURE:  undo reload
+RELATED:  QA-UNDO-011 (external-modification-detected reload, not a
+          user-forced command)
+SCRIPT:   tier1/undo_015_force_reload_command.sh
+
+SETUP
+  Open file, make an edit (undo stack now has an entry).
+
+STEPS
+  1. Modify the buffer (type " modified").
+  2. Open the command palette (⌃Space) and invoke "reload" directly
+     (not triggered by an external file change).
+  3. Confirm the reload prompt if one appears.
+  4. Press ⌃Z.
+
+VERIFY
+  - Editor remains alive and responsive after the forced reload + undo
+    (no crash).
+  - Undo either does nothing (stack cleared by reload) or reverts
+    gracefully — either is acceptable, but the process must not crash.
+
+NOTES
+  This is the command-palette-triggered reload path, distinct from
+  QA-UNDO-011's external-file-change-detected reload path. Previously
+  filed under QA-UNDO-011's ID by mistake (collision found and fixed —
+  see bugs.md's QA catalog ID-collision hygiene entry).

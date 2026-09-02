@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# QA-SBAR-005: Status bar shows Wrap pill active after toggle
+# QA-SBAR-023: Status bar shows Wrap pill active after toggle
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 QA_TIER=2
-qa_header "QA-SBAR-005: Wrap pill active state (visual)"
+qa_header "QA-SBAR-023: Wrap pill active state (visual)"
 
-file=$(qa_tmpfile_nl "sbar005w.txt" "Some text content to test the wrap pill visual state in the status bar.
+file=$(qa_tmpfile_nl "sbar023w.txt" "Some text content to test the wrap pill visual state in the status bar.
 Another line of text here.
 Third line for good measure.")
 qa_start "$file"
