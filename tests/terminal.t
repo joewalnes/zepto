@@ -7,7 +7,7 @@ use Test::More;
 use lib 'lib';
 use Zepto::Terminal;
 use Zepto::ImageConverter;
-use File::Temp qw(tempfile);
+use File::Temp qw(tempfile tempdir);
 
 # ============================================================================
 # Constants
@@ -593,6 +593,92 @@ subtest 'ensure_png returns empty for non-image without converter' => sub {
     my $result = Zepto::ImageConverter->ensure_png($txt_path);
     # Either converted (unlikely for .txt) or empty — either is acceptable
     ok(defined $result, 'ensure_png returns defined value for non-image');
+};
+
+# ============================================================================
+# __WARN__ handler (bugs.md P2 "Perl warnings leak to the terminal and
+# corrupt the TUI display" -- fix)
+# ============================================================================
+# Perl routes BOTH explicit warn() calls and interpreter-generated
+# `use warnings` diagnostics (e.g. FindEngine.pm's "Unescaped left brace
+# in regex" warning while an incomplete {n} quantifier is typed into the
+# find bar) through $SIG{__WARN__} identically. With no handler
+# installed, that text hits real STDERR and scribbles across the TUI's
+# alternate screen buffer. install_warn_handler()/restore_warn_handler()
+# are the process-wide safety net: redirect to a log file for the
+# lifetime of a TUI session, put $SIG{__WARN__} back exactly as it was
+# on exit.
+subtest '__WARN__ handler install/restore lifecycle' => sub {
+    my $term = Zepto::Terminal->new();
+    my $dir = tempdir(CLEANUP => 1);
+    # Nested, not-yet-existing path -- also exercises mkdir -p of the log
+    # file's parent directory.
+    my $log_path = "$dir/nested/warnings.log";
+
+    # Helper: run $code with real STDERR redirected to an in-memory
+    # scalar, return what landed there. This is the actual instrument --
+    # not an approximation -- for "did raw warning text hit the
+    # terminal's output stream", since Terminal writes to the same
+    # STDERR file descriptor the corrupted screen capture showed text on.
+    my $capture_stderr = sub {
+        my ($code) = @_;
+        my $captured = '';
+        open(my $saved_err, '>&', \*STDERR) or die "dup STDERR: $!";
+        close(STDERR);
+        open(STDERR, '>', \$captured) or die "redirect STDERR: $!";
+        eval { $code->() };
+        my $err = $@;
+        open(STDERR, '>&', $saved_err) or die "restore STDERR: $!";
+        close($saved_err);
+        die $err if $err;
+        return $captured;
+    };
+
+    # --- Baseline: with nothing installed, Perl's default behavior is to
+    # write warnings straight to STDERR. This is the pre-existing,
+    # unfixed behavior the corruption bug depends on.
+    my $baseline = $capture_stderr->(sub { warn "baseline warning\n" });
+    like($baseline, qr/baseline warning/, 'baseline: warn() reaches STDERR with no handler installed');
+
+    # --- Install: STDERR must receive NOTHING, and the warning must land
+    # in the log file instead.
+    ok(!-e $log_path, 'log file does not exist yet');
+    $term->install_warn_handler(log_path => $log_path);
+
+    my $during = $capture_stderr->(sub { warn "installed warning\n" });
+    is($during, '', 'STDERR receives nothing while the __WARN__ handler is installed');
+
+    ok(-f $log_path, 'log file was created (including its parent dir)');
+    open(my $log_fh, '<', $log_path) or die "read log: $!";
+    my $log_content = do { local $/; <$log_fh> };
+    close($log_fh);
+    like($log_content, qr/installed warning/, 'warning text was redirected into the log file');
+    like($log_content, qr/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]/m, 'log entry is timestamped');
+
+    # --- Restore: STDERR must go back to receiving warnings normally, so
+    # warnings outside a live TUI session (CLI parsing, --help, after a
+    # clean exit) are not silently eaten forever.
+    $term->restore_warn_handler();
+    my $after = $capture_stderr->(sub { warn "post-restore warning\n" });
+    like($after, qr/post-restore warning/, 'STDERR receives warnings again after restore_warn_handler()');
+
+    # The restored warning must NOT have also landed in the log (proves
+    # the handler was actually removed, not just made a no-op that still
+    # logs).
+    open($log_fh, '<', $log_path) or die "read log: $!";
+    my $log_after = do { local $/; <$log_fh> };
+    close($log_fh);
+    unlike($log_after, qr/post-restore warning/, 'post-restore warning did not also get logged');
+};
+
+subtest '__WARN__ handler is a no-op without a log_path' => sub {
+    my $term = Zepto::Terminal->new();
+    # install_warn_handler() with no log_path must not die or leave a
+    # broken handler installed that itself warns/dies on every warn().
+    $term->install_warn_handler();
+    my $ok = eval { warn "no log path configured\n"; 1 };
+    ok($ok, 'warn() does not die when no log_path was configured');
+    $term->restore_warn_handler();
 };
 
 done_testing();

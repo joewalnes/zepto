@@ -751,6 +751,100 @@ sub cleanup {
 }
 
 # =============================================================================
+# Warning capture
+# =============================================================================
+#
+# Perl routes both explicit warn() calls and interpreter-generated
+# `use warnings` diagnostics through $SIG{__WARN__} identically. With no
+# handler installed, that text hits real STDERR by default -- and
+# because the TUI owns the terminal via the alternate screen buffer (see
+# enter_alt_screen above), raw warning text scribbles across the live
+# display and corrupts it until the next full redraw (bugs.md P2 "Perl
+# warnings leak to the terminal and corrupt the TUI display" -- e.g.
+# FindEngine.pm/FileSearchEngine.pm compiling an incomplete `{n}` regex
+# quantifier as the user types in the find bar, or Highlighter.pm
+# warning on a grammar-load failure).
+#
+# install_warn_handler() redirects warnings to a log file instead of
+# suppressing them outright -- diagnostic value is kept, just moved out
+# of the live display, matching this project's general aversion to
+# silently swallowing real bugs. restore_warn_handler() puts
+# $SIG{__WARN__} back exactly as it was, so warnings outside a live TUI
+# session (CLI arg parsing, --help, tests, after a clean exit) still
+# behave normally.
+#
+# Caller (Editor->init / Editor->cleanup) is responsible for pairing
+# install/restore around the TUI session, mirroring the $SIG{WINCH}
+# handler's own install-on-init/restore-on-cleanup lifecycle there.
+
+sub install_warn_handler {
+    my ($self, %opts) = @_;
+    my $log_path = $opts{log_path};
+
+    # Best-effort: make sure the parent directory exists so the very
+    # first warning of a fresh install isn't silently lost to a
+    # missing-directory open() failure. Manual mkdir -p to match
+    # StateStore::_ensure_dir's existing idiom (no File::Path dependency
+    # elsewhere in this codebase).
+    if (defined $log_path && $log_path =~ m{^(.*)/[^/]+$} && length $1 && !-d $1) {
+        my $built = '';
+        for my $part (split m{/}, $1) {
+            next unless length $part;
+            $built .= "/$part";
+            mkdir $built, 0700 unless -d $built;
+        }
+    }
+
+    $self->{_prev_warn_handler} = $SIG{__WARN__};
+    $self->{_warn_log_path} = $log_path;
+
+    $SIG{__WARN__} = sub {
+        my ($msg) = @_;
+        $self->_write_warn_log($msg);
+    };
+
+    return 1;
+}
+
+# Restore $SIG{__WARN__} to whatever it was before install_warn_handler()
+# was called (normally unset -- Perl's default STDERR behavior).
+sub restore_warn_handler {
+    my ($self) = @_;
+    return unless exists $self->{_prev_warn_handler};
+
+    $SIG{__WARN__} = $self->{_prev_warn_handler} // 'DEFAULT';
+    delete $self->{_prev_warn_handler};
+    delete $self->{_warn_log_path};
+    return 1;
+}
+
+# Append one warning to the configured log file. Best-effort and
+# deliberately silent on failure: an open()/write() error here must
+# never itself warn() or die(), which would recurse back into this
+# handler (or escape it) and reintroduce the exact STDERR corruption
+# this exists to prevent.
+sub _write_warn_log {
+    my ($self, $msg) = @_;
+    my $path = $self->{_warn_log_path};
+    return 0 unless defined $path && length $path;
+
+    local $SIG{__WARN__} = 'DEFAULT';
+    local $SIG{__DIE__};  # Don't let outer handlers see this
+
+    my $ok = eval {
+        open(my $fh, '>>', $path) or die "open failed: $!";
+        my @t = localtime;
+        my $ts = sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+            $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+        print $fh "[$ts] $msg";
+        print $fh "\n" unless $msg =~ /\n\z/;
+        close($fh);
+        1;
+    };
+    return $ok ? 1 : 0;
+}
+
+# =============================================================================
 # Kitty Graphics Protocol
 # =============================================================================
 
