@@ -217,26 +217,45 @@ PRIORITY: P2
 FEATURE:  tab ui
 RELATED:  bugs.md P2 "Non-obvious tab keys"; bugs.md P1 "Discoverability
           Contract gaps" (quit had no hint anywhere; hint was unlabeled
-          bare glyphs) — QA-REG-171, QA-REG-172
+          bare glyphs) — QA-REG-171, QA-REG-172. Updated 2026-09-01 for the
+          pill-styling conversion — bugs.md "Tab-bar buttons (close/tabs/
+          quit hints) use a visually different style than the bottom
+          status bar's pills" — QA-REG-229.
 
 STEPS
   1. At least 1 tab open.
-  2. Observe right side of tab bar at wide terminal (>= ~65 cols with a
+  2. Observe right side of tab bar at wide terminal (>= ~90 cols with a
      short filename).
   3. Narrow the terminal progressively.
 
 VERIFY
-  - At wide widths, the hint shows plain-language labels next to the
-    glyphs: `⌃W close   ⌥←/→ tabs   ⌃Q quit`.
+  - At wide widths, the hint shows three separate rounded PILLS (rounded
+    caps, filled chip background — same visual language as the bottom
+    status bar's pills, e.g. "Save", "Open File"), each with a Title
+    Case plain-language label next to its glyph: `⌃W Close`, `⌥←/→ Tabs`,
+    `⌃Q Quit`. (Was plain, unstyled lowercase text — "close"/"tabs"/
+    "quit" — with no pill shape at all; if it renders as bare text again,
+    that's a regression.)
   - Quit (⌃Q) is included — it previously had no on-screen hint at all,
     anywhere.
   - As the terminal narrows past the point where labels fit, the hint
-    degrades to the compact glyphs-only form (`⌃W × ⌥, ← ⌥. → ⌃Q`) —
-    still includes ⌃Q — rather than disappearing outright.
-  - This compact form persists down to ~40 cols (exact threshold depends
-    on tab name length: see tests/renderer.t for the deterministic
-    width math). Below that, the hint blanks out honestly (no truncated
-    or overlapping glyphs) rather than showing garbage.
+    degrades to a compact pill form (still rounded/chip-shaped, glyphs
+    only: `⌃W ×`, `⌥, ← ⌥. →`, `⌃Q`) — still includes ⌃Q — rather than
+    disappearing outright.
+  - The three pills always appear together or not at all — narrowing the
+    terminal further makes the whole group vanish in one step (blank
+    fill, no truncated/overlapping glyphs, no partial 1-or-2-pill
+    subset that silently drops Quit).
+  - The compact pill form's floor is narrower than the old plain-text
+    floor (pills need more room than dense text for the same content) —
+    roughly 44-51 cols depending on tab name length and nerd-font mode
+    (was a flat ~40 cols before this conversion; see tests/renderer.t for
+    the deterministic, directly-measured width math). Below its floor,
+    the hint blanks out honestly rather than showing garbage — quit/
+    close/tab-switching remain reachable via ⌃␣ Commands regardless.
+  - The FILE_TREE-context hint row (tree panel focused, wide terminal —
+    see QA-TREE tests) shows the identical pill-styled hint in its own
+    fallback segment — the two contexts must not drift apart.
 
 --------------------------------------------------------------------------------
 

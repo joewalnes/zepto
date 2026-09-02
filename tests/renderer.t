@@ -2836,8 +2836,27 @@ subtest 'Tab bar overflow still produces scroll buttons after the redesign' => s
 # "Discoverability Contract gaps" — quit previously had no on-screen hint
 # anywhere, and the close/tab-nav corner hint was bare glyphs with no
 # plain-language label (flagged by an LLM-vision discoverability sweep as
-# unlabeled/ambiguous). Mirrors _fit_pill_group's "full form first, falls
-# back to compact only if it doesn't fit" idiom, applied to this hint.
+# unlabeled/ambiguous).
+#
+# 2026-09-01: converted from plain lowercase text to rounded Title Case
+# pills (see bugs.md "Tab-bar buttons (close/tabs/quit hints) use a
+# visually different style than the bottom status bar's pills"), matching
+# the bottom status bar's visual language. Uses _fit_core_nav_hint_pills()
+# (an atomic all-full/all-compact/none fit across all three pills as one
+# group, NOT _fit_pill_group's per-pill greedy accumulation) specifically
+# so quit can't be silently dropped just because "Close" alone happens to
+# fit in full form — that would reopen the exact P1 gap this hint was
+# created to close.
+#
+# Measured side effect of adopting real pill chrome: each pill carries its
+# own padding + inter-pill gap (vs. the old plain-text form's single
+# leading/trailing space around the whole compact string), so the compact
+# tier needs more room than before. The floor moved from 40 cols to ~44-51
+# cols depending on tab-name length (was exactly 40, confirmed via direct
+# measurement below) — a disclosed, intentional cost of matching the
+# status bar's pill shape, not an oversight. The hint still degrades
+# gracefully (blank fill, never truncated/garbled) below its new floor,
+# and quit remains reachable via ⌃␣ Commands regardless.
 subtest 'Tab bar corner hint shows labeled form when there is room' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $ui = {
@@ -2849,13 +2868,14 @@ subtest 'Tab bar corner hint shows labeled form when there is room' => sub {
     my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
     my $s = strip_escapes($bar);
 
-    like($s, qr/close/, 'Labeled hint includes "close"');
-    like($s, qr/tabs/, 'Labeled hint includes "tabs"');
-    like($s, qr/quit/, 'Labeled hint includes "quit" — quit previously had no on-screen hint at all');
+    like($s, qr/Close/, 'Labeled hint includes Title Case "Close" (was lowercase "close")');
+    like($s, qr/Tabs/, 'Labeled hint includes Title Case "Tabs" (was lowercase "tabs")');
+    like($s, qr/Quit/, 'Labeled hint includes Title Case "Quit" — quit previously had no on-screen hint at all');
     like($s, qr/\x{2303}Q/, 'Labeled hint shows the actual ⌃Q shortcut for quit');
+    unlike($s, qr/\bclose\b|\btabs\b|\bquit\b/, 'No stale lowercase labels leak through');
 };
 
-subtest 'Tab bar corner hint degrades to compact glyphs (with quit) at narrow width, never disappears below 40 cols' => sub {
+subtest 'Tab bar corner hint degrades to compact pills (with quit) at its measured narrow-width floor' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $ui = {
         tabs => [{ display_name => 'testfile.txt', is_dirty => 0, has_vcs_changes => 0 }],
@@ -2863,16 +2883,29 @@ subtest 'Tab bar corner hint degrades to compact glyphs (with quit) at narrow wi
         tab_manager => undef,
     };
 
-    # 40 cols with a 12-char tab name is the exact width this property was
-    # confirmed working at (via hangon) before quit was added to this
-    # hint — must not regress.
-    my $bar = Zepto::Renderer->_render_tab_bar($theme, 40, $ui, 0);
+    # 51 cols with a 12-char tab name (nerd-font mode, the default) is the
+    # measured floor where the compact-tier pill group (all three: close,
+    # tabs, quit) fits as one atomic group post pill-conversion — directly
+    # measured via a synthetic sweep (cols 20-70), not assumed. This is
+    # narrower than the old plain-text floor (40 cols) because each pill
+    # now carries its own padding + gap; see the subtest doc comment above.
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 51, $ui, 0);
     my $s = strip_escapes($bar);
 
-    unlike($s, qr/close/, 'Narrow width: labeled form not used (no room)');
-    like($s, qr/\x{2303}W/, 'Narrow width: compact close hint (⌃W) still visible');
-    like($s, qr/\x{2325}/, 'Narrow width: compact tab-nav hint (⌥) still visible');
-    like($s, qr/\x{2303}Q/, 'Narrow width: quit hint (⌃Q) still visible — the actual gap this fix closes');
+    unlike($s, qr/Close/, 'At the compact floor: labeled form not used (no room for full labels)');
+    like($s, qr/\x{2303}W/, 'At the compact floor: compact close hint (⌃W) still visible');
+    like($s, qr/\x{2325}/, 'At the compact floor: compact tab-nav hint (⌥) still visible');
+    like($s, qr/\x{2303}Q/, 'At the compact floor: quit hint (⌃Q) still visible — the actual gap this fix closes');
+
+    # One column narrower: the atomic fit must drop the WHOLE group (never
+    # a partial 1-or-2-pill subset that would silently lose quit) — see
+    # bugs.md and _fit_core_nav_hint_pills()'s doc comment for why this
+    # must be all-or-nothing rather than _fit_pill_group's per-pill greedy
+    # behavior.
+    my $bar_narrower = Zepto::Renderer->_render_tab_bar($theme, 50, $ui, 0);
+    my $s_narrower = strip_escapes($bar_narrower);
+    unlike($s_narrower, qr/\x{2303}Q/, 'One column narrower than the floor: quit hint absent, not partially rendered');
+    unlike($s_narrower, qr/\x{2303}W/, 'One column narrower than the floor: close hint absent too (atomic group, not partial)');
 };
 
 subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits' => sub {
@@ -2886,8 +2919,75 @@ subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits
     my $bar = Zepto::Renderer->_render_tab_bar($theme, 60, $ui, 0);
     my $s = strip_escapes($bar);
 
-    unlike($s, qr/quit/, 'Extreme narrow: no labeled hint leaks through');
+    unlike($s, qr/Quit/i, 'Extreme narrow: no labeled hint leaks through');
     unlike($s, qr/\x{2303}Q/, 'Extreme narrow: hint honestly absent, not truncated mid-glyph');
+};
+
+# ----------------------------------------------------------------------------
+# QA-REG-229: the tab bar's corner-hint pill group must never, at any
+# terminal width, push the row past $cols. Direct synthetic-sweep guard
+# (same technique as QA-REG-179/186) rather than trusting terminal-level
+# capture, since a soft-wrap overflow here would scroll the whole screen
+# and push the tab bar itself off-screen — the exact failure class those
+# two regressions fixed elsewhere.
+#
+# Tab-name set deliberately excludes a single pathologically-long filename
+# (e.g. 40+ chars) with only ONE tab open: that combination hits a
+# separate, PRE-EXISTING, unrelated bug — _render_tab_bar's truncation/
+# scroll logic is gated on `@tab_info > 1` (Renderer.pm ~1179), so a lone
+# tab's name is never truncated or scrolled regardless of terminal width,
+# and genuinely overflows $cols on unpatched `main` too (confirmed via
+# direct A/B measurement against the pre-existing code, independent of
+# this change). Filed separately in bugs.md ("Single-tab session with a
+# long filename never truncates... pre-existing, found incidentally") per
+# Rule 6 — out of scope to fix here (a tab-name-truncation bug, not a
+# corner-hint-pill bug) and NOT something this guard should be weakened to
+# hide. Two-tab and moderate-length single-tab cases below all go through
+# the working (non-buggy) truncation/scroll path and give this guard real
+# coverage of what this change actually touches.
+# ----------------------------------------------------------------------------
+subtest 'Tab bar row never exceeds $cols at any width, with or without the corner hint (QA-REG-229)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+
+    my $checks = 0;
+    my $failures = 0;
+    my @first_failures;
+
+    my @tab_sets = (
+        ['a.txt'],
+        ['test.txt'],
+        ['testfile.txt'],
+        ['a.txt', 'b.txt'],
+        ['test.txt', 'other.txt'],
+    );
+
+    for my $nerd_font (0, 1) {
+        Zepto::Chars->set_enabled($nerd_font);
+        for my $cols (25, 30, 35, 40, 45, 50, 55, 60, 80, 100, 120) {
+            for my $names (@tab_sets) {
+                my $ui = {
+                    tabs => [ map { { display_name => $_, is_dirty => 0, has_vcs_changes => 0 } } @$names ],
+                    active_tab_index => 0,
+                    tab_manager => undef,
+                };
+                my $bar = Zepto::Renderer->_render_tab_bar($theme, $cols, $ui, 0);
+                my $plain = strip_escapes($bar);
+                $plain =~ s/\x1b\[K//g;
+
+                $checks++;
+                if (length($plain) > $cols) {
+                    $failures++;
+                    push @first_failures,
+                        "nerd_font=$nerd_font cols=$cols names='@$names' len=" . length($plain)
+                        if @first_failures < 10;
+                }
+            }
+        }
+    }
+    Zepto::Chars->set_enabled(1);  # restore default for subsequent tests
+
+    is($failures, 0, "Tab bar row never exceeds \$cols across $checks combinations")
+        or diag(join("\n", @first_failures));
 };
 
 # ============================================================================
@@ -3011,9 +3111,9 @@ subtest 'FILE_TREE hint row shares the core-nav hint (close/tabs/quit) with DOCU
     my $bar = Zepto::Renderer->_render_context_status_bar(undef, undef, $theme, 140, '', 0, $ui, 0);
     my $s = strip_escapes($bar);
 
-    like($s, qr/close/, 'FILE_TREE hint row labels the close-tab shortcut ("close")');
-    like($s, qr/tabs/,  'FILE_TREE hint row labels the tab-nav shortcut ("tabs")');
-    like($s, qr/quit/,  'FILE_TREE hint row labels the quit shortcut ("quit")');
+    like($s, qr/Close/, 'FILE_TREE hint row labels the close-tab shortcut, Title Case ("Close")');
+    like($s, qr/Tabs/,  'FILE_TREE hint row labels the tab-nav shortcut, Title Case ("Tabs")');
+    like($s, qr/Quit/,  'FILE_TREE hint row labels the quit shortcut, Title Case ("Quit")');
     like($s, qr/\x{2303}Q/, 'FILE_TREE hint row shows the actual ⌃Q shortcut glyph for quit');
 };
 
@@ -3102,9 +3202,9 @@ subtest 'DOCUMENT-context tab bar corner hint is unaffected by the FILE_TREE hin
     my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
     my $s = strip_escapes($bar);
 
-    like($s, qr/close/, 'DOCUMENT tab bar corner hint still labels close');
-    like($s, qr/tabs/,  'DOCUMENT tab bar corner hint still labels tabs');
-    like($s, qr/quit/,  'DOCUMENT tab bar corner hint still labels quit');
+    like($s, qr/Close/, 'DOCUMENT tab bar corner hint still labels Close');
+    like($s, qr/Tabs/,  'DOCUMENT tab bar corner hint still labels Tabs');
+    like($s, qr/Quit/,  'DOCUMENT tab bar corner hint still labels Quit');
 };
 
 # ============================================================================

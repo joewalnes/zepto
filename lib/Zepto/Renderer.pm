@@ -1358,20 +1358,33 @@ sub _render_tab_bar {
     # on-screen hint in the current context, and quit previously had none
     # at all here — see bugs.md).
     #
-    # Text/degradation logic lives in _core_nav_hint_text(), shared with
-    # the FILE_TREE-context hint row (_render_context_status_bar) so the
-    # two contexts can't drift apart again. The compact tier must keep
-    # fitting down to 40 cols — that property was confirmed working before
-    # quit was added here and must not regress.
+    # Rendered as rounded pills (Title Case labels) via the shared
+    # _fit_pill_group()/_render_pill_list() machinery, matching the bottom
+    # status bar's pill visual language — previously this was plain
+    # lowercase text via _core_nav_hint_text(), a visually different style
+    # than every pill elsewhere in the UI (see bugs.md "Tab-bar buttons
+    # (close/tabs/quit hints) use a visually different style than the
+    # bottom status bar's pills"). Candidates/wording now live in
+    # _core_nav_hint_pill_candidates(), shared with the FILE_TREE-context
+    # hint row (_render_context_status_bar) so the two contexts can't drift
+    # apart again. Non-interactive (undef hover/buttons/offset) — this hint
+    # has never had a click target and this change doesn't add one. The
+    # compact tier must keep fitting down to 40 cols — that property was
+    # confirmed working before quit was added here and must not regress.
     my $remaining = $tab_cols - $x;
-    my $hint = _core_nav_hint_text($remaining);
+    my $nerd_font = Zepto::Chars->enabled();
+    my $nav_candidates = _core_nav_hint_pill_candidates();
+    my ($fit_nav_pills, $nav_used) = _fit_core_nav_hint_pills($nav_candidates, $remaining, $nerd_font);
 
-    if (defined $hint) {
-        my $hint_width = length($hint) + 2;
-        my $fill = $remaining - $hint_width;
+    if (@$fit_nav_pills) {
+        my $round_l = Zepto::Chars->get('round_left');
+        my $round_r = Zepto::Chars->get('round_right');
+        my $fill = $remaining - $nav_used;
         push @_out, $bar_bg;
         push @_out, ' ' x $fill if $fill > 0;
-        push @_out, ' ' . $theme->color('tab_shortcut_fg') . $hint . ' ';
+        my $center_col = 0;  # unused for hint-only (non-interactive) pills
+        $class->_render_pill_list($theme, $nerd_font, 'tab_bar_bg', $round_l, $round_r, $fit_nav_pills,
+            undef, undef, \@_out, undef, \$center_col);
     } elsif ($remaining > 0) {
         push @_out, $bar_bg;
         push @_out, ' ' x $remaining;
@@ -4156,25 +4169,77 @@ sub get_status_buttons { return @{$_status_buttons}; }
 # caller renders on each side of the returned text (matches the historical
 # accounting in _render_tab_bar, where "remaining" already included that
 # padding) — callers must not add the padding on top of what they pass in.
-sub _core_nav_hint_text {
-    my ($available) = @_;
+# Shared pill candidates for the "core nav" hint (close tab / switch tabs /
+# quit) shown both in the DOCUMENT-context tab bar's corner (_render_tab_bar)
+# and the FILE_TREE-context hint row's fallback segment
+# (_render_context_status_bar) — a single source of truth so wording/casing
+# can't drift between the two contexts (previously this was `_core_nav_hint_
+# text()`, a plain-text two-tier degrader; see bugs.md "Tab-bar buttons
+# (close/tabs/quit hints) use a visually different style than the bottom
+# status bar's pills" for why it was converted to rounded pills with
+# Title Case labels, matching the bottom status bar's visual language).
+#
+# Rendered via _fit_pill_group() + _render_pill_list() like every other
+# pill group — non-interactive (informational only, no click target; this
+# hint has never had one), matching the FILE_TREE tree-context hint pills'
+# established convention for hint-only pills (pass undef for the
+# interactive-only _render_pill_list args).
+#
+# Text content (both tiers) is unchanged from the pre-pill plain-text
+# version except for Title Case on the full-form labels — the compact tier
+# still spells out the actual ⌥, / ⌥. shortcut glyphs rather than the
+# simplified ⌥←/→ notation the full form uses, a pre-existing label/compact
+# wording mismatch not introduced or fixed here (see bugs.md).
+sub _core_nav_hint_pill_candidates {
+    my @candidates = (
+        { full_text => CTRL_GLYPH . "W Close", compact_text => CTRL_GLYPH . "W \x{00d7}",
+          fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+        { full_text => "\x{2325}\x{2190}/\x{2192} Tabs", compact_text => "\x{2325}, \x{2190} \x{2325}. \x{2192}",
+          fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+        { full_text => CTRL_GLYPH . "Q Quit", compact_text => CTRL_GLYPH . "Q",
+          fg => 'pill_action_fg', bg => 'pill_action_bg', edge => 'pill_action_edge' },
+    );
+    $_->{full_width}    = length($_->{full_text}) + 2    for @candidates;
+    $_->{compact_width} = length($_->{compact_text}) + 2 for @candidates;
+    return \@candidates;
+}
 
-    my $hint_close_lbl = CTRL_GLYPH . "W close";                    # ⌃W close
-    my $hint_nav_lbl   = "\x{2325}\x{2190}/\x{2192} tabs";           # ⌥←/→ tabs
-    my $hint_quit_lbl  = CTRL_GLYPH . "Q quit";                     # ⌃Q quit
-    my $hint_labeled   = "$hint_close_lbl   $hint_nav_lbl   $hint_quit_lbl";
+# Atomic (not per-pill graceful) fit for the core-nav hint group: unlike
+# _fit_pill_group's per-pill greedy accumulation (right for pill groups
+# where dropping a low-priority pill to let a higher-priority one render in
+# full form is the desired tradeoff -- e.g. the DOCUMENT status bar's ⌃/⌥
+# columns), this specific hint has an established, tested guarantee that
+# quit must not silently disappear just because "Close" alone happens to
+# fit in full form (quit previously had NO on-screen hint anywhere until
+# that gap was closed -- see bugs.md "Discoverability Contract gaps" /
+# QA-REG-171). So all three pills are tried as one all-or-nothing group:
+# full form for all three, else compact form for all three, else none --
+# mirroring the original plain-text _core_nav_hint_text()'s two-tier
+# degradation exactly, just producing a pill list instead of a formatted
+# string. Returns (\@fit_pills, $used_width), same shape as
+# _fit_pill_group(), so callers can use them interchangeably.
+sub _fit_core_nav_hint_pills {
+    my ($candidates, $available, $nerd_font) = @_;
+    return ([], 0) if $available <= 0 || !@$candidates;
 
-    my $hint_close_compact = CTRL_GLYPH . "W \x{00d7}";                    # ⌃W ×
-    my $hint_nav_compact   = "\x{2325}, \x{2190} \x{2325}. \x{2192}";       # ⌥, ← ⌥. →
-    my $hint_quit_compact  = CTRL_GLYPH . "Q";                              # ⌃Q
-    my $hint_compact = "$hint_close_compact $hint_nav_compact $hint_quit_compact";
+    my $per_pill_overhead = $nerd_font ? 3 : 1;  # caps(2)+gap(1), or just gap(1)
+    my $overhead_total = $per_pill_overhead * scalar(@$candidates);
 
-    my $labeled_width = length($hint_labeled) + 2;  # +2 for surrounding spaces
-    my $compact_width = length($hint_compact) + 2;
+    my $full_total = $overhead_total;
+    $full_total += $_->{full_width} for @$candidates;
+    if ($full_total <= $available) {
+        my @fit = map { { %$_, text => $_->{full_text}, width => $_->{full_width} } } @$candidates;
+        return (\@fit, $full_total);
+    }
 
-    return $hint_labeled if $available >= $labeled_width;
-    return $hint_compact if $available >= $compact_width;
-    return undef;
+    my $compact_total = $overhead_total;
+    $compact_total += $_->{compact_width} for @$candidates;
+    if ($compact_total <= $available) {
+        my @fit = map { { %$_, text => $_->{compact_text}, width => $_->{compact_width} } } @$candidates;
+        return (\@fit, $compact_total);
+    }
+
+    return ([], 0);
 }
 
 # Greedily fit as many candidate pills (sorted ascending by priority, i.e.
@@ -4221,10 +4286,18 @@ sub _fit_pill_group {
 # OPTIONAL: pass undef for all three to render a purely informational pill
 # list — no hover highlighting, no click-button registration. This is for
 # hint-only pills that show a keyboard shortcut but bind to no command
-# (e.g. the FILE_TREE tree-context hint row). Callers that need
-# interactive pills must pass all three.
+# (e.g. the FILE_TREE tree-context hint row, and the DOCUMENT-context tab
+# bar's close/tabs/quit corner hint). Callers that need interactive pills
+# must pass all three.
+#
+# $bg_color_name is the theme color used to paint the bar's own background
+# between/around pills (nerd-font cap fill and the gap after each pill) —
+# callers pass whichever bar they're rendering into (e.g. 'status_bg' for
+# the bottom status bar, 'tab_bar_bg' for the tab bar), since these are
+# genuinely different colors (see Theme.pm) and hardcoding one would leave
+# a wrong-colored seam around pills rendered into the other bar.
 sub _render_pill_list {
-    my ($class, $theme, $nerd_font, $round_l, $round_r, $fit_list,
+    my ($class, $theme, $nerd_font, $bg_color_name, $round_l, $round_r, $fit_list,
         $hover_pill_index, $btn_offset_ref, $out_ref, $buttons_ref, $center_col_ref) = @_;
 
     for my $i (0 .. $#$fit_list) {
@@ -4239,7 +4312,7 @@ sub _render_pill_list {
         my $eff_edge = $is_hover ? 'pill_hover_edge' : $pill->{edge};
 
         if ($nerd_font) {
-            push @$out_ref, $theme->color('status_bg') . $theme->color($eff_edge);
+            push @$out_ref, $theme->color($bg_color_name) . $theme->color($eff_edge);
             push @$out_ref, $round_l;
             $$center_col_ref += 1;
         }
@@ -4256,12 +4329,12 @@ sub _render_pill_list {
         $$center_col_ref += $pill->{width};
 
         if ($nerd_font) {
-            push @$out_ref, $theme->color('status_bg') . $theme->color($eff_edge);
+            push @$out_ref, $theme->color($bg_color_name) . $theme->color($eff_edge);
             push @$out_ref, $round_r;
             $$center_col_ref += 1;
         }
 
-        push @$out_ref, $theme->color('status_bg') . ' ';
+        push @$out_ref, $theme->color($bg_color_name) . ' ';
         $$center_col_ref += 1;
     }
 
@@ -4414,7 +4487,7 @@ sub _render_context_status_bar {
         # These are hint-only pills (keyboard shortcut labels, not bound to
         # a command) — no hover highlighting, no click buttons. Pass undef
         # for the interactive-only args; see _render_pill_list's doc comment.
-        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $fit_tree_pills,
+        $class->_render_pill_list($theme, $nerd_font, 'status_bg', $round_l, $round_r, $fit_tree_pills,
             undef, undef, \@_out, undef, \$center_col);
 
         # Fill remaining space, with the same core-nav hint (close tab /
@@ -4425,18 +4498,20 @@ sub _render_context_status_bar {
         # thing to drop under width pressure; dropping it never removes the
         # only hint for a feature the way the FILE_TREE gap this fix
         # addresses did, since quit/tab-nav still have their DOCUMENT-context
-        # hint and the palette fallback. Shares _core_nav_hint_text() with
-        # _render_tab_bar so wording can't drift between the two contexts.
+        # hint and the palette fallback. Shares _core_nav_hint_pill_candidates()
+        # with _render_tab_bar so wording/casing can't drift between the two
+        # contexts — both now render as rounded pills, not plain text.
         my $remaining = $cols - $center_col - $right_width + 1;
         $remaining = 0 if $remaining < 0;
-        my $nav_hint = _core_nav_hint_text($remaining);
+        my $nav_candidates = _core_nav_hint_pill_candidates();
+        my ($fit_nav_pills, $nav_used) = _fit_core_nav_hint_pills($nav_candidates, $remaining, $nerd_font);
 
         push @_out, $theme->color('status_bg');
-        if (defined $nav_hint) {
-            my $hint_width = length($nav_hint) + 2;
-            my $fill = $remaining - $hint_width;
+        if (@$fit_nav_pills) {
+            my $fill = $remaining - $nav_used;
             push @_out, ' ' x $fill if $fill > 0;
-            push @_out, ' ' . $theme->color('tab_shortcut_fg') . $nav_hint . $theme->color('status_bg') . ' ';
+            $class->_render_pill_list($theme, $nerd_font, 'status_bg', $round_l, $round_r, $fit_nav_pills,
+                undef, undef, \@_out, undef, \$center_col);
         } elsif ($remaining > 0) {
             push @_out, ' ' x $remaining;
         }
@@ -4761,7 +4836,7 @@ sub _render_context_status_bar {
     if (@$ctrl_fit) {
         push @_out, $theme->color('status_bg') . ' ';  # gap after cursor pill
         $center_col += 1;
-        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $ctrl_fit,
+        $class->_render_pill_list($theme, $nerd_font, 'status_bg', $round_l, $round_r, $ctrl_fit,
             $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }
 
@@ -4774,7 +4849,7 @@ sub _render_context_status_bar {
     $center_col += $remaining;
 
     if (@$alt_fit) {
-        $class->_render_pill_list($theme, $nerd_font, $round_l, $round_r, $alt_fit,
+        $class->_render_pill_list($theme, $nerd_font, 'status_bg', $round_l, $round_r, $alt_fit,
             $hover_pill_index, \$pill_btn_offset, \@_out, \@buttons, \$center_col);
     }
 
