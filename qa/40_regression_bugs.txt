@@ -3239,7 +3239,7 @@ VERIFY    `cmd_toggle_tree` (`Editor.pm`) now checks focus state, not
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-222
+ID:       QA-REG-226
 NAME:     Replace All (<=100 matches) required one Undo per match instead
           of one Undo total
 PRIORITY: P1
@@ -3262,13 +3262,13 @@ BUG:      P1 "Replace-All undo granularity inconsistency" -- see bugs.md.
           replace-all" as one action matches user intent and how most
           editors behave) -- the <=100 path was the outlier.
 CROSS-REF: QA-FIND-031 (qa/09_find_replace.txt -- primary catalog entry);
-          QA-REG-223 (Document::replace()'s undo-group bypass, the
+          QA-REG-227 (Document::replace()'s undo-group bypass, the
           precondition this fix depended on); tests/find.t ('Replace All
           (<=100 matches, sync path) produces exactly ONE undo entry',
           'Replace All (<=100 matches): a single undo() fully reverts ALL
           replacements at once', 'Replace All (>100 matches, fast path)
           still produces exactly ONE undo entry (regression guard)').
-SCRIPT:   tier1/reg_222_replace_all_single_undo.sh
+SCRIPT:   tier1/reg_226_replace_all_single_undo.sh
 VERIFY    `_replace_all_sync()` (Editor.pm) now wraps its per-match
           `$doc->replace()` loop in `$doc->begin_undo_group()` /
           `$doc->end_undo_group()`, so it produces exactly one flushed
@@ -3276,7 +3276,7 @@ VERIFY    `_replace_all_sync()` (Editor.pm) now wraps its per-match
           >100 path, which is unchanged (still a single `replace()` call,
           still one undo entry; included as an explicit regression guard
           so unifying the two paths doesn't regress the side that was
-          already correct). Depends on QA-REG-223's fix: without it,
+          already correct). Depends on QA-REG-227's fix: without it,
           `replace()` calls inside the new undo group would still leak
           out as standalone entries instead of joining it. Verified
           non-tautological: `tests/find.t`'s new subtests fail against
@@ -3290,11 +3290,11 @@ VERIFY    `_replace_all_sync()` (Editor.pm) now wraps its per-match
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-223
+ID:       QA-REG-227
 NAME:     Document::replace() bypassed the undo-group check that
           insert()/delete() respect
 PRIORITY: P2
-BUG:      P2 (latent -- no caller triggered it until the QA-REG-222 fix
+BUG:      P2 (latent -- no caller triggered it until the QA-REG-226 fix
           above) "Document::replace() undo-group bypass" -- see bugs.md.
           `Zepto::Document::insert()` and `delete()` both record their
           undo action via `_push_undo()`, which checks `$self->{_undo_group}`
@@ -3307,11 +3307,11 @@ BUG:      P2 (latent -- no caller triggered it until the QA-REG-222 fix
           `replace()` call in `begin_undo_group()`/`end_undo_group()`
           would get the wrong undo granularity: the replace leaks out as
           its own separate undo entry instead of joining the group. No
-          caller did this before the QA-REG-222 fix (which is exactly
+          caller did this before the QA-REG-226 fix (which is exactly
           this scenario: `_replace_all_sync()`'s per-match `replace()`
           loop, now wrapped in an undo group), so this was purely latent
-          until then -- fixing QA-REG-222 required fixing this first.
-CROSS-REF: QA-REG-222 (the fix this one is a precondition for; the
+          until then -- fixing QA-REG-226 required fixing this first.
+CROSS-REF: QA-REG-226 (the fix this one is a precondition for; the
           interactive/UI-visible manifestation of both together);
           tests/document.t ('replace() inside begin/end_undo_group joins
           the group like insert/delete (bugs.md replace() undo-group
@@ -3319,7 +3319,7 @@ CROSS-REF: QA-REG-222 (the fix this one is a precondition for; the
           lacks the text key insert/delete merge-check reads)').
 SCRIPT:   (no dedicated interactive script -- this is a Document-level
           API contract with no independent UI-visible behavior on its
-          own; QA-REG-222's tier1/reg_222_replace_all_single_undo.sh is
+          own; QA-REG-226's tier1/reg_226_replace_all_single_undo.sh is
           the interactive exercise of it via its one real caller.)
 VERIFY    `replace()` (Document.pm) now records its compound action via
           `_push_undo()` instead of pushing directly onto `undo_stack`,
@@ -3348,12 +3348,12 @@ VERIFY    `replace()` (Document.pm) now records its compound action via
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-224
+ID:       QA-REG-228
 NAME:     Document::_push_undo() never bumped _content_version for
           grouped edits -- stale WrapMap/render cache after any
           begin_undo_group()/end_undo_group() edit
 PRIORITY: P1
-BUG:      P1 (pre-existing, surfaced by the QA-REG-222 fix) -- see
+BUG:      P1 (pre-existing, surfaced by the QA-REG-226 fix) -- see
           bugs.md "Replace All undo granularity inconsistency +
           Document::replace() undo-group bypass", third bug. Zepto's
           content-change auto-detection (`WrapMap::_ensure_built()`,
@@ -3371,14 +3371,14 @@ BUG:      P1 (pre-existing, surfaced by the QA-REG-222 fix) -- see
           (`Editor.pm`'s `do_move_line_up`/`do_move_line_down`
           delete+insert swap; `Editor::Commands`'s `_column_paste`) --
           not introduced by this session, just never caught before,
-          since QA-REG-222 was the first change to make a QA script
+          since QA-REG-226 was the first change to make a QA script
           assert on-screen content immediately after a grouped edit.
-CROSS-REF: QA-REG-222/223 (the fix whose interactive verification first
+CROSS-REF: QA-REG-226/223 (the fix whose interactive verification first
           caught this as intermittent screen truncation);
           tests/wrapmap.t ('Edits made inside a Document undo group are
           still picked up (content_version bump)').
 SCRIPT:   (no dedicated interactive script -- caught via, and covered
-          by, QA-REG-222's tier1/reg_222_replace_all_single_undo.sh and
+          by, QA-REG-226's tier1/reg_226_replace_all_single_undo.sh and
           the pre-existing tier1/reg_211_find_replace_preview_no_mutation.sh,
           which happens to assert on-screen content right after a
           Replace All; the deterministic regression guard for this
@@ -3396,7 +3396,7 @@ VERIFY    `Document::_push_undo()`'s grouped branch now increments
           after. Reproduced deterministically outside the QA script's
           flaky timing by running the pre-existing
           reg_211_find_replace_preview_no_mutation.sh 3x in a row:
-          failed 3/3 with QA-REG-222/223's fix applied but this one
+          failed 3/3 with QA-REG-226/223's fix applied but this one
           not yet (screen showed replaced text truncated to the OLD
           line's length, e.g. "REPL bar" rendered as "REPL ba"), passed
           3/3 on unmodified main (proving genuine regression, not

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# QA-REG-222 / QA-REG-223: Replace All produces exactly ONE undo entry
+# QA-REG-226 / QA-REG-227: Replace All produces exactly ONE undo entry
 # regardless of match count
 #
 # bugs.md "Replace All undo granularity inconsistency + Document::replace()
 # undo-group bypass". Two related, compounding root causes:
 #
-#   1. (QA-REG-223) Zepto::Document::replace() built its compound undo
+#   1. (QA-REG-227) Zepto::Document::replace() built its compound undo
 #      action and pushed it straight onto undo_stack unconditionally,
 #      completely bypassing the `_undo_group` check that insert()/delete()
 #      both go through via _push_undo(). Any caller that wrapped a
@@ -15,7 +15,7 @@
 #      (no caller used to combine replace() with an undo group) --
 #      exercised directly by tests/document.t's "replace() inside
 #      begin/end_undo_group joins the group like insert/delete" subtest.
-#   2. (QA-REG-222) Editor.pm's Replace All had two code paths with
+#   2. (QA-REG-226) Editor.pm's Replace All had two code paths with
 #      inconsistent undo granularity: for >100 matches, _replace_all()
 #      did one whole-document $doc->replace() call (1 undo entry); for
 #      <=100 matches, _replace_all_sync() looped $doc->replace() once per
@@ -31,7 +31,7 @@
 # (already correct before this fix) as a regression guard against the
 # unification breaking it.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
-qa_header "QA-REG-222/223: Replace All -- single undo entry regardless of match count"
+qa_header "QA-REG-226/223: Replace All -- single undo entry regardless of match count"
 
 # --- Small match count (<=100): the previously-broken sync path -----------
 file=$(qa_tmpfile_nl "reg222_small.txt" "foo bar foo baz foo

@@ -897,7 +897,7 @@ subtest 'preview_line: replacement substituted in place, remaining line text pre
 };
 
 # ============================================================================
-# Replace All undo granularity (bugs.md / QA-REG-222, QA-REG-223): Replace
+# Replace All undo granularity (bugs.md / QA-REG-226, QA-REG-227): Replace
 # All used to produce ONE undo entry for >100 matches (via _replace_all's
 # single whole-document $doc->replace() call) but N separate undo entries
 # for <=100 matches (via _replace_all_sync looping $doc->replace() once per

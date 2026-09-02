@@ -569,8 +569,8 @@ ID:       QA-FIND-031
 NAME:     Replace All undoes as a single step, regardless of match count
 PRIORITY: P1
 FEATURE:  replace-all undo
-RELATED:  QA-REG-222, QA-REG-223, QA-REG-224
-SCRIPT:   tier1/reg_222_replace_all_single_undo.sh
+RELATED:  QA-REG-226, QA-REG-227, QA-REG-228
+SCRIPT:   tier1/reg_226_replace_all_single_undo.sh
 
 STEPS
   1. Open a file with a small number (<=100) of matches for some term.

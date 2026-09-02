@@ -290,13 +290,13 @@ subtest 'Edits made inside a Document undo group are still picked up (content_ve
     # replace() calls in $doc->begin_undo_group()/end_undo_group() (e.g.
     # do_move_line_up/down's delete+insert swap, _column_paste's per-line
     # inserts, and Replace All's per-match replace() loop as of the
-    # QA-REG-222 fix). Document::_push_undo()'s grouped branch used to
+    # QA-REG-226 fix). Document::_push_undo()'s grouped branch used to
     # skip the $self->{_content_version}++ that its ungrouped branch does
     # -- so WrapMap (and Renderer's content_version-keyed render cache,
     # and Minimap) never saw a version change for any edit made inside a
     # group, and kept serving STALE wrap/render data computed from the
-    # pre-edit content. Caught interactively via QA-REG-222's own script
-    # (reg_222_replace_all_single_undo.sh) intermittently truncating
+    # pre-edit content. Caught interactively via QA-REG-226's own script
+    # (reg_226_replace_all_single_undo.sh) intermittently truncating
     # replaced text to the OLD (pre-replace) line length -- e.g. "foo
     # bar" (7 chars) replaced with "REPL bar" (8 chars) rendered as
     # truncated "REPL ba" (7 chars, the stale cached width) instead of
