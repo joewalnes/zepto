@@ -4124,6 +4124,130 @@ subtest 'cmd_ai_setup accepts a well-formed https API URL and proceeds to step 2
 };
 
 # ============================================================================
+# AI Completion setup — full 3-step wizard (URL -> Model -> API Key) and
+# cmd_toggle_ai. These are the command-layer entry points into
+# Zepto::AIComplete (see tests/aicomplete.t for the module's own pure-logic
+# unit tests). Tested here at the "command dispatches correctly, preference
+# gets stored, in-memory state updates" level, per this project's existing
+# cmd_* testing convention (e.g. cmd_toggle_word_wrap / cmd_toggle_nerd_font
+# above) -- no real network call is made anywhere in this flow; the API
+# key is just stored via StateStore, never sent.
+# ============================================================================
+subtest 'cmd_ai_setup: full wizard stores URL/model/key and enables AI' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+
+    $editor->cmd_ai_setup();
+    is($editor->{footer_input}{prompt}, 'API URL:', 'Step 1: API URL prompt');
+    $editor->{footer_input}{on_submit}->('https://api.example.com/v1');
+
+    is($editor->{footer_input}{prompt}, 'Model:', 'Step 2: Model prompt');
+    $editor->{footer_input}{on_submit}->('test-model-x');
+    is($editor->{prefs}->get('ai_model'), 'test-model-x', 'Model saved to preferences');
+    is($editor->{_ai_complete}{model}, 'test-model-x', 'Model applied to live AIComplete object');
+
+    is($editor->{footer_input}{prompt}, 'API Key:', 'Step 3: API Key prompt');
+    ok(!$editor->{_ai_complete}->is_enabled, 'AI not yet enabled before the key is submitted');
+    $editor->{footer_input}{on_submit}->('sk-super-secret');
+
+    is($editor->{_ai_complete}{api_key}, 'sk-super-secret', 'API key applied to live AIComplete object');
+    ok($editor->{_ai_complete}{enabled}, 'AIComplete becomes enabled once the key is submitted');
+    ok(!$editor->{message_is_error}, 'Completion message is not an error');
+    like($editor->{message}, qr/configured and enabled/i, 'Confirmation message shown');
+
+    # The key must be persisted via StateStore's secrets bucket, not
+    # Preferences (Preferences is plain-text/hand-editable per docs/comments
+    # in Commands.pm -- the key deliberately does NOT go there).
+    my $secrets = $editor->{state_store}->get('secrets');
+    is($secrets->{ai_api_key}, 'sk-super-secret', 'API key persisted in StateStore secrets, not Preferences');
+    is($editor->{prefs}->get('ai_api_key'), undef, 'API key is not a recognized Preferences key');
+};
+
+subtest 'cmd_ai_setup: empty submission at any step is a no-op (does not advance or store)' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    my $orig_url = $editor->{prefs}->get('ai_api_url');
+
+    $editor->cmd_ai_setup();
+    $editor->{footer_input}{on_submit}->('');    # empty URL
+
+    is($editor->{prefs}->get('ai_api_url'), $orig_url, 'Preference untouched on empty URL submission');
+    is($editor->{footer_input}{prompt}, 'API URL:', 'Wizard does not advance past step 1 on empty input');
+
+    # Now advance for real, then try an empty Model.
+    $editor->{footer_input}{on_submit}->('https://api.example.com/v1');
+    is($editor->{footer_input}{prompt}, 'Model:', 'Advanced to step 2');
+    my $orig_model = $editor->{prefs}->get('ai_model');
+    $editor->{footer_input}{on_submit}->('');    # empty model
+    is($editor->{prefs}->get('ai_model'), $orig_model, 'Preference untouched on empty Model submission');
+    is($editor->{footer_input}{prompt}, 'Model:', 'Wizard does not advance past step 2 on empty input');
+};
+
+subtest 'cmd_toggle_ai: with no API key configured, shows a message and does not enable' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    is($editor->{_ai_complete}{api_key}, '', 'Sanity: no API key configured yet');
+
+    $editor->cmd_toggle_ai();
+
+    ok(!$editor->{_ai_complete}{enabled}, 'AI remains disabled with no API key');
+    like($editor->{message}, qr/no api key configured/i, 'Message tells the user to run Setup first');
+};
+
+subtest 'cmd_toggle_ai: flips enabled on/off once an API key is configured' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    $editor->{_ai_complete}{api_key} = 'sk-configured';
+    $editor->{_ai_complete}{enabled} = 0;
+
+    $editor->cmd_toggle_ai();
+    ok($editor->{_ai_complete}{enabled}, 'First toggle turns AI ON');
+    like($editor->{message}, qr/AI Completion: ON/, 'ON message shown');
+
+    $editor->cmd_toggle_ai();
+    ok(!$editor->{_ai_complete}{enabled}, 'Second toggle turns AI back OFF');
+    like($editor->{message}, qr/AI Completion: OFF/, 'OFF message shown');
+};
+
+subtest 'cmd_toggle_ai: turning off cancels any pending/debouncing request' => sub {
+    my $tmpdir = tempdir(CLEANUP => 1);
+    my $editor = Zepto::Editor->new(
+        terminal    => mock_terminal(),
+        state_store => Zepto::StateStore->new(base_dir => $tmpdir),
+    );
+    my $ai = $editor->{_ai_complete};
+    $ai->{api_key} = 'sk-configured';
+    $ai->{enabled} = 1;
+    $ai->trigger('doc', 'view', 'hl');    # arm the debounce timer, simulating mid-typing
+    ok($ai->is_debouncing, 'Sanity: debounce timer armed before toggling off');
+
+    $editor->cmd_toggle_ai();    # turn off
+
+    ok(!$ai->{enabled}, 'AI is now disabled');
+    ok(!$ai->is_debouncing, 'Toggling off cancels the pending debounce timer (via AIComplete::cancel)');
+};
+
+subtest 'cmd_toggle_ai: no-op if AIComplete object is missing entirely' => sub {
+    my $editor = Zepto::Editor->new(terminal => mock_terminal());
+    delete $editor->{_ai_complete};
+    my $msg_before = $editor->{message};
+    $editor->cmd_toggle_ai();
+    is($editor->{message}, $msg_before, 'No message/crash when _ai_complete is absent');
+};
+
+# ============================================================================
 # Sticky/goal column - end-to-end through real key events (ASKS.md item 2,
 # 2026-09-01). tests/view.t and tests/view_wordwrap.t already exercise
 # View's _preferred_col directly; these go through Editor::handle_event
