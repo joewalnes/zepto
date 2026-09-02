@@ -581,4 +581,145 @@ subtest 'Scroll shows line end when approaching EOL' => sub {
     ok($visible_end >= 100, "Line end visible at EOL");
 };
 
+# ============================================================================
+# Sticky/goal column tests (ASKS.md item 2, 2026-09-01)
+#
+# View tracks _preferred_col as a "goal" column that survives vertical
+# movement through shorter lines, so arrowing back to a longer line
+# restores the original horizontal position instead of "jumping around"
+# to wherever the short line happened to leave the cursor. These tests
+# pin down the exact contract:
+#   - vertical movement (up/down/pageup/pagedown) preserves the goal
+#   - horizontal movement (left/right) and explicit repositioning
+#     (Home/End) RESET the goal to the new real column
+#   - the cursor's real column is always clamped to true end-of-line
+#     (never drawn past the text) even while a taller goal is retained
+# ============================================================================
+
+subtest 'Sticky column survives a shorter line and restores on a longer one' => sub {
+    my ($doc, $view) = make_view("looooooooooooong line one\nsh\ntiny\nlooooooooooooong line two again");
+
+    $view->set_cursor(0, 20);
+    is($view->cursor_col(), 20, 'Start at col 20 on long line');
+
+    $view->move_down();
+    is($view->cursor_line(), 1, 'Moved to short line');
+    is($view->cursor_col(), 2, 'Column clamped to short line end (true end, not past it)');
+
+    $view->move_down();
+    is($view->cursor_line(), 2, 'Moved to tiny line');
+    is($view->cursor_col(), 4, 'Column clamped to tiny line end');
+
+    $view->move_down();
+    is($view->cursor_line(), 3, 'Moved to second long line');
+    is($view->cursor_col(), 20, 'Goal column (20) restored exactly, not left at 4');
+
+    # And the reverse direction restores it too.
+    $view->move_up();
+    $view->move_up();
+    $view->move_up();
+    is($view->cursor_line(), 0, 'Back on first long line');
+    is($view->cursor_col(), 20, 'Goal column (20) still intact after round trip');
+};
+
+subtest 'End key sets goal column to the true (real) line end, not a fixed large number' => sub {
+    my ($doc, $view) = make_view("short one\nreally quite a lot longer than the first\nx");
+
+    $view->set_cursor(0, 3);
+    $view->move_to_line_end();
+    is($view->cursor_col(), 9, 'End lands at true end of short line (9 chars)');
+
+    # Goal is now 9 (the line-1 end), NOT some large sentinel. Moving down
+    # to the much longer line 2 must land at col 9, not at line 2's own end.
+    $view->move_down();
+    is($view->cursor_line(), 1, 'Moved to longer line');
+    is($view->cursor_col(), 9, 'Landed at col 9 (End-derived goal), proving End did not set an oversized goal');
+};
+
+subtest 'Horizontal movement (left/right) resets the goal column' => sub {
+    my ($doc, $view) = make_view("looooooooooooong line one\nsh\nlooooooooooooong line two again");
+
+    $view->set_cursor(0, 20);
+    $view->move_down();
+    is($view->cursor_col(), 2, 'Pinned at true end of short line (goal 20 still remembered internally)');
+
+    # Explicit horizontal repositioning: goal must now become 1 (real col
+    # after moving left), NOT stay at the old value of 20.
+    $view->move_left();
+    is($view->cursor_col(), 1, 'Moved left to col 1');
+
+    $view->move_down();
+    is($view->cursor_line(), 2, 'Moved to second long line');
+    is($view->cursor_col(), 1, 'Landed at col 1 (new goal from left-arrow), not the stale 20');
+
+    # move_right also resets the goal.
+    $view->set_cursor(0, 20);
+    $view->move_down();
+    $view->move_right();  # short line has 2 chars; col 2 is EOL, move_right wraps to next line start
+    is($view->cursor_line(), 2, 'Right-arrow at EOL of short line wraps to next line');
+    is($view->cursor_col(), 0, 'Lands at col 0 of next line');
+    $view->move_down();
+    is($view->cursor_col(), 0, 'Goal reset to 0 by the right-arrow wrap, not left at 20');
+};
+
+subtest 'Home resets the goal column to where it lands' => sub {
+    my ($doc, $view) = make_view("    indented one\nlong second line here\nsh");
+
+    $view->set_cursor(1, 10);
+    $view->move_to_line_start();  # smart-home: first non-ws (col 0, no leading ws) -> col 0
+    is($view->cursor_col(), 0, 'Home lands at col 0 (no indent on this line)');
+
+    $view->move_down();
+    is($view->cursor_line(), 2, 'Moved to short line');
+    is($view->cursor_col(), 0, 'Goal reset to 0 by Home, so short line lands at col 0 too');
+};
+
+subtest 'Typing while pinned past a short line snaps to true end, does not pad with whitespace' => sub {
+    my ($doc, $view) = make_view("a very much longer first line indeed\nhi");
+
+    $view->set_cursor(0, 25);
+    $view->move_down();
+    is($view->cursor_line(), 1, 'Moved to short line');
+    is($view->cursor_col(), 2, 'Pinned at true end of "hi" (col 2), not padded out to col 25');
+
+    # Mirror what Editor::do_insert_char does: insert at the CURRENT
+    # (already-clamped) cursor position, then advance.
+    my $offset = $doc->line_col_to_offset($view->cursor_line(), $view->cursor_col());
+    $doc->insert($offset, 'X');
+    $view->move_right();
+
+    is($doc->get_line_content(1), 'hiX', 'Character inserted at true end - no padding whitespace before it');
+    is($view->cursor_col(), 3, 'Cursor now at true col 3 (right after typed char)');
+    is($view->{_preferred_col}, 3, 'Goal column updated to match the new real position (3, not 25)');
+};
+
+subtest 'Page up/down respect the goal column, same as arrow keys' => sub {
+    my ($doc, $view) = make_view(
+        "loooooooooooooooooooooong line 0\n" .
+        "s1\ns2\ns3\ns4\n" .
+        "loooooooooooooooooooooong line 5",
+        rows => 3
+    );
+    # viewport_rows=3 -> page_size = viewport_rows-1 = 2
+
+    $view->set_cursor(0, 25);
+    $view->move_page_down();
+    is($view->cursor_line(), 2, 'Page down moved 2 lines (page_size)');
+    is($view->cursor_col(), 2, 'Column clamped to short line "s2" end');
+
+    $view->move_page_down();
+    is($view->cursor_line(), 4, 'Page down again to s4');
+    is($view->cursor_col(), 2, 'Column clamped to short line "s4" end');
+
+    $view->move_page_down();
+    is($view->cursor_line(), 5, 'Page down lands on the long line at the end (clamped by doc bounds)');
+    is($view->cursor_col(), 25, 'Goal column (25) restored on the long line, not left at 2');
+
+    $view->move_page_up();
+    $view->move_page_up();
+    $view->move_page_up();
+    is($view->cursor_line(), 0, 'Page up back to the first long line');
+    is($view->cursor_col(), 25, 'Goal column (25) still intact after a page up/down round trip');
+};
+
 done_testing();
