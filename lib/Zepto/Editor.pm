@@ -5186,7 +5186,7 @@ sub render {
         my $cell_aspect = $self->{terminal}->cell_aspect_ratio();
         my $img_width = $avail_width;
         my $img_height = $avail_height;
-        my ($wpx, $hpx) = Zepto::Renderer::_get_image_dimensions($image_path);
+        my ($wpx, $hpx) = Zepto::Renderer::get_image_dimensions($image_path);
         if (defined $wpx && $wpx > 0 && $hpx > 0) {
             # Compute rows needed if we use full available width
             my $fit_rows = int(0.5 + ($hpx / $wpx) * $avail_width / $cell_aspect);
