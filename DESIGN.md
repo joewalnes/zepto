@@ -85,7 +85,7 @@ it's the pragmatic choice.
 | **FileSearchEngine** | Cross-file search via external tools              | Stateful (async I/O)         |
 | **Diff**             | Myers diff algorithm for VCS gutter               | Pure function                |
 | **InputWidget**      | Text input for find bar, palette, footer          | Stateful                     |
-| **WrapMap**          | Word wrap computation, visual row mapping         | State in → wrap map out; calls into Renderer's private `_`-prefixed tab/column helpers directly (accepted coupling, not a public API) |
+| **WrapMap**          | Word wrap computation, visual row mapping         | State in → wrap map out; calls Renderer's public `expand_tabs()`/`char_to_visual_col()`/`visual_to_char_col()` tab/column helpers (accepted cross-module coupling; these are supported entry points, not reaches into private `_`-prefixed internals — see `bugs.md` "WrapMap.pm reaches into Renderer.pm's private functions") |
 | **LineMap**          | Maps display rows to document lines (diff view)   | Pure function                |
 | **Minimap**          | Braille-based scrollbar/minimap computation       | Pure function                |
 | **Chars**            | Nerd Font / ASCII glyph abstraction               | Pure data                    |
