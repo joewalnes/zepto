@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# QA-UNDO-011: Undo stack behavior after external reload
+# QA-UNDO-015: Undo stack behavior after command-palette forced reload
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
-qa_header "QA-UNDO-011: Undo after reload"
+qa_header "QA-UNDO-015: Undo after command-palette forced reload"
 
-file=$(qa_tmpfile_nl "undo011.txt" "original content")
+file=$(qa_tmpfile_nl "undo015.txt" "original content")
 qa_start "$file"
 
 # Modify

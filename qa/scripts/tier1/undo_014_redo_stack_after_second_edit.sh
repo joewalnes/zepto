@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# QA-UNDO-010: New edit clears redo stack
+# QA-UNDO-014: New edit clears redo stack (typed-suffix variant)
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
-qa_header "QA-UNDO-010: New edit clears redo"
+qa_header "QA-UNDO-014: New edit clears redo stack (typed-suffix variant)"
 
-file=$(qa_tmpfile_nl "undo010.txt" "original")
+file=$(qa_tmpfile_nl "undo014.txt" "original")
 qa_start "$file"
 
 # Type, undo, then type something new

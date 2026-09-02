@@ -439,3 +439,37 @@ VERIFY
     automated regression coverage (swept across ~5000+ combinations of
     width, multi-cursor count, column-select state, nerd-font mode, and
     filename).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SBAR-023
+NAME:     Wrap pill shows active/highlighted state after toggle
+          (vision-judge)
+PRIORITY: P2
+FEATURE:  sbar toggle, visual
+RELATED:  QA-SBAR-005 (general toggle-pills-visible sweep, tier2
+          sibling)
+SCRIPT:   tier2/sbar_023_wrap_active.sh
+
+STEPS
+  1. Open a file with a few lines of text.
+  2. Toggle word wrap on (⌥Z).
+  3. Screenshot the status bar and ask a vision judge whether the Wrap
+     pill specifically renders in an ACTIVE/highlighted state (brighter
+     color or filled background, distinct from inactive pills) and that
+     at least 2 other pills are present alongside it.
+
+VERIFY
+  - Judge replies PASS: Wrap pill visibly reads as toggled ON.
+  - Requires ZEPTO_QA_API_KEY/ANTHROPIC_API_KEY/OPENAI_API_KEY (skips
+    gracefully without one — see qa/README.md).
+
+NOTES
+  This script previously collided with QA-SBAR-005's ID (both scripts
+  claimed "005" — see bugs.md's QA catalog ID-collision hygiene entry).
+  QA-SBAR-005 covers the broader "toggle pills visible, default and
+  toggled state" sweep; this test is the narrower single-state check
+  specifically for the Wrap pill's active/highlighted rendering. As with
+  all tier2 vision-judge checks, treat a FAIL as a lead, not a confirmed
+  bug — re-run and inspect the actual screenshot before filing to
+  bugs.md.
