@@ -5,8 +5,8 @@
 Covers: the zepto binary itself, CLI flags, env vars, install flow, self-
 installer, version reporting, help output.
 
-Reference: /Users/joe/src/zepto/zepto (top-level argv parsing),
-           /Users/joe/src/zepto/install.sh, /Users/joe/src/zepto/Formula/.
+Reference: zepto (top-level argv parsing), install.sh, Formula/
+           (all relative to repo root).
 
 --------------------------------------------------------------------------------
 
@@ -76,10 +76,11 @@ PRIORITY: P1
 FEATURE:  launch
 
 SETUP
-  Target: an existing directory, e.g. /Users/joe/src/zepto/.
+  Target: an existing directory, e.g. the repo root (run from repo root
+  and use `.`).
 
 STEPS
-  1. Run `./zepto /Users/joe/src/zepto`.
+  1. Run `./zepto .` (from the repo root).
 
 VERIFY
   - Editor opens with file tree visible (regardless of single-file rule).
@@ -167,7 +168,7 @@ PRIORITY: P2
 FEATURE:  cli-flag
 
 STEPS
-  1. Run `./zepto --no-tree /Users/joe/src/zepto`.
+  1. Run `./zepto --no-tree .` (from the repo root).
 
 VERIFY
   - File tree is hidden.
@@ -195,7 +196,7 @@ PRIORITY: P2
 FEATURE:  env-var
 
 STEPS
-  1. Run `ZEPTO_TREE=0 ./zepto /Users/joe/src/zepto`.
+  1. Run `ZEPTO_TREE=0 ./zepto .` (from the repo root).
 
 VERIFY
   - File tree is hidden.
@@ -208,7 +209,7 @@ PRIORITY: P3
 FEATURE:  env-var
 
 STEPS
-  1. Run `ZEPTO_TREE=0 ./zepto --tree /Users/joe/src/zepto`.
+  1. Run `ZEPTO_TREE=0 ./zepto --tree .` (from the repo root).
   2. Run `ZEPTO_NERD_FONT=0 ./zepto /tmp/zqa_a.txt` and compare to
      running without env var.
 

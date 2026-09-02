@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-01
+
+- Fixed a hardcoded developer-machine path (`/Users/joe/src/zepto`) in the QA test catalog's installation/CLI and preferences documentation that could confuse anyone else copy-pasting the example commands on their own machine or in CI. No behavior change — internal QA docs only
+
 ## 2026-08-31
 
 - Fixed `⌃B` hiding the file tree instead of switching focus back to it when the tree was open but not focused (e.g. right after opening a file from the tree, clicking into the document, or pressing Esc to return to the editor). `⌃B` now correctly refocuses the tree from that state — it still shows+focuses the tree when hidden, and still hides it when pressed a second time while the tree is already focused
