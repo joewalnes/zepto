@@ -2401,3 +2401,59 @@ As a side effect this also fixes the same bug on documents *shorter* than the vi
 **QA:** `qa/scripts/tier1/ms_023_scroll_wheel_eof_clamp.sh` (`QA-MS-023`, cataloged in `qa/31_mouse_interactions.txt`; regression entry `QA-REG-221` in `qa/40_regression_bugs.txt`) — opens a 200-line file, sends a large mouse-wheel scroll-down delta via `hangon mouse-scroll`, asserts line 200 is visible AND lands in the bottom few rows of the pane rather than the top. Verified non-tautological the same way: fails against the pre-fix binary (line 200 appears at the top with blank rows below), passes after the fix.
 
 **Interactive verification:** re-confirmed live via `hangon` post-fix — scrolling a 200-line file drastically down with the mouse wheel now stops with line 200 correctly pinned at the bottom row of the viewport, matching standard editor behavior. Also re-confirmed arrow-key scrolling was unaffected throughout (same correct pinned-at-bottom behavior before and after this fix, since that path was never broken).
+
+---
+
+## P0: Cursor left outside valid line numbers after paste → undo (2026-09-01)
+
+**Reported live by the user** (`ASKS.md` item 0, the session's highest-priority item): *"I pasted a block of text, then hit undo, then some sequence of moving / redo, and my cursor ended up outside of the valid line numbers. I'm not sure exactly how I did it."* P0 per this file's own scale — an out-of-range cursor makes the next keystroke insert somewhere other than where the cursor is drawn.
+
+**Reproduced first (Rule 5).** The user could not pin down the trigger, so the hunt started with a fuzz-style permutation sweep rather than a hand-picked sequence: `tests/undo_redo_cursor_bounds.t` builds 6 document shapes × 4 paste payloads × 5 paste positions × ~200 undo/redo/movement sequences and asserts the cursor, selection anchor and every multi-cursor are in range after **every** step. Against the pre-fix code it reported **9082 of 27480 permutations failing**, the first being far simpler than the user's description:
+
+```
+doc[single line, no trailing NL] paste[multi-line block] at[start of document]
+  seq[undo] -- broke after 'undo': cursor line 5 out of range [0, 1)
+```
+
+**Minimal repro: paste a multi-line block, press undo once.** No movement or redo needed — those were incidental to how the user happened to notice it.
+
+Confirmed live in the real binary via `hangon` on a 3-line file (`alpha/beta/gamma`) with a 5-line block pasted at the top:
+
+- after `⌃V`: document 8 lines, cursor line 6 — fine
+- after `⌃Z`: document back to 3 lines, **status bar reported `6:1`** — a line number that does not exist
+- typing `X` there: the character was silently inserted at the **start of line 3**, not at the phantom line 6, because `line_col_to_offset()` saturates at the last real line. Saved file: `alpha\nbeta\nXgamma\n` — text landed somewhere the user was not looking
+- the redraw was also corrupted: line 3 rendered as `Xgamm` (truncated) from the stale render cache, and the status bar still read `6:1` after the keystroke
+
+**Root cause (traced, not guessed).** `Zepto::Document` stores no cursor information in its undo entries at all — `undo()`/`redo()` only replay buffer mutations. `Editor::Commands::cmd_undo`/`cmd_redo` called `$doc->undo()`/`$doc->redo()` and then left the view's cursor exactly as it was. `View::set_cursor()` does clamp, but undo/redo never routed through it, so undoing a paste that had shrunk the document left the cursor addressing a line that no longer existed. `cmd_undo`/`cmd_redo` are the **only** two callers of `Document::undo`/`redo` in the codebase, so this affected every undo and redo.
+
+**NOT caused by this session's `Document.pm` undo-group / `_content_version` work (QA-REG-226/227/228).** The timing was suspicious, so it was checked directly rather than assumed: the same sweep fails **identically — 9082 of 27480** — at `a424abb`, the commit immediately *before* `e59af09` which landed those fixes; and `e59af09` does not touch `lib/Zepto/Editor/Commands.pm` at all (`git show --stat`). `git log -L` on `cmd_undo` shows its last functional change was `2d3055f`, long predating this session. The defect is original to the Editor module (`bc0c1f8`), not a regression.
+
+**Fix.** New `View::clamp_to_document()` (`lib/Zepto/View.pm`) re-clamps every document position the view holds — cursor, selection anchor, all multi-cursors *and* their anchors, and `scroll_line` — into the document's current bounds, using the same rules as `set_cursor()` (including the column-select virtual-whitespace exemption, so column mode is unaffected). It only recomputes the preferred column and calls `ensure_cursor_visible()` when the cursor actually moved, so an already-in-bounds view is left byte-for-byte untouched. `cmd_undo` and `cmd_redo` (`lib/Zepto/Editor/Commands.pm`) call it immediately after a successful `$doc->undo()`/`$doc->redo()`. Because those are the only two callers of undo/redo, the invariant "cursor is always within `[0, line_count)` and `[0, line_length(cursor_line)]`" now holds after *any* undo/redo, not just the reported sequence.
+
+**Tests.** `tests/undo_redo_cursor_bounds.t` — the sweep described above (trimmed to 23,880 permutations to keep it near 1s; Rule 3). It carries its own self-check subtest that pokes known-bad values into the view and asserts the bounds checker flags them, so a broken checker cannot yield a vacuous pass. `tests/editor.t` — new subtest `'Cursor stays in bounds across undo/redo'` driving the real `cmd_paste`/`cmd_undo`/`cmd_redo` command path: **11 of its 24 assertions fail against the pre-fix code**, all `"cursor line N out of range [0, 3)"`. It also asserts that a character typed after the undo lands at the cursor's *own reported* position, with the expected document text computed from the live cursor rather than hardcoded.
+
+**QA.** `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` (`QA-REG-230` in `qa/40_regression_bugs.txt`, feature test `QA-UNDO-013` in `qa/04_undo_redo.txt`). Copies a 3-line block inside the editor, pastes it at **end** of document, undoes, and asserts the status bar's reported line is inside the now-3-line document, that a typed character lands on the line the cursor claims, and that the cursor stays in range through a following undo/move/redo. Verified non-tautological: **3 assertions fail against the unfixed binary** (`"Document has 3 lines, status bar reports line 5"`), all 10 pass after the fix, stable across 3 consecutive runs of each.
+
+**Trap worth recording:** the first draft of that QA script pasted at the *top* of the document. That left the cursor on line 3 of a 3-line document after undo — in range by coincidence — so the script **passed against the unfixed binary and proved nothing**. The paste must leave the cursor *below* the document's original last line for this bug to be reachable at all. The script now carries a comment saying so.
+
+**Interactive verification.** Before/after captured via `hangon` (`--state-dir` scratch dir, unique session names). Before: status bar `6:1` on a 3-line document, typed character landing on line 3, `Xgamm` render corruption. After: status bar `3:1`, cursor visibly on line 3, typing advances it to `3:2` and renders `Xgamma` correctly; paste → undo → ↓ → redo leaves the cursor at `3:1` in an 8-line document.
+
+**Deliberately NOT changed (needs a UX call).** The clamp puts a stale cursor on the nearest valid position — which for the common "paste at end, undo" case is the document's last line, not the position the cursor occupied *before* the paste. Most editors restore the cursor to the edit site on undo, which would require `Document` to record cursor positions in its undo entries (its actions already carry `pos`). That is a visible behavior change to every undo/redo, so per `CLAUDE.md`'s do-not-touch rule it is left for the user to decide rather than picked unilaterally. The P0 — an out-of-range cursor and the silent mis-insertion it caused — is fully fixed either way.
+
+## P2: `cmd_paste` in unit tests reads the developer's real system clipboard (2026-09-01)
+
+Found incidentally while writing the QA-REG-230 regression tests. `tests/editor.t`'s mock terminal (`mock_terminal()`, backed by two temp files) still has `_clipboard_paste_cmd` populated — platform detection doesn't depend on being a tty — so `Editor::cmd_paste` shells out to `pbpaste`/`xclip` and **overwrites `$editor->{clipboard}` with whatever the developer happens to have copied**. The existing paste tests (`tests/editor.t` 'Copy and paste', ~line 1120) only pass because the clipboard is usually empty or irrelevant.
+
+Demonstrated non-destructively (clipboard saved and restored around the probe): with `CLIPBOARD_POLLUTION` on the system clipboard, a test that sets `$editor->{clipboard} = 'Hello'` and pastes into `"Hello World"` produced `"CLIPBOARD_POLLUTIONHello World"` instead of the expected `"HelloHello World"`.
+
+Not fixed here — out of scope for the P0 above, and it needs a decision about whether to neutralise the clipboard command centrally in `mock_terminal()` (which would change several existing tests' effective coverage) or per-test. The QA-REG-230 tests work around it explicitly via a documented `editor_with_paste_isolated()` helper that clears `_clipboard_paste_cmd`. Anyone touching the paste tests should do the same, or fix `mock_terminal()` centrally.
+
+## P2: `make build` did not rebuild after a help-doc edit — shipped stale built-in docs (2026-09-01)
+
+Found incidentally while updating `docs/help/changelog.md` for the P0 above. `build.pl` embeds `docs/help/*.md` into the single-file binary (it globs that directory directly), but the `Makefile`'s `zepto:` target only depended on `$(MODULES)` (`lib/**/*.pm`) and `build.pl`. Editing a help doc alone therefore left `make build` reporting `Nothing to be done for 'build'`, and the binary kept serving the previous revision of the built-in documentation — including the changelog that `CLAUDE.md` requires be updated on every commit.
+
+**Fix:** added `HELPDOCS := $(wildcard docs/help/*.md)` to the `zepto:` target's prerequisites, with a comment explaining the coupling.
+
+**Verified non-tautological:** with the target already up to date, `make build` correctly reports `Nothing to be done`; `touch docs/help/changelog.md && make build` then rebuilds (`Building single-file zepto... Built: zepto`). Against the pre-fix Makefile the same `touch` produced `Nothing to be done`, i.e. the stale binary the bug describes.
+
+No QA script — this is a build-system dependency, not user-visible editor behavior, and the guard is the Makefile prerequisite itself.

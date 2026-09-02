@@ -164,6 +164,93 @@ sub set_cursor {
     $self->ensure_cursor_visible();
 }
 
+# Re-clamp every document position this view holds -- cursor, selection
+# anchor, multi-cursors and their anchors, and the scroll position -- into
+# the document's CURRENT bounds.
+#
+# Why this exists: set_cursor() clamps, but undo/redo mutate the document
+# underneath the view without routing through it. After undoing a multi-line
+# paste the document can be many lines shorter than the cursor's recorded
+# line, leaving the cursor outside the valid line range. That is not merely
+# cosmetic -- line_col_to_offset() saturates at the end of the buffer, so the
+# next typed character lands at end-of-document instead of where the cursor
+# appears, silently corrupting the file (ASKS.md item 0 / QA-REG-230).
+#
+# Returns true if anything actually had to be moved, false if the view was
+# already in bounds.
+sub clamp_to_document {
+    my ($self) = @_;
+
+    my $doc = $self->{document};
+    return 0 unless $doc;
+
+    my $max_line = $doc->line_count() - 1;
+    $max_line = 0 if $max_line < 0;
+
+    my $changed = 0;
+
+    # Clamps one (line, col) pair using the same rules as set_cursor().
+    my $clamp = sub {
+        my ($line, $col) = @_;
+
+        my $l = (!defined($line) || $line < 0) ? 0 : $line;
+        $l = $max_line if $l > $max_line;
+
+        my $c = (!defined($col) || $col < 0) ? 0 : $col;
+        # Column-select mode intentionally allows virtual whitespace past the
+        # end of a line, so only the line is clamped there -- same exemption
+        # set_cursor() makes.
+        unless ($self->{column_select}) {
+            my $max_col = $doc->line_length($l);
+            $c = $max_col if $c > $max_col;
+        }
+
+        $changed = 1 if !defined($line) || !defined($col)
+                     || $l != $line || $c != $col;
+        return ($l, $c);
+    };
+
+    ($self->{cursor_line}, $self->{cursor_col}) =
+        $clamp->($self->{cursor_line}, $self->{cursor_col});
+    my $cursor_moved = $changed;
+
+    if (defined $self->{selection_anchor_line}) {
+        ($self->{selection_anchor_line}, $self->{selection_anchor_col}) =
+            $clamp->($self->{selection_anchor_line}, $self->{selection_anchor_col});
+    }
+
+    for my $mc (@{ $self->{_multi_cursors} }) {
+        ($mc->{line}, $mc->{col}) = $clamp->($mc->{line}, $mc->{col});
+        if (defined $mc->{anchor_line}) {
+            ($mc->{anchor_line}, $mc->{anchor_col}) =
+                $clamp->($mc->{anchor_line}, $mc->{anchor_col});
+        }
+    }
+
+    # The scroll position indexes lines too, and can be left pointing past the
+    # end of a shrunken document.
+    if ($self->{scroll_line} < 0 || $self->{scroll_line} > $max_line) {
+        $self->{scroll_line} = $self->{scroll_line} < 0 ? 0 : $max_line;
+        $changed = 1;
+    }
+
+    # Only disturb the preferred column and viewport when the cursor itself
+    # actually moved -- an already-in-bounds view must be left exactly as it
+    # was, so this is a no-op in the common case.
+    if ($cursor_moved) {
+        if ($self->{_wrap_map}) {
+            my (undef, $vcol) = $self->{_wrap_map}->doc_to_visual(
+                $self->{cursor_line}, $self->{cursor_col}, $self->{_cursor_affinity});
+            $self->{_preferred_col} = $vcol;
+        } else {
+            $self->{_preferred_col} = $self->{cursor_col};
+        }
+        $self->ensure_cursor_visible();
+    }
+
+    return $changed ? 1 : 0;
+}
+
 # Get cursor as byte offset in document
 sub cursor_offset {
     my ($self) = @_;

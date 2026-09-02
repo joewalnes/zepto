@@ -711,6 +711,146 @@ subtest 'Ctrl char mapping' => sub {
 };
 
 # ============================================================================
+# Cursor bounds across undo/redo (QA-REG-230)
+#
+# Regression for the P0 in ASKS.md item 0: "I pasted a block of text, then hit
+# undo, then some sequence of moving / redo, and my cursor ended up outside of
+# the valid line numbers." cmd_undo/cmd_redo used to mutate the document
+# without re-clamping the view, so undoing a multi-line paste left the cursor
+# on a line that no longer existed. The broad permutation sweep lives in
+# tests/undo_redo_cursor_bounds.t; these cover the real command path.
+# ============================================================================
+
+# Asserts the view's cursor indexes a line and column that actually exist.
+sub cursor_in_bounds_ok {
+    my ($editor, $label) = @_;
+    my $doc  = $editor->active_doc();
+    my $view = $editor->active_view();
+    my ($line, $col) = ($view->cursor_line(), $view->cursor_col());
+    my $count = $doc->line_count();
+
+    if ($line < 0 || $line >= $count) {
+        fail("$label: cursor line $line out of range [0, $count)");
+        return;
+    }
+    my $len = $doc->line_length($line);
+    if ($col < 0 || $col > $len) {
+        fail("$label: cursor col $col out of range [0, $len] on line $line");
+        return;
+    }
+    pass("$label: cursor ($line,$col) in bounds (doc has $count lines)");
+}
+
+# cmd_paste() consults the SYSTEM clipboard first and only falls back to
+# $editor->{clipboard}. Left alone it would shell out to pbpaste/xclip and
+# splice whatever the developer happened to have copied into these tests, so
+# the platform command is disabled here to force the internal-clipboard path.
+sub editor_with_paste_isolated {
+    my ($content) = @_;
+    my $term = mock_terminal();
+    my $filename = create_temp_file($content);
+    my $editor = Zepto::Editor->new(terminal => $term, file => $filename);
+    setup_editor_doc($editor, $filename);
+    $editor->{terminal}{_clipboard_paste_cmd} = undef;
+    return $editor;
+}
+
+subtest 'Cursor stays in bounds across undo/redo' => sub {
+    # --- Minimal repro: paste a multi-line block, then a single undo -------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        # Document::load() normalises the trailing newline away, so the file
+        # "alpha\nbeta\ngamma\n" loads as 3 lines and pasting 5 gives 8.
+        is($editor->active_doc()->line_count(), 3, 'document starts with 3 lines');
+        $editor->cmd_paste();
+        is($editor->active_doc()->line_count(), 8, 'paste added 5 lines');
+        cursor_in_bounds_ok($editor, 'after paste');
+
+        my $line_before = $editor->active_view()->cursor_line();
+        cmp_ok($line_before, '>=', 3,
+               'cursor is past the original last line after paste (would be stale on undo)');
+
+        $editor->cmd_undo();
+        is($editor->active_doc()->text(), "alpha\nbeta\ngamma", 'undo reverted the paste');
+        cursor_in_bounds_ok($editor, 'after undo of multi-line paste');
+    }
+
+    # --- The user's described shape: paste -> undo -> move -> redo --------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        $editor->cmd_paste();
+        $editor->cmd_undo();
+        cursor_in_bounds_ok($editor, 'paste/undo');
+
+        $editor->active_view()->move_down();
+        cursor_in_bounds_ok($editor, 'paste/undo/move-down');
+
+        $editor->cmd_redo();
+        cursor_in_bounds_ok($editor, 'paste/undo/move/redo');
+
+        $editor->cmd_undo();
+        cursor_in_bounds_ok($editor, 'paste/undo/move/redo/undo');
+    }
+
+    # --- Typing after undo must land where the cursor appears -------------
+    # This is the corruption the out-of-range cursor caused: line_col_to_offset
+    # saturates at end-of-buffer, so the character went to the end of the file
+    # instead of to the cursor.
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\nfour\nfive\n";
+        $editor->{clipboard_columnar} = 0;
+
+        $editor->active_view()->set_cursor(0, 0);
+        $editor->cmd_paste();
+        $editor->cmd_undo();
+
+        is($editor->active_doc()->text(), "alpha\nbeta\ngamma",
+           'undo restored the original content');
+
+        my ($line, $col) = ($editor->active_view()->cursor_line(),
+                            $editor->active_view()->cursor_col());
+
+        # Build what the document MUST look like if the character lands at the
+        # cursor's own reported position -- computed from the live cursor, so
+        # this cannot pass by coincidence if the character goes elsewhere.
+        my @lines = split(/\n/, $editor->active_doc()->text(), -1);
+        substr($lines[$line], $col, 0) = 'X';
+        my $expected = join("\n", @lines);
+
+        $editor->do_insert_char('X');
+
+        is($editor->active_doc()->text(), $expected,
+           "typed character landed at the cursor's reported position ($line,$col), "
+           . "not at end of document");
+    }
+
+    # --- Multiple back-to-back paste/undo/redo cycles ---------------------
+    {
+        my $editor = editor_with_paste_isolated("alpha\nbeta\ngamma\n");
+        $editor->{clipboard} = "one\ntwo\nthree\n";
+        $editor->{clipboard_columnar} = 0;
+
+        for my $cycle (1 .. 3) {
+            $editor->cmd_paste();
+            cursor_in_bounds_ok($editor, "cycle $cycle paste");
+            $editor->cmd_undo();
+            cursor_in_bounds_ok($editor, "cycle $cycle undo");
+            $editor->cmd_redo();
+            cursor_in_bounds_ok($editor, "cycle $cycle redo");
+            $editor->cmd_undo();
+            cursor_in_bounds_ok($editor, "cycle $cycle final undo");
+        }
+    }
+};
+
+# ============================================================================
 # Insert and delete with selection
 # ============================================================================
 subtest 'Delete selection' => sub {

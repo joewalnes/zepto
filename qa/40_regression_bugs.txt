@@ -3557,3 +3557,86 @@ QA:       `qa/scripts/tier1/ms_023_scroll_wheel_eof_clamp.sh` — opens a
           `git stash` technique: fails against the pre-fix binary (shows
           an empty "201" gutter row at the top of the viewport instead
           of line 200 near the bottom), passes after the fix.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-REG-230
+NAME:     Cursor left outside the document's valid line numbers after
+          undoing a multi-line paste (P0 -- silent mis-insertion on the
+          next keystroke)
+PRIORITY: P0
+BUG:      P0 "Cursor can end up outside valid line numbers after paste ->
+          undo" — reported live by the user (2026-09-01, ASKS.md item 0):
+          "I pasted a block of text, then hit undo, then some sequence of
+          moving / redo, and my cursor ended up outside of the valid line
+          numbers. I'm not sure exactly how I did it."
+          Root cause: `Zepto::Document` does not store cursor positions in
+          its undo entries at all, and `Editor::Commands::cmd_undo` /
+          `cmd_redo` called `$doc->undo()` / `$doc->redo()` and then left
+          the view's cursor exactly where it was. Undoing a multi-line
+          paste shrinks the document, so a cursor that the paste had
+          placed at the end of the pasted block was left pointing at a
+          line that no longer existed. `View::set_cursor()` clamps, but
+          undo/redo never routed through it.
+          NOT caused by this session's `Document.pm` undo-group /
+          `_content_version` work (QA-REG-226/227/228): the permutation
+          sweep below fails identically (9082 of 27480 permutations) at
+          `a424abb`, the commit immediately BEFORE `e59af09` which landed
+          those fixes, and `e59af09` does not touch
+          `lib/Zepto/Editor/Commands.pm` at all. `cmd_undo`'s last
+          functional change was `2d3055f`; the defect is original to the
+          Editor module.
+          User-visible symptoms on a 3-line file after pasting a 3-line
+          block at end-of-document and pressing Undo: the status bar
+          reported line 5 on a 3-line document; the next typed character
+          silently landed on line 3 (because `line_col_to_offset()`
+          saturates at the last line) rather than where the cursor was
+          drawn; and the redrawn line was visually mangled ("Xgamm"
+          instead of "Xgamma") from the stale render cache.
+CROSS-REF: QA-UNDO-013 (the primary feature test for cursor bounds across
+          undo/redo, qa/04_undo_redo.txt); QA-UNDO-001/002 (which already
+          state that undo/redo reposition the cursor).
+FIX:      `lib/Zepto/View.pm` — new `clamp_to_document()` re-clamps every
+          document position the view holds (cursor, selection anchor, all
+          multi-cursors and their anchors, and `scroll_line`) into the
+          document's current bounds, using the same rules as
+          `set_cursor()` including the column-select virtual-whitespace
+          exemption. `lib/Zepto/Editor/Commands.pm` — `cmd_undo` and
+          `cmd_redo` call it immediately after a successful
+          `$doc->undo()` / `$doc->redo()`. These are the only two callers
+          of `Document::undo`/`redo` in the codebase, so the invariant
+          holds for every undo/redo, not just the reported sequence.
+VERIFY    `tests/undo_redo_cursor_bounds.t` — a fuzz-style sweep over 6
+          document shapes x 4 paste payloads x 5 paste positions x 199
+          undo/redo/movement sequences (23,880 permutations), asserting
+          the cursor, selection anchor and every multi-cursor are in
+          range after EVERY step, not just at the end. Verified
+          non-tautological two ways: (1) against the pre-fix code it
+          reported 9082 of 27480 permutations failing (the sweep was
+          slightly larger before being trimmed for speed), and (2) the
+          file carries its own self-check subtest that pokes known-bad
+          values into the view and asserts the bounds checker flags them,
+          so a broken checker cannot produce a vacuous pass.
+          `tests/editor.t` 'Cursor stays in bounds across undo/redo'
+          drives the real `cmd_paste`/`cmd_undo`/`cmd_redo` command path
+          (11 of its 24 assertions fail against the pre-fix code, all
+          "cursor line N out of range [0, 3)") and additionally asserts
+          that a character typed after the undo lands at the cursor's own
+          reported position, computed from the live cursor rather than
+          hardcoded.
+QA:       `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` — copies a
+          3-line block inside the editor, pastes it at END of document
+          (cursor -> line 5 of 5), presses Undo, and asserts the status
+          bar's reported line is within the now-3-line document, that a
+          typed character lands on the line the cursor claims, and that
+          the cursor stays in range through a following
+          undo/move-down/redo. Verified non-tautological: 3 assertions
+          FAIL against the unfixed binary ("Document has 3 lines, status
+          bar reports line 5"), all 10 pass after the fix, stable across
+          3 consecutive runs of each.
+          NOTE for future authors: an earlier draft of this script pasted
+          at the TOP of the document, which left the cursor on line 3 of
+          a 3-line document after undo — in range by coincidence — so it
+          passed against the unfixed binary and proved nothing. The paste
+          must leave the cursor BELOW the document's original last line
+          for this bug to be reachable.

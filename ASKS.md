@@ -6,7 +6,7 @@ Mark an item `[DONE — <date>, <commit/PR ref>]` in place when finished. Don't 
 
 ---
 
-## 0. Cursor can end up outside valid line numbers after paste → undo → move/redo (2026-09-01)
+## 0. [DONE — 2026-09-01, branch `fix-cursor-out-of-bounds`] Cursor can end up outside valid line numbers after paste → undo → move/redo (2026-09-01)
 
 **Highest priority — work this before anything else in this file, including the item below.** Reported live, exact repro not yet pinned down: *"I pasted a block of text, then hit undo, then some sequence of moving / redo, and my cursor ended up outside of the valid line numbers. I'm not sure exactly how I did it."* This is a P0-class report per this project's own bug severity scale (`bugs.md`: "P0: Data loss, crash, or fundamentally wrong behavior") — an out-of-range cursor position is exactly the kind of state that can crash on the next edit or silently corrupt the document, and it's in the undo/redo + cursor-position machinery that `Document.pm`'s undo-group fix (item 1, finding #3/#4 below) touched this very session.
 
