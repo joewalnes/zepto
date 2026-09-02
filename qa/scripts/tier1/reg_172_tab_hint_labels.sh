@@ -16,7 +16,7 @@
 # (was plain lowercase text with no pill shape at all) — see bugs.md
 # "Tab-bar buttons (close/tabs/quit hints) use a visually different
 # style than the bottom status bar's pills". Assertions below updated
-# from lowercase to Title Case to match; QA-REG-230 covers the pill
+# from lowercase to Title Case to match; QA-REG-231 covers the pill
 # shape / overflow-at-narrow-width aspects of that same fix.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
 qa_header "QA-REG-172: Tab bar corner hint shows plain-language labels"

@@ -18,7 +18,7 @@ qa_assert_expect "reg171" "file is open"
 # The tab bar's right-aligned corner hint should mention Quit somewhere.
 # Default hangon terminal size (80 cols) is wide enough for the labeled
 # form ("⌃Q Quit"); tests/renderer.t covers the narrower compact-pill
-# fallback (see QA-REG-230) deterministically since hangon sessions here
+# fallback (see QA-REG-231) deterministically since hangon sessions here
 # can't easily be resized. Title Case since the 2026-09-01 pill-styling
 # conversion (bugs.md "Tab-bar buttons... use a visually different
 # style" — was lowercase "quit").
