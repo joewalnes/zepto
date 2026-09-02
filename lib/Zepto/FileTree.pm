@@ -768,11 +768,23 @@ my %VCS_PRIORITY = (
 sub _propagate_dir_status {
     my ($self, $nodes) = @_;
 
+    # Pre-index the changed-files hash by every ancestor directory ONCE per
+    # top-level call (a single O(S * depth) pass, S = number of changed
+    # files) rather than re-scanning the full status hash for every
+    # unloaded directory node encountered during the walk below (which was
+    # O(D * S) for D unloaded dirs — see bugs.md 2026-09-01 scorecard).
+    my $dir_index = $self->_build_vcs_dir_index($self->{_vcs_statuses});
+    $self->_propagate_dir_status_rec($nodes, $dir_index);
+}
+
+sub _propagate_dir_status_rec {
+    my ($self, $nodes, $dir_index) = @_;
+
     for my $node (@$nodes) {
         next unless $node->{is_dir};
 
         if (defined $node->{children}) {
-            $self->_propagate_dir_status($node->{children});
+            $self->_propagate_dir_status_rec($node->{children}, $dir_index);
 
             # Find worst status among children
             my $worst_priority = 0;
@@ -790,32 +802,42 @@ sub _propagate_dir_status {
 
             $node->{vcs_status} = $worst_status;
         } else {
-            # Children not loaded — compute dir status from the status hash directly
-            $node->{vcs_status} = $self->_dir_vcs_status_from_hash($node->{path});
+            # Children not loaded — O(1) lookup in the pre-built index
+            # (covers all descendants recursively, same semantics as the
+            # old full-hash prefix scan).
+            $node->{vcs_status} = $dir_index->{$node->{path}};
         }
     }
 }
 
-# Compute worst VCS status for a dir by scanning the status hash for paths
-# under this directory. Used for dirs whose children aren't loaded yet.
-sub _dir_vcs_status_from_hash {
-    my ($self, $dir_path) = @_;
-    my $statuses = $self->{_vcs_statuses};
-    my $prefix = "$dir_path/";
-    my $worst_priority = 0;
-    my $worst_status = undef;
+# Build a dir_path => worst_status index from the VCS status hash in a
+# single pass. For each changed file, walks up every ancestor directory
+# (e.g. "a/b/c/file.txt" touches "a", "a/b", "a/b/c") and records the
+# worst (highest-priority) status seen under each. This is what lets
+# _propagate_dir_status_rec answer "what's the worst status anywhere
+# under this unloaded directory?" in O(1) instead of rescanning the full
+# S-length status hash per directory.
+sub _build_vcs_dir_index {
+    my ($self, $statuses) = @_;
+    my %dir_index;
 
     for my $path (keys %$statuses) {
-        next unless index($path, $prefix) == 0;
         my $status = $statuses->{$path};
         my $p = $VCS_PRIORITY{$status} // 0;
-        if ($p > $worst_priority) {
-            $worst_priority = $p;
-            $worst_status = $status;
+        next unless $p > 0;
+
+        my @parts = split m{/}, $path;
+        pop @parts;  # drop the filename itself — only ancestor dirs matter
+        my $prefix = '';
+        for my $part (@parts) {
+            $prefix = length($prefix) ? "$prefix/$part" : $part;
+            my $existing = $dir_index{$prefix};
+            my $existing_p = defined($existing) ? ($VCS_PRIORITY{$existing} // 0) : 0;
+            $dir_index{$prefix} = $status if $p > $existing_p;
         }
     }
 
-    return $worst_status;
+    return \%dir_index;
 }
 
 # =============================================================================

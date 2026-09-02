@@ -3506,7 +3506,64 @@ VERIFY    `Document::_push_undo()`'s grouped branch now increments
           clip_007_column_paste.sh` (the third caller, column-paste)
           passes cleanly.
 
----------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-229
+NAME:     FileTree::_dir_vcs_status_from_hash() rescanned the entire VCS
+          status hash per unloaded directory -- O(unloaded-dirs x
+          changed-files)
+PRIORITY: P3
+BUG:      P3 (scorecard finding, bugs.md 2026-09-01) -- see the full
+          FIXED entry in bugs.md for root cause, fix, and real
+          `Time::HiRes` before/after timing numbers at multiple scales.
+          `_propagate_dir_status()` called `_dir_vcs_status_from_hash()`
+          for every directory node whose children weren't loaded yet,
+          which did `for my $path (keys %$statuses)` over the *entire*
+          changed-files hash, filtered by a per-path `index()` prefix
+          check -- O(D*S) for D unloaded dirs and S changed files.
+          Mitigated by the existing 5s VCS debounce, so it was a
+          periodic hitch rather than a per-keystroke one, but the
+          algorithmic cost was real: confirmed via direct
+          `Time::HiRes`-timed calls to the actual function (not a
+          theoretical estimate) at D=100/S=1000 (6.8ms), D=300/S=3000
+          (59ms), D=600/S=6000 (261ms) -- consistent with O(D*S)
+          scaling.
+CROSS-REF: QA-PERF-022 (interactive hang-detection leg); QA-TREE-010,
+          QA-VCS-013 (existing vision-based file-tree VCS-coloring
+          coverage, unaffected by this fix -- output is unchanged, only
+          faster).
+SCRIPT:   tests/filetree_vcs_perf.t (unit-level, primary regression
+          guard) + tier1/perf_022_filetree_vcs_many_dirs.sh (interactive
+          hang-detection leg, see QA-PERF-022 above).
+VERIFY    Fixed by pre-indexing the changed-files hash by every ancestor
+          directory ONCE per propagation pass (new
+          `_build_vcs_dir_index()`, a single O(S*depth) walk), instead of
+          rescanning the full hash per unloaded directory --
+          `_propagate_dir_status_rec()` now does an O(1) hash lookup per
+          directory. `tests/filetree_vcs_perf.t` reconstructs the exact
+          pre-fix algorithm as local subs and runs it side-by-side
+          against the new code on identical synthetic VCS-status data
+          (no matches, mixed-priority overlapping changes at varying
+          depths, empty status hash) -- `is_deeply` confirms
+          byte-identical directory-status results in every case.
+          Performance: D=300/S=3000 old=63-66ms vs new=1.9ms (~35x);
+          D=600/S=6000 old=245-267ms vs new=3.9-5.5ms (~47-69x). The
+          test's own bound guards (30ms / 150ms) were confirmed to fail
+          against the actual pre-fix function by running the identical,
+          unmodified test file in a second worktree checked out at the
+          pre-fix commit (5a720fd): D=300/S=3000 took 58.9ms (fails the
+          30ms bound), D=600/S=6000 took 245.7ms (fails the 150ms
+          bound) -- proving the guards actually bite, not just pass
+          trivially. `make test`: 47 files, 1282 tests, all pass, no
+          stdout/stderr noise, 33s wallclock (was 32s -- the new file
+          adds ~0.6s in isolation). Interactively verified via `hangon`:
+          git repo with 4 subdirs (2 modified, 1 untracked, 1 clean) plus
+          a clean root file -- file tree's directory-name colors
+          correctly reflect status (modified dirs share one color,
+          untracked dir a different one, clean dir/file the default),
+          matching `git status --porcelain` exactly.
+
+--------------------------------------------------------------------------------
 
 ID:       QA-REG-221
 NAME:     Mouse wheel scroll-down clamps at end of file instead of
