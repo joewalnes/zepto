@@ -35,6 +35,23 @@ use constant BRAILLE_BASE => 0x2800;
 # When lines_per_row > this, we subsample instead of reading every line.
 use constant MAX_SAMPLE_LINES => 4;
 
+# Maximum number of lines to sample per minimap row for VCS-status
+# aggregation. When a row's line span exceeds this, we subsample evenly
+# across the span instead of scanning every line — same technique as
+# MAX_SAMPLE_LINES above, but a much larger count. Braille's cap of 4 works
+# because 4 is also the *display* resolution (a braille glyph has exactly 4
+# dot rows) — sampling more would add no visible information. VCS status has
+# no such resolution ceiling: it's a correctness signal ("did any line in
+# this row change?"), so too small a sample risks silently missing real but
+# sparse changes. 200 keeps the per-row cost a small constant regardless of
+# file size (unlike the old unbounded scan, which cost O(lines_per_row) and
+# could hit ~100k+ hash lookups per keystroke on a large file), while still
+# guaranteeing that any contiguous changed hunk spanning
+# ceil(line_span / MAX_VCS_SAMPLE_LINES) lines or more is caught — the
+# common case for real diffs, which are hunk-based, not scattered
+# single-line edits. See _aggregate_vcs_status for the accepted tradeoff.
+use constant MAX_VCS_SAMPLE_LINES => 200;
+
 # 8-dot braille dot layout:
 #   Col0  Col1
 #   d1    d4     row 0  (bits 0, 3)
@@ -307,20 +324,38 @@ sub _compute_braille {
 
 # Aggregate VCS change status for a range of document lines.
 # Priority: deleted > modified > added.
+#
+# For large spans (line_span > MAX_VCS_SAMPLE_LINES), this samples evenly
+# spaced lines instead of scanning the whole range — see MAX_VCS_SAMPLE_LINES
+# above for why, and the accepted accuracy tradeoff. Below the cap, every
+# line in the span is still checked exactly, same as before.
 sub _aggregate_vcs_status {
     my ($doc, $start_line, $end_line) = @_;
 
     return undef unless $doc && $doc->can('vcs_change_status');
 
+    my $line_count = $doc->line_count();
+    $end_line = $line_count if $end_line > $line_count;
+    my $line_span = $end_line - $start_line;
+    return undef if $line_span <= 0;
+
+    my @sample_lines;
+    if ($line_span <= MAX_VCS_SAMPLE_LINES) {
+        @sample_lines = ($start_line .. $end_line - 1);
+    } else {
+        # Subsample: evenly-spaced lines across the span, always including
+        # the first and last line (same formula as the braille subsampler).
+        for my $i (0 .. MAX_VCS_SAMPLE_LINES - 1) {
+            push @sample_lines,
+                $start_line + int($i * ($line_span - 1) / (MAX_VCS_SAMPLE_LINES - 1));
+        }
+    }
+
     my $has_added = 0;
     my $has_modified = 0;
     my $has_deleted = 0;
 
-    my $line_count = $doc->line_count();
-
-    for my $line ($start_line .. $end_line - 1) {
-        last if $line >= $line_count;
-
+    for my $line (@sample_lines) {
         my $change = $doc->vcs_change_status($line);
         if ($change) {
             if ($change eq 'added') {

@@ -3800,3 +3800,52 @@ QA:       `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` — copies a
           passed against the unfixed binary and proved nothing. The paste
           must leave the cursor BELOW the document's original last line
           for this bug to be reachable.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-233
+NAME:     Minimap VCS-status aggregation no longer scans the whole
+          document on every keystroke
+PRIORITY: P3
+BUG:      `_aggregate_vcs_status()` (Minimap.pm) scanned every document
+          line in a minimap row's span with no subsampling cap, unlike
+          the braille density path (`MAX_SAMPLE_LINES => 4`). Because the
+          minimap cache key includes `content_version()` (bumped on
+          every edit), this full per-line scan re-ran on every keystroke,
+          not just when VCS/diff state actually changed — up to
+          ~100k-200k hash lookups per keystroke on a large file.
+          Reproduced: 100k-line document, minimap height 50
+          (`lines_per_row=2000`), 20 simulated keystrokes: 0.0624s/edit
+          before the fix.
+CROSS-REF: QA-GUT-021 (qa/27_gutter_ruler_minimap.txt),
+           tests/minimap_vcs_perf.t
+VERIFY    Added `MAX_VCS_SAMPLE_LINES` (200) to Minimap.pm and applied
+          the braille path's evenly-spaced-subsample technique to
+          `_aggregate_vcs_status()`: below the cap every line is still
+          checked exactly (no accuracy change); above it, 200 evenly
+          spaced lines are sampled, guaranteeing any contiguous changed
+          hunk of `ceil(line_span / 199)` lines or more is still caught.
+          Accepted tradeoff: a truly isolated single-line change that
+          doesn't land on a sampled line, in a row spanning more than 200
+          lines, can be missed — demonstrated directly (not hidden) by
+          `tests/minimap_vcs_perf.t`'s "KNOWN LIMITATION" subtest.
+          Benchmarks (`Time::HiRes`, real numbers): 100k lines/height 50,
+          20 simulated keystrokes: 0.0624s/keystroke before -> 0.0064s/
+          keystroke after (~9.8x). 300k lines/height 20 (stress case,
+          `lines_per_row=15000`): 0.1147s/keystroke before -> 0.0019s/
+          keystroke after (~60x) — improvement grows with row span, as
+          expected for O(span) -> O(cap). `tests/minimap_vcs_perf.t`
+          reconstructs the old algorithm verbatim (same pattern as
+          `tests/filetree_vcs_perf.t`) for self-proving before/after
+          bounds in the same run; proven to fail loudly (not silently
+          pass) against unfixed code by swapping in the pre-fix
+          `Minimap.pm` via `git show` (not `git stash`) — the suite
+          aborts immediately with `Undefined subroutine
+          &Zepto::Minimap::MAX_VCS_SAMPLE_LINES`.
+          `qa/scripts/tier1/reg_233_minimap_vcs_perf.sh` — coarse
+          interactive smoke test: minimap renders correctly on a large
+          git-tracked file with scattered changes, a known-modified line
+          is reachable and shows correct content, typing stays
+          responsive. Not a tight discriminator (PTY/tmux round-trip
+          overhead dwarfs the millisecond-level render difference) — the
+          isolated Perl benchmarks above are the real evidence.
