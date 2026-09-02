@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-01
+
+- Fixed Cut (⌃X) and Copy (⌃C) freezing the whole editor if the system clipboard command hangs (e.g. a wedged `pbcopy`/`xclip`/`wl-copy`, or one blocked writing to a slow/stuck consumer) — previously there was no timeout at all on this path, unlike paste which was already fixed the same way. A hang is now detected within a few seconds and shows "Cut: system clipboard write timed out" / "Copy: system clipboard write timed out" instead of freezing; the cut/copy itself still completes normally within the editor either way, only the system clipboard sync can fail
+
 ## 2026-08-31
 
 - Fixed `⌃B` hiding the file tree instead of switching focus back to it when the tree was open but not focused (e.g. right after opening a file from the tree, clicking into the document, or pressing Esc to return to the editor). `⌃B` now correctly refocuses the tree from that state — it still shows+focuses the tree when hidden, and still hides it when pressed a second time while the tree is already focused

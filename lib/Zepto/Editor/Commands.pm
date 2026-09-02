@@ -388,9 +388,18 @@ sub cmd_cut {
         my $lines = $view->column_selected_text();
         $self->{clipboard} = join("\n", @$lines);
         $self->{clipboard_columnar} = 1;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        my $copied = $self->{terminal}->copy_to_clipboard($self->{clipboard});
         $self->delete_selection();
-        $self->show_message("Cut " . scalar(@$lines) . " lines (column)");
+        # The internal clipboard/cut always succeeds regardless of the
+        # system clipboard's fate; only the message differs. copy_to_clipboard
+        # returns undef specifically when the platform clipboard command
+        # hung past its timeout (see Terminal.pm::copy_to_clipboard) --
+        # distinct from '' (skipped, e.g. no system clipboard) or 1 (ok).
+        if (!defined $copied) {
+            $self->show_error_message(_user_error("Cut", "system clipboard write timed out"));
+        } else {
+            $self->show_message("Cut " . scalar(@$lines) . " lines (column)");
+        }
         return;
     }
 
@@ -400,9 +409,13 @@ sub cmd_cut {
     if ($view->has_selection()) {
         $self->{clipboard} = $view->selected_text();
         $self->{clipboard_columnar} = 0;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        my $copied = $self->{terminal}->copy_to_clipboard($self->{clipboard});
         $self->delete_selection();
-        $self->show_message("Cut");
+        if (!defined $copied) {
+            $self->show_error_message(_user_error("Cut", "system clipboard write timed out"));
+        } else {
+            $self->show_message("Cut");
+        }
     }
 }
 
@@ -417,8 +430,17 @@ sub cmd_copy {
         my $lines = $view->column_selected_text();
         $self->{clipboard} = join("\n", @$lines);
         $self->{clipboard_columnar} = 1;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
-        $self->show_message("Copied " . scalar(@$lines) . " lines (column)");
+        my $copied = $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        # copy_to_clipboard returns undef specifically when the platform
+        # clipboard command hung past its timeout (see
+        # Terminal.pm::copy_to_clipboard) -- distinct from '' (skipped,
+        # e.g. no system clipboard) or 1 (ok). The internal clipboard
+        # copy always succeeds regardless; only the message differs.
+        if (!defined $copied) {
+            $self->show_error_message(_user_error("Copy", "system clipboard write timed out"));
+        } else {
+            $self->show_message("Copied " . scalar(@$lines) . " lines (column)");
+        }
         return;
     }
 
@@ -434,21 +456,29 @@ sub cmd_copy {
 
         $self->{clipboard} = $content;
         $self->{clipboard_columnar} = 0;
-        $self->{terminal}->copy_to_clipboard($self->{clipboard});
+        my $copied = $self->{terminal}->copy_to_clipboard($self->{clipboard});
 
         # Select the line visually (cursor stays at end of line)
         my $line_len = $doc->line_length($line);
         $view->set_cursor($line, 0, 0);        # Start of line, no extend
         $view->set_cursor($line, $line_len, 1); # End of line, extend selection
 
-        $self->show_message("Copied line");
+        if (!defined $copied) {
+            $self->show_error_message(_user_error("Copy", "system clipboard write timed out"));
+        } else {
+            $self->show_message("Copied line");
+        }
         return;
     }
 
     $self->{clipboard} = $view->selected_text();
     $self->{clipboard_columnar} = 0;
-    $self->{terminal}->copy_to_clipboard($self->{clipboard});
-    $self->show_message("Copied");
+    my $copied = $self->{terminal}->copy_to_clipboard($self->{clipboard});
+    if (!defined $copied) {
+        $self->show_error_message(_user_error("Copy", "system clipboard write timed out"));
+    } else {
+        $self->show_message("Copied");
+    }
 }
 
 sub cmd_paste {

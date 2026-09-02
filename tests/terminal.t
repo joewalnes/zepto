@@ -396,6 +396,38 @@ subtest 'paste_from_clipboard times out on a hung clipboard command' => sub {
         or diag('paste_from_clipboard is blocking past its alarm -- the timeout guard has regressed');
 };
 
+# Regression test for the copy-side sibling of QA-REG-188 (bugs.md P1
+# "Clipboard paste has no timeout"): copy_to_clipboard's platform-command
+# write path had no alarm() guard at all, unlike paste_from_clipboard's
+# read path above. `close` on a piped filehandle opened via `open($pipe,
+# '|-', @cmd)` blocks until the child exits, so a wedged clipboard
+# command (e.g. pbcopy/xclip/wl-copy stuck, or blocked on a full pipe
+# with a slow/stuck consumer) would freeze the whole editor forever with
+# no recovery path.
+subtest 'copy_to_clipboard times out on a hung clipboard command' => sub {
+    my ($out_fh, $out_name) = tempfile(UNLINK => 1);
+    my $term = Zepto::Terminal->new(out => $out_fh);
+
+    # Simulate a wedged platform clipboard command: 'sleep' comfortably
+    # outlives CLIPBOARD_COPY_ALARM_SECS (3s) but is portable (POSIX
+    # standard, no macOS/Linux-specific flags) and self-terminates so the
+    # test process doesn't leak a runaway child if something goes wrong.
+    # 'sleep' never reads stdin, so the write itself may return
+    # immediately (kernel pipe buffer) -- it's `close`, which waits for
+    # the child to exit, that actually blocks here.
+    $term->{_clipboard_copy_cmd} = ['sleep', '30'];
+
+    my $start = time();
+    my $result = $term->copy_to_clipboard("hello");
+    my $elapsed = time() - $start;
+
+    ok(!defined $result,
+        'Returns undef on timeout -- distinct from 1 (success) or "" (skipped), so callers can tell the difference');
+    ok($elapsed < Zepto::Terminal::CLIPBOARD_COPY_ALARM_SECS + 3,
+        "Returns promptly after the alarm fires (${elapsed}s), not after the full 30s hang")
+        or diag('copy_to_clipboard is blocking past its alarm -- the timeout guard has regressed');
+};
+
 # ============================================================================
 # Cleanup
 # ============================================================================

@@ -3236,3 +3236,41 @@ VERIFY    `cmd_toggle_tree` (`Editor.pm`) now checks focus state, not
           contradicted by the actual, confirmed, unchanged behavior
           (hides on the second press, matching QA-TREE-001) and by
           reg_183's own assertion being tautological (see above).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-222
+NAME:     Clipboard copy recovers from a hung clipboard command instead
+          of freezing the editor
+PRIORITY: P1
+BUG:      P1 "Clipboard copy has no timeout — a hung copy command
+          freezes the UI indefinitely" — bugs.md scorecard audit
+          (2026-08-31). Copy-direction sibling of QA-REG-188 (paste).
+CROSS-REF: QA-CLIP-001, QA-CLIP-002 (qa/05_clipboard.txt),
+           tests/terminal.t "copy_to_clipboard times out on a hung
+           clipboard command", QA-REG-188 (paste timeout, same fix
+           idiom applied to the opposite direction)
+VERIFY    Terminal.pm::copy_to_clipboard wrote to the platform
+          clipboard-copy command's pipe and called `close` on it with no
+          alarm()/timeout guard, unlike paste_from_clipboard's
+          CLIPBOARD_PASTE_ALARM_SECS pattern. `close` on a piped
+          filehandle blocks until the child exits, so a wedged clipboard
+          command (e.g. pbcopy/xclip/wl-copy stuck, or blocked on a full
+          pipe with a slow/stuck consumer) would freeze the whole editor
+          forever with no recovery path. Fixed by guarding the write+close
+          with the same alarm()-guard idiom
+          (CLIPBOARD_COPY_ALARM_SECS = 3s); on timeout the child is
+          killed and reaped, and copy_to_clipboard returns undef
+          (distinct from '' for "skipped, e.g. no system clipboard" and
+          1 for "ok") so cmd_cut/cmd_copy surface a real "Cut/Copy:
+          system clipboard write timed out" message instead of silently
+          hanging — the internal clipboard/cut still completes either
+          way. `qa/scripts/tier1/reg_222_clipboard_copy_timeout.sh`
+          shadows the platform clipboard copy command (whichever one
+          Terminal.pm would detect, on whatever platform the runner has)
+          with a fake that sleeps 30s, presses ⌃C in the real binary, and
+          asserts the timeout message appears within 8s and the editor
+          remains responsive afterward. Confirmed this script fails
+          (freezes for the full ~30s hang, no message, no typed text
+          lands) against the pre-fix binary before the fix, and passes
+          in ~3s after.

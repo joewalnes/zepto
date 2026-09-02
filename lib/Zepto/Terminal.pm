@@ -76,6 +76,14 @@ use constant {
 # Mirrors FindEngine.pm's MATCH_ALARM_SECS alarm-guard idiom.
 use constant CLIPBOARD_PASTE_ALARM_SECS => 3;
 
+# Same idea, copy direction: a blocking write+close to the platform
+# clipboard-copy command (bugs.md P1 "Clipboard copy has no timeout" /
+# scorecard audit round, 2026-08-31). `close` on a piped filehandle
+# blocks until the child exits, so a wedged pbcopy/xclip/wl-copy (or one
+# blocked on a full pipe with a slow/stuck consumer) would otherwise
+# freeze the whole editor forever, same as the paste case above.
+use constant CLIPBOARD_COPY_ALARM_SECS => 3;
+
 sub new {
     my ($class, %opts) = @_;
 
@@ -564,10 +572,17 @@ sub _safe_backtick {
 
 # Copy text to system clipboard
 # Uses both OSC 52 (for terminal support) and platform command (as fallback)
+#
+# Returns 1 on success, '' if there was nothing to do (empty/undef text,
+# or system clipboard disabled), or undef if the platform clipboard-copy
+# command hung past CLIPBOARD_COPY_ALARM_SECS -- a distinct outcome from
+# both, so callers can tell "we skipped it" apart from "it broke". OSC 52
+# always fires before the platform command is attempted, so a timeout
+# here doesn't mean the terminal-native copy failed too.
 sub copy_to_clipboard {
     my ($self, $text) = @_;
-    return unless defined $text && length $text;
-    return if $self->{_no_system_clipboard};
+    return '' unless defined $text && length $text;
+    return '' if $self->{_no_system_clipboard};
 
     # Encode to UTF-8 bytes — encode_base64 and pipe write expect bytes,
     # not Perl's internal wide character strings
@@ -586,8 +601,34 @@ sub copy_to_clipboard {
         my $pid = open(my $pipe, '|-', @{$self->{_clipboard_copy_cmd}});
         if ($pid) {
             binmode($pipe, ':raw');
-            print $pipe $bytes;
-            close $pipe;
+
+            # Guard the blocking write+close with a match-time alarm, same
+            # idiom as paste_from_clipboard's slurp guard above. Unlike
+            # the paste case, `print` on a small payload usually returns
+            # immediately (kernel pipe buffer) -- it's `close`, which
+            # waits for the child to exit, that actually blocks on a
+            # wedged command, so both are inside the guarded region.
+            my $ok = eval {
+                local $SIG{ALRM} = sub { die "clipboard_copy_timeout\n" };
+                alarm(CLIPBOARD_COPY_ALARM_SECS);
+                print $pipe $bytes;
+                close $pipe;
+                alarm(0);
+                1;
+            };
+            alarm(0);  # Ensure alarm is cancelled even on exception
+
+            if (!$ok) {
+                die $@ unless $@ eq "clipboard_copy_timeout\n";
+                # Timed out: the child is still running (or wedged), and
+                # $pipe may not have finished closing. Kill it and
+                # close/reap defensively so neither a zombie nor a leaked
+                # fd remains, then report the distinct timeout outcome.
+                kill('TERM', $pid);
+                close($pipe) if $pipe;
+                waitpid($pid, 0);
+                return undef;
+            }
         }
     }
 
