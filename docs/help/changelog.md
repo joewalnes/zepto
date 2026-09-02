@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-01
+
+- Fixed Replace All requiring a separate Undo press per replacement instead of one Undo for the whole operation, when replacing 100 or fewer matches (the common case) — pressing Undo once now reverts every replacement at once, matching what already happened for very large (100+) match counts. Redo works the same way in reverse
+- Fixed a rendering glitch that could show newly-replaced text truncated to the length of the old text it replaced (only reachable via the Replace All fix above, and now closed alongside it)
+
 ## 2026-08-31
 
 - Fixed `⌃B` hiding the file tree instead of switching focus back to it when the tree was open but not focused (e.g. right after opening a file from the tree, clicking into the document, or pressing Esc to return to the editor). `⌃B` now correctly refocuses the tree from that state — it still shows+focuses the tree when hidden, and still hides it when pressed a second time while the tree is already focused

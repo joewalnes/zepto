@@ -3262,12 +3262,21 @@ sub _replace_all_sync {
         $b->{col} <=> $a->{col}
     } @$matches;
 
+    # Wrap all per-match replace() calls in a single undo group so Replace
+    # All produces exactly ONE undo entry, matching the >100-match fast
+    # path in _replace_all() above (which already does a single whole-
+    # document replace() and therefore was always one entry). Without
+    # this, each match was its own standalone undo step, so undoing a
+    # small Replace All only reverted the last match instead of all of
+    # them.
     my $engine = $self->active_find_engine();
+    $doc->begin_undo_group();
     for my $match (@sorted) {
         my $expanded = $engine->expand_replacement_for_match($match, $replacement);
         my $offset = $doc->line_col_to_offset($match->{line}, $match->{col});
         $doc->replace($offset, $offset + $match->{length}, $expanded);
     }
+    $doc->end_undo_group();
 
     # Update matches
     $self->_update_find_matches();

@@ -317,6 +317,7 @@ sub _push_undo {
         push @{$self->{_undo_group}}, $action;
         $self->{redo_stack} = [];
         $self->{dirty} = 1;
+        $self->{_content_version}++;
         $self->{_vcs_dirty} = 1;
         $self->{_last_edit_time} = $now;
         $self->{_last_edit_type} = $action->{type};
@@ -328,8 +329,14 @@ sub _push_undo {
     if (@{$self->{undo_stack}} > 0) {
         my $last = $self->{undo_stack}[-1];
 
-        # Same operation type, within timeout, adjacent position
+        # Same operation type, within timeout, adjacent position.
+        # Restricted to insert/delete: this merge heuristic reads
+        # ->{text}, which only insert/delete actions have (replace
+        # actions use old_text/new_text instead) -- without this guard,
+        # a 'replace' action reaching here reads an undef ->{text} and
+        # warns "Use of uninitialized value in numeric eq (==)".
         if ($action->{type} eq $last->{type} &&
+            ($action->{type} eq 'insert' || $action->{type} eq 'delete') &&
             ($now - $self->{_last_edit_time}) < UNDO_GROUP_TIMEOUT &&
             CORE::length($action->{text}) == 1 &&
             CORE::length($last->{text}) < 100)  # Don't make groups too large
@@ -418,18 +425,17 @@ sub replace {
     my $deleted = $self->{buffer}->delete($start, $end - $start);
     $self->{buffer}->insert($start, $text);
 
-    # Record as a single compound action
-    push @{$self->{undo_stack}}, {
-        type => 'replace',
-        pos  => $start,
+    # Record as a single compound action, via _push_undo() so this respects
+    # an in-progress _undo_group exactly like insert()/delete() do (it used
+    # to push directly onto undo_stack unconditionally, which meant a
+    # replace() call made while a group was open leaked out as its own
+    # standalone undo entry instead of joining the group).
+    $self->_push_undo({
+        type     => 'replace',
+        pos      => $start,
         old_text => $deleted,
         new_text => $text,
-    };
-
-    $self->{redo_stack} = [];
-    $self->{dirty} = 1;
-    $self->{_content_version}++;
-    $self->{_vcs_dirty} = 1;  # Mark VCS diff as stale
+    });
 
     return $deleted;
 }
