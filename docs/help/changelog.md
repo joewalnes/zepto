@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-01
+
+- Fixed Perl warnings (e.g. typing an ordinary incomplete regex quantifier like `(a?){` into the find bar in regex mode) corrupting the screen with raw warning text scrolled across the document area. Warnings are now redirected to a `warnings.log` file next to your preferences instead of hitting the terminal directly — nothing is silently lost, it's just off the live display
+
 ## 2026-08-31
 
 - Fixed `⌃B` hiding the file tree instead of switching focus back to it when the tree was open but not focused (e.g. right after opening a file from the tree, clicking into the document, or pressing Esc to return to the editor). `⌃B` now correctly refocuses the tree from that state — it still shows+focuses the tree when hidden, and still hides it when pressed a second time while the tree is already focused

@@ -3236,3 +3236,63 @@ VERIFY    `cmd_toggle_tree` (`Editor.pm`) now checks focus state, not
           contradicted by the actual, confirmed, unchanged behavior
           (hides on the second press, matching QA-TREE-001) and by
           reg_183's own assertion being tautological (see above).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-REG-225
+NAME:     Perl warnings no longer corrupt the TUI display
+PRIORITY: P2
+BUG:      P2 "Perl warnings leak to the terminal and corrupt the TUI
+          display" — bugs.md "Found while fixing the ReDoS match-timeout
+          bug" (2026-08-30). Nothing in the codebase installed a
+          $SIG{__WARN__} handler, so any warn() (explicit, e.g.
+          Highlighter.pm's grammar-load-failure warning, or interpreter-
+          generated via `use warnings`, e.g. FindEngine.pm's/
+          FileSearchEngine.pm's "Unescaped left brace in regex" warning
+          on every intermediate incomplete `{n}` quantifier typed into
+          the find bar in regex mode) wrote straight to real STDERR,
+          scribbling raw warning text across the TUI's alternate screen
+          buffer until the next full redraw.
+CROSS-REF: QA-FIND-031 (qa/09_find_replace.txt), tests/terminal.t
+          ('__WARN__ handler install/restore lifecycle', '__WARN__
+          handler is a no-op without a log_path')
+VERIFY    Terminal.pm's install_warn_handler()/restore_warn_handler()
+          install a process-wide $SIG{__WARN__} for the lifetime of the
+          TUI session (Editor::init installs it before anything else
+          touches the terminal — including enable_raw_mode()'s own
+          internal warn() on failure; Editor::cleanup restores it,
+          mirroring the existing $SIG{WINCH} handler's install/restore
+          lifecycle in the same two methods). Warnings are redirected to
+          `warnings.log` under the state dir (StateStore's base_dir,
+          same convention as preferences/history) rather than suppressed
+          outright — diagnostic value is kept, just moved off the live
+          display. `qa/scripts/tier1/reg_225_warn_handler_no_screen_corruption.sh`
+          types `(a?){28}` one character at a time into the find bar in
+          regex mode (the exact repro confirmed live via `hangon` on
+          unfixed code before the fix — the corrupted screen showed
+          literal "Unescaped left brace in regex is passed through in
+          regex; marked by <-- HERE in m/..." text scrolled across the
+          document area) and asserts none of that raw text reaches the
+          screen, the find bar still shows the fully-typed pattern
+          (proves this is a display bug, not a hang — the editor kept
+          working underneath), and the warning landed in
+          `$QA_STATE_DIR/warnings.log` instead of being lost. Verified
+          non-tautological: 4 of 7 assertions fail against the pre-fix
+          binary (raw warning text and Perl error trace both appear on
+          screen; no log file is created) and all 7 pass against the
+          fix. `tests/terminal.t`'s new subtests separately verify the
+          install/restore mechanism at the unit level: STDERR is
+          captured via an in-memory filehandle swap (not approximated)
+          and shown to receive nothing while installed, to receive the
+          log-file-redirected text is confirmed via direct file read,
+          and to receive warnings again after restore_warn_handler() —
+          proving the handler doesn't permanently swallow all future
+          warnings. Confirmed unfixed-code failure directly: running
+          this test file before the fix existed failed with "Can't
+          locate object method 'install_warn_handler'".
+          NOT fixed here (explicitly out of scope, per the original
+          bugs.md finding): the underlying warn()-triggering causes in
+          FindEngine.pm/FileSearchEngine.pm's regex compilation or
+          Highlighter.pm's grammar-load failure — those still warn()
+          exactly as before, now just safely caught by the process-wide
+          handler regardless of trigger site.

@@ -806,6 +806,17 @@ sub init {
 
     my $term = $self->{terminal};
 
+    # Install the process-wide __WARN__ handler for the lifetime of this
+    # TUI session, before anything else touches the terminal (including
+    # enable_raw_mode()'s own internal warn() on failure below). See
+    # Terminal::install_warn_handler for why (bugs.md P2 "Perl warnings
+    # leak to the terminal and corrupt the TUI display") and cleanup()
+    # below for the paired restore -- mirrors the $SIG{WINCH} handler's
+    # own install-on-init/restore-on-cleanup lifecycle just below.
+    $term->install_warn_handler(
+        log_path => File::Spec->catfile($self->{state_store}->base_dir(), 'warnings.log'),
+    );
+
     # Set process name (shows in ps/top)
     $0 = 'zepto';
 
@@ -1185,6 +1196,12 @@ sub cleanup {
 
     # Clear SIGWINCH handler
     $SIG{WINCH} = 'DEFAULT';
+
+    # Restore $SIG{__WARN__} to whatever it was before init() installed
+    # it, so warnings after a clean exit (or during crash reporting --
+    # see run()'s _print_crash_report, called after this cleanup())
+    # behave normally again instead of being silently redirected.
+    $self->{terminal}->restore_warn_handler();
 }
 
 sub update_title {

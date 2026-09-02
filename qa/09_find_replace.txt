@@ -562,3 +562,42 @@ VERIFY
     underlying regex/case cycle once past replace-all/replace-one)
     continues to work correctly — this is a display-corruption fix, not
     a change to the toggle behavior covered by QA-FIND-029.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-031
+NAME:     Typing an incomplete regex quantifier no longer corrupts the
+          screen with a raw Perl warning
+PRIORITY: P2
+FEATURE:  find bar regex-mode robustness
+RELATED:  QA-REG-225
+SCRIPT:   tier1/reg_225_warn_handler_no_screen_corruption.sh
+
+STEPS
+  1. ⌃F, ⌃R to switch to regex mode.
+  2. Type `(a?){28}` one character at a time (a totally ordinary counted-
+     repetition pattern, not a pathological one).
+  3. Observe the screen after each character, especially while the
+     pattern is mid-quantifier (e.g. `(a?){`, `(a?){2`).
+
+VERIFY
+  - The screen never shows raw warning/error text (e.g. "Unescaped left
+    brace in regex is passed through in regex", "marked by <-- HERE", or
+    a `Carp`/Perl file-and-line trace) scrolled across the document area
+    — this text used to appear on every intermediate incomplete `{n}`
+    quantifier as FindEngine.pm recompiled the regex on each keystroke,
+    because nothing caught Perl's `$SIG{__WARN__}` before this fix.
+  - The find bar still shows the fully-typed pattern once done typing —
+    confirms the editor kept working correctly underneath the whole
+    time; this was always a display bug, never a hang or data-loss
+    issue.
+  - The warning itself is not silently lost: it lands in
+    `warnings.log` under the state directory (same directory
+    preferences/history live in), discoverable for anyone diagnosing a
+    real bug later.
+  - The identical mechanism also covers Find in Files' regex mode
+    (FileSearchEngine.pm has the same `qr//`-compile-time warning gap)
+    and any other `warn()` call site in the codebase (e.g.
+    Highlighter.pm's grammar-load-failure warning) — the fix is a
+    process-wide safety net, not a per-trigger patch, so it isn't
+    re-tested separately at each call site.
