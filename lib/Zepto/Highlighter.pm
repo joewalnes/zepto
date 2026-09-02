@@ -72,6 +72,12 @@ package Zepto::Highlighter;
 use strict;
 use warnings;
 
+# Time::HiRes::alarm overrides CORE::alarm in this package only, adding
+# fractional-second resolution -- see TOKENIZE_ALARM_SECS below for why
+# that's needed. Same core-only import pattern already used for `time` in
+# FindEngine.pm/StateStore.pm/etc. (Rule 1: stdlib only, no CPAN).
+use Time::HiRes qw(alarm);
+
 # Extension to grammar class mapping
 # Keys are lowercase extensions (without dot)
 my %EXTENSION_MAP = (
@@ -435,6 +441,32 @@ my %SHEBANG_MAP = (
 # through a large real-world file without thrashing.
 use constant MAX_TOKEN_CACHE_ENTRIES => 8000;
 
+# Wall-clock ceiling (seconds) for a single grammar tokenize() call on one
+# line. Follows the exact same guard idiom as FindEngine.pm's
+# _match_with_alarm (local $SIG{ALRM}, alarm(N), eval{}, unconditional
+# alarm(0) cleanup, a distinct sentinel exception for "timed out" vs. a
+# real Perl error) -- but with a MUCH smaller budget than FindEngine's
+# MATCH_ALARM_SECS (1s).
+#
+# Why smaller: FindEngine's alarm guards one explicit, user-initiated
+# search() call. tokenize_line() runs on every visible line, on every
+# render() -- including every single keystroke, not just an explicit user
+# action. A viewport is commonly 30-100 lines; at a 1s-per-line budget, a
+# handful of slow lines could visibly freeze the editor for many seconds.
+# FindEngine.pm's own comment on MATCH_ALARM_SECS notes that legitimate
+# (non-catastrophic) matches complete in low single-digit milliseconds
+# even against multi-megabyte single-line input. 100ms keeps roughly
+# 20-50x headroom above that worst-case legitimate cost while still
+# failing fast enough that even a fully-pathological viewport degrades
+# to "briefly slow" rather than "hung".
+#
+# Perl's core alarm() only accepts whole seconds -- far too coarse for a
+# 100ms budget. Time::HiRes::alarm() (imported above, overriding
+# CORE::alarm in this package only) supports fractional seconds with the
+# same SIGALRM delivery/cancellation semantics; it's a drop-in swap, not
+# a different mechanism.
+use constant TOKENIZE_ALARM_SECS => 0.1;
+
 sub new {
     my ($class, %args) = @_;
     return bless {
@@ -449,6 +481,15 @@ sub new {
         # logic is needed beyond clearing it wholesale on set_file().
         _token_cache       => {},
         _token_cache_count => 0,   # entries currently cached (for the size cap)
+
+        # Set when a grammar's tokenize() call has ever hit
+        # TOKENIZE_ALARM_SECS on the current file. Mirrors FindEngine.pm's
+        # _search_timed_out flag/accessor pattern. Reset in set_file()
+        # (start of a fresh unit of work), not per tokenize_line() call --
+        # a single render pass may mix pathological and normal lines and
+        # we don't want a later normal line to erase the signal that an
+        # earlier one in the same pass timed out.
+        _highlight_timed_out => 0,
     }, $class;
 }
 
@@ -465,6 +506,7 @@ sub set_file {
     # actually changed.
     $self->{_token_cache} = {};
     $self->{_token_cache_count} = 0;
+    $self->{_highlight_timed_out} = 0;
 
     my $grammar_class = $self->_detect_grammar($filename);
 
@@ -611,7 +653,30 @@ sub tokenize_line {
         return ($tokens, $end_state);
     }
 
-    my ($tokens, $end_state) = $self->{grammar}->tokenize($line_content, $start_state);
+    my ($timed_out, $tokens, $end_state) = $self->_tokenize_with_alarm(sub {
+        return $self->{grammar}->tokenize($line_content, $start_state);
+    });
+
+    if ($timed_out) {
+        $self->{_highlight_timed_out} = 1;
+        # Give up on this line's highlighting for this (and every future,
+        # via the cache write below) render: no tokens means the renderer
+        # draws it as plain/unhighlighted text -- never block, never crash.
+        #
+        # end_state: assume unchanged from start_state rather than
+        # guessing what the grammar would have produced. We don't know
+        # whether the real tokenize() would have entered a multi-line
+        # construct (e.g. opened a block comment) -- guessing wrong would
+        # desync every subsequent line's start state from what a working
+        # grammar would produce. Assuming STATE_NORMAL-equivalent
+        # continuity (start_state carried through unchanged) is the more
+        # conservative failure: at worst a multi-line construct that
+        # *should* have opened here doesn't get highlighted either, which
+        # is the same "give up gracefully" behavior we already chose for
+        # this line, rather than corrupting unrelated lines below it.
+        $tokens = [];
+        $end_state = $start_state;
+    }
 
     # Cache end state
     $self->{line_states}[$line_num] = $end_state;
@@ -623,10 +688,67 @@ sub tokenize_line {
         $self->{_token_cache_count} = 0;
         $state_bucket = $self->{_token_cache}{$start_state} = {};
     }
+
+    # A timed-out result is cached here exactly like a normal one -- this
+    # is deliberate, not an oversight. Without it, a genuinely pathological
+    # line would re-run the full TOKENIZE_ALARM_SECS budget on every single
+    # render of that line (every scroll, every keystroke on another line
+    # that redraws the viewport), i.e. a tight retry loop paying the
+    # timeout cost forever. Caching the fallback means the cost is paid
+    # once per (start_state, line_content) key, then every future request
+    # for that exact key hits the memo and returns instantly -- same
+    # amortization the cache already gives normal lines, just with "gave up,
+    # render as plain text" as the memoized answer instead of real tokens.
+    # This is still a pure function of the two key inputs: the same
+    # pathological pattern against the same content deterministically
+    # re-triggers the same catastrophic backtracking, so re-deriving it
+    # would (barring wall-clock jitter right at the timeout boundary,
+    # already an accepted tradeoff in FindEngine.pm's identical alarm
+    # design) reach the same "timed out" outcome every time anyway.
     $state_bucket->{$line_content} = [$tokens, $end_state];
     $self->{_token_cache_count}++;
 
     return ($tokens, $end_state);
+}
+
+# Query whether any grammar tokenize() call has hit TOKENIZE_ALARM_SECS
+# since the current file was loaded (set_file() resets this). Mirrors
+# FindEngine.pm's search_timed_out() accessor/flag pattern.
+sub highlight_timed_out {
+    my ($self) = @_;
+    return $self->{_highlight_timed_out} ? 1 : 0;
+}
+
+# Run a grammar's tokenize() call (passed as a coderef so the caller
+# controls exactly what's guarded) under a wall-clock alarm. Returns
+# ($timed_out, @result) where @result is exactly whatever $coderef->()
+# returned (empty if timed out).
+#
+# Follows the identical cleanup discipline as FindEngine.pm's
+# _match_with_alarm: $SIG{ALRM} is localized to the eval, a distinct
+# sentinel exception ("tokenize_timeout") distinguishes an alarm firing
+# from a real error in the grammar (which is re-thrown, not swallowed --
+# a bug in a grammar's tokenize() should surface, not be silently treated
+# as "just slow"), and alarm(0) is called both on the success path inside
+# the eval and unconditionally after it, so no armed alarm can ever leak
+# out of this call regardless of how it exits.
+sub _tokenize_with_alarm {
+    my ($self, $coderef) = @_;
+
+    my @result = eval {
+        local $SIG{ALRM} = sub { die "tokenize_timeout\n" };
+        alarm(TOKENIZE_ALARM_SECS);
+        my @r = $coderef->();
+        alarm(0);
+        @r;
+    };
+    alarm(0);  # Ensure alarm is cancelled even on exception
+
+    if ($@) {
+        die $@ unless $@ eq "tokenize_timeout\n";
+        return (1);  # timed_out, no result
+    }
+    return (0, @result);
 }
 
 # Get the start state for a given line (end state of previous line)

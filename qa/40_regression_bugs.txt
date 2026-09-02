@@ -3800,3 +3800,93 @@ QA:       `qa/scripts/tier1/reg_230_undo_cursor_bounds.sh` — copies a
           passed against the unfixed binary and proved nothing. The paste
           must leave the cursor BELOW the document's original last line
           for this bug to be reachable.
+
+---------------------------------------------------------------------------------
+
+ID:       QA-REG-233
+NAME:     Syntax highlighter's grammar tokenize() calls are bounded by a
+          tokenize-time alarm guard (P3 -- structural gap, no confirmed
+          exploit in any shipped grammar)
+PRIORITY: P3
+BUG:      `Highlighter.pm`/`Syntax/Base.pm` had zero `alarm()`/timeout
+          protection around each grammar's `tokenize()` call, unlike
+          `FindEngine.pm`'s explicit 1s match-time alarm (`QA-SEC-012`,
+          `_match_with_alarm`) added earlier to close a ReDoS gap in
+          user-typed find patterns. Highlighting runs ~53 hand-written
+          grammar regexes automatically on every open/edit -- a bigger,
+          more automatic attack surface than Find's user-typed-pattern
+          case, since it requires no user action at all. No exploitable
+          pattern was found in any of the 53 real shipped grammars (this
+          was a documented structural-gap finding, not a confirmed
+          exploit) -- but there was no safety net if one existed in an
+          untested grammar or was introduced later.
+CROSS-REF: bugs.md P3 "No regex-match timeout in the syntax-highlighting
+          path"; QA-SEC-012 (FindEngine.pm's equivalent match-time
+          alarm, the template this fix follows); QA-SYN-024
+          (qa/32_syntax_highlighting.txt).
+FIX:      `Highlighter.pm::tokenize_line()` now wraps its single call
+          site into a grammar's `tokenize()` -- `$self->{grammar}->
+          tokenize($line_content, $start_state)`, the one place all ~53
+          grammars funnel through -- in a `_tokenize_with_alarm` helper,
+          following `FindEngine.pm::_match_with_alarm`'s exact idiom
+          (local `$SIG{ALRM}`, `alarm(N)`, `eval{}`, unconditional
+          `alarm(0)` cleanup, a distinct sentinel exception
+          `"tokenize_timeout\n"` for "timed out" vs. a real grammar bug,
+          which is re-thrown rather than swallowed). Budget is
+          `TOKENIZE_ALARM_SECS => 0.1` (100ms via `Time::HiRes::alarm`,
+          since core `alarm()` is whole-seconds-only) -- much tighter
+          than Find's 1s budget, since `tokenize_line()` runs on every
+          visible line on every render (every keystroke), not just an
+          explicit user search. On timeout: falls back to `[]` (no
+          tokens -> plain/unhighlighted text for that line) with
+          `end_state` assumed unchanged from `start_state` (rather than
+          guessed) so a pathological line can't desync later lines'
+          state. The fallback is written into the existing token memo
+          cache exactly like a real result, so a persistently
+          pathological line pays the 100ms cost once, not on every
+          render (verified: a repeat request for the identical
+          `(start_state, line_content)` key returns in ~5us from cache).
+          Does not violate `docs/CODE_QUALITY.md` Pitfall #9's
+          pure-memoization invariant -- the cached fallback is still
+          fully determined by the two key inputs. Added
+          `highlight_timed_out()` accessor mirroring `FindEngine.pm`'s
+          `search_timed_out()`, reset in `set_file()`.
+TESTS:    `tests/highlighter_regex_timeout.t` (6 subtests) -- reproduced
+          the mechanism with a synthetic test-only grammar
+          (`Test::Syntax::Pathological`) using the same `(a?){28}a{28}`
+          catastrophic-backtracking pattern `tests/find_engine_redos.t`
+          verified against Perl's own regex engine (no real shipped
+          grammar is known to contain one). Confirmed the gap first:
+          swapped in the pre-fix `Highlighter.pm` (via `git show
+          <base-commit>:lib/Zepto/Highlighter.pm`, not `git stash`) and
+          ran the test -- `tokenize_line()` failed to return within a
+          6s fork/watchdog bound (child SIGKILLed) and, run in-process
+          without a watchdog, took 31.7 seconds to return. Restored the
+          fix and re-ran -- same call now returns in ~0.25s. Also
+          covers: bounded-timeout-with-plain-text-fallback, cache
+          absorbs repeated requests for the same pathological line (no
+          per-frame retry storm), `highlight_timed_out()` resets on
+          `set_file()`, a genuine non-timeout grammar bug still
+          propagates as itself (not swallowed as a timeout), and normal
+          highlighting is completely unaffected (real Perl grammar,
+          ordinary code, sub-millisecond, timeout never fires).
+          `tests/highlighter.t` and `tests/syntax_samples.t` (189
+          combined subtests) re-run unchanged -- no regression in any
+          real grammar's output.
+QA:       `qa/scripts/tier1/reg_233_highlighter_timeout_guard.sh` --
+          drives the real running editor: opens a `.pl` file with
+          keywords/strings/comments/numbers, confirms the content
+          renders, jumps to the end of the document, types a new line,
+          and confirms it's accepted and rendered within a 3s budget
+          (would stall well past this if the guard were somehow
+          blocking). Does not attempt to trigger the guard itself
+          through the live UI -- no real shipped grammar can reach it,
+          and fabricating a deliberately pathological grammar to ship in
+          the built binary just to exercise one QA script would be worse
+          than the gap it tests. The guard-fires-safely mechanism is
+          proven at the unit level instead (see TESTS above), which is
+          the authoritative evidence for this fix; this script instead
+          guards against the realistic regression risk of a
+          wrap-every-tokenize-call change: that it slows down or breaks
+          ordinary highlighting. Verified via `perl qa/runner.pl --tier 1
+          --filter reg_233` -- 4/4 assertions pass.
