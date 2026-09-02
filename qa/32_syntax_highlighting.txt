@@ -410,3 +410,45 @@ VERIFY
     and `qa/scripts/tier1/reg_200_highlighter_cache_undo_restores_tokens.sh`,
     which check the actual rendered ANSI color codes rather than just
     screen text (text is identical either way — only the color changes).
+
+--------------------------------------------------------------------------------
+
+ID:       QA-SYN-024
+NAME:     A grammar's tokenize() call cannot hang the editor — bounded by
+          a per-line timeout guard, ordinary highlighting unaffected
+PRIORITY: P3
+FEATURE:  syntax highlighter regex timeout guard
+RELATED:  bugs.md P3 "No regex-match timeout in the syntax-highlighting
+          path" (structural gap, no exploit found in any of the ~53
+          shipped grammars — see writeup); QA-REG-234
+          (qa/40_regression_bugs.txt); QA-SEC-012 (FindEngine.pm's
+          equivalent match-time alarm for Find, which this mirrors).
+
+STEPS
+  1. Open any syntax-highlighted file (e.g. a `.pl` file with keywords,
+     strings, comments, numbers).
+  2. Observe it renders promptly with full coloring.
+  3. Edit the file (add/remove lines, type at various positions).
+  4. Observe highlighting keeps up, with no perceptible lag or freeze.
+
+VERIFY
+  - Highlighting renders correctly and promptly — no regression from the
+    timeout guard added around `Highlighter.pm::tokenize_line()`'s call
+    into each grammar's `tokenize()`.
+  - No user-facing command or setting is needed — this is a passive
+    safety net, not a feature with its own UI surface, so there is
+    nothing new to discover in the command palette or status bar (same
+    reasoning as `FindEngine.pm`'s equivalent match-time alarm, which
+    also has no dedicated UI control).
+  - Discoverable indirectly: if a grammar ever does hit the timeout, the
+    affected line falls back to plain/unhighlighted text rather than
+    freezing the editor — a visible (if degraded) result, never a hang.
+  - Automated as `qa/scripts/tier1/reg_234_highlighter_timeout_guard.sh`
+    (drives the real running editor: opens a highlighted file, confirms
+    content renders, and confirms a typed edit is accepted and rendered
+    within a 3-second budget). The actual guard-fires-on-a-pathological-
+    regex mechanism (no real shipped grammar is known to trigger it) is
+    proven at the unit level by `tests/highlighter_regex_timeout.t`,
+    using a synthetic test-only grammar and a fork+watchdog hang check
+    against the pre-fix code (confirmed hung 31.7s unfixed, bounded to
+    ~0.25s fixed) — see bugs.md for the full writeup.
