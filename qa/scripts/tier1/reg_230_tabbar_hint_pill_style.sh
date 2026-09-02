@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# QA-REG-229: the tab bar's close/tabs/quit corner hint must render as
+# QA-REG-230: the tab bar's close/tabs/quit corner hint must render as
 # rounded, Title Case pills matching the bottom status bar's visual
 # language -- not plain lowercase text -- and must never overflow the
 # terminal width at any size, degrading to blank fill (never garbled
@@ -34,7 +34,7 @@
 # values), bypassing qa_start's fixed invocation.
 # See bugs.md 2026-09-01, qa/21_tabs.txt QA-TAB-013.
 source "$(dirname "$0")/../../lib/qa-helpers.sh"
-qa_header "QA-REG-229: Tab bar corner hint renders as Title Case pills, never overflows"
+qa_header "QA-REG-230: Tab bar corner hint renders as Title Case pills, never overflows"
 
 qa_setup
 

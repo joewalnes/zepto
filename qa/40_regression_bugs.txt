@@ -3560,7 +3560,7 @@ QA:       `qa/scripts/tier1/ms_023_scroll_wheel_eof_clamp.sh` — opens a
 
 --------------------------------------------------------------------------------
 
-ID:       QA-REG-229
+ID:       QA-REG-230
 NAME:     Tab bar corner hint (close/tabs/quit) renders as Title Case
           pills, matching the status bar, and never overflows
 PRIORITY: P2
@@ -3592,7 +3592,7 @@ VERIFY    `_render_tab_bar`'s corner hint (and its FILE_TREE-context twin
           `tests/renderer.t`'s direct synthetic sweep, not assumed; below
           its floor the hint degrades to blank fill (no corruption, no
           garbled/truncated glyphs).
-          `qa/scripts/tier1/reg_229_tabbar_hint_pill_style.sh` confirms,
+          `qa/scripts/tier1/reg_230_tabbar_hint_pill_style.sh` confirms,
           against the real running binary: (1) at 80 cols, the hint shows
           Title Case pill text and no lowercase leaks through; (2) at
           40 cols, the tab bar itself stays visible as row 1 (no

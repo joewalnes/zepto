@@ -2924,7 +2924,7 @@ subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits
 };
 
 # ----------------------------------------------------------------------------
-# QA-REG-229: the tab bar's corner-hint pill group must never, at any
+# QA-REG-230: the tab bar's corner-hint pill group must never, at any
 # terminal width, push the row past $cols. Direct synthetic-sweep guard
 # (same technique as QA-REG-179/186) rather than trusting terminal-level
 # capture, since a soft-wrap overflow here would scroll the whole screen
@@ -2946,7 +2946,7 @@ subtest 'Tab bar corner hint drops to blank fill (not garbage) when nothing fits
 # the working (non-buggy) truncation/scroll path and give this guard real
 # coverage of what this change actually touches.
 # ----------------------------------------------------------------------------
-subtest 'Tab bar row never exceeds $cols at any width, with or without the corner hint (QA-REG-229)' => sub {
+subtest 'Tab bar row never exceeds $cols at any width, with or without the corner hint (QA-REG-230)' => sub {
     my $theme = Zepto::Theme->dark_theme();
 
     my $checks = 0;

@@ -220,7 +220,7 @@ RELATED:  bugs.md P2 "Non-obvious tab keys"; bugs.md P1 "Discoverability
           bare glyphs) — QA-REG-171, QA-REG-172. Updated 2026-09-01 for the
           pill-styling conversion — bugs.md "Tab-bar buttons (close/tabs/
           quit hints) use a visually different style than the bottom
-          status bar's pills" — QA-REG-229.
+          status bar's pills" — QA-REG-230.
 
 STEPS
   1. At least 1 tab open.
