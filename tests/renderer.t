@@ -2875,6 +2875,48 @@ subtest 'Tab bar corner hint shows labeled form when there is room' => sub {
     unlike($s, qr/\bclose\b|\btabs\b|\bquit\b/, 'No stale lowercase labels leak through');
 };
 
+# QA-REG-232: the tab bar's baseline row is deliberately underlined (with
+# its own SGR-58 underline color, $ul_color/tab_baseline_ul) throughout
+# the tab labels/gaps/scroll-arrow, and only turned off ($UL_OFF, \e[24m)
+# at the very end of the row -- AFTER this pill block, not before it. The
+# pill-rendering code sits between the last \e[4m and that trailing
+# \e[24m, so the pill text and its rounded caps both inherited underline
+# styling. Reported live by the user viewing a screenshot: "I see some
+# text underlined in the tabs and pills. And the rounded caps of the
+# pills seem to be a different color to rest of pill." Both symptoms were
+# the same root cause -- the underline color escape bleeding through the
+# cap glyph, which (unlike the plain pill body) sits right at a color
+# boundary where a stray underline reads as a mismatched edge color.
+subtest 'Tab bar corner hint pills are never underlined (QA-REG-232)' => sub {
+    my $theme = Zepto::Theme->dark_theme();
+    my $ui = {
+        tabs => [{ display_name => 'test.txt', is_dirty => 0, has_vcs_changes => 0 }],
+        active_tab_index => 0,
+        tab_manager => undef,
+    };
+
+    my $bar = Zepto::Renderer->_render_tab_bar($theme, 80, $ui, 0);
+    my $s = strip_escapes($bar);
+
+    my $close_pos = index($s, 'Close');
+    ok($close_pos >= 0, 'sanity: "Close" pill text is present') or return;
+
+    # Map the stripped-text position back to the raw (escape-sequence
+    # included) string by finding the same substring there -- simpler and
+    # just as reliable as walking both strings in lockstep, since "Close"
+    # is a literal run of plain characters with no escapes inside it.
+    my $raw_close_pos = index($bar, 'Close');
+    ok($raw_close_pos >= 0, 'sanity: raw output also contains literal "Close"') or return;
+
+    my $before = substr($bar, 0, $raw_close_pos);
+    my $last_ul_on  = rindex($before, "\e[4m");
+    my $last_ul_off = rindex($before, "\e[24m");
+
+    ok($last_ul_off > $last_ul_on,
+        'underline is turned OFF (\e[24m) after the last underline-ON before the pill text, not left dangling on')
+        or diag("last \\e[4m at $last_ul_on, last \\e[24m at $last_ul_off, 'Close' at $raw_close_pos");
+};
+
 subtest 'Tab bar corner hint degrades to compact pills (with quit) at its measured narrow-width floor' => sub {
     my $theme = Zepto::Theme->dark_theme();
     my $ui = {

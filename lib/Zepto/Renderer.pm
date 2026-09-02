@@ -1380,6 +1380,13 @@ sub _render_tab_bar {
         my $round_l = Zepto::Chars->get('round_left');
         my $round_r = Zepto::Chars->get('round_right');
         my $fill = $remaining - $nav_used;
+        # Pills are chips, not part of the underlined baseline ruler --
+        # turn underline off before them (it's been on since $UL_ON above
+        # for the tab labels/gaps/scroll arrow) or both the pill text and
+        # its rounded caps inherit the baseline's underline + underline
+        # color (SGR 58, $ul_color), which reads as stray underlines and
+        # makes the caps look like a different color than the pill body.
+        push @_out, $UL_OFF;
         push @_out, $bar_bg;
         push @_out, ' ' x $fill if $fill > 0;
         my $center_col = 0;  # unused for hint-only (non-interactive) pills
