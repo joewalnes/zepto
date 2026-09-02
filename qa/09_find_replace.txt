@@ -601,3 +601,54 @@ VERIFY
     Highlighter.pm's grammar-load-failure warning) — the fix is a
     process-wide safety net, not a per-trigger patch, so it isn't
     re-tested separately at each call site.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-FIND-032
+NAME:     Replace All undoes as a single step, regardless of match count
+PRIORITY: P1
+FEATURE:  replace-all undo
+RELATED:  QA-REG-226, QA-REG-227, QA-REG-228
+SCRIPT:   tier1/reg_226_replace_all_single_undo.sh
+
+STEPS
+  1. Open a file with a small number (<=100) of matches for some term.
+  2. ⌃F, type the term, Tab to replace field, type a replacement, Enter
+     (runs Replace All).
+  3. Observe all matches replaced.
+  4. Press ⌃Z once.
+  5. Press ⌃Y (redo) once.
+  6. Repeat steps 1-5 against a file with a large number (>100) of
+     matches for the same term (forces the internal whole-document fast
+     path instead of the per-match sync path -- see NOTES).
+
+VERIFY
+  - After step 3, every match in the document is replaced.
+  - A SINGLE ⌃Z (step 4) reverts ALL replacements at once, back to the
+    original text -- not just the most recent match. Before this fix,
+    a small (<=100 match) Replace All pushed one undo entry PER match,
+    so a single ⌃Z only reverted the last one and repeated ⌃Z presses
+    were needed to fully undo.
+  - A SINGLE ⌃Y (step 5) restores ALL replacements at once.
+  - The large-match-count case (step 6) behaves identically: single ⌃Z
+    reverts everything, single ⌃Y restores everything. This path was
+    already correct before the fix (it always did one whole-document
+    replace) -- it's included here as a regression guard so unifying
+    the two paths doesn't regress it.
+
+NOTES
+  Root cause (bugs.md "Replace All undo granularity inconsistency +
+  Document::replace() undo-group bypass"): Zepto::Document::replace()
+  built its compound undo action and pushed it straight onto the undo
+  stack unconditionally, bypassing the same "is a group open?" check
+  that insert()/delete() respect. Editor.pm's Replace All has two
+  internal code paths keyed off match count (>100 uses one whole-
+  document replace() call; <=100 loops replace() once per match for
+  precise per-match capture-group expansion) -- the <=100 path never
+  wrapped its loop in an undo group, and even if it had, replace()'s
+  bypass would have defeated it anyway. Fixed by making replace()
+  respect an open undo group (like insert/delete) and wrapping the
+  <=100 path's loop in begin_undo_group()/end_undo_group(). Which match
+  count you need to force the >100 path is not something to hardcode in
+  this test's step list (implementation detail that may change) --
+  use a file with clearly more than 100 matches of a simple term.

@@ -279,6 +279,56 @@ subtest 'invalidate forces rebuild' => sub {
     ok(!$wm->{_dirty}, 'No longer dirty after rebuild');
 };
 
+subtest 'Edits made inside a Document undo group are still picked up (content_version bump)' => sub {
+    # Regression guard for bugs.md "Document::_push_undo() never bumped
+    # _content_version for grouped edits". WrapMap's _ensure_built()
+    # auto-detects document changes purely by comparing
+    # $doc->content_version() to its own _last_content_version cache
+    # (see _ensure_built above and _last_content_version's field comment
+    # in new()) -- it has no other signal that content changed. Editor.pm
+    # has several call sites that wrap multiple insert()/delete()/
+    # replace() calls in $doc->begin_undo_group()/end_undo_group() (e.g.
+    # do_move_line_up/down's delete+insert swap, _column_paste's per-line
+    # inserts, and Replace All's per-match replace() loop as of the
+    # QA-REG-226 fix). Document::_push_undo()'s grouped branch used to
+    # skip the $self->{_content_version}++ that its ungrouped branch does
+    # -- so WrapMap (and Renderer's content_version-keyed render cache,
+    # and Minimap) never saw a version change for any edit made inside a
+    # group, and kept serving STALE wrap/render data computed from the
+    # pre-edit content. Caught interactively via QA-REG-226's own script
+    # (reg_226_replace_all_single_undo.sh) intermittently truncating
+    # replaced text to the OLD (pre-replace) line length -- e.g. "foo
+    # bar" (7 chars) replaced with "REPL bar" (8 chars) rendered as
+    # truncated "REPL ba" (7 chars, the stale cached width) instead of
+    # the full "REPL bar".
+    my ($wm, $doc) = make_wm(80, "short line");
+    is($wm->total_visual_rows(), 2, 'Initial: 1 line + trailing empty = 2 rows');
+    my $version_before = $doc->content_version();
+
+    # Replace "short" with something much longer, inside an undo group --
+    # mirrors the real call sites above (delete+insert or replace() done
+    # between begin_undo_group()/end_undo_group()).
+    $doc->begin_undo_group();
+    $doc->replace(0, 5, "a much longer replacement word");
+    $doc->end_undo_group();
+
+    isnt($doc->content_version(), $version_before,
+        'content_version changed after a grouped edit (was previously a no-op bug)');
+
+    # WrapMap must notice the change via its normal content_version
+    # auto-detection path (_ensure_built), NOT via an explicit invalidate()
+    # call -- that's the whole point of the auto-detect mechanism, and
+    # exactly what silently broke.
+    my $content = $doc->get_line_content(0);
+    is($content, "a much longer replacement word line",
+       'Sanity: document text reflects the grouped replace()');
+
+    my $segs = $wm->segments_for_line(0);
+    my $rebuilt_text = join('', map { substr($content, $_->{col_start}, $_->{col_end} - $_->{col_start}) } @$segs);
+    is($rebuilt_text, $content,
+       'WrapMap rebuilt from the NEW (post-edit) content, not stale pre-edit segments');
+};
+
 # =============================================================================
 # Hanging indent with doc_to_visual
 # =============================================================================

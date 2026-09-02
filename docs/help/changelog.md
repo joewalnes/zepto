@@ -5,6 +5,8 @@
 - Fixed a hardcoded developer-machine path (`/Users/joe/src/zepto`) in the QA test catalog's installation/CLI and preferences documentation that could confuse anyone else copy-pasting the example commands on their own machine or in CI. No behavior change — internal QA docs only
 - Fixed Cut (⌃X) and Copy (⌃C) freezing the whole editor if the system clipboard command hangs (e.g. a wedged `pbcopy`/`xclip`/`wl-copy`, or one blocked writing to a slow/stuck consumer) — previously there was no timeout at all on this path, unlike paste which was already fixed the same way. A hang is now detected within a few seconds and shows "Cut: system clipboard write timed out" / "Copy: system clipboard write timed out" instead of freezing; the cut/copy itself still completes normally within the editor either way, only the system clipboard sync can fail
 - Fixed Perl warnings (e.g. typing an ordinary incomplete regex quantifier like `(a?){` into the find bar in regex mode) corrupting the screen with raw warning text scrolled across the document area. Warnings are now redirected to a `warnings.log` file next to your preferences instead of hitting the terminal directly — nothing is silently lost, it's just off the live display
+- Fixed Replace All requiring a separate Undo press per replacement instead of one Undo for the whole operation, when replacing 100 or fewer matches (the common case) — pressing Undo once now reverts every replacement at once, matching what already happened for very large (100+) match counts. Redo works the same way in reverse
+- Fixed a rendering glitch that could show newly-replaced text truncated to the length of the old text it replaced (only reachable via the Replace All fix above, and now closed alongside it)
 
 ## 2026-08-31
 

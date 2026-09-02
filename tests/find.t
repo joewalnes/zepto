@@ -896,4 +896,85 @@ subtest 'preview_line: replacement substituted in place, remaining line text pre
        'Highlight spans exactly the replacement text');
 };
 
+# ============================================================================
+# Replace All undo granularity (bugs.md / QA-REG-226, QA-REG-227): Replace
+# All used to produce ONE undo entry for >100 matches (via _replace_all's
+# single whole-document $doc->replace() call) but N separate undo entries
+# for <=100 matches (via _replace_all_sync looping $doc->replace() once per
+# match with no undo group). Pressing Undo once after a small Replace All
+# only reverted the LAST match, not all of them. Both paths must now behave
+# identically: exactly one undo entry for the whole operation.
+# ============================================================================
+
+subtest 'Replace All (<=100 matches, sync path) produces exactly ONE undo entry' => sub {
+    my $editor = create_editor_with_content("foo bar foo baz foo\n");
+    $editor->enter_find_mode(replace => 1);
+    $editor->{find_widget}->set_value('foo');
+    $editor->{find_replace_widget}->set_value('XXX');
+    $editor->_update_find_matches();
+
+    my $doc = $editor->active_doc();
+    is(scalar @{$editor->{find_matches}}, 3, 'Found three matches (sync path: <=100)');
+
+    my $undo_depth_before = scalar @{$doc->{undo_stack} // []};
+
+    $editor->_replace_all();
+
+    is($doc->text(), "XXX bar XXX baz XXX\n", 'All three foo replaced with XXX');
+    is(scalar(@{$doc->{undo_stack} // []}) - $undo_depth_before, 1,
+       'Replace All added exactly ONE undo entry for 3 replacements, not 3');
+};
+
+subtest 'Replace All (<=100 matches): a single undo() fully reverts ALL replacements at once' => sub {
+    my $editor = create_editor_with_content("foo bar foo baz foo\n");
+    $editor->enter_find_mode(replace => 1);
+    $editor->{find_widget}->set_value('foo');
+    $editor->{find_replace_widget}->set_value('XXX');
+    $editor->_update_find_matches();
+
+    my $doc = $editor->active_doc();
+    $editor->_replace_all();
+    is($doc->text(), "XXX bar XXX baz XXX\n", 'Sanity: all three replaced');
+
+    $doc->undo();
+    is($doc->text(), "foo bar foo baz foo\n",
+       'A single undo() call fully reverts all 3 replacements at once, not just the last match');
+};
+
+subtest 'Replace All (>100 matches, fast path) still produces exactly ONE undo entry (regression guard)' => sub {
+    # Regression guard: unifying the <=100 and >100 paths onto the same
+    # undo-group mechanism must not break the fast path, which was already
+    # correct (a single whole-document $doc->replace() call).
+    my $content = join("\n", map { "item_$_" } 1..150) . "\n";
+    my $editor = create_editor_with_content($content);
+    $editor->enter_find_mode(replace => 1);
+    $editor->{find_widget}->set_value('item_');
+    $editor->{find_replace_widget}->set_value('thing_');
+    $editor->_update_find_matches();
+
+    # Content is larger than the viewport, so _update_find_matches() only
+    # returns viewport-synchronous matches plus whatever background search
+    # has completed so far; finish the background search before asserting
+    # the full match count (same pattern used elsewhere in this file, e.g.
+    # 'Replace all with captures on many matches' below).
+    my $engine = $editor->active_find_engine();
+    while ($engine->is_searching()) { $engine->tick(100); }
+    $editor->{find_matches} = $engine->matches();
+
+    my $doc = $editor->active_doc();
+    is(scalar @{$editor->{find_matches}}, 150, 'Found all 150 matches (fast path: >100)');
+
+    my $undo_depth_before = scalar @{$doc->{undo_stack} // []};
+
+    $editor->_replace_all();
+
+    like($doc->text(), qr/^thing_1\nthing_2\n/, 'Sanity: replacements applied');
+    is(scalar(@{$doc->{undo_stack} // []}) - $undo_depth_before, 1,
+       'Fast path (>100 matches) still produces exactly ONE undo entry');
+
+    $doc->undo();
+    like($doc->text(), qr/^item_1\nitem_2\n/,
+       'A single undo() reverts the entire fast-path Replace All');
+};
+
 done_testing();

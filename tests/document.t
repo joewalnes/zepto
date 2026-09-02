@@ -265,6 +265,60 @@ subtest 'Unbalanced end_undo_group without begin is a safe no-op' => sub {
     ok($doc->can_undo(), 'Normal undo history still intact after stray end_undo_group');
 };
 
+subtest 'replace() inside begin/end_undo_group joins the group like insert/delete (bugs.md replace() undo-group bypass)' => sub {
+    # replace() used to push its compound action straight onto undo_stack
+    # unconditionally, bypassing the _undo_group check that _push_undo()
+    # applies for insert/delete. That meant a replace() call made while a
+    # group was open would leak out as its own standalone undo entry
+    # instead of joining the group, splitting one logical edit into two
+    # (or more) undo steps.
+    my $doc = Zepto::Document->new();
+    $doc->insert(0, 'hello world');   # one standalone undo entry, outside any group
+
+    $doc->begin_undo_group();
+    $doc->replace(0, 5, 'HELLO');     # hello -> HELLO
+    $doc->insert(11, '!');            # append '!' -- same group
+    $doc->end_undo_group();
+
+    is($doc->text(), 'HELLO world!', 'Both grouped edits applied');
+    is(scalar(@{$doc->{undo_stack}}), 2,
+        'replace() joined the open group: undo_stack has the initial insert plus ONE flushed group entry, not three separate entries');
+
+    $doc->undo();
+    is($doc->text(), 'hello world',
+        'A single undo() fully reverts both grouped edits (the replace AND the insert) atomically');
+
+    $doc->redo();
+    is($doc->text(), 'HELLO world!', 'A single redo() restores both grouped edits atomically');
+};
+
+subtest 'Two consecutive replace() calls do not warn (replace lacks the text key insert/delete merge-check reads)' => sub {
+    # Regression guard for a warning introduced while fixing replace()'s
+    # undo-group bypass above: routing replace() through _push_undo()
+    # exposed it to the consecutive-edit merge heuristic (grouping
+    # adjacent single-char inserts/deletes), which only runs when the new
+    # action's type matches undo_stack[-1]'s type, then reads
+    # $action->{text}. replace() actions store old_text/new_text instead
+    # of text, so back-to-back ungrouped replace() calls (type 'replace'
+    # both times, e.g. Zepto::Editor::Commands's multi-line comment
+    # toggle, which calls $doc->replace() once per line with no undo
+    # group) used to hit CORE::length($action->{text}) == 1 with an
+    # undef ->{text} and warn "Use of uninitialized value in numeric eq
+    # (==)".
+    my $doc = Zepto::Document->new();
+    $doc->insert(0, 'hello world');
+
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+
+    $doc->replace(0, 5, 'HELLO');    # replace #1, not in a group
+    $doc->replace(6, 11, 'PLANET');  # replace #2 -- same type as undo_stack[-1], used to trip the merge-check
+
+    is(scalar(@warnings), 0, 'No warnings from two consecutive replace() calls')
+        or diag("Warnings: @warnings");
+    is($doc->text(), 'HELLO PLANET', 'Sanity: both replacements applied');
+};
+
 # ============================================================================
 # Dirty tracking tests
 # ============================================================================
