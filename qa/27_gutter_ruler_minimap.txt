@@ -346,3 +346,47 @@ VERIFY
     full render at narrow widths (QA-REG-177)", "Manual minimap
     preference still works normally above MINIMAP_MIN_COLS
     (QA-REG-177)" for the automated regression coverage.
+
+--------------------------------------------------------------------------------
+
+ID:       QA-GUT-021
+NAME:     Minimap VCS-status coloring stays correct on a large file
+          (subsampled aggregation, REGRESSION)
+PRIORITY: P3
+FEATURE:  minimap VCS status
+RELATED:  bugs.md P3 "Minimap VCS-status aggregation scans the whole
+          document on every keystroke" — QA-REG-233
+
+STEPS
+  1. Open a git-tracked file large enough to span many minimap rows
+     (thousands of lines) with a handful of scattered added/modified
+     lines relative to HEAD.
+  2. Confirm the minimap (Braille density column) is visible.
+  3. Go to a known-changed line (⌃G). Confirm the gutter shows a VCS
+     change marker on that line, and the line's content matches the
+     expected change.
+  4. Type a short burst of characters. Confirm the edit appears
+     immediately with no visible freeze/stutter, and the minimap remains
+     rendered (no garbling, no crash).
+
+VERIFY
+  - Minimap VCS-status coloring for a row still reflects a real change in
+    that row's line span after the fix that added `MAX_VCS_SAMPLE_LINES`
+    subsampling — a row's span below the 200-line cap is checked exactly
+    (same as before the fix); a span above the cap samples 200 evenly
+    spaced lines, which is guaranteed to catch any contiguous changed
+    hunk of `ceil(line_span / 199)` lines or more (real diffs are
+    hunk-based, not scattered isolated single lines).
+  - Typing on a large git-tracked file does not visibly stutter or hang
+    (coarse smoke check — the real timing evidence is in
+    tests/minimap_vcs_perf.t, not this interactive script; PTY/tmux
+    round-trip overhead is too coarse to discriminate millisecond-level
+    render differences).
+  - Known accepted limitation, not verified here as a pass/fail (see
+    tests/minimap_vcs_perf.t's "KNOWN LIMITATION" subtest instead): a
+    truly isolated single-line change that doesn't land on a sampled
+    line, in a row spanning more than 200 lines, can be missed by the
+    minimap's VCS coloring. This is the same class of tradeoff the
+    pre-existing braille `MAX_SAMPLE_LINES` cap already accepts for text
+    density.
+  - See `qa/scripts/tier1/reg_233_minimap_vcs_perf.sh`.
