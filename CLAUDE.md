@@ -236,6 +236,7 @@ hangon stop zepto
 - Capture the screen after each interaction to see what actually happened
 - Clean up test files after — don't leave scratch files in the repo
 - Never infer behavior from code alone — observe it in the running editor
+- **`hangon screenshot` cannot be fully trusted for pixel-color or cell-boundary claims.** Four separate confirmed rendering bugs in `hangon`'s own SVG/PNG renderer have been found via this project alone (see `bugs.md`, search "screenshot rendering artifact") — a light-theme background-fill fallback, under-rendered box-drawing glyphs, hairline inter-cell gaps, and a pill-cap color mismatch. Each looked like a real Zepto bug until traced further. If a screenshot shows something color- or boundary-related that seems surprising (a mismatched color, a seam, a gap that shouldn't be there), corroborate before treating it as a real bug or reverting a fix: pull the raw ANSI via `hangon readall` and check the actual SGR color codes at that position, or ask the user to look at a real terminal directly. `hangon screen` (plain text) and `hangon readall` (raw bytes) don't go through the SVG rendering path and are more trustworthy for exactly the claims screenshots have been wrong about. Screenshots remain fine for everything else (layout, text content, general "does this look right").
 
 ---
 
